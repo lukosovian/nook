@@ -2,7 +2,8 @@
 #   1) src-tauri/tauri.conf.json, package.json ve src-tauri/Cargo.toml'daki "version"u artir (orn. 0.2.0 -> 0.3.0)
 #   2) PowerShell'de:  .\release.ps1 "Bu surumde neler var"
 # Imzali kurulum dosyasini derler, latest.json'u hazirlar ve GitHub'a yukler
-# (gh kurulu ve giris yapilmissa otomatik; degilse release\vX klasorunu elle yuklersin).
+# (git ile GitHub girisi kayitliysa otomatik; degilse release\vX klasorunu elle yuklersin).
+# Once degisiklikleri commit'le; betik main'i de gonderir.
 
 param([string]$Notes = "Yeni surum")
 
