@@ -102,9 +102,9 @@ struct Cache {
 
 static CACHE: Mutex<Option<Cache>> = Mutex::new(None);
 
-/// Bir klasör Argus kök klasörü mü
+/// Bir klasör Argus kök klasörü mü. data/ ilk profil açılınca oluşur — yeni kurulumda olmayabilir.
 fn is_argus(d: &Path) -> bool {
-    d.join("data").join("profile.json").is_file() && d.join("app").join("server").join("index.js").is_file()
+    d.join("app").join("server").join("index.js").is_file() && d.join("app").join("package.json").is_file()
 }
 
 /// Kullanıcının elle seçtiği klasör (Ayarlar), bulunan klasör ve son tarama zamanı
@@ -592,7 +592,20 @@ pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: Stri
                 mtime(&d.join("watched.json")).max(mtime(&d.join("recent-watch.json"))).max(mtime(&d.join("boards.json")))
             })
         };
-        let (pid, pname) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned()?;
+        // Argus kurulu ama henüz profil/arşiv yok: boş özet (panel "Argus'u bir kez aç" der)
+        let empty = || Snapshot {
+            profiles: all.iter().map(|(_, n)| n.clone()).collect(),
+            dir: dir.to_string_lossy().into_owned(),
+            profile: String::new(),
+            profile_id: String::new(),
+            board_id: String::new(),
+            running: server_up(),
+            items: Vec::new(),
+            episode_days: HashMap::new(),
+        };
+        let Some((pid, pname)) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned() else {
+            return Some(empty());
+        };
         let pdir = dir.join("data").join("profiles").join(&pid);
         let key = format!(
             "{pid}|{today}|{}|{}|{}|{}|{}",
@@ -610,7 +623,9 @@ pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: Stri
 
         let mut cache = CACHE.lock().unwrap();
         if cache.as_ref().map(|c| c.key != key).unwrap_or(true) {
-            let (snap, meta) = build(&dir, &pid, &pname, all.iter().map(|(_, n)| n.clone()).collect(), &today)?;
+            let Some((snap, meta)) = build(&dir, &pid, &pname, all.iter().map(|(_, n)| n.clone()).collect(), &today) else {
+                return Some(empty());
+            };
             // Afişler yalnızca bu klasörden okunabilsin
             let _ = app.asset_protocol_scope().allow_directory(dir.join("medya"), false);
             *cache = Some(Cache { key, snap, meta });

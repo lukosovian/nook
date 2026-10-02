@@ -40,6 +40,22 @@ export function ArgusPanel() {
   useEffect(() => () => useArgus.setState({ focusId: null }), []);
 
   if (!snap) return <ArgusPromo />;
+  if (!snap.boardId)
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2">
+        <div className="h-[110px]">
+          <EmptyState title="Argus'u buldum" hint="Argus'ta profilini ve arşivini oluşturunca dizilerin burada görünür" color={COLOR} />
+        </div>
+        <button
+          onClick={() => void openArgus()}
+          className="flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium"
+          style={{ background: tintBg(COLOR), color: tintText(COLOR) }}
+        >
+          Argus'u aç
+          <ExternalLink size={10} />
+        </button>
+      </div>
+    );
 
   return (
     <div className="flex h-full flex-col gap-2">
