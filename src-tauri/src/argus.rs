@@ -47,6 +47,8 @@ pub struct Series {
     upcoming: Vec<Ep>,
     /// Son izleme günü (YYYY-MM-DD)
     last_seen: Option<String>,
+    /// Bugün izlendi diye işaretlenmiş bölümler ("1-3") — işaretli bölüm için tekrar sorulmasın
+    seen_today: Vec<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -592,6 +594,14 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
             let last_seen = seen_map.and_then(|m| {
                 m.values().filter_map(|v| v.as_array()).flatten().filter_map(|d| d.as_str()).max().map(str::to_owned)
             });
+            let seen_today: Vec<String> = seen_map
+                .map(|m| {
+                    m.iter()
+                        .filter(|(_, v)| v.as_array().is_some_and(|a| a.iter().any(|d| d.as_str() == Some(today))))
+                        .map(|(k, _)| k.clone())
+                        .collect()
+                })
+                .unwrap_or_default();
             let (mut aired, mut seen, mut latest, mut upcoming) = (0, 0, None, Vec::new());
             // Yayınlanmış bölümler sırayla: (bölüm, izlendi mi)
             let mut order: Vec<(Ep, bool)> = Vec::new();
@@ -623,7 +633,7 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
             let from = last.map_or(0, |i| i + 1);
             let next = order[from..].iter().find(|(_, w)| !w).map(|(e, _)| e.clone());
             let position = last.map_or(0, |i| i as u32 + 1);
-            Series { aired, seen, position, next, latest, upcoming, last_seen }
+            Series { aired, seen, position, next, latest, upcoming, last_seen, seen_today }
         });
 
         items.push(Item {

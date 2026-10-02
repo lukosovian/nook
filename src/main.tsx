@@ -1,3 +1,5 @@
+// İlk sırada kalmalı: Motion requestAnimationFrame'i içe aktarılırken yakalar
+import "./lib/frameCap";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";

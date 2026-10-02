@@ -25,7 +25,7 @@ function demoArgus() {
   const ep = (season: number, episode: number, name: string, date: string) => ({ season, episode, name, date });
   const show = (id: string, title: string, aired: number, seen: number, next: ReturnType<typeof ep> | null, upcoming: ReturnType<typeof ep>[], latest = next): ArgusItem => ({
     id, title, original: null, status: "İzleniyor", kind: "Dizi", genres: ["Bilim Kurgu", "Dram"], release: "2024-05-01", runtime: 50, score: 8.4, poster: null,
-    recent: Date.now() - aired * 1000, watchDates: [], series: { aired, seen, position: seen, next, latest, upcoming, lastSeen: day(-1) },
+    recent: Date.now() - aired * 1000, watchDates: [], series: { aired, seen, position: seen, next, latest, upcoming, lastSeen: day(-1), seenToday: [] },
   });
   const items: ArgusItem[] = [
     show("a", "Star Trek: Starfleet Academy", 10, 8, ep(1, 9, "300. Gece", day(-7)), []),
@@ -70,6 +70,7 @@ export function applyPreview(mode: string) {
       diskUsed: 380 * 1024 ** 3,
       diskTotal: 476 * 1024 ** 3,
       battery: null,
+      saver: false,
     },
     netHistory: Array.from({ length: 40 }, (_, i) => (Math.sin(i / 3) + 1.3) * 1e6 + Math.random() * 4e5),
     cpuHistory: Array.from({ length: 40 }, () => 10 + Math.random() * 30),

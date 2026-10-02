@@ -85,6 +85,10 @@ pub struct Settings {
     pub voice_shortcut: String,
     pub auto_screenshots: bool,
     pub hide_in_fullscreen: bool,
+    /// Oyun açılınca ada gizlenmeden önce birkaç saniye özet gösterir
+    pub game_intro: bool,
+    /// Bu kadar dakikada bir mola hatırlatır (0 = kapalı)
+    pub break_reminder_min: u64,
 }
 
 impl Default for Settings {
@@ -98,6 +102,8 @@ impl Default for Settings {
             voice_shortcut: "Ctrl+Shift+D".into(),
             auto_screenshots: true,
             hide_in_fullscreen: true,
+            game_intro: true,
+            break_reminder_min: 120,
         }
     }
 }

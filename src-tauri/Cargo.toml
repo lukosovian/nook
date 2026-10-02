@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.8"
+version = "0.2.9"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -34,6 +34,8 @@ tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+# IPolicyConfig (ses çıkışını değiştirme) için #[interface] makrosu — windows 0.62 ile aynı sürüm
+windows-core = "0.62"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",

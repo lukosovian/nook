@@ -47,6 +47,8 @@ export interface ArgusItem {
     latest: ArgusEp | null;
     upcoming: ArgusEp[];
     lastSeen: string | null;
+    /** Bugün izlendi diye işaretlenmiş bölümler ("1-3") */
+    seenToday: string[];
   } | null;
 }
 
@@ -210,10 +212,22 @@ const EP_PATTERNS: RegExp[] = [
   /\bsezon\s*(\d{1,2})\D{1,10}b[öo]l[üu]m\s*(\d{1,3})/i,
 ];
 
-export function parseEpisode(text: string): { season: number; episode: number } | null {
+// Sezonsuz yazımlar ("Tuzlu Kahve 3. Bölüm", "Bölüm 3", "Episode 3") — Türk dizilerinde en yaygını
+const BARE_EP_PATTERNS: RegExp[] = [
+  /(\d{1,3})\.?\s*b[öo]l[üu]m/i,
+  /\bb[öo]l[üu]m\s*(\d{1,3})\b/i,
+  /\b(?:episode|ep\.?)\s*(\d{1,3})\b/i,
+];
+
+/** `season`: başlıkta sezon yazmıyorsa varsayılacak sezon */
+export function parseEpisode(text: string, season = 1): { season: number; episode: number } | null {
   for (const re of EP_PATTERNS) {
     const m = re.exec(text);
     if (m) return { season: Number(m[1]), episode: Number(m[2]) };
+  }
+  for (const re of BARE_EP_PATTERNS) {
+    const m = re.exec(text);
+    if (m) return { season, episode: Number(m[1]) };
   }
   return null;
 }
@@ -242,7 +256,7 @@ export function matchMedia(snap: ArgusSnapshot | null, title: string, artist: st
   const item = matchTitle(snap, text);
   if (!item) return null;
   if (!item.series) return { itemId: item.id };
-  const ep = parseEpisode(text) ?? item.series.next;
+  const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1) ?? item.series.next;
   return ep ? { itemId: item.id, season: ep.season, episode: ep.episode } : null;
 }
 
@@ -412,6 +426,8 @@ export function useArgusDetect() {
       if (store.asked.includes(c.key)) return;
       const item = findItem(c.sug.itemId);
       if (!item || played(c.key) < needFor(c.duration)) return;
+      // Bu bölümü bugün Argus'ta zaten işaretlemiş — sormaya gerek yok
+      if (c.sug.season && item.series?.seenToday.includes(`${c.sug.season}-${c.sug.episode}`)) return;
       store.asked.push(c.key);
       savePlayed(store);
       useArgus.setState({ suggestion: c.sug });

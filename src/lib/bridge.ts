@@ -43,6 +43,8 @@ export const EVENTS = {
   askScreen: "nook://ask-screen",
   online: "nook://online",
   game: "nook://game",
+  gameStart: "nook://game-start",
+  gameBreak: "nook://game-break",
 } as const;
 
 /** Windows bildirim merkezine düşen bir bildirim (Discord, WhatsApp, Mail…). */
@@ -58,6 +60,12 @@ export interface NotificationPayload {
 
 /** Sesli komut: kısayol basılınca "start", bırakınca kayıt (base64 WAV) ya da hata. */
 export type VoicePayload = { phase: "start" } | { phase: "done"; audio: string | null } | { phase: "error"; message: string };
+
+/** Oyun açıldı (mins = 0) ya da mola vakti geldi (mins = oynanan dakika). */
+export interface GamePeekPayload {
+  app: string;
+  mins: number;
+}
 
 /** Tam ekran oyundan çıkınca oturum özeti. */
 export interface GamePayload {
@@ -82,6 +90,8 @@ export interface StatsPayload {
   diskUsed: number;
   diskTotal: number;
   battery: { percent: number; charging: boolean } | null;
+  /** Pille çalışıyor ya da Windows enerji tasarrufu açık */
+  saver: boolean;
 }
 
 export type SysEventKind =
@@ -135,6 +145,14 @@ export interface QuickState {
   micMuted: boolean | null;
   /** Ana ses seviyesi 0–1 */
   volume: number | null;
+  /** Ses çıkış cihazları */
+  outputs: AudioOutput[];
+}
+export interface AudioOutput {
+  id: string;
+  name: string;
+  default: boolean;
+  headphone: boolean;
 }
 export type QuickKey = "wifi" | "bluetooth" | "dark" | "mute" | "mic";
 
@@ -142,7 +160,10 @@ export const quickState = () =>
   inTauri
     ? invoke<QuickState>("quick_state")
     : // Tarayıcı önizlemesi: Wi-Fi/Bluetooth'suz masaüstü
-      Promise.resolve<QuickState>({ wifi: null, bluetooth: null, dark: true, muted: false, micMuted: false, volume: 0.45 });
+      Promise.resolve<QuickState>({ wifi: null, bluetooth: null, dark: true, muted: false, micMuted: false, volume: 0.45, outputs: [
+        { id: "a", name: "Hoparlör (Realtek Audio)", default: true, headphone: false },
+        { id: "b", name: "Kulaklık (HyperX Cloud)", default: false, headphone: true },
+      ] });
 export const quickSet = (key: QuickKey, on: boolean) => (inTauri ? invoke<void>("quick_set", { key, on }) : Promise.resolve());
 /** Alarm sesi (Windows Alarm01–10). `preview`: tek sefer dinlet. */
 /** Sıradaki alarm zamanını Rust'a bildir — tam ekranda ada vakitlice açılsın. */
@@ -151,6 +172,8 @@ export const alarmNext = (at: number | null) => (inTauri ? invoke<void>("alarm_n
 export const alarmRing = (on: boolean, sound = 1, preview = false) =>
   inTauri ? invoke<void>("alarm_ring", { on, sound, preview }) : Promise.resolve();
 
+/** Varsayılan ses çıkışını değiştir */
+export const quickOutput = (id: string) => (inTauri ? invoke<void>("quick_output", { id }) : Promise.resolve());
 /** Ana ses seviyesi (0–1) */
 export const quickVolume = (value: number) => (inTauri ? invoke<void>("quick_volume", { value }) : Promise.resolve());
 /** Ekran parlaklığı 0–100 (dizüstü paneli WMI, harici monitörler DDC/CI); desteklenmiyorsa null */
@@ -191,6 +214,10 @@ export interface NativeSettings {
   voiceShortcut: string;
   autoScreenshots: boolean;
   hideInFullscreen: boolean;
+  /** Oyun açılınca ada gizlenmeden önce kısa özet */
+  gameIntro: boolean;
+  /** Bu kadar dakikada bir oyun molası hatırlat (0 = kapalı) */
+  breakReminderMin: number;
 }
 
 export interface MonitorInfo {

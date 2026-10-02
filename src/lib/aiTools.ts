@@ -262,7 +262,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: `${args.title} bulunamadı` } };
         let ep: { season: number; episode: number } | null = null;
         if (it.series) {
-          ep = args.episode != null ? { season: args.season != null ? num(args.season) : (it.series.next?.season ?? 1), episode: num(args.episode) } : (parseEpisode(str(args.title)) ?? it.series.next);
+          ep = args.episode != null ? { season: args.season != null ? num(args.season) : (it.series.next?.season ?? 1), episode: num(args.episode) } : (parseEpisode(str(args.title), it.series.next?.season ?? 1) ?? it.series.next);
           if (!ep) return { result: `${it.title} dizisinin çıkmış bütün bölümleri zaten izlenmiş.`, note: { icon: "argus", text: `${it.title} güncel` } };
         }
         await markWatched(it, ep);

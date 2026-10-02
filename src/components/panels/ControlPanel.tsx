@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Bluetooth, Lock, Mic, MicOff, Moon, MonitorOff, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
-import { brightnessGet, brightnessSet, quickAction, quickSet, quickState, quickVolume, type QuickKey, type QuickState } from "../../lib/bridge";
+import { Bluetooth, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { brightnessGet, brightnessSet, quickAction, quickOutput, quickSet, quickState, quickVolume, type QuickKey, type QuickState } from "../../lib/bridge";
 import { spring } from "../../lib/motion";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 
@@ -13,6 +13,7 @@ import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 export function ControlPanel() {
   const [state, setState] = useState<QuickState | null>(null);
   const [busy, setBusy] = useState<QuickKey | null>(null);
+  const [outputBusy, setOutputBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Parlaklık yavaş okunur (DDC/CI) — yalnızca açılışta; desteklenmiyorsa kaydırıcı gizlenir
   const [light, setLight] = useState<number | null | undefined>(undefined);
@@ -38,8 +39,21 @@ export function ControlPanel() {
 
   const s = state;
   const vol = s?.volume ?? null;
-  // Wi-Fi, Bluetooth, (ses kaydırıcısı yoksa) Ses + her zaman olan dört düğme
-  const toggles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (vol == null ? 1 : 0) + 4;
+  // Ses çıkışı: tıklayınca sıradaki cihaza geçer (iki cihazda kulaklık ↔ hoparlör)
+  const outputs = s?.outputs ?? [];
+  const current = outputs.find((o) => o.default) ?? null;
+  const nextOutput = outputs.length > 1 ? outputs[(outputs.findIndex((o) => o.default) + 1) % outputs.length] : null;
+  const switchOutput = async () => {
+    if (!nextOutput) return;
+    setOutputBusy(true);
+    setError(null);
+    setState((p) => (p ? { ...p, outputs: p.outputs.map((o) => ({ ...o, default: o.id === nextOutput.id })) } : p));
+    await quickOutput(nextOutput.id).catch((e) => setError(String(e)));
+    setOutputBusy(false);
+    refresh();
+  };
+  // Wi-Fi, Bluetooth, ses çıkışı, (ses kaydırıcısı yoksa) Ses + her zaman olan dört düğme
+  const toggles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (nextOutput ? 1 : 0) + (vol == null ? 1 : 0) + 4;
   return (
     <div className="flex h-full gap-1.5">
       {vol != null && (
@@ -73,6 +87,17 @@ export function ControlPanel() {
         <div className={`grid min-h-0 flex-1 auto-rows-[38px] content-center gap-1.5 ${toggles > 4 ? "grid-cols-2" : "grid-cols-1"}`}>
           {s?.wifi != null && <Toggle label="Wi-Fi" icon={s.wifi ? Wifi : WifiOff} on={s.wifi} color={ACCENT.blue} busy={busy === "wifi"} onClick={() => toggle("wifi", !s.wifi)} />}
           {s?.bluetooth != null && <Toggle label="Bluetooth" icon={Bluetooth} on={s.bluetooth} color={ACCENT.blue} busy={busy === "bluetooth"} onClick={() => toggle("bluetooth", !s.bluetooth)} />}
+          {nextOutput && current && (
+            <Toggle
+              label={shortName(current.name)}
+              icon={current.headphone ? Headphones : Speaker}
+              on
+              color={ACCENT.pink}
+              busy={outputBusy}
+              tip={`${current.name}\nTıkla: ${nextOutput.name}`}
+              onClick={() => void switchOutput()}
+            />
+          )}
           <Toggle label={s?.dark ? "Karanlık" : "Aydınlık"} icon={s?.dark ? Moon : Sun} on={!!s?.dark} color={ACCENT.purple} busy={busy === "dark"} onClick={() => toggle("dark", !s?.dark)} />
           <Toggle label={s?.micMuted ? "Mik. kapalı" : "Mikrofon"} icon={s?.micMuted ? MicOff : Mic} on={!!s?.micMuted} color={ACCENT.orange} disabled={s?.micMuted == null} busy={busy === "mic"} onClick={() => toggle("mic", !s?.micMuted)} />
           {vol == null && (
@@ -85,6 +110,13 @@ export function ControlPanel() {
       </div>
     </div>
   );
+}
+
+/** "Hoparlör (Realtek(R) Audio)" → "Hoparlör"; ad yalnızca genel bir sözcükse parantezdeki marka */
+function shortName(name: string) {
+  const head = name.split(" (")[0].trim();
+  const inner = name.match(/\(([^)]+)/)?.[1]?.trim();
+  return /^(hoparlör|hoparlörler|speakers?|headphones?|kulaklık|headset)$/i.test(head) && inner && !/realtek|high definition/i.test(inner) ? inner : head || name;
 }
 
 const patch = (key: QuickKey, on: boolean): Partial<QuickState> =>
@@ -192,9 +224,12 @@ function Toggle({
   disabled,
   busy,
   action,
+  tip,
   onClick,
 }: {
   label: string;
+  /** Üstüne gelince görünen açıklama (verilmezse ad) */
+  tip?: string;
   icon: LucideIcon;
   on?: boolean;
   color: string;
@@ -211,7 +246,7 @@ function Toggle({
       transition={spring.pop}
       disabled={disabled}
       onClick={onClick}
-      title={label}
+      title={tip ?? label}
       className="flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-1 pr-2 text-left transition-colors disabled:opacity-35"
       style={{ background: lit ? tintBg(color, on ? 16 : 7) : "rgb(255 255 255 / 0.035)", borderColor: lit ? tintBg(color, on ? 40 : 20) : "rgb(255 255 255 / 0.06)" }}
     >

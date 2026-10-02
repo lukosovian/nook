@@ -21,6 +21,10 @@ const POLL: Duration = Duration::from_millis(500);
 const HIDE_AFTER: Duration = Duration::from_millis(260);
 /// Bundan kısa tam ekranlar (yükleme ekranı, yanlışlıkla F11) oyun özeti çıkarmaz.
 const MIN_GAME: Duration = Duration::from_secs(120);
+/// Oyun açılınca ada gizlenmeden önce özet kartı bu kadar görünür.
+const INTRO_PEEK: Duration = Duration::from_secs(5);
+/// Mola hatırlatıcısı için ada oyunun üstünde bu kadar görünür, sonra yine gizlenir.
+const BREAK_PEEK: Duration = Duration::from_secs(8);
 
 /// Tarayıcılar, video oynatıcılar ve sunum gibi "oyun olmayan" tam ekranlar (küçük harf, .exe'siz).
 const NOT_GAMES: &[&str] = &[
@@ -28,6 +32,14 @@ const NOT_GAMES: &[&str] = &[
     "potplayer", "potplayermini", "potplayermini64", "wmplayer", "video.ui", "microsoft.media.player", "spotify", "netflix", "explorer",
     "applicationframehost", "powerpnt", "obs64", "mpv", "kmplayer", "discord", "code", "windowsterminal", "nook",
 ];
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GamePeek {
+    app: String,
+    /// Oyunun başından beri geçen dakika (açılışta 0)
+    mins: u64,
+}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +53,8 @@ struct GameSession {
 struct Session {
     exe: String,
     started: Instant,
+    /// Gösterilen mola hatırlatması sayısı
+    breaks: u64,
     peak_cpu: f32,
     peak_mem: u32,
 }
@@ -64,10 +78,14 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
         .spawn(move || {
             let mut hidden: HashSet<String> = HashSet::new();
             let mut session: Option<Session> = None;
+            // Ada oyunun üstünde kısa süre görünsün (açılış özeti, mola hatırlatması)
+            let mut peek_until: Option<Instant> = None;
             loop {
                 thread::sleep(POLL);
+                let settings = shared.settings();
                 let alarm = crate::alarm::imminent(&shared);
-                let enabled = shared.settings().hide_in_fullscreen && !alarm;
+                let enabled = settings.hide_in_fullscreen && !alarm;
+                let mut break_due: Option<GamePeek> = None;
                 let detected = imp::fullscreen_monitor(&shared);
 
                 // --- Oyun oturumu
@@ -80,6 +98,13 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     (Some(s), Some(g)) if s.exe == g => {
                         s.peak_cpu = s.peak_cpu.max(f32::from_bits(shared.cpu.load(Ordering::Relaxed)));
                         s.peak_mem = s.peak_mem.max(shared.mem.load(Ordering::Relaxed));
+                        let mins = s.started.elapsed().as_secs() / 60;
+                        let every = settings.break_reminder_min;
+                        if every > 0 && mins >= every * (s.breaks + 1) {
+                            s.breaks = mins / every;
+                            peek_until = Some(Instant::now() + BREAK_PEEK);
+                            break_due = Some(GamePeek { app: pretty(&s.exe), mins });
+                        }
                     }
                     (cur, next) => {
                         if let Some(s) = cur.take() {
@@ -90,11 +115,17 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                                 );
                             }
                         }
-                        *cur = next.map(|exe| Session { exe, started: Instant::now(), peak_cpu: 0.0, peak_mem: 0 });
+                        if let (Some(exe), true) = (&next, settings.game_intro) {
+                            peek_until = Some(Instant::now() + INTRO_PEEK);
+                            let _ = app.emit("nook://game-start", GamePeek { app: pretty(exe), mins: 0 });
+                        }
+                        *cur = next.map(|exe| Session { exe, started: Instant::now(), breaks: 0, peak_cpu: 0.0, peak_mem: 0 });
                     }
                 }
 
-                let full = if enabled { detected.map(|d| d.0) } else { None };
+                let peek = peek_until.is_some_and(|t| Instant::now() < t);
+                let in_game = detected.is_some();
+                let full = if enabled && !peek { detected.map(|d| d.0) } else { None };
 
                 let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                 for (label, ws) in windows {
@@ -113,10 +144,14 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         imp::show(ws.hwnd, true);
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", false);
                     }
-                    // Oyun da "en üstte" olabilir — alarm sırasında adayı tekrar tekrar en öne it
-                    if alarm {
+                    // Oyun da "en üstte" olabilir — alarm/kısa gösterim sırasında adayı tekrar tekrar en öne it
+                    if alarm || (peek && in_game) {
                         imp::raise(ws.hwnd);
                     }
+                }
+                // Pencere yeniden göründükten (ve kareler açıldıktan) sonra
+                if let Some(b) = break_due {
+                    let _ = app.emit("nook://game-break", b);
                 }
             }
         })

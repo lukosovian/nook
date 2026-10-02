@@ -28,6 +28,8 @@ pub struct Stats {
     disk_used: u64,
     disk_total: u64,
     battery: Option<Battery>,
+    /// Pille çalışıyor ya da Windows enerji tasarrufu açık — animasyonlar yavaşlasın
+    saver: bool,
 }
 
 #[derive(Clone, Copy, Serialize, PartialEq)]
@@ -76,7 +78,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 }
                 let _ = app.emit(
                     "nook://stats",
-                    Stats { cpu: cpu_now, mem_used, mem_total, net_down, net_up, disk_used, disk_total, battery },
+                    Stats { cpu: cpu_now, mem_used, mem_total, net_down, net_up, disk_used, disk_total, battery, saver: imp::power_saver() },
                 );
 
                 // --- Pil olayları
@@ -233,6 +235,16 @@ mod imp {
         Some(Battery { percent: s.BatteryLifePercent, charging: s.ACLineStatus == 1 })
     }
 
+    /// Enerji tasarrufu (SystemStatusFlag) açık mı, ya da pille mi çalışıyor
+    pub fn power_saver() -> bool {
+        let mut s: SYSTEM_POWER_STATUS = unsafe { std::mem::zeroed() };
+        if unsafe { GetSystemPowerStatus(&mut s) } == 0 {
+            return false;
+        }
+        let on_battery = s.ACLineStatus == 0 && s.BatteryFlag != 128;
+        s.SystemStatusFlag == 1 || on_battery
+    }
+
     #[derive(Default)]
     pub struct NetMeter {
         prev: Option<(u64, u64, Instant)>,
@@ -340,6 +352,9 @@ mod imp {
     }
     pub fn battery() -> Option<Battery> {
         None
+    }
+    pub fn power_saver() -> bool {
+        false
     }
     pub fn removable_drives() -> HashSet<String> {
         HashSet::new()

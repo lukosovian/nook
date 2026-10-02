@@ -13,6 +13,17 @@ pub struct QuickState {
     mic_muted: Option<bool>,
     /// Ana ses seviyesi 0–1
     volume: Option<f32>,
+    /// Ses çıkış cihazları (kulaklık ↔ hoparlör geçişi)
+    outputs: Vec<Output>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Output {
+    id: String,
+    name: String,
+    default: bool,
+    headphone: bool,
 }
 
 #[tauri::command]
@@ -24,7 +35,14 @@ pub async fn quick_state() -> QuickState {
         muted: imp::endpoint_muted(false),
         mic_muted: imp::endpoint_muted(true),
         volume: imp::volume(),
+        outputs: imp::outputs(),
     }
+}
+
+/// Varsayılan ses çıkışını değiştirir (tüm roller: oyun, müzik, sesli görüşme).
+#[tauri::command]
+pub async fn quick_output(id: String) -> Result<(), String> {
+    imp::set_output(&id)
 }
 
 /// Ana ses seviyesi (0–1). Sıfırdan büyükse sessiz de kaldırılır.
@@ -60,8 +78,12 @@ pub fn quick_action(action: String) -> Result<(), String> {
 mod imp {
     use windows::Devices::Radios::{Radio, RadioAccessStatus, RadioKind, RadioState};
     use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
-    use windows::Win32::Media::Audio::{eCapture, eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
-    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+    use windows::core::{GUID, PCWSTR};
+    use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+    use windows::Win32::Media::Audio::{
+        eCapture, eCommunications, eConsole, eMultimedia, eRender, IMMDeviceEnumerator, MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
+    };
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ};
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
     use winreg::RegKey;
 
@@ -164,6 +186,84 @@ mod imp {
         }
     }
 
+    fn enumerator() -> windows::core::Result<IMMDeviceEnumerator> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        }
+    }
+
+    pub fn outputs() -> Vec<super::Output> {
+        let Ok(e) = enumerator() else { return Vec::new() };
+        unsafe {
+            let default = e.GetDefaultAudioEndpoint(eRender, eConsole).and_then(|d| d.GetId()).ok().map(|raw| {
+                let id = raw.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(raw.0 as _));
+                id
+            });
+            let Ok(list) = e.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) else { return Vec::new() };
+            let count = list.GetCount().unwrap_or(0);
+            (0..count)
+                .filter_map(|i| {
+                    let d = list.Item(i).ok()?;
+                    let raw = d.GetId().ok()?;
+                    let id = raw.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(raw.0 as _));
+                    let name = d.OpenPropertyStore(STGM_READ).and_then(|p| p.GetValue(&PKEY_Device_FriendlyName)).map(|v| v.to_string()).unwrap_or_default();
+                    Some(super::Output { default: default.as_deref() == Some(id.as_str()), headphone: crate::audio::is_headphone(&name), id, name })
+                })
+                .collect()
+        }
+    }
+
+    /// Windows'un kendi ses ayarlarının kullandığı (belgelenmemiş ama yıllardır sabit) arayüz —
+    /// EarTrumpet, SoundSwitch gibi uygulamalar da bunu kullanır. Yalnızca SetDefaultEndpoint çağrılır;
+    /// öncekiler vtable sırası için yer tutucu.
+    // Yöntem adları Windows'unkilerle aynı olmalı
+    #[allow(non_snake_case)]
+    mod policy {
+        use windows::core::{IUnknown, IUnknown_Vtbl, HRESULT, PCWSTR};
+        use windows_core::interface;
+
+        #[interface("f8679f50-850a-41cf-9c72-430f290290c8")]
+        pub unsafe trait IPolicyConfig: IUnknown {
+            fn GetMixFormat(&self, id: PCWSTR, fmt: *mut *mut core::ffi::c_void) -> HRESULT;
+            fn GetDeviceFormat(&self, id: PCWSTR, default: i32, fmt: *mut *mut core::ffi::c_void) -> HRESULT;
+            fn ResetDeviceFormat(&self, id: PCWSTR) -> HRESULT;
+            fn SetDeviceFormat(&self, id: PCWSTR, a: *mut core::ffi::c_void, b: *mut core::ffi::c_void) -> HRESULT;
+            fn GetProcessingPeriod(&self, id: PCWSTR, default: i32, a: *mut i64, b: *mut i64) -> HRESULT;
+            fn SetProcessingPeriod(&self, id: PCWSTR, a: *mut i64) -> HRESULT;
+            fn GetShareMode(&self, id: PCWSTR, mode: *mut core::ffi::c_void) -> HRESULT;
+            fn SetShareMode(&self, id: PCWSTR, mode: *mut core::ffi::c_void) -> HRESULT;
+            fn GetPropertyValue(&self, id: PCWSTR, key: *const core::ffi::c_void, v: *mut core::ffi::c_void) -> HRESULT;
+            fn SetPropertyValue(&self, id: PCWSTR, key: *const core::ffi::c_void, v: *mut core::ffi::c_void) -> HRESULT;
+            fn SetDefaultEndpoint(&self, id: PCWSTR, role: i32) -> HRESULT;
+            fn SetEndpointVisibility(&self, id: PCWSTR, visible: i32) -> HRESULT;
+        }
+
+        pub fn set_default(p: &IPolicyConfig, id: PCWSTR, role: i32) -> HRESULT {
+            unsafe { p.SetDefaultEndpoint(id, role) }
+        }
+    }
+    use policy::IPolicyConfig;
+
+    const POLICY_CONFIG_CLIENT: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
+
+    pub fn set_output(id: &str) -> Result<(), String> {
+        if !outputs().iter().any(|o| o.id == id) {
+            return Err("ses cihazı bulunamadı".into());
+        }
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let policy: IPolicyConfig = CoCreateInstance(&POLICY_CONFIG_CLIENT, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
+            let wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
+            for role in [eConsole, eMultimedia, eCommunications] {
+                policy::set_default(&policy, PCWSTR(wide.as_ptr()), role.0).ok().map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn lock() -> Result<(), String> {
         let ok = unsafe { windows_sys::Win32::System::Shutdown::LockWorkStation() };
         if ok == 0 {
@@ -208,6 +308,12 @@ mod imp {
         None
     }
     pub fn set_volume(_v: f32) -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+    pub fn outputs() -> Vec<super::Output> {
+        Vec::new()
+    }
+    pub fn set_output(_id: &str) -> Result<(), String> {
         Err("yalnızca Windows".into())
     }
     pub fn lock() -> Result<(), String> {

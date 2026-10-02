@@ -12,6 +12,7 @@ import {
   voiceStart,
   voiceStop,
   type GamePayload,
+  type GamePeekPayload,
   type NotificationPayload,
   type VoicePayload,
 } from "../lib/bridge";
@@ -216,6 +217,13 @@ const duration = (secs: number) => {
   return h ? `${h} sa ${m} dk` : `${m} dk`;
 };
 
+/** 120 → "2 saattir", 150 → "2 saat 30 dakikadır" */
+const since = (mins: number) => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return !h ? `${m} dakikadır` : !m ? `${h} saattir` : `${h} saat ${m} dakikadır`;
+};
+
 /** Oyundan çıkınca: süre ve en yüksek yük. */
 export function useGameFeed() {
   useEffect(() => {
@@ -231,6 +239,36 @@ export function useGameFeed() {
         ms: 7000,
       });
       playAntic("hop");
+    });
+  }, []);
+
+  // Oyun açılınca, ada gizlenmeden önce: makinenin ve cihazların durumu
+  useEffect(() => {
+    if (!isPrimary) return;
+    return subscribe<GamePeekPayload>(EVENTS.gameStart, (g) => {
+      const { stats, devices, pushToast } = useNook.getState();
+      const parts = [
+        stats && `İşlemci %${Math.round(stats.cpu)}`,
+        stats && stats.memTotal > 0 && `Bellek %${Math.round((stats.memUsed / stats.memTotal) * 100)}`,
+        devices?.headset && `Kulaklık %${devices.headset.percent}`,
+        devices?.mouse && `Mouse %${devices.mouse.percent}`,
+      ].filter(Boolean);
+      pushToast({ kind: "game", title: `${g.app} başlıyor · iyi oyunlar!`, detail: parts.join(" · ") || "Ben burada bekliyorum", ms: 4800 });
+      playAntic("wink");
+    });
+  }, []);
+
+  // Uzun oyun: ada kısa süre görünür, mola hatırlatır
+  useEffect(() => {
+    if (!isPrimary) return;
+    return subscribe<GamePeekPayload>(EVENTS.gameBreak, (g) => {
+      useNook.getState().pushToast({
+        kind: "break",
+        title: `${since(g.mins)} ${g.app} oynuyorsun`,
+        detail: "Biraz su iç, gözlerini dinlendir, bir esne",
+        ms: 7500,
+      });
+      playAntic("yawn");
     });
   }, []);
 }

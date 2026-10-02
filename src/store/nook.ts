@@ -213,6 +213,8 @@ export interface Settings extends NativeSettings {
   gameSummary: boolean;
   /** Nook sıkılınca oyun teklif etsin */
   playOffers: boolean;
+  /** Pilde / enerji tasarrufunda animasyonları yavaşlat */
+  powerSaver: boolean;
   /** Argus profili (kullanıcı adı); boşsa en son kullanılan */
   argusProfile: string;
   /** Argus klasörü elle seçildiyse (boş = otomatik bul) */
@@ -255,7 +257,10 @@ export const DEFAULT_SETTINGS: Settings = {
   waterEvery: 60,
   dailySummary: true,
   gameSummary: true,
+  gameIntro: true,
+  breakReminderMin: 120,
   playOffers: true,
+  powerSaver: true,
   argusProfile: "",
   argusPromo: true,
   argusDir: "",

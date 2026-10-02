@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { pauseFrames, setFrameRate } from "../lib/frameCap";
 import {
   applySettings,
   consumeSelfWrite,
@@ -74,7 +75,16 @@ export function useMediaFeed() {
 }
 
 export function useStatsFeed() {
-  useEffect(() => subscribe<StatsPayload>(EVENTS.stats, (s) => useNook.getState().setStats(s)), []);
+  useEffect(
+    () =>
+      subscribe<StatsPayload>(EVENTS.stats, (s) => {
+        const st = useNook.getState();
+        st.setStats(s);
+        // Pilde / enerji tasarrufunda animasyonlar 30 karede
+        setFrameRate(s.saver && st.settings.powerSaver ? 30 : 60);
+      }),
+    [],
+  );
 }
 
 /** Lukonnect: mouse, kulaklık, vantilatör. */
@@ -209,11 +219,27 @@ const native = (s: Settings) => ({
   voiceShortcut: s.voiceShortcut,
   autoScreenshots: s.autoScreenshots,
   hideInFullscreen: s.hideInFullscreen,
+  gameIntro: s.gameIntro,
+  breakReminderMin: s.breakReminderMin,
 });
 
-/** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). */
+/** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). Gizliyken kare çizilmez. */
 export function useFullscreenFeed() {
-  useEffect(() => subscribe<boolean>(EVENTS.fullscreen, (on) => useNook.getState().setFullscreen(on)), []);
+  useEffect(() => {
+    let hide = 0;
+    const off = subscribe<boolean>(EVENTS.fullscreen, (on) => {
+      useNook.getState().setFullscreen(on);
+      window.clearTimeout(hide);
+      // Kaçış animasyonu bitsin, pencere gizlensin (Rust: 260 ms), sonra durdur
+      if (on) hide = window.setTimeout(() => pauseFrames(true), 400);
+      else pauseFrames(false);
+    });
+    return () => {
+      off();
+      window.clearTimeout(hide);
+      pauseFrames(false);
+    };
+  }, []);
 }
 
 /** Mikrofon / kamera kullanımı — yeni başlayan uygulama için kısa bir kart. */

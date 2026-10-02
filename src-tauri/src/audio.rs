@@ -33,7 +33,7 @@ pub fn spawn(app: AppHandle) {
 }
 
 /// Kulaklık gibi görünen cihaz adları (olay ikonunu seçmek için).
-fn is_headphone(name: &str) -> bool {
+pub(crate) fn is_headphone(name: &str) -> bool {
     let n = name.to_lowercase();
     ["headphone", "headset", "kulaklık", "airpods", "buds", "earphone", "hands-free"].iter().any(|k| n.contains(k))
 }

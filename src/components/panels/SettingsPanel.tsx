@@ -23,6 +23,13 @@ const SLEEP: { id: number; label: string }[] = [
   { id: 0, label: "Hiç" },
 ];
 
+const GAME_BREAK: { id: number; label: string }[] = [
+  { id: 0, label: "Yok" },
+  { id: 60, label: "1 sa" },
+  { id: 120, label: "2 sa" },
+  { id: 180, label: "3 sa" },
+];
+
 const WATER: { id: number; label: string }[] = [
   { id: 0, label: "Yok" },
   { id: 45, label: "45 dk" },
@@ -90,6 +97,9 @@ export function SettingsPanel() {
         <Row label="Oyunda / tam ekranda gizlen">
           <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
         </Row>
+        <Row label="Pilde / tasarrufta yavaşla">
+          <Toggle on={s.powerSaver} onChange={(v) => update({ powerSaver: v })} />
+        </Row>
         <Row label="Hızlı arama kısayolu">
           <ShortcutInput value={s.shortcut} onChange={(v) => update({ shortcut: v })} />
         </Row>
@@ -139,8 +149,14 @@ export function SettingsPanel() {
         <Row label="Günün ilk açılışında özet">
           <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
         </Row>
+        <Row label="Oyun açılınca özet">
+          <Toggle on={s.gameIntro} onChange={(v) => update({ gameIntro: v })} />
+        </Row>
         <Row label="Oyundan çıkınca özet">
           <Toggle on={s.gameSummary} onChange={(v) => update({ gameSummary: v })} />
+        </Row>
+        <Row label="Oyun molası hatırlat">
+          <Segmented id="settings-game-break" options={GAME_BREAK} value={s.breakReminderMin} onChange={(v) => update({ breakReminderMin: v })} color={ACCENT.orange} />
         </Row>
         <Row label="Sıkılınca oyun teklif etsin">
           <Toggle on={s.playOffers} onChange={(v) => update({ playOffers: v })} />
