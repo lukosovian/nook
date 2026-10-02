@@ -107,7 +107,7 @@ export function Tour() {
       exit={{ opacity: 0, transition: { duration: 0.12 } }}
     >
       {/* Üst çubuk */}
-      <div className="absolute inset-x-5 top-0 flex items-center justify-between" style={{ height: TOUR.header }}>
+      <div className="absolute inset-x-5 top-0 z-10 flex items-center justify-between" style={{ height: TOUR.header }}>
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-label-2">
           <Sparkles size={13} strokeWidth={2.2} style={{ color: tintText(cur.color) }} />
           Nook nedir?
