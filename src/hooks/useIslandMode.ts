@@ -1,0 +1,18 @@
+import { isPrimary } from "../lib/bridge";
+import type { IslandMode } from "../lib/layout";
+import { useNook } from "../store/nook";
+
+/** Öncelik: yemek › arama › üzerine gelme › olay kartı › ses/parlaklık › kapalı */
+export function useIslandMode(): IslandMode {
+  return useNook((s) => {
+    if (s.intro) return "intro";
+    if (s.ringing) return "alarm";
+    if (s.tour && isPrimary) return "tour";
+    if (s.mood === "hungry" || s.mood === "chewing") return "feeding";
+    if (s.searching) return "search";
+    if (s.hovered || s.grabbed || s.pinned) return "expanded";
+    if (s.toasts.length) return "toast";
+    if (s.osd) return "osd";
+    return "collapsed";
+  });
+}

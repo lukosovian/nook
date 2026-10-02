@@ -1,0 +1,102 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter/opsz.css";
+@import "@fontsource-variable/nunito/wght.css";
+
+/*
+ * Tasarım dili: Grok Bot'tan ilham. Saf siyah ada; içinde hafif ışık alan koyu kartlar,
+ * renkli mini-Nook avatarlı çipler ve duruma göre yumuşak renkli parıltılar.
+ */
+@theme {
+  --color-ink: #0f0f11;
+  /* Kartlar ve yüzeyler */
+  --color-card: #161618;
+  --color-card-hi: #1e1e21;
+  --color-well: rgb(255 255 255 / 0.045);
+  --color-well-hi: rgb(255 255 255 / 0.08);
+  --color-edge: rgb(255 255 255 / 0.06);
+  /* Metin */
+  --color-label: #ececee;
+  --color-label-2: #9a9aa2;
+  --color-label-3: #5f5f66;
+  /* Vurgu renkleri (Grok Bot'taki çip renkleri) */
+  --color-teal: #3fbfa5;
+  --color-red: #f0545c;
+  --color-orange: #f2a33a;
+  --color-purple: #8f6bff;
+  --color-blue: #3d8bff;
+  --color-green: #3ccf6e;
+  --color-pink: #ff5c8a;
+  --color-yellow: #ffd23f;
+
+  /* Eski sınıf adlarıyla uyum (bazı küçük bileşenler hâlâ kullanıyor) */
+  --color-surface: rgb(255 255 255 / 0.045);
+  --color-surface-2: rgb(255 255 255 / 0.08);
+  --color-surface-3: rgb(255 255 255 / 0.13);
+  --color-sys-green: #3ccf6e;
+  --color-sys-yellow: #ffd23f;
+  --color-sys-orange: #f2a33a;
+  --color-sys-red: #f0545c;
+  --color-sys-blue: #3d8bff;
+  --color-sys-teal: #3fbfa5;
+  --color-sys-purple: #8f6bff;
+  --color-sys-pink: #ff5c8a;
+
+  /* Inter (opsz): küçük boyda okunaklı, büyükte sıkı — Grok Bot'taki SF Pro hissine en yakın */
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* Yuvarlak, kalın rakamlar (ses göstergesi) — Nook'un yuvarlak hatlarıyla uyumlu */
+  --font-round: "Nunito Variable", "Inter Variable", system-ui, sans-serif;
+  --font-display: "Inter Variable", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Pencere tamamen şeffaf bir tuval; görünen tek şey ada. */
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: white;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+  /* cv11: tek katlı a, ss03: yuvarlak virgül/tırnak; tnum yok — rakamlar yalnızca gerekli yerde sabit genişlik */
+  font-feature-settings: "cv11", "ss03";
+  letter-spacing: -0.01em;
+  text-rendering: optimizeLegibility;
+}
+
+textarea,
+input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+button {
+  cursor: default;
+}
+
+/* Kart: üstten hafif ışık alan koyu yüzey */
+.nook-card {
+  background: linear-gradient(180deg, var(--color-card-hi) 0%, var(--color-card) 100%);
+  border: 1px solid var(--color-edge);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.12);
+  border-radius: 2px;
+}

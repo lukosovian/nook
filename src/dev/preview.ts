@@ -1,0 +1,148 @@
+/**
+ * Yalnızca geliştirme: `?preview=<durum>` ile adayı örnek verilerle belirli bir duruma sokar.
+ * Tarayıcıda tasarım incelemesi ve ekran görüntüsü için. Üretim paketine girmez.
+ *   ?preview=collapsed | music | osd | toast | search | <sekme adı: media, shelf, clip, note, devices, stats, settings>
+ */
+import { MotionGlobalConfig } from "motion/react";
+import { useNook, type Tab } from "../store/nook";
+
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "settings"];
+
+const ART =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#ff375f'/><stop offset='0.5' stop-color='#bf5af2'/><stop offset='1' stop-color='#0a84ff'/></linearGradient></defs><rect width='200' height='200' fill='url(#g)'/><circle cx='100' cy='100' r='46' fill='none' stroke='white' stroke-opacity='.5' stroke-width='6'/></svg>`,
+  );
+
+export function applyPreview(mode: string) {
+  document.documentElement.style.background = "#3a4a5c";
+  // Ekran görüntüsü animasyonun ortasında çekilmesin
+  if (new URLSearchParams(location.search).has("still")) MotionGlobalConfig.skipAnimations = true;
+  const s = useNook.getState();
+  const now = performance.now();
+
+  useNook.setState({
+    media: {
+      title: "Blinding Lights",
+      artist: "The Weeknd",
+      album: "After Hours",
+      app: "Spotify.exe",
+      playing: true,
+      positionMs: 72_000,
+      durationMs: 200_000,
+      trackKey: "demo",
+      artwork: ART,
+      at: now,
+    },
+    stats: {
+      cpu: 23,
+      memUsed: 9.4 * 1024 ** 3,
+      memTotal: 16 * 1024 ** 3,
+      netDown: 2.4 * 1024 ** 2,
+      netUp: 310 * 1024,
+      diskUsed: 380 * 1024 ** 3,
+      diskTotal: 476 * 1024 ** 3,
+      battery: null,
+    },
+    netHistory: Array.from({ length: 40 }, (_, i) => (Math.sin(i / 3) + 1.3) * 1e6 + Math.random() * 4e5),
+    cpuHistory: Array.from({ length: 40 }, () => 10 + Math.random() * 30),
+    devices: {
+      lukonnect: true,
+      mouse: { percent: 26, remainingSec: 84_000 },
+      headset: { percent: 82, charging: "Şarj olmuyor" },
+      fan: { on: true, speed: 60 },
+    },
+    clips: [
+      { id: "c1", text: "#FF375F", color: "#FF375F", at: 1 },
+      { id: "c2", text: "#30D158", color: "#30D158", at: 2 },
+      { id: "c3", text: "#0A84FF", color: "#0A84FF", at: 3 },
+      { id: "c4", text: "https://github.com/tauri-apps/tauri", color: null, at: 4 },
+      { id: "c5", text: "Toplantı notları: perşembe 14:00", color: null, at: 5 },
+      { id: "c6", text: "npm run tauri build", color: null, at: 6 },
+    ],
+    shelf: [
+      { id: "s1", path: "C:/rapor.pdf", name: "rapor.pdf", ext: "pdf", size: 1_240_000, isDir: false, isImage: false, addedAt: 1 },
+      { id: "s2", path: "C:/proje.zip", name: "proje.zip", ext: "zip", size: 48_000_000, isDir: false, isImage: false, addedAt: 2 },
+      { id: "s3", path: "C:/sunum.docx", name: "sunum.docx", ext: "docx", size: 380_000, isDir: false, isImage: false, addedAt: 3 },
+      { id: "s4", path: "C:/Fotoğraflar", name: "Fotoğraflar", ext: "", size: 0, isDir: true, isImage: false, addedAt: 4 },
+    ],
+    alarms: [
+      { id: "a1", hour: 7, minute: 30, label: "Kalk", repeat: "weekdays", enabled: true, next: Date.now() + 8.5 * 3600_000 },
+      { id: "a2", hour: 14, minute: 0, label: "Toplantı", repeat: "once", enabled: false, next: null },
+    ],
+    note: mode === "note" ? "Market: süt, ekmek\nPazartesi sunum provası" : "",
+    focus: mode === "focus" ? { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 2 } : null,
+    notifications: [
+      { id: 1, app: "Discord", appId: "d", title: "Ayşe", body: "Akşam maça geliyor musun?", icon: null, at: Date.now() - 3 * 60_000 },
+      { id: 2, app: "WhatsApp", appId: "w", title: "Annem", body: "Eve gelirken ekmek al", icon: null, at: Date.now() - 50 * 60_000 },
+      { id: 3, app: "Outlook", appId: "o", title: "Toplantı daveti", body: "Perşembe 14:00 · Proje değerlendirme", icon: null, at: Date.now() - 4 * 3600_000 },
+    ],
+    pinnedApps: [
+      { id: "p1", name: "Spotify", path: "x" },
+      { id: "p2", name: "Discord", path: "y" },
+      { id: "p3", name: "Steam", path: "z" },
+    ],
+    scores: { catch: 17, simon: 6 },
+    days: Object.fromEntries(
+      Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        return [key, { music: 60 + i * 9, focus: [45, 90, 20, 75, 0, 110, 60][i], pomodoros: [2, 4, 1, 3, 0, 4, 2][i], game: [30, 0, 120, 0, 200, 15, 40][i], active: [260, 410, 180, 380, 90, 450, 300][i], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60 }];
+      }),
+    ),
+    weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() },
+    privacy: { mic: mode === "privacy" || TABS.includes(mode as Tab) ? ["Discord"] : [], camera: [] },
+  });
+  const params = new URLSearchParams(location.search);
+  // ?ask=… → soruyu yerel yapay zekâya gönder (uçtan uca sohbet testi)
+  const ask = params.get("ask");
+  if (ask) window.setTimeout(() => void import("../lib/chat").then((m) => m.sendChat(ask)), 800);
+  const expr = params.get("expr");
+  if (expr) useNook.setState({ antic: expr as never });
+  // ?busy → Nook düşünür (yörünge gözler + mavi rozet)
+  if (params.has("busy")) useNook.setState({ busy: ["preview"] });
+  // Açılış animasyonu yalnızca ?preview=intro'da
+  useNook.setState({ intro: mode === "intro", settings: { ...useNook.getState().settings, weather: false } });
+
+  if (mode === "tour") {
+    useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
+  } else if (TABS.includes(mode as Tab)) {
+    useNook.setState({ hovered: true, tab: mode as Tab });
+    // Panels açılınca çalan müzik yüzünden medyaya geçer; istenen sekmeye geri dön
+    window.setTimeout(() => useNook.getState().setTab(mode as Tab), 50);
+  } else if (mode.startsWith("osd")) {
+    s.setMedia(null);
+    const v = { osd: [0.62, false, 1], osddown: [0.3, false, -1], osdloud: [0.92, false, 1], osdmute: [0.4, true, -1], osdlight: [0.7, false, 1] }[mode] ?? [0.62, false, 1];
+    useNook.setState({ media: null, osd: { kind: mode === "osdlight" ? "brightness" : "volume", value: v[0] as number, muted: v[1] as boolean, dir: v[2] as number } });
+  } else if (mode === "toast") {
+    useNook.setState({ media: null, toasts: [{ id: "t", kind: "device-low", title: "Mouse pili azalıyor", detail: "%10 kaldı" }] });
+  } else if (mode === "search") {
+    useNook.setState({ searching: true });
+  } else if (mode === "collapsed" || mode === "privacy") {
+    useNook.setState({ media: null });
+  } else if (mode === "ringing") {
+    useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: "Toplantı", repeat: "once", enabled: false, next: null } });
+  } else if (mode === "feeding") {
+    useNook.setState({ media: null, mood: "hungry" });
+  } else if (mode === "focusmini") {
+    useNook.setState({ media: null, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000, left: 0, total: 25 * 60_000, round: 1 } });
+  } else if (mode === "listen") {
+    useNook.setState({ media: null, listening: true });
+  } else if (mode === "notifytoast") {
+    useNook.setState({ media: null, toasts: [{ id: "n", kind: "notify", title: "Ayşe", detail: "Akşam maça geliyor musun?", ms: 99999 }] });
+  } else if (mode === "download") {
+    useNook.setState({ media: null, downloads: [{ id: "d", name: "kurulum.exe", received: 42e6, speed: 8.4 * 1024 ** 2 }] });
+  }
+  // "music": kapalı ada + mini oynatıcı (varsayılan veriler)
+
+  // Önizlemede durumun kendiliğinden değişmesini engelle.
+  const freeze = useNook.getState();
+  useNook.setState = ((orig) => (partial: Parameters<typeof orig>[0], replace?: boolean) => {
+    const next = typeof partial === "function" ? partial(useNook.getState()) : partial;
+    const blocked = ["hovered", "osd", "toasts", "searching", "antic", "tab"];
+    const filtered = Object.fromEntries(Object.entries(next as object).filter(([k]) => !blocked.includes(k)));
+    orig(filtered as never, replace as never);
+  })(useNook.setState) as typeof useNook.setState;
+  void freeze;
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Nook ada penceresinin izinleri",
+  "windows": ["island", "island-*"],
+  "permissions": [
+    "core:default",
+    "clipboard-manager:allow-write-text",
+    "drag:default",
+    "autostart:default",
+    "updater:default",
+    "process:allow-restart"
+  ]
+}

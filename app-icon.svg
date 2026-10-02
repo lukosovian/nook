@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Nook: 3B gölgeli beyaz küre + siyah hap gözler (uygulamadaki maskotla aynı oranlar) -->
+  <defs>
+    <radialGradient id="sphere" cx="0.36" cy="0.30" r="0.78">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.34" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#b9b9c2"/>
+    </radialGradient>
+    <radialGradient id="shade" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.78" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.14"/>
+    </radialGradient>
+  </defs>
+  <circle cx="512" cy="512" r="470" fill="url(#sphere)"/>
+  <circle cx="512" cy="512" r="470" fill="url(#shade)"/>
+  <circle cx="512" cy="512" r="466" fill="none" stroke="#000" stroke-opacity="0.28" stroke-width="10"/>
+  <rect x="288" y="410" width="141" height="298" rx="70.5" fill="#0b0b0d"/>
+  <rect x="595" y="410" width="141" height="298" rx="70.5" fill="#0b0b0d"/>
+</svg>
