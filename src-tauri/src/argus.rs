@@ -904,10 +904,9 @@ pub async fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64
 
 fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
     let app = window.app_handle();
+    // Pencere hiç gizlenip yeniden gösterilmez (show() odağı çalıp tam ekran oyunu alta atabilir);
+    // kart içeriği kendi animasyonuyla kaybolur, şeffaf ve tıklanamaz pencere yerinde kalır.
     if !show {
-        if let Some(c) = app.get_webview_window(CARD) {
-            c.hide().map_err(|e| e.to_string())?;
-        }
         return Ok(());
     }
     let pos = window.outer_position().map_err(|e| e.to_string())?;
@@ -938,8 +937,5 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
         }
     };
     card.set_position(at).map_err(|e| e.to_string())?;
-    if !card.is_visible().unwrap_or(false) {
-        card.show().map_err(|e| e.to_string())?;
-    }
     Ok(())
 }
