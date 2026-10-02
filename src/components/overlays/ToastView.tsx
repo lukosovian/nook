@@ -14,6 +14,7 @@ import {
   BatteryLow,
   BatteryWarning,
   Camera,
+  Clapperboard,
   Download,
   Fan,
   Headphones,
@@ -56,6 +57,7 @@ const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
   game: { icon: Gamepad2, color: ACCENT.green },
   play: { icon: Gamepad2, color: ACCENT.pink },
   update: { icon: Download, color: ACCENT.green },
+  argus: { icon: Clapperboard, color: ACCENT.orange },
 };
 
 /** Sistem olayı kartı: solda Nook (rozetli), ortada metin, sağda renkli mini avatar. */

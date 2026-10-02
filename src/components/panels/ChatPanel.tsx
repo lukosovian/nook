@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AlarmClock, AppWindow, ArrowUp, Brain, CircleAlert, Globe, Mic, Music, Square, StickyNote, Target, ToggleRight, X, type LucideIcon } from "lucide-react";
+import { AlarmClock, AppWindow, ArrowUp, Brain, CircleAlert, Clapperboard, Globe, Mic, Music, Square, StickyNote, Target, ToggleRight, X, type LucideIcon } from "lucide-react";
 import { toggleVoice } from "../../hooks/useFeatures";
 import { useGemini } from "../../hooks/useGemini";
 import { setInteractive } from "../../lib/bridge";
@@ -23,6 +23,7 @@ const NOTE_STYLE: Record<ToolNote["icon"], { icon: LucideIcon; color: string }> 
   memory: { icon: Brain, color: ACCENT.purple },
   error: { icon: CircleAlert, color: ACCENT.red },
   focus: { icon: Target, color: ACCENT.red },
+  argus: { icon: Clapperboard, color: ACCENT.orange },
 };
 
 /** "Ekrana sor" adayı fare dışarıdayken de açık tutar; başka yere tıklayınca ya da Esc ile kapanır. */

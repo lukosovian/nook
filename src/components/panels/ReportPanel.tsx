@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
+import { useArgus, weekStats } from "../../lib/argus";
 import { dayKey, EMPTY_DAY, useNook, type DayStats } from "../../store/nook";
 import { ACCENT, MiniNook, tintText } from "../ui/primitives";
 
@@ -46,6 +47,7 @@ function grade(week: { stats: DayStats }[]) {
 /** Karne: haftanın aktif süre grafiği + özet kutucukları + Nook'un notu. */
 export function ReportPanel() {
   const days = useNook((s) => s.days);
+  const watch = weekStats(useArgus((s) => s.snap));
   const week = lastWeek(days);
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(60, ...week.map((d) => d.stats.active));
@@ -102,6 +104,11 @@ export function ReportPanel() {
         <MiniNook color={color} size={22} eyes={g.letter <= "B" ? "happy" : "open"} />
         <p className="text-[10px] leading-snug text-label-2">{g.line}</p>
         <p className="text-[9.5px] text-label-3">Keyif ort. %{Math.round(g.mood)}</p>
+        {watch && (watch.episodes > 0 || watch.movies > 0) && (
+          <p className="text-[9.5px]" style={{ color: tintText(ACCENT.orange) }}>
+            {[watch.episodes && `${watch.episodes} bölüm`, watch.movies && `${watch.movies} film`].filter(Boolean).join(", ")} izledin
+          </p>
+        )}
       </div>
     </div>
   );

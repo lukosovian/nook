@@ -4,9 +4,10 @@
  *   ?preview=collapsed | music | osd | toast | search | <sekme adı: media, shelf, clip, note, devices, stats, settings>
  */
 import { MotionGlobalConfig } from "motion/react";
-import { useNook, type Tab } from "../store/nook";
+import { dayKey, useNook, type Tab } from "../store/nook";
+import { useArgus, type ArgusItem } from "../lib/argus";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "settings"];
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "settings"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -14,7 +15,33 @@ const ART =
     `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#ff375f'/><stop offset='0.5' stop-color='#bf5af2'/><stop offset='1' stop-color='#0a84ff'/></linearGradient></defs><rect width='200' height='200' fill='url(#g)'/><circle cx='100' cy='100' r='46' fill='none' stroke='white' stroke-opacity='.5' stroke-width='6'/></svg>`,
   );
 
+function day(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return dayKey(d);
+}
+
+function demoArgus() {
+  const ep = (season: number, episode: number, name: string, date: string) => ({ season, episode, name, date });
+  const show = (id: string, title: string, aired: number, seen: number, next: ReturnType<typeof ep> | null, upcoming: ReturnType<typeof ep>[], latest = next): ArgusItem => ({
+    id, title, original: null, status: "İzleniyor", kind: "Dizi", genres: ["Bilim Kurgu", "Dram"], release: "2024-05-01", runtime: 50, score: 8.4, poster: null,
+    recent: Date.now() - aired * 1000, watchDates: [], series: { aired, seen, next, latest, upcoming, lastSeen: day(-1) },
+  });
+  const items: ArgusItem[] = [
+    show("a", "Star Trek: Starfleet Academy", 10, 8, ep(1, 9, "300. Gece", day(-7)), []),
+    show("b", "Lanterns", 8, 7, ep(1, 8, "Yeşil Işık", day(0)), [ep(1, 9, "Karanlık", day(7))], ep(1, 8, "Yeşil Işık", day(0))),
+    show("c", "Silo", 30, 5, ep(1, 6, "Obje", day(-400)), []),
+    show("d", "Tuzlu Kahve", 5, 2, ep(1, 3, "3. Bölüm", day(-14)), [ep(1, 6, "6. Bölüm", day(4))]),
+    { id: "m", title: "Bıçaklar Çekildi: Gizemli Bir Serüven", original: "Glass Onion: A Knives Out Mystery", status: "İzlenecek", kind: "Film", genres: ["Gizem", "Komedi"], release: "2022-11-23", runtime: 140, score: null, poster: null, recent: null, watchDates: [], series: null },
+  ];
+  useArgus.setState({
+    snap: { profiles: ["Luko", "Zırtapoz"], profile: "Luko", profileId: "p", boardId: "b", running: false, items, episodeDays: { [day(0)]: 2, [day(-1)]: 4 } },
+    suggestion: new URLSearchParams(location.search).has("suggest") ? { itemId: "b", season: 1, episode: 8 } : null,
+  });
+}
+
 export function applyPreview(mode: string) {
+  demoArgus();
   document.documentElement.style.background = "#3a4a5c";
   // Ekran görüntüsü animasyonun ortasında çekilmesin
   if (new URLSearchParams(location.search).has("still")) MotionGlobalConfig.skipAnimations = true;

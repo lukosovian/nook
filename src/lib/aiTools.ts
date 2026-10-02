@@ -8,6 +8,7 @@ import { clock, REPEAT_LABEL, type Repeat } from "./alarm";
 import { listApps, mediaControl, openPath, quickSet, type QuickKey } from "./bridge";
 import { mmss, PHASE_LABEL, remaining, startFocus, stopFocus } from "./focus";
 import type { FunctionDecl } from "./ai";
+import { calendar, dayLabel, epLabel, findItem, markWatched, matchTitle, parseEpisode, pickPool, useArgus, watching, weekStats, type ArgusItem } from "./argus";
 import { useNook } from "../store/nook";
 
 const fn = (name: string, description: string, properties: object, required: string[] = []): FunctionDecl => ({
@@ -15,6 +16,39 @@ const fn = (name: string, description: string, properties: object, required: str
   description,
   parameters: { type: "object", properties, required },
 });
+
+const ARGUS_FUNCTIONS: FunctionDecl[] = [
+  fn(
+    "argus_overview",
+    "Kullanıcının Argus arşivinden: şu an izlediği diziler ve sıradaki bölümleri, önümüzdeki günlerde çıkacak bölümler, bu hafta kaç bölüm/film izlediği. 'Ne izliyordum', 'yeni bölüm var mı', 'bu hafta ne kadar izledim' gibi sorularda kullan.",
+    {},
+  ),
+  fn(
+    "argus_suggest",
+    "Argus'taki İzlenecekler listesinden, yayınlanmış yapımlardan rastgele adaylar getirir. 'Ne izlesem', 'bir film öner' gibi isteklerde kullan; adaylardan birini seçip kısaca nedenini söyle.",
+    {
+      kind: { type: "string", enum: ["film", "dizi", "all"], description: "Film mi dizi mi; belirtilmediyse all" },
+      max_minutes: { type: "integer", description: "En fazla süre (dakika), kullanıcı kısa bir şey isterse" },
+      genre: { type: "string", description: "Tür (Komedi, Bilim Kurgu, Korku…)" },
+    },
+  ),
+  fn(
+    "argus_find",
+    "Argus'ta bir dizi/film kaydını adıyla bulur: durumu, puanı, kaç bölüm izlendiği, sıradaki bölüm.",
+    { title: { type: "string" } },
+    ["title"],
+  ),
+  fn(
+    "argus_mark_watched",
+    "Kullanıcı bir bölümü ya da filmi izlediğini söylerse Argus'a bugün izlendi olarak işaretler. Bölüm belirtilmezse dizinin sıradaki bölümü işaretlenir.",
+    {
+      title: { type: "string" },
+      season: { type: "integer" },
+      episode: { type: "integer" },
+    },
+    ["title"],
+  ),
+];
 
 export const FUNCTIONS: FunctionDecl[] = [
   fn(
@@ -71,11 +105,18 @@ export const FUNCTIONS: FunctionDecl[] = [
   ),
 ];
 
+/** Argus yalnızca bu bilgisayarda varsa modele tanıtılır */
+export const functions = () => (useArgus.getState().snap ? [...FUNCTIONS, ...ARGUS_FUNCTIONS] : FUNCTIONS);
+
 /** Sohbet içinde araç sonucunu gösteren küçük etiket */
 export interface ToolNote {
-  icon: "alarm" | "toggle" | "note" | "music" | "app" | "web" | "memory" | "error" | "focus";
+  icon: "alarm" | "toggle" | "note" | "music" | "app" | "web" | "memory" | "error" | "focus" | "argus";
   text: string;
 }
+
+/** Model için tek satırlık kayıt özeti */
+const describe = (i: ArgusItem) =>
+  `${i.title}${i.original ? ` (${i.original})` : ""}: ${[i.kind, i.release?.slice(0, 4), i.genres.slice(0, 3).join("/"), i.runtime ? `${i.runtime} dk` : null, i.series ? `${i.series.aired} bölüm` : null, i.status].filter(Boolean).join(", ")}`;
 
 const num = (v: unknown, d = 0) => (typeof v === "number" ? v : Number(v ?? d)) || d;
 const str = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
@@ -182,6 +223,53 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         playAntic("love");
         return { result: `Kaydedildi: ${fact}`, note: { icon: "memory", text: `Hatırlayacağım: ${fact}` } };
       }
+      case "argus_overview": {
+        const snap = useArgus.getState().snap;
+        if (!snap) return { result: "Argus bu bilgisayarda yok.", note: { icon: "error", text: "Argus yok" } };
+        const w = watching(snap).map((i) => `${i.title}: ${i.series!.next ? `sıradaki ${epLabel(i.series!.next)} ${i.series!.next.name}` : "güncel"} (${i.series!.seen}/${i.series!.aired})`);
+        const cal = calendar(snap).slice(0, 8).map((c) => `${dayLabel(c.date)}: ${c.item.title} ${epLabel(c.ep)}`);
+        const st = weekStats(snap)!;
+        return {
+          result: [`İzlediği diziler: ${w.join("; ") || "yok"}`, `Takvim: ${cal.join("; ") || "yakında bölüm yok"}`, `Son 7 gün: ${st.episodes} bölüm, ${st.movies} film`].join("\n"),
+          note: { icon: "argus", text: "Argus'a baktım" },
+        };
+      }
+      case "argus_suggest": {
+        const snap = useArgus.getState().snap;
+        const kind = (["film", "dizi", "all"].includes(str(args.kind)) ? str(args.kind) : "all") as "film" | "dizi" | "all";
+        const pool = pickPool(snap, { kind, maxMinutes: args.max_minutes != null ? num(args.max_minutes) : null, genre: str(args.genre) || null });
+        if (!pool.length) return { result: "Bu ölçülere uyan, izlenecekler listesinde çıkmış bir yapım yok.", note: { icon: "argus", text: "Uygun yapım yok" } };
+        const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 8);
+        return {
+          result: `Adaylar (${pool.length} içinden):\n${picks.map(describe).join("\n")}`,
+          note: { icon: "argus", text: `${pool.length} izlenecek arasından seçtim` },
+        };
+      }
+      case "argus_find": {
+        const it = matchTitle(useArgus.getState().snap, str(args.title));
+        if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: `${args.title} bulunamadı` } };
+        const sr = it.series;
+        return {
+          result: `${describe(it)}${it.score != null ? `, puanı ${it.score.toFixed(1)}` : ""}${sr ? `, ${sr.seen}/${sr.aired} bölüm izlendi${sr.next ? `, sıradaki ${epLabel(sr.next)}` : ""}` : ""}`,
+          note: { icon: "argus", text: it.title },
+        };
+      }
+      case "argus_mark_watched": {
+        const snap = useArgus.getState().snap;
+        const it = matchTitle(snap, str(args.title));
+        if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: `${args.title} bulunamadı` } };
+        let ep: { season: number; episode: number } | null = null;
+        if (it.series) {
+          ep = args.episode != null ? { season: args.season != null ? num(args.season) : (it.series.next?.season ?? 1), episode: num(args.episode) } : (parseEpisode(str(args.title)) ?? it.series.next);
+          if (!ep) return { result: `${it.title} dizisinin çıkmış bütün bölümleri zaten izlenmiş.`, note: { icon: "argus", text: `${it.title} güncel` } };
+        }
+        await markWatched(it, ep);
+        const fresh = findItem(it.id);
+        return {
+          result: `${it.title}${ep ? ` ${epLabel(ep)}` : ""} izlendi olarak işaretlendi.${fresh?.series?.next ? ` Sıradaki: ${epLabel(fresh.series.next)}.` : ""}`,
+          note: { icon: "argus", text: `${it.title}${ep ? ` ${epLabel(ep)}` : ""} izlendi` },
+        };
+      }
       default:
         return { result: `Bilinmeyen araç: ${name}`, note: { icon: "error", text: `Bilinmeyen araç: ${name}` } };
     }
@@ -219,6 +307,11 @@ export function systemPrompt(): string {
   if (s.note) lines.push(`Kullanıcının hızlı notu: ${s.note.replace(/\n/g, " / ")}`);
   if (s.focus) lines.push(`Odak sayacı: ${PHASE_LABEL[s.focus.phase]}, ${mmss(remaining(s.focus))} kaldı${s.focus.endsAt === null ? " (duraklatıldı)" : ""}.`);
   if (!s.online) lines.push("İnternet bağlantısı şu an yok.");
+  const argus = useArgus.getState().snap;
+  if (argus) {
+    const w = watching(argus).slice(0, 5).map((i) => i.title);
+    lines.push(`Kullanıcının Argus adlı dizi/film arşivi var (izledikleri, izleyecekleri). ${w.length ? `Şu an izlediği diziler: ${w.join(", ")}. ` : ""}Dizi/film soruları ve "ne izlesem" için argus_* araçlarını kullan.`);
+  }
   if (s.settings.memories.length) lines.push("", "Kullanıcı hakkında hatırladıkların:", ...s.settings.memories.map((m) => `- ${m}`));
   return lines.join("\n");
 }

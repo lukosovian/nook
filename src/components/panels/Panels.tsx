@@ -6,6 +6,8 @@ import { easeOut } from "../../lib/motion";
 import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
+import { ArgusPanel } from "./ArgusPanel";
+import { epLabel, todayEpisodes, useArgus, watching } from "../../lib/argus";
 import { AppsPanel } from "./AppsPanel";
 import { FocusPanel } from "./FocusPanel";
 import { NotifyPanel } from "./NotifyPanel";
@@ -29,6 +31,7 @@ type Module = Exclude<Tab, "home">;
 const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "today", label: "Bugün", color: ACCENT.yellow },
   { id: "media", label: "Müzik", color: ACCENT.pink },
+  { id: "argus", label: "İzliyorum", color: ACCENT.orange },
   { id: "focus", label: "Odak", color: ACCENT.red },
   { id: "shelf", label: "Raf", color: ACCENT.teal },
   { id: "clip", label: "Pano", color: ACCENT.purple },
@@ -62,6 +65,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   devices: DevicesPanel,
   control: ControlPanel,
   stats: StatsPanel,
+  argus: ArgusPanel,
   settings: SettingsPanel,
 };
 
@@ -71,6 +75,7 @@ const TITLE = {
   chat: "Nook'la sohbet",
   today: "Günün özeti",
   report: "Haftalık karne",
+  argus: "Argus",
 } as Record<Module, string>;
 
 /**
@@ -138,7 +143,8 @@ function ModuleGrid() {
   const setTab = useNook((s) => s.setTab);
   const lukonnect = useNook((s) => hasLukonnect(s.devices));
   const sub = useModuleStatus();
-  const modules = MODULES.filter((m) => m.id !== "devices" || lukonnect);
+  const argus = useArgus((s) => !!s.snap);
+  const modules = MODULES.filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus));
   return (
     <div className="-mr-1.5 grid h-full auto-rows-[41px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5">
       {modules.map((m, i) => (
@@ -180,6 +186,9 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
   const notifs = useNook((s) => s.notifications.length);
   const best = useNook((s) => Math.max(0, ...Object.values(s.scores)));
   const active = useNook((s) => s.days[dayKey()]?.active ?? 0);
+  const argusSnap = useArgus((s) => s.snap);
+  const newToday = todayEpisodes(argusSnap);
+  const watchingList = watching(argusSnap);
 
   const next = alarms.filter((a) => a.enabled && a.next).sort((a, b) => a.next! - b.next!)[0];
   const batteries = [devices?.headset?.percent, devices?.mouse?.percent].filter((p): p is number => p != null);
@@ -199,6 +208,13 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
     notify: { text: notifs ? `${notifs} bildirim` : "Sessiz" },
     play: { text: best ? `Rekor ${best}` : "Yakala · Hafıza" },
     report: { text: active ? `Bugün ${active >= 60 ? `${Math.floor(active / 60)} sa ${active % 60} dk` : `${active} dk`}` : "Bu hafta" },
+    argus: {
+      text: newToday.length
+        ? `Bugün ${newToday[0].item.title} ${epLabel(newToday[0].ep)}`
+        : watchingList.length
+          ? `${watchingList.length} dizi izliyorsun`
+          : "Ne izlesem?",
+    },
     today: { text: new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "short" }) },
   };
 }

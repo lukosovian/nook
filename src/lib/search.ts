@@ -1,10 +1,11 @@
 import type { AppEntry } from "./bridge";
+import type { ArgusItem } from "./argus";
 import { evaluate, formatNumber } from "./calc";
 import { convert } from "./convert";
 import { searchEmoji } from "./emoji";
 import { convertCurrency, parseCurrency, translate } from "./online";
 
-export type ResultKind = "calc" | "convert" | "currency" | "translate" | "emoji" | "app" | "web" | "note" | "ask";
+export type ResultKind = "calc" | "convert" | "currency" | "translate" | "emoji" | "app" | "web" | "note" | "ask" | "argus";
 
 export interface SearchResult {
   id: string;
@@ -28,7 +29,9 @@ function score(name: string, q: string): number {
 
 const MAX_APPS = 5;
 
-export function search(query: string, apps: AppEntry[]): SearchResult[] {
+const MAX_ARGUS = 3;
+
+export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = []): SearchResult[] {
   const q = query.trim();
   if (!q) return [];
   const out: SearchResult[] = [];
@@ -62,6 +65,24 @@ export function search(query: string, apps: AppEntry[]): SearchResult[] {
     .sort((x, y) => y.s - x.s)
     .slice(0, MAX_APPS)
     .forEach(({ a }) => out.push({ id: `app:${a.path}`, kind: "app", title: a.name, subtitle: "Uygulamayı aç", payload: a.path }));
+
+  // Argus arşivi (dizi/film)
+  if (lower.length >= 2) {
+    argus
+      .map((it) => ({ it, s: Math.max(score(it.title, lower), it.original ? score(it.original, lower) - 1 : -1) }))
+      .filter((x) => x.s >= 60)
+      .sort((x, y) => y.s - x.s)
+      .slice(0, MAX_ARGUS)
+      .forEach(({ it }) =>
+        out.push({
+          id: `argus:${it.id}`,
+          kind: "argus",
+          title: it.title,
+          subtitle: [it.status, it.kind, it.release?.slice(0, 4)].filter(Boolean).join(" · ") || "Argus",
+          payload: it.id,
+        }),
+      );
+  }
 
   // Yerel yapay zekâya sor
   out.push({ id: "ask", kind: "ask", title: q, subtitle: "Nook'a sor", payload: q });

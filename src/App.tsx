@@ -1,5 +1,6 @@
 import { Island } from "./components/Island";
 import { useUpdateCheck } from "./lib/update";
+import { useArgusDetect, useArgusFeed } from "./lib/argus";
 import { useAlarms } from "./hooks/useAlarms";
 import { useAntics } from "./hooks/useAntics";
 import { useCursorFeed } from "./hooks/useCursorFeed";
@@ -69,6 +70,8 @@ export default function App() {
   useGameFeed();
   usePlayOffers();
   useUpdateCheck();
+  useArgusFeed();
+  useArgusDetect();
 
   return <Island />;
 }

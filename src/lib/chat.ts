@@ -4,7 +4,7 @@
  */
 import { GeminiError, inlinePart, pickFallbackModel, streamChat, type Content, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
-import { FUNCTIONS, runTool, systemPrompt } from "./aiTools";
+import { functions, runTool, systemPrompt } from "./aiTools";
 import { useNook, type ChatItem } from "../store/nook";
 
 /** Modele gönderilen geçmiş (son N mesaj). */
@@ -75,7 +75,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
         parts.length = 0;
         reply = reply.slice(0, turnStart);
         try {
-          for await (const ev of streamChat(key, model, systemPrompt(), contents, FUNCTIONS, controller.signal)) {
+          for await (const ev of streamChat(key, model, systemPrompt(), contents, functions(), controller.signal)) {
             if (ev.type === "part") {
               parts.push(ev.part);
               continue;

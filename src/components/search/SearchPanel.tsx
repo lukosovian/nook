@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AppWindow, ArrowRightLeft, Calculator, CornerDownLeft, Globe, Languages, MessageCircle, Search, Smile, StickyNote, TrendingUp, type LucideIcon } from "lucide-react";
+import { AppWindow, ArrowRightLeft, Calculator, Clapperboard, CornerDownLeft, Globe, Languages, MessageCircle, Search, Smile, StickyNote, TrendingUp, type LucideIcon } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
 import { copyText, listApps, openPath, setInteractive, type AppEntry } from "../../lib/bridge";
 import { sendChat } from "../../lib/chat";
+import { useArgus } from "../../lib/argus";
 import { search, searchOnline, type ResultKind, type SearchResult } from "../../lib/search";
 import { useNook } from "../../store/nook";
 import { Frame } from "../panels/Frame";
@@ -19,6 +20,7 @@ const KIND: Record<ResultKind, { icon: LucideIcon; color: string }> = {
   web: { icon: Globe, color: ACCENT.blue },
   note: { icon: StickyNote, color: ACCENT.yellow },
   ask: { icon: MessageCircle, color: ACCENT.purple },
+  argus: { icon: Clapperboard, color: ACCENT.orange },
 };
 
 const HINTS = ["Spotify", "12*3+4", "100 usd tl", "10 km mi", "en: günaydın", "emoji kalp", "not: süt al"];
@@ -45,7 +47,8 @@ export function SearchPanel() {
     };
   }, []);
 
-  const local = useMemo(() => search(query, apps), [query, apps]);
+  const argusItems = useArgus((st) => st.snap?.items);
+  const local = useMemo(() => search(query, apps, argusItems), [query, apps, argusItems]);
   // Döviz/çeviri: yazmayı bırakınca (350 ms) internetten — bu sırada Nook "düşünür"
   const [online, setOnline] = useState<SearchResult[]>([]);
   useEffect(() => {
@@ -77,6 +80,14 @@ export function SearchPanel() {
       st.setSearching(false);
       st.setBusy("search", false);
       void sendChat(r.payload);
+      return;
+    } else if (r.kind === "argus") {
+      // Argus bölümünde ayrıntısını aç
+      const st = useNook.getState();
+      useArgus.setState({ focusId: r.payload });
+      st.setTab("argus");
+      st.setHovered(true);
+      close();
       return;
     } else if (r.kind === "note") {
       const { note, setNote } = useNook.getState();

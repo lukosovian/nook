@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AlarmClock, Bell, CloudSun, Headphones, Mouse, Target, type LucideIcon } from "lucide-react";
+import { AlarmClock, Bell, Clapperboard, CloudSun, Headphones, Mouse, Target, type LucideIcon } from "lucide-react";
+import { calendar, dayLabel, epLabel, useArgus } from "../../lib/argus";
 import { generateOnce, pickQuickModel } from "../../lib/ai";
 import { systemPrompt } from "../../lib/aiTools";
 import { clock } from "../../lib/alarm";
@@ -67,6 +68,7 @@ export function TodayPanel() {
   y.setDate(y.getDate() - 1);
   const yesterday = s.days[dayKey(y)];
   const w = s.weather;
+  const argus = useArgus((st) => st.snap);
 
   const items: { icon: LucideIcon; color: string; text: string }[] = [];
   if (w) items.push({ icon: CloudSun, color: ACCENT.yellow, text: `${w.temp}° ${SKY_LABEL[w.sky].toLocaleLowerCase("tr")} · ${w.high}°/${w.low}° · yağış %${w.rainChance}` });
@@ -75,6 +77,16 @@ export function TodayPanel() {
     color: ACCENT.orange,
     text: alarms.length ? `Bugün ${alarms.map((a) => `${clock(a)}${a.label ? ` ${a.label}` : ""}`).join(", ")}` : "Bugün alarm yok",
   });
+  const shows = calendar(argus).slice(0, 3);
+  if (shows.length) {
+    const first = shows[0].date;
+    const same = shows.filter((e) => e.date === first);
+    items.push({
+      icon: Clapperboard,
+      color: ACCENT.orange,
+      text: `${dayLabel(first)} yeni bölüm: ${same.map((e) => `${e.item.title} ${epLabel(e.ep)}`).join(", ")}`,
+    });
+  }
   if (s.notifications.length) {
     const since = s.notifications.filter((n) => n.at > Date.now() - 12 * 3600_000).length;
     if (since) items.push({ icon: Bell, color: ACCENT.purple, text: `Gece ${since} bildirim geldi` });

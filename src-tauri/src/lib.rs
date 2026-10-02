@@ -1,4 +1,5 @@
 mod alarm;
+mod argus;
 mod audio;
 mod brightness;
 mod clipboard;
@@ -45,6 +46,9 @@ pub fn run() {
             commands::apply_settings,
             commands::list_monitors,
             commands::set_window_size,
+            argus::argus_snapshot,
+            argus::argus_mark,
+            argus::argus_open,
             commands::inspect_paths,
             commands::drag_icon_path,
             shell::open_path,

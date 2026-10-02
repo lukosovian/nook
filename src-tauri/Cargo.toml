@@ -29,6 +29,7 @@ png = "0.17"
 jpeg-encoder = "0.6"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+ureq = { version = "2", default-features = false, features = ["json"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

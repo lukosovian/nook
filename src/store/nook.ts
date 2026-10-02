@@ -90,6 +90,7 @@ export type Tab =
   | "play"
   | "report"
   | "today"
+  | "argus"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -194,6 +195,12 @@ export interface Settings extends NativeSettings {
   gameSummary: boolean;
   /** Nook sıkılınca oyun teklif etsin */
   playOffers: boolean;
+  /** Argus profili (kullanıcı adı) */
+  argusProfile: string;
+  /** Takip ettiğin dizilerin yeni bölüm haberleri */
+  argusNews: boolean;
+  /** Tarayıcıda izlediğini Argus'la eşleştirip işaretlemeyi teklif et */
+  argusDetect: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -227,6 +234,9 @@ export const DEFAULT_SETTINGS: Settings = {
   dailySummary: true,
   gameSummary: true,
   playOffers: true,
+  argusProfile: "Luko",
+  argusNews: true,
+  argusDetect: true,
 };
 
 export interface Osd {

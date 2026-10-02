@@ -111,7 +111,8 @@ export type SysEventKind =
   | "water"
   | "game"
   | "play"
-  | "update";
+  | "update"
+  | "argus";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {
@@ -200,6 +201,12 @@ export const applySettings = (settings: NativeSettings) =>
 export const listMonitors = () => (inTauri ? invoke<MonitorInfo[]>("list_monitors") : Promise.resolve([]));
 /** Arama açıkken pencere tıklanabilir/odakta kalsın; kapanınca odak önceki uygulamaya döner. */
 export const setInteractive = (on: boolean) => (inTauri ? invoke<void>("set_interactive", { on }) : noop());
+/** Argus (dizi/film arşivi) — yoksa null */
+export const argusSnapshot = (profile: string, today: string) =>
+  inTauri ? invoke<import("./argus").ArgusSnapshot | null>("argus_snapshot", { profile, today }) : Promise.resolve(null);
+export const argusMark = (rowId: string, today: string, season?: number, episode?: number) =>
+  invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode });
+export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
 /** Tanıtım ekranı için pencereyi büyüt; argümansız çağrı varsayılan boyuta döndürür. */
 export const setWindowSize = (width?: number, height?: number) => (inTauri ? invoke<void>("set_window_size", { width, height }) : noop());
 export const releaseFocus = () => (inTauri ? invoke<void>("release_focus") : noop());

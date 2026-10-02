@@ -4,6 +4,7 @@ import { useGemini } from "../../hooks/useGemini";
 import { alarmRing, listMonitors, type MonitorInfo } from "../../lib/bridge";
 import { startTour } from "../../lib/tour";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
+import { openArgus, useArgus } from "../../lib/argus";
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle } from "../ui/primitives";
 
@@ -76,6 +77,8 @@ export function SettingsPanel() {
       </Section>
 
       <AiSection />
+
+      <ArgusSection />
 
       <Section title="Davranış">
         <Row label="Windows açılınca başlat">
@@ -175,6 +178,41 @@ export function SettingsPanel() {
         )}
       </Section>
     </div>
+  );
+}
+
+/** Argus (dizi/film arşivi) — yalnızca bu bilgisayarda varsa görünür. */
+function ArgusSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const snap = useArgus((st) => st.snap);
+  if (!snap) return null;
+  return (
+    <Section title="Argus">
+      <Row label="Profil">
+        <select
+          value={snap.profile}
+          onChange={(e) => update({ argusProfile: e.target.value })}
+          className="rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label outline-none"
+        >
+          {snap.profiles.map((p) => (
+            <option key={p} value={p} className="bg-neutral-900">
+              {p}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <Row label="Yeni bölüm haberleri">
+        <Toggle on={s.argusNews} onChange={(v) => update({ argusNews: v })} color={ACCENT.orange} />
+      </Row>
+      <Row label="İzlediğimi fark et, işaretlemeyi sor">
+        <Toggle on={s.argusDetect} onChange={(v) => update({ argusDetect: v })} color={ACCENT.orange} />
+      </Row>
+      <Row label={snap.running ? "Argus açık" : "Argus kapalı"}>
+        <TextButton onClick={() => void openArgus()}>Argus'u aç</TextButton>
+      </Row>
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">Argus kapalıyken de işaretleyebilirsin; Nook onu arka planda kısa süreliğine açıp kapatır.</p>
+    </Section>
   );
 }
 
