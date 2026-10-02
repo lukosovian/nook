@@ -71,9 +71,16 @@ interface ArgusState {
   suggestion: ArgusSuggestion | null;
   /** Aramadan seçilen kayıt — panelde ayrıntısı açılır */
   focusId: string | null;
+  /** Şu an çalan ve Argus'la eşleşen şey: bugün ne kadar izlendi */
+  live: ArgusLive | null;
 }
 
-export const useArgus = create<ArgusState>(() => ({ snap: null, busy: null, suggestion: null, focusId: null }));
+export interface ArgusLive extends ArgusSuggestion {
+  playedMs: number;
+  needMs: number;
+}
+
+export const useArgus = create<ArgusState>(() => ({ snap: null, busy: null, suggestion: null, focusId: null, live: null }));
 
 const REFRESH_MS = 60_000;
 const NEWS_KEY = "nook-argus-news";
@@ -337,39 +344,67 @@ function announceNews() {
 }
 
 const TICK_MS = 5000;
-/** Süresi bilinmiyorsa en az bu kadar izlenmiş olmalı */
-const MIN_EPISODE_MS = 15 * 60_000;
-const MIN_MOVIE_MS = 45 * 60_000;
+/** Kullanıcının kendi kuralı: dizi/film 15 dk izlendiyse o güne yazılır (yüzdeye bakılmaz) */
+const MIN_WATCH_MS = 15 * 60_000;
 /** Duraklatıldıktan bu kadar sonra "bitti" sayılır */
 const IDLE_END_MS = 3 * 60_000;
 
+/** Bugün bölüm/film başına oynatılan süre — Nook yeniden açılsa da, duraklatıp dönülse de kaybolmaz */
+const PLAYED_KEY = "nook-argus-played";
+type PlayedStore = { day: string; ms: Record<string, number>; asked: string[] };
+
+function loadPlayed(): PlayedStore {
+  try {
+    const v = JSON.parse(localStorage.getItem(PLAYED_KEY) ?? "null") as PlayedStore | null;
+    if (v && v.day === dayKey()) return v;
+  } catch {
+    /* bozuksa sıfırdan */
+  }
+  return { day: dayKey(), ms: {}, asked: [] };
+}
+
+function savePlayed(p: PlayedStore) {
+  try {
+    localStorage.setItem(PLAYED_KEY, JSON.stringify(p));
+  } catch {
+    /* önemsiz */
+  }
+}
+
+const sugKey = (sug: ArgusSuggestion) => `${sug.itemId}:${sug.season ?? ""}:${sug.episode ?? ""}`;
+// 15 dk'dan kısa bölümlerde neredeyse tamamı yeter
+const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, duration * 0.9) : MIN_WATCH_MS);
+
 /**
- * Tarayıcıda/oynatıcıda çalan şeyi Argus'la eşleştirir. Yeterince izlenip bitince (ya da
- * uzun süre duraklatılınca, başka şeye geçilince) "işaretleyeyim mi?" diye sorar.
+ * Tarayıcıda/oynatıcıda çalan şeyi Argus'la eşleştirir. Yalnızca gerçekten oynarken geçen süre
+ * sayılır (duraklatma sayılmaz, ileri sarma süre eklemez). 15 dk dolup izleme bitince
+ * (durdurulup 3 dk geçince, başka şeye geçilince, jeneriğe gelince) "işaretleyeyim mi?" diye sorar.
  */
 export function useArgusDetect() {
   useEffect(() => {
     if (!isPrimary || !inTauri) return;
-    let cur: { key: string; sug: ArgusSuggestion; played: number; duration: number; idleSince: number | null } | null = null;
-    const asked = new Set<string>();
+    let store = loadPlayed();
+    let cur: { key: string; sug: ArgusSuggestion; duration: number; idleSince: number | null } | null = null;
     let lastText = "";
     let lastMatch: ArgusSuggestion | null = null;
+
+    const played = (key: string) => store.ms[key] ?? 0;
 
     const finish = () => {
       const c = cur;
       cur = null;
-      if (!c || asked.has(c.key)) return;
+      useArgus.setState({ live: null });
+      if (!c || store.asked.includes(c.key)) return;
       const item = findItem(c.sug.itemId);
-      if (!item) return;
-      const need = c.duration > 0 ? c.duration * 0.6 : item.series ? MIN_EPISODE_MS : MIN_MOVIE_MS;
-      if (c.played < need) return;
-      asked.add(c.key);
+      if (!item || played(c.key) < needFor(c.duration)) return;
+      store.asked.push(c.key);
+      savePlayed(store);
       useArgus.setState({ suggestion: c.sug });
       const s = useNook.getState();
       s.pushToast({
         kind: "argus",
         title: `${item.title}${c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""} bitti mi?`,
-        detail: "Üstüme gel, Argus'a işaretleyeyim",
+        detail: `${Math.round(played(c.key) / 60_000)} dk izledin · Üstüme gel, Argus'a işaretleyeyim`,
         ms: 9000,
       });
       s.setPendingTab("argus");
@@ -380,26 +415,30 @@ export function useArgusDetect() {
       const s = useNook.getState();
       const snap = useArgus.getState().snap;
       if (!s.settings.argusDetect || !snap) return;
+      if (store.day !== dayKey()) store = loadPlayed();
       const m = s.media;
       if (m?.playing) {
-        const text = `${m.title}\n${m.artist}`;
+        const text = `${m.title}
+${m.artist}`;
         if (text !== lastText) {
           lastText = text;
           lastMatch = matchMedia(snap, m.title, m.artist);
         }
         const sug = lastMatch;
-        const key = sug ? `${sug.itemId}:${sug.season ?? ""}:${sug.episode ?? ""}` : "";
         if (!sug) {
           if (cur) finish();
           return;
         }
+        const key = sugKey(sug);
         if (cur?.key !== key) {
           finish();
-          cur = { key, sug, played: 0, duration: m.durationMs || 0, idleSince: null };
+          cur = { key, sug, duration: m.durationMs || 0, idleSince: null };
         }
-        cur.played += TICK_MS;
+        store.ms[key] = played(key) + TICK_MS;
+        savePlayed(store);
         cur.idleSince = null;
         if (m.durationMs) cur.duration = m.durationMs;
+        useArgus.setState({ live: { ...sug, playedMs: played(key), needMs: needFor(cur.duration) } });
         const pos = m.positionMs + (performance.now() - m.at);
         // Jenerik: %93'e gelince bitti say
         if (cur.duration && pos >= cur.duration * 0.93) finish();

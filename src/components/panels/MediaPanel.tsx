@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { AnimatePresence, motion, useAnimationFrame } from "motion/react";
+import { epLabel, useArgus } from "../../lib/argus";
 import { mediaControl, type MediaAction } from "../../lib/bridge";
 import { appName, formatTime, livePosition } from "../../lib/media";
 import { spring } from "../../lib/motion";
@@ -77,10 +78,28 @@ export function MediaPanel() {
             </p>
           </motion.div>
         </AnimatePresence>
+        <ArgusWatch />
         {media.durationMs > 0 && <Progress media={media} />}
         <Controls playing={media.playing} />
       </div>
     </div>
+  );
+}
+
+/** Argus'la eşleşen dizi/film çalıyorsa: bugün ne kadar izlendi, 15 dk'ya ne kaldı */
+function ArgusWatch() {
+  const live = useArgus((s) => s.live);
+  const item = useArgus((s) => s.snap?.items.find((i) => i.id === live?.itemId) ?? null);
+  if (!live || !item) return null;
+  const min = Math.floor(live.playedMs / 60_000);
+  const done = live.playedMs >= live.needMs;
+  const ep = live.season ? ` ${epLabel(live as { season: number; episode: number })}` : "";
+  return (
+    <p className="mt-1 truncate text-[10px] font-medium tabular-nums" style={{ color: tintText(ACCENT.orange) }} title={`${item.title}${ep}`}>
+      Argus · {item.title}
+      {ep} · {min} dk izlendi
+      {done ? " ✓" : ` / ${Math.ceil(live.needMs / 60_000)} dk`}
+    </p>
   );
 }
 
