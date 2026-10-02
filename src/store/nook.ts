@@ -36,7 +36,8 @@ export type Antic =
   | "annoyed"
   | "shy"
   | "suspicious"
-  | "bored";
+  | "bored"
+  | "drink";
 
 /** Yüz ifadesi = mood › antic › uyku › yorgunluk (düşük pil) › gece uykululuğu */
 export type Expression =
@@ -130,9 +131,11 @@ export interface DayStats {
   /** Gün boyu sevgi ortalaması için */
   moodSum: number;
   moodN: number;
+  /** İçilen bardak su */
+  water: number;
 }
 
-export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0 };
+export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0, water: 0 };
 
 /** Yerel tarih anahtarı: 2026-10-02 */
 export const dayKey = (d = new Date()) =>
@@ -300,6 +303,8 @@ interface NookState {
   grabbed: boolean;
   /** Açılış animasyonu sürüyor */
   intro: boolean;
+  /** Kalıcı hatırlatma (su): kullanıcı cevaplayana kadar adada durur */
+  reminder: { kind: "water"; phase: "due" | "drinking" } | null;
   /** "Nook nedir?" tanıtımı açık */
   tour: boolean;
   tourStep: number;
@@ -370,6 +375,7 @@ interface NookState {
   setGrabbed: (grabbed: boolean) => void;
   setIntro: (intro: boolean) => void;
   setTour: (tour: boolean) => void;
+  setReminder: (reminder: NookState["reminder"]) => void;
   setTourStep: (tourStep: number) => void;
   setBusy: (key: string, on: boolean) => void;
   addAlarm: (a: Omit<Alarm, "id" | "next" | "enabled"> & { at?: number }) => void;
@@ -437,6 +443,7 @@ export const useNook = create<NookState>()(
       grabbed: false,
       intro: true,
       tour: false,
+      reminder: null,
       tourStep: 0,
       toured: false,
       busy: [],
@@ -544,6 +551,7 @@ export const useNook = create<NookState>()(
       setIntro: (intro) => set({ intro }),
       setTour: (tour) => set(tour ? { tour, tourStep: 0 } : { tour, toured: true }),
       setTourStep: (tourStep) => set({ tourStep }),
+      setReminder: (reminder) => set({ reminder }),
       addAlarm: ({ at, ...a }) =>
         set((s) => ({
           alarms: [...s.alarms, { ...a, id: crypto.randomUUID(), enabled: true, next: at ?? nextFire(a) }].sort(

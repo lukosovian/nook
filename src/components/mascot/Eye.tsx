@@ -83,6 +83,8 @@ export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
   volDown: [pill(3.8, 5.4, 0.8), pill(3.8, 5.4, 0.8)],
   // Çok yüksek: gözlerini sıkar "> <"
   loud: [pill(5.4, 1.8, 0.4), pill(5.4, 1.8, 0.4)],
+  // Su içerken keyifle kapalı gözler
+  drink: [arch(5, 3), arch(5, 3)],
   // Sessiz: huzurla kapalı gözler
   muted: [arch(5, 2.6), arch(5, 2.6)],
 };

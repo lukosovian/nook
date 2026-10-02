@@ -39,7 +39,7 @@ export function AlarmPanel() {
         <div className="flex items-center rounded-[14px] bg-well px-1.5">
           <Digit value={hour} max={23} onChange={setHour} />
           <span className="pb-0.5 font-display text-[24px] font-medium text-label-3">:</span>
-          <Digit value={minute} max={59} step={5} onChange={setMinute} />
+          <Digit value={minute} max={59} onChange={setMinute} />
         </div>
         <div className="min-w-0 flex-1 space-y-1.5">
           <input
@@ -134,33 +134,59 @@ export function AlarmPanel() {
   );
 }
 
-/** Büyük rakam: fare tekerleği ya da oklarla değişir (dakika 5'er). */
-function Digit({ value, max, step = 1, onChange }: { value: number; max: number; step?: number; onChange: (v: number) => void }) {
+/**
+ * Büyük rakam: oklar ve fare tekerleği 1'er (Shift ile 5'er) değiştirir; rakama tıklayınca
+ * klavyeden yazılır (Enter / dışarı tıklama ile kaydedilir, ↑↓ de çalışır).
+ */
+function Digit({ value, max, onChange }: { value: number; max: number; onChange: (v: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
   const wrap = (v: number) => (v + max + 1) % (max + 1);
-  const up = () => onChange(wrap(step > 1 ? Math.floor(value / step) * step + step : value + 1));
-  const down = () => onChange(wrap(step > 1 ? Math.ceil(value / step) * step - step : value - 1));
+  const up = (n = 1) => onChange(wrap(value + n));
+  const down = (n = 1) => onChange(wrap(value - n));
+  const commit = () => {
+    if (draft !== null && draft !== "") onChange(Math.min(max, Math.max(0, Number(draft))));
+    setDraft(null);
+  };
   return (
     <div
       className="group flex flex-col items-center"
-      onWheel={(e) => (e.deltaY < 0 ? up() : down())}
-      title="Fare tekerleği ya da oklarla değiştir"
+      onWheel={(e) => (e.deltaY < 0 ? up(e.shiftKey ? 5 : 1) : down(e.shiftKey ? 5 : 1))}
+      title="Tıkla ve yaz · fare tekerleği ya da oklar (Shift ile 5'er)"
     >
-      <button onClick={up} className="text-label-3 opacity-40 transition-opacity hover:text-label group-hover:opacity-100">
+      <button onClick={() => up()} className="text-label-3 opacity-40 transition-opacity hover:text-label group-hover:opacity-100">
         <ChevronUp size={12} strokeWidth={2.6} />
       </button>
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span
-          key={value}
-          className="w-8 text-center font-display text-[24px] font-medium leading-none tabular-nums text-label"
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 6 }}
-          transition={{ duration: 0.12 }}
-        >
-          {pad(value)}
-        </motion.span>
-      </AnimatePresence>
-      <button onClick={down} className="text-label-3 opacity-40 transition-opacity hover:text-label group-hover:opacity-100">
+      {draft !== null ? (
+        <input
+          autoFocus
+          value={draft}
+          inputMode="numeric"
+          maxLength={2}
+          onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 2))}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            else if (e.key === "Escape") setDraft(null);
+          }}
+          onFocus={(e) => e.target.select()}
+          className="w-8 rounded-[6px] bg-white/10 text-center font-display text-[24px] font-medium leading-none tabular-nums text-label outline-none"
+        />
+      ) : (
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.button
+            key={value}
+            onClick={() => setDraft(pad(value))}
+            className="w-8 text-center font-display text-[24px] font-medium leading-none tabular-nums text-label"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.12 }}
+          >
+            {pad(value)}
+          </motion.button>
+        </AnimatePresence>
+      )}
+      <button onClick={() => down()} className="text-label-3 opacity-40 transition-opacity hover:text-label group-hover:opacity-100">
         <ChevronDown size={12} strokeWidth={2.6} />
       </button>
     </div>

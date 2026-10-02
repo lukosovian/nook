@@ -34,17 +34,44 @@ export function useFocusTimer() {
   }, []);
 }
 
+/** Son su içiminden bu yana geçen aktif dakika — "Sonra" bunu geri sarar */
+let waterMinutes = 0;
+const SNOOZE_MIN = 15;
+
+/** "İçtim": Nook da bardağıyla içer, sonra hatırlatma kapanır. Hatırlatma yokken de (Bugün'den) kaydedilebilir. */
+export function drankWater() {
+  const s = useNook.getState();
+  if (s.reminder?.phase === "drinking") return;
+  waterMinutes = 0;
+  s.setReminder({ kind: "water", phase: "drinking" });
+  s.track({ water: 1 });
+  s.care(2);
+  playAntic("drink");
+  window.setTimeout(() => {
+    useNook.getState().setReminder(null);
+    playAntic("love");
+  }, 2400);
+}
+
+/** "Sonra": 15 dakika sonra yeniden hatırlat. */
+export function snoozeWater() {
+  const s = useNook.getState();
+  waterMinutes = Math.max(0, s.settings.waterEvery - SNOOZE_MIN);
+  s.setReminder(null);
+  playAntic("nod");
+}
+
 /**
  * Dakikada bir: bugünün istatistiği (Karne) ve mola hatırlatıcıları.
  *  - 20-20-20: 20 dk kesintisiz kullanımda "20 sn uzağa bak"
- *  - Su: ayardaki aralıkla
- * Bilgisayar boştaysa (uyku) göz sayacı sıfırlanır; oyunda/tam ekranda hatırlatma yapılmaz.
+ *  - Su: ayardaki aralıkla; cevaplanana kadar adada durur (bilgisayar başında değilken ya da
+ *    tam ekrandayken kaybolmaz — dönünce seni bekler)
+ * Bilgisayar boştaysa (uyku) göz sayacı sıfırlanır; oyunda/tam ekranda göz hatırlatması yapılmaz.
  */
 export function useDayTracker() {
   useEffect(() => {
     if (!isPrimary) return;
     let eye = 0;
-    let water = 0;
     const t = window.setInterval(() => {
       const s = useNook.getState();
       const away = isSleeping(s);
@@ -62,7 +89,8 @@ export function useDayTracker() {
         return;
       }
       eye += 1;
-      water += 1;
+      // Hatırlatma ekranda beklerken sayaç ilerlemez
+      if (!s.reminder) waterMinutes += 1;
       const resting = !!s.focus && s.focus.phase !== "work";
       const quiet = s.fullscreen || !!s.ringing || resting;
       if (s.settings.eyeBreak && eye >= 20) {
@@ -72,12 +100,10 @@ export function useDayTracker() {
           playAntic("suspicious");
         }
       }
-      if (s.settings.waterEvery > 0 && water >= s.settings.waterEvery) {
-        water = 0;
-        if (!quiet) {
-          s.pushToast({ kind: "water", title: "Su içme vakti", detail: "Bir bardak su iyi gelir", ms: 6000 });
-          playAntic("nod");
-        }
+      if (s.settings.waterEvery > 0 && waterMinutes >= s.settings.waterEvery && !s.reminder) {
+        waterMinutes = 0;
+        s.setReminder({ kind: "water", phase: "due" });
+        playAntic("surprised");
       }
     }, 60_000);
     return () => window.clearInterval(t);

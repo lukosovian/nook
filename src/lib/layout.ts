@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -17,6 +17,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   toast: { width: 310, height: 52, radius: 20 },
   /** Çalan alarm */
   alarm: { width: 360, height: 70, radius: 26 },
+  /** Su hatırlatması: cevaplanana kadar durur */
+  reminder: { width: 440, height: 66, radius: 26 },
   /** "Nook nedir?" tanıtımı: ada ekrana yayılır */
   tour: { width: 900, height: 520, radius: 40 },
 };
@@ -94,6 +96,7 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
     case "toast":
       return center(28, height / 2, 1.15);
     case "alarm":
+    case "reminder":
       return center(36, height / 2 + 2, 1.45);
     default:
       return center(width / 2, height / 2, 1);

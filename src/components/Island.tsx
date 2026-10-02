@@ -18,6 +18,7 @@ import { ListenMini } from "./overlays/ListenMini";
 import { Intro, INTRO_MS } from "./overlays/Intro";
 import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
+import { ReminderView } from "./overlays/ReminderView";
 import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
 import { SearchPanel } from "./search/SearchPanel";
@@ -164,6 +165,7 @@ export function Island() {
             {mode === "osd" && <OsdView key="osd" />}
             {mode === "toast" && <ToastView key="toast" />}
             {mode === "alarm" && <AlarmView key="alarm" />}
+            {mode === "reminder" && <ReminderView key="reminder" />}
           </AnimatePresence>
         </motion.div>
       </motion.div>

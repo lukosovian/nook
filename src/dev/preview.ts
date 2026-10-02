@@ -115,7 +115,7 @@ export function applyPreview(mode: string) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        return [key, { music: 60 + i * 9, focus: [45, 90, 20, 75, 0, 110, 60][i], pomodoros: [2, 4, 1, 3, 0, 4, 2][i], game: [30, 0, 120, 0, 200, 15, 40][i], active: [260, 410, 180, 380, 90, 450, 300][i], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60 }];
+        return [key, { music: 60 + i * 9, focus: [45, 90, 20, 75, 0, 110, 60][i], pomodoros: [2, 4, 1, 3, 0, 4, 2][i], game: [30, 0, 120, 0, 200, 15, 40][i], active: [260, 410, 180, 380, 90, 450, 300][i], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, water: [3, 5, 2, 4, 6, 1, 4][i] }];
       }),
     ),
     weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() },
@@ -148,6 +148,8 @@ export function applyPreview(mode: string) {
     useNook.setState({ searching: true });
   } else if (mode === "collapsed" || mode === "privacy") {
     useNook.setState({ media: null });
+  } else if (mode === "reminder" || mode === "drinking") {
+    useNook.setState({ media: null, reminder: { kind: "water", phase: mode === "drinking" ? "drinking" : "due" }, antic: mode === "drinking" ? "drink" : null });
   } else if (mode === "ringing") {
     useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: "Toplantı", repeat: "once", enabled: false, next: null } });
   } else if (mode === "feeding") {

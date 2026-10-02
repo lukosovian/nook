@@ -19,6 +19,7 @@ export const ANTIC_MS: Record<Antic, number> = {
   shy: 2400,
   suspicious: 2600,
   bored: 3200,
+  drink: 2300,
 };
 
 let token = 0;

@@ -88,6 +88,8 @@ const BODY: Record<Expression, TargetAndTransition> = {
   shy: { x: 0, y: [0, 1, 0], rotate: [0, -6, -6, 0], transition: { duration: sec(ANTIC_MS.shy), times: [0, 0.2, 0.8, 1] } },
   suspicious: { x: [0, 2, 2, 0], y: 0, rotate: [0, -7, -7, 0], transition: { duration: sec(ANTIC_MS.suspicious), times: [0, 0.2, 0.85, 1] } },
   bored: { x: 0, rotate: 0, y: [0, 1.5, 1.5, 0], transition: { duration: sec(ANTIC_MS.bored), times: [0, 0.3, 0.8, 1] } },
+  // Su içer: başını geriye atıp yudumlar
+  drink: { x: 0, y: [0, -1, -1.5, -1, 0], rotate: [0, -12, -16, -12, 0], transition: { duration: sec(ANTIC_MS.drink), times: [0, 0.2, 0.5, 0.8, 1] } },
   downloading: { x: 0, y: 0, rotate: 0 },
   talking: { x: 0, rotate: [0, -2, 0, 2, 0], y: [0, -0.6, 0], transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } },
   // Alarm: zil gibi titrer
@@ -133,7 +135,7 @@ const EYE_OFFSET: Partial<Record<Expression, { x: number; y: number }>> = {
 };
 
 /** Gözleri kapalı/özel çizimli ifadeler — imleç takibi yok. */
-const NO_LOOK = new Set<Expression>(["volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading"]);
+const NO_LOOK = new Set<Expression>(["volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
 /** Kendiliğinden göz kırpan ifadeler. */
 const BLINKS = new Set<Expression>(["idle", "drowsy", "tired", "wander", "hop", "surprised", "hungry"]);
 
@@ -270,6 +272,9 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
           </AnimatePresence>
         </motion.div>
 
+        {/* Su bardağı: içerken ağzına gider, eğilir, su azalır */}
+        <AnimatePresence>{expression === "drink" && <Glass key="glass" />}</AnimatePresence>
+
         {/* Kutu kapağı: dosya gelince açılır, yutunca kapanır */}
         <AnimatePresence>
           {isBox && (
@@ -320,6 +325,34 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
         </AnimatePresence>
       </motion.div>
       <AnimatePresence>{floater && <Floater key={floater.char} {...floater} />}</AnimatePresence>
+    </motion.div>
+  );
+}
+
+/** Su içerken tuttuğu küçük cam bardak (yüz biriminde ~7×9). */
+function Glass() {
+  const d = sec(ANTIC_MS.drink);
+  return (
+    <motion.div
+      className="pointer-events-none absolute"
+      style={{ left: 14, top: 15, width: 6.5, height: 8.5, originX: 0.1, originY: 0.1 }}
+      initial={{ opacity: 0, x: 4, y: 6, rotate: 0 }}
+      animate={{ opacity: [0, 1, 1, 1, 0], x: [5, 0, -1.5, 0, 5], y: [6, 0, -0.5, 0, 6], rotate: [0, -30, -50, -30, 0] }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: d, times: [0, 0.2, 0.5, 0.8, 1], ease: "easeInOut" }}
+    >
+      <div
+        className="relative h-full w-full overflow-hidden"
+        style={{ borderRadius: "1px 1px 2px 2px", background: "rgba(220,240,255,0.35)", boxShadow: "inset 0 0 0 0.6px rgba(255,255,255,0.9), 0 1px 2px rgba(0,0,0,0.4)" }}
+      >
+        <motion.div
+          className="absolute inset-x-0 bottom-0"
+          style={{ background: "linear-gradient(180deg, #8fd0ff, #3d8bff)" }}
+          initial={{ height: "75%" }}
+          animate={{ height: ["75%", "75%", "25%", "15%", "15%"] }}
+          transition={{ duration: d, times: [0, 0.2, 0.6, 0.8, 1] }}
+        />
+      </div>
     </motion.div>
   );
 }

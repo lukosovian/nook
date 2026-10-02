@@ -59,6 +59,8 @@ const POSES: Partial<Record<Expression, [Pose, Pose]>> = {
   wink: [HIDE, show({ x: 2, y: -2, rotate: -25 })],
   // Utangaç: elleriyle yanaklarını kapatır
   shy: [show({ x: 4.5, y: 4, rotate: 25 }), show({ x: -4.5, y: 4, rotate: -25 })],
+  // Su içerken: sağ el bardağı ağzına götürür
+  drink: [show({ x: 2, y: 4 }), show({ x: -7, y: [6, 5, 5, 5, 6], rotate: [-10, -40, -40, -40, -10], transition: { duration: sec(ANTIC_MS.drink), times: [0, 0.2, 0.5, 0.8, 1] } })],
   // Şüpheci: el çenede
   suspicious: [HIDE, show({ x: -6.5, y: 10, rotate: -10 })],
   // Sıkılmış: eller sarkık

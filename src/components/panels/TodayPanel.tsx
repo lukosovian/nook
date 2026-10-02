@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { AlarmClock, Bell, Clapperboard, CloudSun, Headphones, Mouse, Target, type LucideIcon } from "lucide-react";
+import { AlarmClock, Bell, Clapperboard, CloudSun, Droplet, Headphones, Mouse, Target, type LucideIcon } from "lucide-react";
 import { calendar, dayLabel, epLabel, useArgus } from "../../lib/argus";
+import { drankWater } from "../../hooks/useFeatures";
 import { generateOnce, pickQuickModel } from "../../lib/ai";
 import { systemPrompt } from "../../lib/aiTools";
 import { clock } from "../../lib/alarm";
@@ -70,7 +71,7 @@ export function TodayPanel() {
   const w = s.weather;
   const argus = useArgus((st) => st.snap);
 
-  const items: { icon: LucideIcon; color: string; text: string }[] = [];
+  const items: { icon: LucideIcon; color: string; text: string; action?: { label: string; run: () => void } }[] = [];
   if (w) items.push({ icon: CloudSun, color: ACCENT.yellow, text: `${w.temp}° ${SKY_LABEL[w.sky].toLocaleLowerCase("tr")} · ${w.high}°/${w.low}° · yağış %${w.rainChance}` });
   items.push({
     icon: AlarmClock,
@@ -93,6 +94,13 @@ export function TodayPanel() {
   }
   if (s.devices?.headset) items.push({ icon: Headphones, color: ACCENT.blue, text: `Kulaklık %${s.devices.headset.percent}` });
   if (s.devices?.mouse) items.push({ icon: Mouse, color: ACCENT.blue, text: `Mouse %${s.devices.mouse.percent}` });
+  const water = s.days[dayKey()]?.water ?? 0;
+  items.push({
+    icon: Droplet,
+    color: ACCENT.blue,
+    text: water ? `Bugün ${water} bardak su içtin` : "Bugün henüz su içmedin",
+    action: { label: "İçtim", run: drankWater },
+  });
   if (yesterday?.focus) items.push({ icon: Target, color: ACCENT.red, text: `Dün ${yesterday.focus} dk odaklandın (${yesterday.pomodoros} tur)` });
 
   return (
@@ -130,6 +138,15 @@ export function TodayPanel() {
           <div key={i} className="flex items-center gap-2 text-[11.5px] text-label-2">
             <it.icon size={12} strokeWidth={2.4} style={{ color: it.color }} className="shrink-0" />
             <span className="truncate">{it.text}</span>
+            {it.action && (
+              <button
+                onClick={it.action.run}
+                className="ml-auto shrink-0 rounded-full border px-2 py-px text-[10.5px] font-medium"
+                style={{ background: tintBg(it.color, 14), borderColor: tintBg(it.color, 36), color: tintText(it.color) }}
+              >
+                + {it.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

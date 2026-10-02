@@ -31,6 +31,8 @@ const MOUTH: Partial<Record<Expression, TargetAndTransition>> = {
   happy: smile(6, 2.8),
   sulk: { ...base, width: 5, height: 1.8, ...corners(2, 2, 0.4, 0.4) },
   shy: smile(4, 1.8),
+  // Yudumlarken küçük "o"
+  drink: { ...base, width: [2.6, 3, 2.6], height: [2.6, 3, 2.6], ...corners(2, 2, 2, 2), transition: { duration: 0.5, repeat: 3 } },
   // Konuşurken ağız açılıp kapanır
   talking: {
     ...base,
