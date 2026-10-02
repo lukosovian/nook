@@ -387,9 +387,8 @@ const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, dur
 
 /**
  * Tarayıcıda/oynatıcıda çalan şeyi Argus'la eşleştirir. Yalnızca gerçekten oynarken geçen süre
- * sayılır (duraklatma sayılmaz, ileri sarma süre eklemez). 15 dk dolduğu anda (izleme sürerken de)
- * ya da 15 dk'yı geçmiş bir izleme bitince (durdurulunca, başka şeye geçilince, jeneriğe gelince)
- * "işaretleyeyim mi?" diye sorar. Süre 15 dk'dan sonra da saymaya devam eder.
+ * sayılır (duraklatma sayılmaz, ileri sarma süre eklemez). 15 dk'yı geçmiş bir izleme bitince
+ * (durdurulunca — beklemeden, başka şeye geçilince, jeneriğe gelince) "işaretleyeyim mi?" diye sorar.
  */
 export function useArgusDetect() {
   useEffect(() => {
@@ -409,7 +408,7 @@ export function useArgusDetect() {
     };
 
     /** Süre dolduysa (bu bölüm için daha önce sorulmadıysa) Argus'a yazmayı önerir */
-    const ask = (c: NonNullable<typeof cur>, watching = false) => {
+    const ask = (c: NonNullable<typeof cur>) => {
       if (store.asked.includes(c.key)) return;
       const item = findItem(c.sug.itemId);
       if (!item || played(c.key) < needFor(c.duration)) return;
@@ -419,10 +418,8 @@ export function useArgusDetect() {
       const s = useNook.getState();
       s.pushToast({
         kind: "argus",
-        title: `${item.title}${c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""}${watching ? "" : " bitti mi?"}`,
-        detail: watching
-          ? `${Math.round(played(c.key) / 60_000)} dk oldu · Üstüme gel, Argus'a yazayım`
-          : `${Math.round(played(c.key) / 60_000)} dk izledin · Üstüme gel, Argus'a işaretleyeyim`,
+        title: `${item.title}${c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""} bitti mi?`,
+        detail: `${Math.round(played(c.key) / 60_000)} dk izledin · Üstüme gel, Argus'a işaretleyeyim`,
         ms: 9000,
       });
       s.setPendingTab("argus");
@@ -457,8 +454,6 @@ ${m.artist}`;
         cur.idleSince = null;
         if (m.durationMs) cur.duration = m.durationMs;
         useArgus.setState({ live: { ...sug, playedMs: played(key), needMs: needFor(cur.duration) } });
-        // 15 dk dolar dolmaz sor — izlemenin bitmesini bekleme
-        if (played(key) >= needFor(cur.duration)) ask(cur, true);
         const pos = m.positionMs + (performance.now() - m.at);
         // Jenerik: %93'e gelince bitti say
         if (cur.duration && pos >= cur.duration * 0.93) finish();
@@ -486,8 +481,8 @@ export interface ArgusCardData {
 }
 
 const CARD_GAP = 10;
-/** Kartın görünen boyutu (pencerede soldan 6 px boşlukla) */
-export const CARD_SIZE = { width: 300, height: 132 };
+/** Kartın görünen boyutu (pencerede soldan 6 px boşlukla) — açık adayla aynı boy */
+export const CARD_SIZE = { width: 360, height: ISLAND.expanded.height };
 /** Karta en son gönderilen — kart penceresi yeni açıldıysa "hazırım" deyince yeniden gönderilir */
 let lastCard: ArgusCardData | { visible: false } = { visible: false };
 const sendCard = (d: ArgusCardData | { visible: false }) => {

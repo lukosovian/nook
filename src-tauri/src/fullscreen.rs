@@ -128,7 +128,7 @@ mod imp {
     use windows_sys::Win32::Foundation::{HWND, RECT};
     use windows_sys::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetClassNameW, GetForegroundWindow, GetWindowRect, IsIconic, IsWindowVisible, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE,
+        GetAncestor, GetClassNameW, GetForegroundWindow, GA_ROOTOWNER, GetWindowRect, IsIconic, IsWindowVisible, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE,
         SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNOACTIVATE,
     };
 
@@ -169,7 +169,17 @@ mod imp {
             }
             let m = mi.rcMonitor;
             let covers = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
-            covers.then(|| ((m.left, m.top, m.right, m.bottom), exe_of(fg)))
+            if !covers {
+                return None;
+            }
+            // Nook'un kendi açtığı tam ekran katmanlar (ekrandan renk seçici) adayı gizlemesin
+            let owner = GetAncestor(fg, GA_ROOTOWNER);
+            let exe = exe_of(fg);
+            let webview = exe.as_deref().is_some_and(|e| e.to_lowercase().ends_with("msedgewebview2.exe"));
+            if shared.is_ours(owner as isize) || webview {
+                return None;
+            }
+            Some(((m.left, m.top, m.right, m.bottom), exe))
         }
     }
 
