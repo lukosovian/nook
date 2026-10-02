@@ -11,7 +11,7 @@ import { create } from "zustand";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../hooks/useAntics";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
-import { emitTo } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
 import type { IslandMode } from "./layout";
 import { ISLAND, ISLAND_TOP } from "./layout";
@@ -475,6 +475,13 @@ export interface ArgusCardData {
 }
 
 const CARD_GAP = 10;
+/** Karta en son gönderilen — kart penceresi yeni açıldıysa "hazırım" deyince yeniden gönderilir */
+let lastCard: ArgusCardData | { visible: false } = { visible: false };
+const sendCard = (d: ArgusCardData | { visible: false }) => {
+  lastCard = d;
+  return emitTo("argus-card", "nook://argus-card", d).catch(() => {});
+};
+if (isPrimary && inTauri) void listen("nook://argus-card-ready", () => void sendCard(lastCard));
 
 /**
  * Ada açıkken ve Argus'taki bir şey çalarken adanın sağında afişli kart gösterir
@@ -501,12 +508,12 @@ export function useArgusCard(mode: IslandMode) {
         needMs: live.needMs,
       };
       void argusCard(true, window.innerWidth / 2 + ISLAND.expanded.width / 2 + CARD_GAP, ISLAND_TOP)
-        .then(() => emitTo("argus-card", "nook://argus-card", data))
-        .catch(() => {});
+        .then(() => sendCard(data))
+        .catch((e) => console.warn("[nook] argus kartı", e));
       return;
     }
     // Önce kart kendi çıkış animasyonunu oynasın, sonra pencere gizlensin
-    void emitTo("argus-card", "nook://argus-card", { visible: false }).catch(() => {});
+    void sendCard({ visible: false });
     const t = window.setTimeout(() => void argusCard(false, 0, 0).catch(() => {}), 260);
     return () => window.clearTimeout(t);
   }, [show, live, snap]);

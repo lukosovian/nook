@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Film } from "lucide-react";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import type { ArgusCardData } from "../lib/argus";
 import { ACCENT, Bar, tintText } from "./ui/primitives";
 
@@ -16,6 +16,8 @@ export function ArgusCard({ initial = null }: { initial?: ArgusCardData | null }
   useEffect(() => {
     if (initial) return;
     const off = listen<ArgusCardData>("nook://argus-card", (e) => setData(e.payload));
+    // Ada, bu pencere yüklenmeden gönderdiyse kaçırmayalım
+    void off.then(() => emit("nook://argus-card-ready"));
     return () => void off.then((f) => f());
   }, [initial]);
 

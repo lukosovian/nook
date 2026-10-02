@@ -892,8 +892,17 @@ pub const CARD: &str = "argus-card";
 pub const CARD_W: f64 = 184.0;
 pub const CARD_H: f64 = 360.0;
 
+/// Pencere oluşturduğu için async olmalı: senkron komutta Windows'ta kilitlenir (wry#583).
 #[tauri::command]
-pub fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
+pub async fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
+    let r = card_inner(&window, show, x, y);
+    if let Err(e) = &r {
+        crate::log::write("warn", &format!("argus kartı: {e}"));
+    }
+    r
+}
+
+fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
     let app = window.app_handle();
     if !show {
         if let Some(c) = app.get_webview_window(CARD) {
@@ -901,10 +910,15 @@ pub fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> R
         }
         return Ok(());
     }
+    let pos = window.outer_position().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let at = tauri::PhysicalPosition::new(pos.x + (x * scale).round() as i32, pos.y + (y * scale).round() as i32);
     let card = match app.get_webview_window(CARD) {
         Some(c) => c,
         None => {
+            // Görünür oluşturulmalı (gizli oluşturulan WebView2 içeriği geç/eksik açabiliyor); doğrudan yerinde
             let c = tauri::WebviewWindowBuilder::new(app, CARD, tauri::WebviewUrl::App("index.html".into()))
+                .position(at.x as f64 / scale, at.y as f64 / scale)
                 .title("Nook")
                 .inner_size(CARD_W, CARD_H)
                 .resizable(false)
@@ -916,17 +930,14 @@ pub fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> R
                 .always_on_top(true)
                 .skip_taskbar(true)
                 .focused(false)
-                .visible(false)
+                .visible(true)
                 .build()
                 .map_err(|e| e.to_string())?;
             c.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
             c
         }
     };
-    let pos = window.outer_position().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    card.set_position(tauri::PhysicalPosition::new(pos.x + (x * scale).round() as i32, pos.y + (y * scale).round() as i32))
-        .map_err(|e| e.to_string())?;
+    card.set_position(at).map_err(|e| e.to_string())?;
     if !card.is_visible().unwrap_or(false) {
         card.show().map_err(|e| e.to_string())?;
     }
