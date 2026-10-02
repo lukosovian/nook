@@ -4,7 +4,7 @@ import { useGemini } from "../../hooks/useGemini";
 import { alarmRing, listMonitors, type MonitorInfo } from "../../lib/bridge";
 import { startTour } from "../../lib/tour";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
-import { installArgus, openArgus, useArgus } from "../../lib/argus";
+import { chooseArgusDir, installArgus, openArgus, useArgus } from "../../lib/argus";
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle } from "../ui/primitives";
 
@@ -192,6 +192,9 @@ function ArgusSection() {
         <Row label="Dizi/film arşivi: Argus">
           <TextButton onClick={() => void installArgus()}>Kur</TextButton>
         </Row>
+        <Row label="Argus kurulu ama bulamadım">
+          <TextButton onClick={() => void chooseArgusDir()}>Klasörünü seç</TextButton>
+        </Row>
         <p className="-mt-0.5 pb-1 text-[10px] text-label-3">Nook'un kardeşi. Kurarsan yeni bölümleri haber veririm, ne izleyeceğini seçerim.</p>
       </Section>
     );
@@ -218,6 +221,14 @@ function ArgusSection() {
       </Row>
       <Row label="İzlediğimi fark et, işaretlemeyi sor">
         <Toggle on={s.argusDetect} onChange={(v) => update({ argusDetect: v })} color={ACCENT.orange} />
+      </Row>
+      <Row label="Klasör">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="max-w-[150px] truncate text-[10.5px] text-label-3" title={snap.dir}>
+            {snap.dir}
+          </span>
+          <TextButton onClick={() => void chooseArgusDir()}>Değiştir</TextButton>
+        </div>
       </Row>
       <Row label={snap.running ? "Argus açık" : "Argus kapalı"}>
         <TextButton onClick={() => void openArgus()}>Argus'u aç</TextButton>

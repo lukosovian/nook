@@ -38,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(Shared::default()))
         .invoke_handler(tauri::generate_handler![
             commands::set_hit_rect,
@@ -50,6 +51,7 @@ pub fn run() {
             argus::argus_mark,
             argus::argus_open,
             argus::argus_install,
+            argus::argus_check_dir,
             commands::inspect_paths,
             commands::drag_icon_path,
             shell::open_path,

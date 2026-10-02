@@ -202,8 +202,9 @@ export const listMonitors = () => (inTauri ? invoke<MonitorInfo[]>("list_monitor
 /** Arama açıkken pencere tıklanabilir/odakta kalsın; kapanınca odak önceki uygulamaya döner. */
 export const setInteractive = (on: boolean) => (inTauri ? invoke<void>("set_interactive", { on }) : noop());
 /** Argus (dizi/film arşivi) — yoksa null */
-export const argusSnapshot = (profile: string, today: string) =>
-  inTauri ? invoke<import("./argus").ArgusSnapshot | null>("argus_snapshot", { profile, today }) : Promise.resolve(null);
+export const argusSnapshot = (profile: string, today: string, dir: string) =>
+  inTauri ? invoke<import("./argus").ArgusSnapshot | null>("argus_snapshot", { profile, today, dir }) : Promise.resolve(null);
+export const argusCheckDir = (dir: string) => invoke<string | null>("argus_check_dir", { dir });
 export const argusMark = (rowId: string, today: string, season?: number, episode?: number) =>
   invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode });
 export const argusInstall = () => invoke<void>("argus_install");

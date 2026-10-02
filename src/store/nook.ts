@@ -197,6 +197,8 @@ export interface Settings extends NativeSettings {
   playOffers: boolean;
   /** Argus profili (kullanıcı adı); boşsa en son kullanılan */
   argusProfile: string;
+  /** Argus klasörü elle seçildiyse (boş = otomatik bul) */
+  argusDir: string;
   /** Argus'u olmayanlara Argus'u tanıt (ana sayfa çipi) */
   argusPromo: boolean;
   /** Takip ettiğin dizilerin yeni bölüm haberleri */
@@ -238,6 +240,7 @@ export const DEFAULT_SETTINGS: Settings = {
   playOffers: true,
   argusProfile: "",
   argusPromo: true,
+  argusDir: "",
   argusNews: true,
   argusDetect: true,
 };

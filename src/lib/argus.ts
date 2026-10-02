@@ -10,7 +10,8 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../hooks/useAntics";
-import { argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
+import { open as pickFolder } from "@tauri-apps/plugin-dialog";
+import { argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
 import { dayKey, useNook } from "../store/nook";
 
 export interface ArgusEp {
@@ -47,6 +48,7 @@ export interface ArgusItem {
 
 export interface ArgusSnapshot {
   profiles: string[];
+  dir: string;
   profile: string;
   profileId: string;
   boardId: string;
@@ -82,7 +84,8 @@ const lc = (s: string) => s.toLocaleLowerCase("tr");
 export async function refreshArgus() {
   if (!inTauri) return;
   try {
-    const snap = await argusSnapshot(useNook.getState().settings.argusProfile, dayKey());
+    const st = useNook.getState().settings;
+    const snap = await argusSnapshot(st.argusProfile, dayKey(), st.argusDir);
     useArgus.setState({ snap });
   } catch (e) {
     console.warn("[nook] argus", e);
@@ -256,6 +259,25 @@ export async function markWatched(item: ArgusItem, ep?: { season: number; episod
   }
 }
 
+/** Argus başka bir yerdeyse klasörünü elle seç */
+export async function chooseArgusDir() {
+  const s = useNook.getState();
+  const picked = await pickFolder({ directory: true, title: "Argus klasörünü seç" }).catch(() => null);
+  if (typeof picked !== "string") return;
+  const dir = await argusCheckDir(picked).catch(() => null);
+  if (!dir) {
+    s.pushToast({ kind: "argus", title: "Burada Argus yok", detail: "İçinde app ve data klasörleri olan Argus klasörünü seç", ms: 6000 });
+    playAntic("suspicious");
+    return;
+  }
+  s.updateSettings({ argusDir: dir });
+  await refreshArgus();
+  if (useArgus.getState().snap) {
+    s.pushToast({ kind: "argus", title: "Argus'u buldum!", detail: dir, ms: 4500 });
+    playAntic("love");
+  }
+}
+
 /** Argus'un kurulum betiğini açar; kurulunca Nook dakikada bir yoklarken kendiliğinden bulur. */
 export async function installArgus() {
   const s = useNook.getState();
@@ -278,11 +300,12 @@ export async function openArgus() {
 /** Özet: açılışta, dakikada bir ve profil değişince. Günde bir kez yeni bölüm haberi. */
 export function useArgusFeed() {
   const profile = useNook((s) => s.settings.argusProfile);
+  const dir = useNook((s) => s.settings.argusDir);
   useEffect(() => {
     void refreshArgus().then(announceNews);
     const t = window.setInterval(() => void refreshArgus().then(announceNews), REFRESH_MS);
     return () => window.clearInterval(t);
-  }, [profile]);
+  }, [profile, dir]);
 }
 
 function announceNews() {

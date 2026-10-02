@@ -35,7 +35,7 @@ function demoArgus() {
     { id: "m", title: "Bıçaklar Çekildi: Gizemli Bir Serüven", original: "Glass Onion: A Knives Out Mystery", status: "İzlenecek", kind: "Film", genres: ["Gizem", "Komedi"], release: "2022-11-23", runtime: 140, score: null, poster: null, recent: null, watchDates: [], series: null },
   ];
   useArgus.setState({
-    snap: { profiles: ["Luko", "Zırtapoz"], profile: "Luko", profileId: "p", boardId: "b", running: false, items, episodeDays: { [day(0)]: 2, [day(-1)]: 4 } },
+    snap: { profiles: ["Luko", "Zırtapoz"], dir: "C:\Users\OEM\Desktop\Argus", profile: "Luko", profileId: "p", boardId: "b", running: false, items, episodeDays: { [day(0)]: 2, [day(-1)]: 4 } },
     suggestion: new URLSearchParams(location.search).has("suggest") ? { itemId: "b", season: 1, episode: 8 } : null,
   });
 }

@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { BellRing, CalendarDays, Download, Shuffle, type LucideIcon } from "lucide-react";
 import symbol from "../assets/argus/symbol.png";
 import wordmark from "../assets/argus/wordmark.png";
-import { installArgus } from "../lib/argus";
+import { chooseArgusDir, installArgus } from "../lib/argus";
 import { spring } from "../lib/motion";
 import { useNook } from "../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText } from "./ui/primitives";
@@ -56,6 +56,9 @@ export function ArgusPromo({ big = false }: { big?: boolean }) {
             <Download size={big ? 14 : 11} strokeWidth={2.4} />
             Argus'u kur
           </motion.button>
+          <button onClick={() => void chooseArgusDir()} className={`rounded-full px-2 py-0.5 text-label-3 hover:bg-well-hi hover:text-label-2 ${big ? "text-[12px]" : "text-[10.5px]"}`}>
+            Zaten kurulu
+          </button>
           {!big && (
             <button onClick={hide} className="rounded-full px-2 py-0.5 text-[10.5px] text-label-3 hover:bg-well-hi hover:text-label-2">
               Gösterme

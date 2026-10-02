@@ -74,6 +74,8 @@ pub struct Item {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     profiles: Vec<String>,
+    /// Argus'un bulunduğu klasör
+    dir: String,
     profile: String,
     profile_id: String,
     board_id: String,
@@ -100,17 +102,154 @@ struct Cache {
 
 static CACHE: Mutex<Option<Cache>> = Mutex::new(None);
 
+/// Bir klasör Argus kök klasörü mü
+fn is_argus(d: &Path) -> bool {
+    d.join("data").join("profile.json").is_file() && d.join("app").join("server").join("index.js").is_file()
+}
+
+/// Kullanıcının elle seçtiği klasör (Ayarlar), bulunan klasör ve son tarama zamanı
+static CUSTOM: Mutex<Option<PathBuf>> = Mutex::new(None);
+static FOUND: Mutex<Option<PathBuf>> = Mutex::new(None);
+static LAST_SCAN: Mutex<Option<Instant>> = Mutex::new(None);
+/// Bulunamazsa en fazla bu sıklıkla yeniden aranır (tarama PowerShell çalıştırır)
+const RESCAN: Duration = Duration::from_secs(600);
+
+/// Argus nerede? Seçilen klasör › önceden bulunan › masaüstleri › kısayollar/çalışan Argus › kısa tarama.
 pub fn argus_dir() -> Option<PathBuf> {
-    let home = PathBuf::from(std::env::var_os("USERPROFILE")?);
-    let mut roots = vec![home.join("Desktop")];
-    for od in ["OneDrive", "OneDrive - Personal"] {
-        roots.push(home.join(od).join("Desktop"));
-        roots.push(home.join(od).join("Masaüstü"));
+    if let Some(c) = CUSTOM.lock().unwrap().clone().filter(|c| is_argus(c)) {
+        return Some(c);
     }
-    roots
-        .into_iter()
-        .map(|r| r.join("Argus"))
-        .find(|d| d.join("data").join("profile.json").is_file() && d.join("app").join("server").join("index.js").is_file())
+    if let Some(f) = FOUND.lock().unwrap().clone().filter(|f| is_argus(f)) {
+        return Some(f);
+    }
+    let quick = desktops().into_iter().map(|d| d.join("Argus")).find(|d| is_argus(d));
+    let found = quick.or_else(|| {
+        let mut last = LAST_SCAN.lock().unwrap();
+        if last.is_some_and(|t| t.elapsed() < RESCAN) {
+            return None;
+        }
+        *last = Some(Instant::now());
+        drop(last);
+        from_shortcuts_and_processes().or_else(scan)
+    })?;
+    *FOUND.lock().unwrap() = Some(found.clone());
+    Some(found)
+}
+
+/// Ayarlardan seçilen klasör (boş = otomatik)
+pub fn set_custom(dir: Option<String>) {
+    *CUSTOM.lock().unwrap() = dir.filter(|d| !d.trim().is_empty()).map(PathBuf::from);
+}
+
+/// Seçilen klasör (ya da onun içindeki/üstündeki) Argus mu — Ayarlar'daki "Klasörü seç" için
+#[tauri::command]
+pub fn argus_check_dir(dir: String) -> Option<String> {
+    let p = PathBuf::from(dir);
+    root_of(&p).or_else(|| ["Argus", "ARGUS"].iter().map(|n| p.join(n)).find(|d| is_argus(d))).map(|d| d.to_string_lossy().into_owned())
+}
+
+fn home() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE").map(PathBuf::from)
+}
+
+/// Gerçek Masaüstü (OneDrive'a taşınmış olabilir) + bilinen yerler
+fn desktops() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        if let Ok(k) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") {
+            if let Ok(v) = k.get_value::<String, _>("Desktop") {
+                let expanded = v.replace("%USERPROFILE%", &home().unwrap_or_default().to_string_lossy());
+                out.push(PathBuf::from(expanded));
+            }
+        }
+    }
+    if let Some(h) = home() {
+        out.push(h.join("Desktop"));
+        for od in ["OneDrive", "OneDrive - Personal"] {
+            out.push(h.join(od).join("Desktop"));
+            out.push(h.join(od).join("Masaüstü"));
+        }
+    }
+    out
+}
+
+/// Bir yoldan yukarı çıkarak Argus kökünü bul (ör. ...\Argus\app\launcher\baslat.ps1 → ...\Argus)
+fn root_of(path: &Path) -> Option<PathBuf> {
+    path.ancestors().take(7).find(|a| is_argus(a)).map(Path::to_path_buf)
+}
+
+/// Argus'un masaüstü/Başlat kısayolları (ARGUS.lnk) ve çalışan Argus işlemleri
+fn from_shortcuts_and_processes() -> Option<PathBuf> {
+    let script = r#"
+$sh = New-Object -ComObject WScript.Shell
+$dirs = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'), [Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('StartMenu'))
+foreach ($d in $dirs) { if ($d -and (Test-Path $d)) { Get-ChildItem -Path $d -Filter '*.lnk' -Recurse -Depth 1 -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'argus' } | ForEach-Object { $s = $sh.CreateShortcut($_.FullName); $s.TargetPath; $s.WorkingDirectory; $s.Arguments } } }
+Get-Process electron, node -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }
+"#;
+    let mut cmd = Command::new("powershell");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", script]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let out = cmd.output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    text.lines()
+        .flat_map(|l| l.split('"'))
+        .map(str::trim)
+        .filter(|l| l.len() > 3 && l.contains(':'))
+        .find_map(|l| root_of(Path::new(l)))
+}
+
+/// Belgeler, İndirilenler, ev klasörü ve sürücü köklerinde kısa tarama: kökün kendisi, alt klasörleri
+/// ve adında "argus" geçen ikinci seviye klasörler.
+fn scan() -> Option<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(h) = home() {
+        for d in ["Documents", "Downloads", "OneDrive", "source", "Projects", "Projeler"] {
+            roots.push(h.join(d));
+        }
+        roots.push(h.clone());
+    }
+    roots.extend(desktops());
+    for letter in b'C'..=b'Z' {
+        let r = PathBuf::from(format!("{}:\\", letter as char));
+        if r.is_dir() {
+            roots.push(r);
+        }
+    }
+    let skip = |n: &str| {
+        let n = n.to_lowercase();
+        n.starts_with('.')
+            || ["appdata", "windows", "program files", "program files (x86)", "programdata", "$recycle.bin", "node_modules", "system volume information"].contains(&n.as_str())
+    };
+    for root in roots {
+        if is_argus(&root) {
+            return Some(root);
+        }
+        let Ok(level1) = std::fs::read_dir(&root) else { continue };
+        for e in level1.flatten().filter(|e| e.path().is_dir()) {
+            if skip(&e.file_name().to_string_lossy()) {
+                continue;
+            }
+            let p = e.path();
+            if is_argus(&p) {
+                return Some(p);
+            }
+            if let Ok(level2) = std::fs::read_dir(&p) {
+                for e2 in level2.flatten() {
+                    if e2.file_name().to_string_lossy().to_lowercase().contains("argus") && is_argus(&e2.path()) {
+                        return Some(e2.path());
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn read_json(path: &Path) -> Option<Value> {
@@ -326,6 +465,7 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
 
     let snap = Snapshot {
         profiles: all,
+        dir: dir.to_string_lossy().into_owned(),
         profile: pname.to_owned(),
         profile_id: pid.to_owned(),
         board_id,
@@ -342,8 +482,9 @@ fn server_up() -> bool {
 
 /// Argus'un özeti. `profile`: kullanıcı adı (yoksa ilk profil). `today`: yerel gün (YYYY-MM-DD).
 #[tauri::command]
-pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: String) -> Option<Snapshot> {
+pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: String, dir: Option<String>) -> Option<Snapshot> {
     tauri::async_runtime::spawn_blocking(move || {
+        set_custom(dir);
         let dir = argus_dir()?;
         let all = profiles(&dir);
         let want = profile.unwrap_or_default().to_lowercase();
@@ -519,6 +660,7 @@ pub fn argus_open() -> Result<bool, String> {
     crate::shell::open_path(dir.join("ARGUS.exe").to_string_lossy().into_owned())?;
     Ok(true)
 }
+
 
 
 
