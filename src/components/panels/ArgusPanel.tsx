@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, ExternalLink, Film, MessageCircle, Shuffle, Tv, X } from "lucide-react";
 import {
@@ -32,6 +33,8 @@ const VIEWS: { id: View; label: string }[] = [
 
 /** Argus: izlediğin diziler, yayın takvimi, izleneceklerden öneri. */
 export function ArgusPanel() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("argus", scroller);
   const snap = useArgus((s) => s.snap);
   const focusId = useArgus((s) => s.focusId);
   const [view, setView] = useState<View>("watching");
@@ -72,7 +75,7 @@ export function ArgusPanel() {
         </button>
       </div>
       <SuggestionBanner />
-      <div className="-mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5">
+      <div ref={scroller} className="-mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={focused ? `f${focused.id}` : view} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
             {focused ? <Detail item={focused} /> : view === "watching" ? <Watching /> : view === "calendar" ? <Calendar /> : <Pick />}

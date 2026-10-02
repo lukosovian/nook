@@ -1,9 +1,13 @@
+import { useRef } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { useNook, type NotifItem } from "../../store/nook";
 import { ACCENT, EmptyState, MiniNook, TextButton, Toggle } from "../ui/primitives";
 
 /** Son Windows bildirimleri (Discord, WhatsApp, Mail…). Odaktayken susturulanlar da burada birikir. */
 export function NotifyPanel() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("notify", scroller);
   const items = useNook((s) => s.notifications);
   const on = useNook((s) => s.settings.notifications);
   const update = useNook((s) => s.updateSettings);
@@ -29,7 +33,7 @@ export function NotifyPanel() {
           color={ACCENT.purple}
         />
       ) : (
-        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+        <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
           <AnimatePresence initial={false}>
             {items.map((n) => (
               <Row key={n.id} n={n} />

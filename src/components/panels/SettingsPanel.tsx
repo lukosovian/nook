@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { Eye, EyeOff, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
 import { alarmRing, listMonitors, type MonitorInfo } from "../../lib/bridge";
@@ -32,13 +33,15 @@ const WATER: { id: number; label: string }[] = [
 const COLORS = ["#FFFFFF", "#BFF5DC", "#FFD6BA", "#D9CCFF", "#FFF1A8", "#BDE3FF"];
 
 export function SettingsPanel() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("settings", scroller);
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   useEffect(() => void listMonitors().then(setMonitors), []);
 
   return (
-    <div className="h-full space-y-3 overflow-y-auto pr-1.5">
+    <div ref={scroller} className="h-full space-y-3 overflow-y-auto pr-1.5">
       <Section title="Nook">
         <Affection />
         <Row label="Rengi">

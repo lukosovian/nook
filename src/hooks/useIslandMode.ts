@@ -12,7 +12,7 @@ export function useIslandMode(): IslandMode {
     if (s.searching) return "search";
     // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
     if (s.reminder) return "reminder";
-    if (s.hovered || s.grabbed || s.pinned) return "expanded";
+    if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";
     if (s.toasts.length) return "toast";
     if (s.osd) return "osd";
     return "collapsed";

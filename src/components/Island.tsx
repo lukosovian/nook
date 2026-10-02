@@ -13,6 +13,7 @@ import { expressionOf, statusOf, useNook, type Mood } from "../store/nook";
 import { Nook, STATUS_COLOR } from "./mascot/Nook";
 import { MiniPlayer } from "./media/MiniPlayer";
 import { AlarmView } from "./overlays/AlarmView";
+import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { FocusMini } from "./overlays/FocusMini";
 import { ListenMini } from "./overlays/ListenMini";
@@ -91,6 +92,7 @@ export function Island() {
 
   const ref = useRef<HTMLDivElement>(null);
   useHitRect(ref);
+  useSelectHold();
 
   // Ses/parlaklık her adımda: Nook bara doğru dürtüp (ya da geri çekip) yerine döner
   const nudge = useAnimationControls();
@@ -162,6 +164,7 @@ export function Island() {
           <AnimatePresence>{miniFocus && <FocusMini key="focus" />}</AnimatePresence>
           <AnimatePresence>{miniListen && <ListenMini key="listen" />}</AnimatePresence>
           <PrivacyDots mode={mode} />
+          <ContextMenu bounds={ref} />
 
           <AnimatePresence>
             {mode === "osd" && <OsdView key="osd" />}
@@ -173,6 +176,30 @@ export function Island() {
       </motion.div>
     </div>
   );
+}
+
+/**
+ * Açılır listenin (select) seçenekleri adanın dışına taşar; imleç oraya gidince ada kapanıp
+ * listeyi de götürüyordu. Liste açıkken ada açık kalır; seçince, Esc'te ya da odak gidince bırakır.
+ */
+function useSelectHold() {
+  useEffect(() => {
+    const isSelect = (t: EventTarget | null) => t instanceof HTMLSelectElement;
+    const hold = (on: boolean) => useNook.getState().setHold("select", on);
+    const down = (e: PointerEvent) => isSelect(e.target) && hold(true);
+    const release = (e: Event) => isSelect(e.target) && hold(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && hold(false);
+    window.addEventListener("pointerdown", down, true);
+    window.addEventListener("change", release, true);
+    window.addEventListener("focusout", release, true);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointerdown", down, true);
+      window.removeEventListener("change", release, true);
+      window.removeEventListener("focusout", release, true);
+      window.removeEventListener("keydown", key, true);
+    };
+  }, []);
 }
 
 function Halo({

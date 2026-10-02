@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   AnimatePresence,
   motion,
@@ -18,6 +18,7 @@ import { useNook, type Expression, type Status } from "../../store/nook";
 import { Eye, EYES } from "./Eye";
 import { Hands } from "./Hands";
 import { Mouth } from "./Mouth";
+import { Props, type SleepStyle } from "./Props";
 
 /** Durum renkleri (rozet, alt ton, ada parıltısı) */
 export const STATUS_COLOR: Record<Status, string> = {
@@ -101,15 +102,44 @@ const BODY: Record<Expression, TargetAndTransition> = {
   muted: { x: 0, y: 0.8, rotate: -8, scaleX: 1, scaleY: 1 },
   // Kızgın: titreyerek söylenir
   annoyed: { rotate: 0, y: 1, x: [0, -1.2, 1.2, -1.2, 1.2, 0], transition: { duration: 0.5, repeat: 2 } },
+  // Bir sola bir sağa bakınır
+  lookAround: { x: 0, y: 0, rotate: [0, -6, -6, 6, 6, 0], transition: { duration: sec(ANTIC_MS.lookAround), times: [0, 0.15, 0.4, 0.55, 0.85, 1], ease: "easeInOut" } },
+  // "Ha… ha…" geriye kaykılır, "hapşu!" öne fırlar
+  sneeze: {
+    x: 0,
+    y: [0, -1, -2, 2.5, 0],
+    rotate: [0, -6, -10, 9, 0],
+    scaleX: [1, 0.98, 0.96, 1.08, 1],
+    scaleY: [1, 1.03, 1.05, 0.9, 1],
+    transition: { duration: sec(ANTIC_MS.sneeze), times: [0, 0.3, 0.52, 0.6, 1] },
+  },
+  // Zıplayıp kendi etrafında döner
+  spin: { x: 0, y: [0, -5, -5, 0], rotate: [0, 0, 360, 360], transition: { duration: sec(ANTIC_MS.spin), times: [0, 0.2, 0.8, 1], ease: "easeInOut" } },
+  gum: { x: 0, rotate: 0, y: [0, -0.5, 0, 1.5, 0], transition: { duration: sec(ANTIC_MS.gum), times: [0, 0.6, 0.86, 0.9, 1] } },
+  read: { x: 0, rotate: [0, -3, 3, -3, 0], y: 0.5, transition: { duration: sec(ANTIC_MS.read), ease: "easeInOut" } },
+  // Ateşin başına geçip (yer açmak için biraz sağa) ona doğru eğilir
+  campfire: { x: 4, y: 0.5, rotate: [-5, -7, -5], transition: { duration: 2, repeat: Infinity, ease: "easeInOut" } },
+  umbrella: { x: 0, rotate: 0, y: [0, -0.8, 0], transition: { duration: 1.8, repeat: Infinity, ease: "easeInOut" } },
+  // Sıcaktan erimiş gibi basık
+  hot: { x: 0, rotate: 0, y: 1, scaleX: 1.04, scaleY: 0.95 },
+  note: { x: 0, y: 0.5, rotate: [-2, 1, -2], transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } },
+  writing: { x: 0, y: 0.5, rotate: [-2, 1, -2], transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } },
+  magnify: { x: 0, y: 0, rotate: [0, 4, -2, 0], transition: { duration: 2.6, repeat: Infinity, ease: "easeInOut" } },
 };
 
-/** Müzik çalarken (tepki kapalıysa) sabit tempoda sallanma. */
-const GROOVE: TargetAndTransition = {
-  x: 0,
-  y: [0, -1.5, 0],
-  rotate: [0, -4, 0, 4, 0],
-  transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" },
-};
+/**
+ * Müzik çalarken dans figürleri — birkaç saniyede bir değişir (eller: Hands'teki DANCE_HANDS).
+ * Sallanma, zıplama, kafa sallama, yan adım, fırıldak.
+ */
+const DANCES: TargetAndTransition[] = [
+  { x: 0, y: [0, -1.5, 0], rotate: [0, -4, 0, 4, 0], scaleX: 1, scaleY: 1, transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } },
+  { x: 0, rotate: 0, y: [0, -4, 0], scaleX: [1, 0.96, 1.05], scaleY: [1, 1.05, 0.94], transition: { duration: 0.5, repeat: Infinity, ease: "easeOut" } },
+  { x: 0, scaleX: 1, scaleY: 1, y: [0, 1.2, 0], rotate: [0, 9, 0], transition: { duration: 0.45, repeat: Infinity, ease: "easeInOut" } },
+  { scaleX: 1, scaleY: 1, x: [0, -5, 0, 5, 0], y: [0, -1.5, 0, -1.5, 0], rotate: [0, -6, 0, 6, 0], transition: { duration: 1.8, repeat: Infinity, ease: "easeInOut" } },
+  { x: 0, scaleX: 1, scaleY: 1, y: [0, -2, 0], rotate: [0, 360], transition: { duration: 1.2, repeat: Infinity, repeatDelay: 1.4, ease: "easeInOut" } },
+];
+/** Bir dans figürü en az/en çok bu kadar sürer */
+const DANCE_MS = [7000, 13000];
 
 /** Yüzün üstünden yükselen minik işaretler. */
 const FLOATER: Partial<Record<Expression, { char: string; className: string }>> = {
@@ -123,11 +153,20 @@ const FLOATER: Partial<Record<Expression, { char: string; className: string }>> 
   alarm: { char: "♪", className: "text-yellow-300" },
   shy: { char: "♡", className: "text-pink-300" },
   loud: { char: "!", className: "text-amber-300" },
+  sneeze: { char: "!", className: "text-amber-200" },
+  campfire: { char: "~", className: "text-orange-200/70" },
 };
 
 /** Bazı ifadelerde gözler bir yöne kayar (aşağı bakmak, yan bakmak). */
-const EYE_OFFSET: Partial<Record<Expression, { x: number; y: number }>> = {
+const EYE_OFFSET: Partial<Record<Expression, TargetAndTransition>> = {
   bored: { x: 0, y: 3.5 },
+  lookAround: { x: [0, -3, -3, 3, 3, 0], y: 0, transition: { duration: sec(ANTIC_MS.lookAround), times: [0, 0.15, 0.4, 0.55, 0.85, 1], ease: "easeInOut" } },
+  // Satırları okur: sola-sağa, aşağıda
+  read: { y: 2.6, x: [-1.6, 1.6, -1.6, 1.6, -1.6, 1.6, -1.6], transition: { duration: sec(ANTIC_MS.read), ease: "linear" } },
+  note: { x: -1.2, y: 2.4 },
+  writing: { x: -1.2, y: 2.4 },
+  campfire: { x: -2.4, y: 1 },
+  magnify: { x: 1.2, y: 0 },
   suspicious: { x: 3, y: 0 },
   shy: { x: 0, y: 1.5 },
   volUp: { x: 2.6, y: 0 },
@@ -135,9 +174,9 @@ const EYE_OFFSET: Partial<Record<Expression, { x: number; y: number }>> = {
 };
 
 /** Gözleri kapalı/özel çizimli ifadeler — imleç takibi yok. */
-const NO_LOOK = new Set<Expression>(["volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
+const NO_LOOK = new Set<Expression>(["lookAround", "sneeze", "spin", "read", "campfire", "note", "writing", "magnify", "hot", "volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
 /** Kendiliğinden göz kırpan ifadeler. */
-const BLINKS = new Set<Expression>(["idle", "drowsy", "tired", "wander", "hop", "surprised", "hungry"]);
+const BLINKS = new Set<Expression>(["idle", "drowsy", "tired", "wander", "hop", "surprised", "hungry", "lookAround", "gum", "umbrella", "magnify", "read", "note", "writing"]);
 
 /** Bu hızdan (px/sn) sert fırlatılırsa Nook sersemler. */
 const FLING_SPEED = 900;
@@ -179,8 +218,10 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const scaleYL = useTransform([lid, attentionScale], ([l, a]: number[]) => l * a);
   const scaleYR = scaleYL;
 
-  // --- Müzik/video çalarken gözler dalgalı ses çubuklarına dönüşür (Grok Bot "▮•▮")
+  // --- Müzik/video çalarken gözler dalgalı ses çubuklarına dönüşür (Grok Bot "▮•▮") ve dans eder
   const wave = grooving && expression === "idle";
+  const dance = useDance(wave);
+  const sleepStyle = useSleepStyle(expression);
 
   // --- İmleç yüzün dibinde 1,5 sn oyalanırsa utanır
   useShyWhenStaredAt(look.attention, expression);
@@ -188,7 +229,8 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const rightSX = useTransform([rightScaleX, attentionScale], ([s, a]: number[]) => s * a);
 
   const [left, right] = EYES[expression];
-  const floater = FLOATER[expression];
+  // Balon şişirerek uyurken "z" çıkmaz
+  const floater = expression === "sleepy" && sleepStyle === "bubble" ? undefined : FLOATER[expression];
   const tint = status ? STATUS_COLOR[status] : null;
   const isBox = expression === "hungry" || expression === "chewing";
 
@@ -213,9 +255,9 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
         className="relative"
         style={{ width: FACE, height: FACE }}
         initial={false}
-        animate={grooving && expression === "idle" ? GROOVE : BODY[expression]}
+        animate={wave ? DANCES[dance] : expression === "sleepy" && sleepStyle === "nap" ? NAP : BODY[expression]}
       >
-        <Hands expression={expression} />
+        <Hands expression={expression} dance={wave ? dance : null} />
 
         {/* Küre (ya da kutu) yüz */}
         <motion.div
@@ -271,6 +313,9 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
             {expression === "downloading" && <ProgressDots key="dl" />}
           </AnimatePresence>
         </motion.div>
+
+        {/* Eşyalar: yorgan, kitap, kamp ateşi, şemsiye, kâğıt-kalem, büyüteç… */}
+        <Props expression={expression} sleepStyle={sleepStyle} />
 
         {/* Su bardağı: içerken ağzına gider, eğilir, su azalır */}
         <AnimatePresence>{expression === "drink" && <Glass key="glass" />}</AnimatePresence>
@@ -419,6 +464,47 @@ function ProgressDots() {
       ))}
     </motion.div>
   );
+}
+
+/** Uyurken bir yana devrilmiş şekerleme */
+const NAP: TargetAndTransition = { x: 0, rotate: [-16, -18, -16], y: [1.5, 2.2, 1.5], transition: { duration: 3.6, repeat: Infinity, ease: "easeInOut" } };
+const SLEEP_STYLES: SleepStyle[] = ["blanket", "bubble", "nap"];
+
+/** Her uykuya dalışta farklı bir uyku: yorgan çeker, burnundan balon şişirir ya da yana devrilir. */
+function useSleepStyle(expression: Expression): SleepStyle {
+  const [style, setStyle] = useState<SleepStyle>(() =>
+    import.meta.env.DEV && new URLSearchParams(location.search).get("sleep")
+      ? (new URLSearchParams(location.search).get("sleep") as SleepStyle)
+      : SLEEP_STYLES[Math.floor(Math.random() * SLEEP_STYLES.length)],
+  );
+  const prev = useRef(expression);
+  useEffect(() => {
+    if (expression === "sleepy" && prev.current !== "sleepy" && !(import.meta.env.DEV && location.search.includes("sleep="))) {
+      setStyle((cur) => {
+        const others = SLEEP_STYLES.filter((s) => s !== cur);
+        return others[Math.floor(Math.random() * others.length)];
+      });
+    }
+    prev.current = expression;
+  }, [expression]);
+  return style;
+}
+
+/** Müzik sürdükçe birkaç saniyede bir başka dans figürüne geçer. */
+function useDance(on: boolean): number {
+  const [dance, setDance] = useState(() => (import.meta.env.DEV ? Number(new URLSearchParams(location.search).get("dance") ?? 0) : 0));
+  useEffect(() => {
+    if (!on) return;
+    let t = 0;
+    const wait = () => DANCE_MS[0] + Math.random() * (DANCE_MS[1] - DANCE_MS[0]);
+    const next = () => {
+      setDance((d) => (d + 1 + Math.floor(Math.random() * (DANCES.length - 1))) % DANCES.length);
+      t = window.setTimeout(next, wait());
+    };
+    t = window.setTimeout(next, wait());
+    return () => window.clearTimeout(t);
+  }, [on]);
+  return dance;
 }
 
 /** İmleç yüzün dibinde (dikkat > 0.85) 1,5 sn oyalanırsa utanır — en fazla 30 sn'de bir. */

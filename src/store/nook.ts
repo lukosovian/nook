@@ -37,7 +37,20 @@ export type Antic =
   | "shy"
   | "suspicious"
   | "bored"
-  | "drink";
+  | "drink"
+  // Boşta: etrafa bakınır, hapşırır, döner, sakız şişirir, kitap okur
+  | "lookAround"
+  | "sneeze"
+  | "spin"
+  | "gum"
+  | "read"
+  // Havaya göre: soğukta kamp ateşi, yağmurda şemsiye, sıcakta yelpaze
+  | "campfire"
+  | "umbrella"
+  | "hot"
+  // Not alırken kâğıt-kalem, ararken büyüteç
+  | "note"
+  | "magnify";
 
 /** Yüz ifadesi = mood › antic › uyku › yorgunluk (düşük pil) › gece uykululuğu */
 export type Expression =
@@ -51,6 +64,8 @@ export type Expression =
   | "alarm"
   | "downloading"
   | "talking"
+  /** Sohbette cevap yazarken kâğıt-kalem */
+  | "writing"
   // Ses/parlaklık göstergesindeyken: bara iter, geri çeker, kulaklarını kapatır, "şşş"
   | "volUp"
   | "volDown"
@@ -330,6 +345,8 @@ interface NookState {
   online: boolean;
   /** Fare üzerinde olmasa da açık kalsın ("Ekrana sor") */
   pinned: boolean;
+  /** Ada dışına taşan bir etkileşim sürüyor (ekrandan renk seçme, açılır liste) — ada kapanmaz */
+  holds: string[];
   /** Sesli komut dinleniyor */
   listening: boolean;
   /** Sohbete eklenecek ekran görüntüsü */
@@ -378,6 +395,7 @@ interface NookState {
   setReminder: (reminder: NookState["reminder"]) => void;
   setTourStep: (tourStep: number) => void;
   setBusy: (key: string, on: boolean) => void;
+  setHold: (key: string, on: boolean) => void;
   addAlarm: (a: Omit<Alarm, "id" | "next" | "enabled"> & { at?: number }) => void;
   toggleAlarm: (id: string, enabled: boolean) => void;
   setAlarmSilent: (id: string, silent: boolean) => void;
@@ -459,6 +477,7 @@ export const useNook = create<NookState>()(
       scores: {},
       online: true,
       pinned: false,
+      holds: [],
       listening: false,
       attachment: null,
       pendingTab: null,
@@ -615,6 +634,8 @@ export const useNook = create<NookState>()(
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       setBusy: (key, on) =>
         set((s) => ({ busy: on ? [...s.busy.filter((k) => k !== key), key] : s.busy.filter((k) => k !== key) })),
+      setHold: (key, on) =>
+        set((s) => ({ holds: on ? [...s.holds.filter((k) => k !== key), key] : s.holds.filter((k) => k !== key) })),
     }),
     {
       name: "nook",
@@ -676,8 +697,11 @@ export function expressionOf(s: NookState): Expression {
     return (s.osd.dir ?? 0) < 0 ? "volDown" : "volUp";
   }
   if (s.antic) return s.antic;
+  // Ararken büyüteçle bakar
+  if (s.searching) return "magnify";
   if (s.busy.length) return "thinking";
-  if (s.talking) return "talking";
+  // Sohbette cevabı kâğıda yazar
+  if (s.talking) return "writing";
   if (s.downloads.length) return "downloading";
   // Müzik/video çalarken dalgalı gözler (idle) gece/yorgun/küs hâllerin önüne geçer
   if (s.media?.playing) return "idle";

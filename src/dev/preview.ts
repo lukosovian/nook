@@ -127,6 +127,11 @@ export function applyPreview(mode: string) {
   if (ask) window.setTimeout(() => void import("../lib/chat").then((m) => m.sendChat(ask)), 800);
   const expr = params.get("expr");
   if (expr) useNook.setState({ antic: expr as never });
+  // ?sleep=blanket|bubble|nap → uyku; ?talk → sohbette cevap yazıyor; ?dance=N → dans figürü
+  const sleep = params.get("sleep");
+  if (sleep) useNook.setState({ asleep: true, media: null });
+  if (params.has("talk")) useNook.setState({ talking: true, chatBusy: true, media: null });
+  if (expr) useNook.setState({ media: null });
   // ?busy → Nook düşünür (yörünge gözler + mavi rozet)
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
   // Açılış animasyonu yalnızca ?preview=intro'da

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AlarmClock, Bell, Clapperboard, CloudSun, Droplet, Headphones, Mouse, Target, type LucideIcon } from "lucide-react";
 import { calendar, dayLabel, epLabel, useArgus } from "../../lib/argus";
 import { drankWater } from "../../hooks/useFeatures";
@@ -57,6 +58,8 @@ function useTodayLine() {
 
 /** Günün özeti: selam, hava, bugünkü alarmlar, bildirimler, cihaz pilleri, dünkü odak. */
 export function TodayPanel() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("today", scroller);
   const s = useNook();
   const line = useTodayLine();
   const now = new Date();
@@ -133,7 +136,7 @@ export function TodayPanel() {
           {line ?? "…"}
         </p>
       )}
-      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+      <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {items.map((it, i) => (
           <div key={i} className="flex items-center gap-2 text-[11.5px] text-label-2">
             <it.icon size={12} strokeWidth={2.4} style={{ color: it.color }} className="shrink-0" />

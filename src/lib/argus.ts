@@ -6,6 +6,7 @@
  *  - Tarayıcıda izlenen dizi/filmi tanıyıp "işaretleyeyim mi?" diye sorma
  * Argus olmayan bilgisayarda `snap` hep null kalır ve her şey gizlenir.
  */
+import { setHitExtra } from "../hooks/useHitRect";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -355,8 +356,8 @@ function announceNews() {
 const TICK_MS = 5000;
 /** Kullanıcının kendi kuralı: dizi/film 15 dk izlendiyse o güne yazılır (yüzdeye bakılmaz) */
 const MIN_WATCH_MS = 15 * 60_000;
-/** Duraklatıldıktan bu kadar sonra "bitti" sayılır */
-const IDLE_END_MS = 3 * 60_000;
+/** Durdurulunca hemen "bitti" sayılır — yalnızca yüklenme/reklam gibi anlık takılmalar için kısa pay */
+const IDLE_END_MS = 8000;
 
 /** Bugün bölüm/film başına oynatılan süre — Nook yeniden açılsa da, duraklatıp dönülse de kaybolmaz */
 const PLAYED_KEY = "nook-argus-played";
@@ -386,8 +387,9 @@ const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, dur
 
 /**
  * Tarayıcıda/oynatıcıda çalan şeyi Argus'la eşleştirir. Yalnızca gerçekten oynarken geçen süre
- * sayılır (duraklatma sayılmaz, ileri sarma süre eklemez). 15 dk dolup izleme bitince
- * (durdurulup 3 dk geçince, başka şeye geçilince, jeneriğe gelince) "işaretleyeyim mi?" diye sorar.
+ * sayılır (duraklatma sayılmaz, ileri sarma süre eklemez). 15 dk dolduğu anda (izleme sürerken de)
+ * ya da 15 dk'yı geçmiş bir izleme bitince (durdurulunca, başka şeye geçilince, jeneriğe gelince)
+ * "işaretleyeyim mi?" diye sorar. Süre 15 dk'dan sonra da saymaya devam eder.
  */
 export function useArgusDetect() {
   useEffect(() => {
@@ -403,7 +405,12 @@ export function useArgusDetect() {
       const c = cur;
       cur = null;
       useArgus.setState({ live: null });
-      if (!c || store.asked.includes(c.key)) return;
+      if (c) ask(c);
+    };
+
+    /** Süre dolduysa (bu bölüm için daha önce sorulmadıysa) Argus'a yazmayı önerir */
+    const ask = (c: NonNullable<typeof cur>, watching = false) => {
+      if (store.asked.includes(c.key)) return;
       const item = findItem(c.sug.itemId);
       if (!item || played(c.key) < needFor(c.duration)) return;
       store.asked.push(c.key);
@@ -412,8 +419,10 @@ export function useArgusDetect() {
       const s = useNook.getState();
       s.pushToast({
         kind: "argus",
-        title: `${item.title}${c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""} bitti mi?`,
-        detail: `${Math.round(played(c.key) / 60_000)} dk izledin · Üstüme gel, Argus'a işaretleyeyim`,
+        title: `${item.title}${c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""}${watching ? "" : " bitti mi?"}`,
+        detail: watching
+          ? `${Math.round(played(c.key) / 60_000)} dk oldu · Üstüme gel, Argus'a yazayım`
+          : `${Math.round(played(c.key) / 60_000)} dk izledin · Üstüme gel, Argus'a işaretleyeyim`,
         ms: 9000,
       });
       s.setPendingTab("argus");
@@ -448,6 +457,8 @@ ${m.artist}`;
         cur.idleSince = null;
         if (m.durationMs) cur.duration = m.durationMs;
         useArgus.setState({ live: { ...sug, playedMs: played(key), needMs: needFor(cur.duration) } });
+        // 15 dk dolar dolmaz sor — izlemenin bitmesini bekleme
+        if (played(key) >= needFor(cur.duration)) ask(cur, true);
         const pos = m.positionMs + (performance.now() - m.at);
         // Jenerik: %93'e gelince bitti say
         if (cur.duration && pos >= cur.duration * 0.93) finish();
@@ -475,6 +486,8 @@ export interface ArgusCardData {
 }
 
 const CARD_GAP = 10;
+/** Kartın görünen boyutu (pencerede soldan 6 px boşlukla) */
+export const CARD_SIZE = { width: 300, height: 132 };
 /** Karta en son gönderilen — kart penceresi yeni açıldıysa "hazırım" deyince yeniden gönderilir */
 let lastCard: ArgusCardData | { visible: false } = { visible: false };
 const sendCard = (d: ArgusCardData | { visible: false }) => {
@@ -507,10 +520,13 @@ export function useArgusCard(mode: IslandMode) {
         playedMs: live.playedMs,
         needMs: live.needMs,
       };
-      void argusCard(true, window.innerWidth / 2 + ISLAND.expanded.width / 2 + CARD_GAP, ISLAND_TOP)
+      const x = window.innerWidth / 2 + ISLAND.expanded.width / 2 + CARD_GAP;
+      void argusCard(true, x, ISLAND_TOP)
         .then(() => sendCard(data))
         .catch((e) => console.warn("[nook] argus kartı", e));
-      return;
+      // İmleç karta (ve aradaki boşluğa) geçince ada kapanmasın
+      setHitExtra({ x: x - CARD_GAP - 4, y: ISLAND_TOP, width: CARD_GAP + 4 + 6 + CARD_SIZE.width + 6, height: CARD_SIZE.height + 6 });
+      return () => setHitExtra(null);
     }
     // Önce kart kendi çıkış animasyonunu oynasın, sonra pencere gizlensin
     void sendCard({ visible: false });

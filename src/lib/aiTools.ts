@@ -186,6 +186,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
       case "add_note": {
         const text = str(args.text).trim();
         s.setNote(s.note ? `${s.note}\n${text}` : text);
+        playAntic("note");
         return { result: `Nota eklendi: ${text}`, note: { icon: "note", text: `Nota eklendi: ${text}` } };
       }
       case "media": {
@@ -209,6 +210,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
       case "web_search": {
         const query = str(args.query);
         await openPath(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
+        playAntic("magnify");
         return { result: `Tarayıcıda "${query}" araması açıldı.`, note: { icon: "web", text: `"${query}" aranıyor` } };
       }
       case "set_user_name": {

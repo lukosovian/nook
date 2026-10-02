@@ -1,4 +1,5 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
@@ -140,6 +141,8 @@ export function Panels() {
 
 /** Ana sayfa: Grok Bot'taki renkli ajan çipleri gibi — her modül bir mini Nook, yanında canlı bilgi. */
 function ModuleGrid() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("home", scroller);
   const setTab = useNook((s) => s.setTab);
   const lukonnect = useNook((s) => hasLukonnect(s.devices));
   const sub = useModuleStatus();
@@ -149,7 +152,7 @@ function ModuleGrid() {
     m.id === "argus" && !argus ? { ...m, label: "Argus", color: "#1a8cff" } : m,
   );
   return (
-    <div className="-mr-1.5 grid h-full auto-rows-[41px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5">
+    <div ref={scroller} className="-mr-1.5 grid h-full auto-rows-[41px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5">
       {modules.map((m, i) => (
         <motion.button
           key={m.id}

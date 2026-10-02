@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { AlarmClock, Bell, BellOff, ChevronDown, ChevronUp, Repeat2, X } from "lucide-react";
 import { clock, pad, REPEAT_LABEL, until, type Repeat } from "../../lib/alarm";
@@ -11,6 +12,8 @@ const REPEATS = Object.keys(REPEAT_LABEL) as Repeat[];
 
 /** Alarm kur: saat seçici + isim + tekrar; hızlı "+N dk"; kurulu alarmlar listesi. */
 export function AlarmPanel() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("alarm", scroller);
   const alarms = useNook((s) => s.alarms);
   const addAlarm = useNook((s) => s.addAlarm);
   const now = useNow();
@@ -92,7 +95,7 @@ export function AlarmPanel() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+      <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
         {!alarms.length && <p className="pt-3 text-center text-[11px] text-label-3">Kurulu alarm yok</p>}
         <AnimatePresence initial={false}>
           {alarms.map((a) => (

@@ -50,6 +50,8 @@ impl Default for Geometry {
 #[derive(Clone, Copy, Default)]
 pub struct WinState {
     pub hit: Rect,
+    /// Adaya bağlı ek alan (ör. yandaki Argus kartı): imleç oradayken de ada açık kalır.
+    pub extra: Rect,
     pub geom: Geometry,
     pub hwnd: isize,
 }
@@ -138,9 +140,10 @@ impl Shared {
         self.forced.lock().unwrap().remove(label);
     }
 
-    pub fn set_hit(&self, label: &str, rect: Rect) {
+    pub fn set_hit(&self, label: &str, rect: Rect, extra: Option<Rect>) {
         if let Some(w) = self.windows.lock().unwrap().get_mut(label) {
             w.hit = rect;
+            w.extra = extra.unwrap_or_default();
         }
     }
 

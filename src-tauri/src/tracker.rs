@@ -40,6 +40,9 @@ struct CursorPayload {
 
 struct Prev {
     inside: bool,
+    /// Sol tuş basılı mıydı / basış adanın içinde mi başladı
+    down: bool,
+    drag: bool,
     near: bool,
     last: (f64, f64),
     emitted: Instant,
@@ -47,7 +50,7 @@ struct Prev {
 
 impl Default for Prev {
     fn default() -> Self {
-        Self { inside: false, near: false, last: (f64::NAN, f64::NAN), emitted: Instant::now() - EMIT_EVERY }
+        Self { inside: false, down: false, drag: false, near: false, last: (f64::NAN, f64::NAN), emitted: Instant::now() - EMIT_EVERY }
     }
 }
 
@@ -72,7 +75,17 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let p = prev.entry(label.clone()).or_default();
                         let g = ws.geom;
                         let (x, y) = ((px - g.x) / g.scale, (py - g.y) / g.scale);
-                        let hit = ws.hit.contains(x, y);
+                        // Ada içinde basılıp (metin seçerken, kaydırıcı çekerken) imleç dışarı kayarsa
+                        // tuş bırakılana kadar ada kapanmaz.
+                        let over = ws.hit.contains(x, y) || ws.extra.contains(x, y);
+                        let down = left_button_down();
+                        if !down {
+                            p.drag = false;
+                        } else if !p.down && over {
+                            p.drag = true;
+                        }
+                        p.down = down;
+                        let hit = over || p.drag;
                         let inside = hit || forced.contains(&label);
                         let near = inside || ws.hit.distance(x, y) < TRACK_RADIUS;
 
@@ -182,6 +195,22 @@ fn click_through(hwnd: isize, on: bool) {
 
 #[cfg(not(windows))]
 fn click_through(_hwnd: isize, _on: bool) {}
+
+/// Farenin sol tuşu şu an basılı mı (tuşlar yer değiştirilmişse fiziksel sol tuş).
+#[cfg(windows)]
+fn left_button_down() -> bool {
+    use windows_sys::Win32::UI::{
+        Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON},
+        WindowsAndMessaging::{GetSystemMetrics, SM_SWAPBUTTON},
+    };
+    let key = if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0 { VK_RBUTTON } else { VK_LBUTTON };
+    (unsafe { GetAsyncKeyState(key as i32) } as u16 & 0x8000) != 0
+}
+
+#[cfg(not(windows))]
+fn left_button_down() -> bool {
+    false
+}
 
 /// Fiziksel ekran koordinatı. Windows'ta doğrudan GetCursorPos (ana thread'e gidiş-dönüş yok).
 #[cfg(windows)]

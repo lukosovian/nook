@@ -11,6 +11,8 @@ pub struct QuickState {
     dark: bool,
     muted: Option<bool>,
     mic_muted: Option<bool>,
+    /// Ana ses seviyesi 0–1
+    volume: Option<f32>,
 }
 
 #[tauri::command]
@@ -21,7 +23,14 @@ pub async fn quick_state() -> QuickState {
         dark: imp::dark_mode(),
         muted: imp::endpoint_muted(false),
         mic_muted: imp::endpoint_muted(true),
+        volume: imp::volume(),
     }
+}
+
+/// Ana ses seviyesi (0–1). Sıfırdan büyükse sessiz de kaldırılır.
+#[tauri::command]
+pub async fn quick_volume(value: f32) -> Result<(), String> {
+    imp::set_volume(value.clamp(0.0, 1.0))
 }
 
 /// key: wifi | bluetooth | dark | mute | mic
@@ -49,7 +58,7 @@ pub fn quick_action(action: String) -> Result<(), String> {
 
 #[cfg(windows)]
 mod imp {
-    use windows::Devices::Radios::{Radio, RadioKind, RadioState};
+    use windows::Devices::Radios::{Radio, RadioAccessStatus, RadioKind, RadioState};
     use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
     use windows::Win32::Media::Audio::{eCapture, eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
     use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
@@ -82,10 +91,15 @@ mod imp {
 
     pub fn set_radio(kind: Kind, on: bool) -> Result<(), String> {
         let r = find(&kind).map_err(|e| e.to_string())?.ok_or("bu bilgisayarda yok")?;
-        r.SetStateAsync(if on { RadioState::On } else { RadioState::Off })
+        let status = r
+            .SetStateAsync(if on { RadioState::On } else { RadioState::Off })
             .and_then(|op| op.join())
-            .map(|_| ())
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        match status {
+            RadioAccessStatus::Allowed => Ok(()),
+            RadioAccessStatus::DeniedByUser => Err("Windows Ayarlar › Gizlilik › Radyolar'dan izin ver".into()),
+            _ => Err("Windows izin vermedi".into()),
+        }
     }
 
     const PERSONALIZE: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
@@ -135,6 +149,21 @@ mod imp {
         }
     }
 
+    pub fn volume() -> Option<f32> {
+        unsafe { endpoint(false).and_then(|v| v.GetMasterVolumeLevelScalar()).ok() }
+    }
+
+    pub fn set_volume(value: f32) -> Result<(), String> {
+        unsafe {
+            let v = endpoint(false).map_err(|e| e.to_string())?;
+            v.SetMasterVolumeLevelScalar(value, std::ptr::null()).map_err(|e| e.to_string())?;
+            if value > 0.0 {
+                let _ = v.SetMute(false, std::ptr::null());
+            }
+            Ok(())
+        }
+    }
+
     pub fn lock() -> Result<(), String> {
         let ok = unsafe { windows_sys::Win32::System::Shutdown::LockWorkStation() };
         if ok == 0 {
@@ -173,6 +202,12 @@ mod imp {
         None
     }
     pub fn set_endpoint_muted(_c: bool, _m: bool) -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+    pub fn volume() -> Option<f32> {
+        None
+    }
+    pub fn set_volume(_v: f32) -> Result<(), String> {
         Err("yalnızca Windows".into())
     }
     pub fn lock() -> Result<(), String> {

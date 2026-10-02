@@ -889,8 +889,8 @@ pub fn argus_open() -> Result<bool, String> {
 /// İzlenen dizi/film kartı: adanın sağında ayrı, tıklanamaz küçük pencere.
 /// `x`, `y`: çağıran ada penceresine göre mantıksal konum.
 pub const CARD: &str = "argus-card";
-pub const CARD_W: f64 = 184.0;
-pub const CARD_H: f64 = 360.0;
+pub const CARD_W: f64 = 320.0;
+pub const CARD_H: f64 = 160.0;
 
 /// Pencere oluşturduğu için async olmalı: senkron komutta Windows'ta kilitlenir (wry#583).
 #[tauri::command]

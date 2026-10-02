@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { playAntic } from "../../hooks/useAntics";
 import { copyText } from "../../lib/bridge";
 import { useNook } from "../../store/nook";
 import { TextButton } from "../ui/primitives";
@@ -20,7 +21,11 @@ export function ScratchPanel() {
       <textarea
         ref={ref}
         value={note}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={(e) => {
+          setNote(e.target.value);
+          // Yazarken Nook da kâğıt-kalemle not alır
+          playAntic("note");
+        }}
         onKeyDown={(e) => e.key === "Escape" && setNote("")}
         spellCheck={false}
         placeholder="Aklından geçeni yaz…"

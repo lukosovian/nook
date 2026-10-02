@@ -133,10 +133,16 @@ export interface QuickState {
   dark: boolean;
   muted: boolean | null;
   micMuted: boolean | null;
+  /** Ana ses seviyesi 0–1 */
+  volume: number | null;
 }
 export type QuickKey = "wifi" | "bluetooth" | "dark" | "mute" | "mic";
 
-export const quickState = () => (inTauri ? invoke<QuickState>("quick_state") : Promise.resolve(null));
+export const quickState = () =>
+  inTauri
+    ? invoke<QuickState>("quick_state")
+    : // Tarayıcı önizlemesi: Wi-Fi/Bluetooth'suz masaüstü
+      Promise.resolve<QuickState>({ wifi: null, bluetooth: null, dark: true, muted: false, micMuted: false, volume: 0.45 });
 export const quickSet = (key: QuickKey, on: boolean) => (inTauri ? invoke<void>("quick_set", { key, on }) : Promise.resolve());
 /** Alarm sesi (Windows Alarm01–10). `preview`: tek sefer dinlet. */
 /** Sıradaki alarm zamanını Rust'a bildir — tam ekranda ada vakitlice açılsın. */
@@ -145,6 +151,11 @@ export const alarmNext = (at: number | null) => (inTauri ? invoke<void>("alarm_n
 export const alarmRing = (on: boolean, sound = 1, preview = false) =>
   inTauri ? invoke<void>("alarm_ring", { on, sound, preview }) : Promise.resolve();
 
+/** Ana ses seviyesi (0–1) */
+export const quickVolume = (value: number) => (inTauri ? invoke<void>("quick_volume", { value }) : Promise.resolve());
+/** Ekran parlaklığı 0–100 (dizüstü paneli WMI, harici monitörler DDC/CI); desteklenmiyorsa null */
+export const brightnessGet = () => (inTauri ? invoke<number | null>("brightness_get") : Promise.resolve(70));
+export const brightnessSet = (value: number) => (inTauri ? invoke<void>("brightness_set", { value: Math.round(value) }) : Promise.resolve());
 export const quickAction = (action: "lock" | "screen-off") =>
   inTauri ? invoke<void>("quick_action", { action }) : Promise.resolve();
 
@@ -302,8 +313,9 @@ export function subscribe<T>(event: string, handler: Handler<T>): () => void {
   return () => set.delete(handler as Handler<unknown>);
 }
 
-export function setHitRect(rect: Rect): Promise<void> {
-  if (inTauri) return invoke("set_hit_rect", { rect });
+/** `extra`: adaya bağlı ek alan (yandaki Argus kartı) — imleç oradayken de ada açık kalır. */
+export function setHitRect(rect: Rect, extra: Rect | null = null): Promise<void> {
+  if (inTauri) return invoke("set_hit_rect", { rect, extra });
   webHit = rect;
   return Promise.resolve();
 }

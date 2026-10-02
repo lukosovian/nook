@@ -13,8 +13,8 @@ const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
 
 /// Frontend, adanın o anki sınırlarını (pencere-yerel, mantıksal px) bildirir.
 #[tauri::command]
-pub fn set_hit_rect(window: WebviewWindow, rect: Rect, shared: State<'_, Arc<Shared>>) {
-    shared.set_hit(window.label(), rect);
+pub fn set_hit_rect(window: WebviewWindow, rect: Rect, extra: Option<Rect>, shared: State<'_, Arc<Shared>>) {
+    shared.set_hit(window.label(), rect, extra);
 }
 
 /// Arama açıkken imleç dışarıda olsa da pencere tıklanabilir ve odakta kalır.

@@ -81,6 +81,27 @@ const POSES: Partial<Record<Expression, [Pose, Pose]>> = {
   ],
   // Sessiz: "şşş" — sağ el ağzında
   muted: [HIDE, show({ x: -8.5, y: 5.5, rotate: -12 })],
+  // Etrafa bakınır: sağ el alnında siper
+  lookAround: [HIDE, show({ x: -5.5, y: -6, rotate: -35 })],
+  // Hapşırırken iki eli ağzına gider
+  sneeze: [
+    show({ x: [0, 0, 5, 0], y: [2, 2, 6, 2], transition: { duration: sec(ANTIC_MS.sneeze), times: [0, 0.4, 0.55, 1] } }),
+    show({ x: [0, 0, -5, 0], y: [2, 2, 6, 2], transition: { duration: sec(ANTIC_MS.sneeze), times: [0, 0.4, 0.55, 1] } }),
+  ],
+  // Dönerken kollar açık
+  spin: [show({ x: -2, y: -2, rotate: 30 }), show({ x: 2, y: -2, rotate: -30 })],
+  // Ateşe ellerini uzatıp ısıtır
+  campfire: [
+    show({ x: -3.5, y: [3.5, 2.5, 3.5], rotate: [20, 5, 20], transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } }),
+    HIDE,
+  ],
+  // Kitap, kâğıt-kalem, büyüteç, şemsiye, yelpaze ve yorgandaki eller eşyayla birlikte çizilir
+  read: [HIDE, HIDE],
+  note: [HIDE, HIDE],
+  writing: [HIDE, HIDE],
+  magnify: [show({ x: 1, y: 5, rotate: 10 }), HIDE],
+  umbrella: [show({ x: 1, y: 5, rotate: 10 }), HIDE],
+  hot: [HIDE, show({ x: -1, y: 6, rotate: -10 })],
   // Alarm: iki el havada sallanır
   alarm: [
     show({ x: -2, y: [-6, -9, -6], rotate: [25, 45, 25], transition: { duration: 0.3, repeat: Infinity } }),
@@ -88,8 +109,34 @@ const POSES: Partial<Record<Expression, [Pose, Pose]>> = {
   ],
 };
 
-export function Hands({ expression }: { expression: Expression }) {
-  const [l, r] = POSES[expression] ?? [HIDE, HIDE];
+/** Müzik çalarken dans figürleri (Nook.tsx'teki DANCES ile aynı sırada). */
+export const DANCE_HANDS: [Pose, Pose][] = [
+  // Sallanma: eller yanlarda salınır
+  [
+    show({ y: [3, 1, 3], rotate: [10, -10, 10], transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } }),
+    show({ y: [1, 3, 1], rotate: [10, -10, 10], transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } }),
+  ],
+  // Zıplama: eller havada pompalar
+  [
+    show({ x: -1, y: [-5, -9, -5], rotate: 30, transition: { duration: 0.5, repeat: Infinity, ease: "easeOut" } }),
+    show({ x: 1, y: [-9, -5, -9], rotate: -30, transition: { duration: 0.5, repeat: Infinity, ease: "easeOut" } }),
+  ],
+  // Kafa sallama: eller "rock" işareti gibi yukarıda
+  [
+    show({ x: -1.5, y: -7, rotate: 40 }),
+    show({ x: 1.5, y: [-7, -9, -7], rotate: -40, transition: { duration: 0.45, repeat: Infinity } }),
+  ],
+  // Yan adım: eller ters yönde savrulur
+  [
+    show({ x: [0, 3, 0, -2, 0], y: [2, -1, 2, 1, 2], transition: { duration: 1.8, repeat: Infinity, ease: "easeInOut" } }),
+    show({ x: [0, 2, 0, -3, 0], y: [2, 1, 2, -1, 2], transition: { duration: 1.8, repeat: Infinity, ease: "easeInOut" } }),
+  ],
+  // Fırıldak: kollar açık
+  [show({ x: -2, y: -3, rotate: 35 }), show({ x: 2, y: -3, rotate: -35 })],
+];
+
+export function Hands({ expression, dance = null }: { expression: Expression; dance?: number | null }) {
+  const [l, r] = (dance != null ? DANCE_HANDS[dance] : null) ?? POSES[expression] ?? [HIDE, HIDE];
   return (
     <>
       <Hand side={-1} pose={l} />

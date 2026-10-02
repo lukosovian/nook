@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { AlarmClock, AppWindow, ArrowUp, Brain, CircleAlert, Clapperboard, Globe, Mic, Music, Square, StickyNote, Target, ToggleRight, X, type LucideIcon } from "lucide-react";
 import { toggleVoice } from "../../hooks/useFeatures";
 import { useGemini } from "../../hooks/useGemini";
+import { isPinnedBottom, useScrollMemory } from "../../hooks/useScrollMemory";
 import { setInteractive } from "../../lib/bridge";
 import type { ToolNote } from "../../lib/aiTools";
 import { sendChat, stopChat } from "../../lib/chat";
@@ -55,9 +56,16 @@ export function ChatPanel() {
     };
   }, []);
 
-  // Yeni mesaj/kelime gelince en alta kaydır
+  // Kapanıp açılınca kaldığı yer korunur (ilk açılışta en alt)
+  useScrollMemory("chat", list, true);
+  // Yeni mesaj gelince en alta kaydır; cevap akarken yalnızca kullanıcı zaten en alttaysa
   const last = chat[chat.length - 1];
+  const seen = useRef({ n: chat.length, mounted: false });
   useEffect(() => {
+    const first = !seen.current.mounted;
+    const added = chat.length !== seen.current.n;
+    seen.current = { n: chat.length, mounted: true };
+    if (first || (!added && !isPinnedBottom("chat"))) return;
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
   }, [chat.length, last?.text, last?.notes?.length]);
 

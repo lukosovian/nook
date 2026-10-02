@@ -87,6 +87,23 @@ export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
   drink: [arch(5, 3), arch(5, 3)],
   // Sessiz: huzurla kapalı gözler
   muted: [arch(5, 2.6), arch(5, 2.6)],
+  lookAround: [OPEN, OPEN],
+  // Hapşırırken gözlerini sıkar
+  sneeze: [pill(5.2, 1.8, 0.6), pill(5.2, 1.8, 0.6)],
+  spin: [arch(5, 3.2), arch(5, 3.2)],
+  gum: [pill(3.8, 6.2, 0.6), pill(3.8, 6.2, 0.6)],
+  // Okurken aşağı bakan, yarı kapalı gözler
+  read: [pill(3.6, 4.6, 1.4), pill(3.6, 4.6, 1.4)],
+  // Ateşin başında keyifli
+  campfire: [arch(5, 3), arch(5, 3)],
+  umbrella: [OPEN, OPEN],
+  // Sıcaktan bitkin
+  hot: [pill(4, 3.4, 2), pill(4, 3.4, 2)],
+  // Yazarken kâğıda bakar
+  note: [pill(3.6, 4.8, 1.4), pill(3.6, 4.8, 1.4)],
+  writing: [pill(3.6, 4.8, 1.4), pill(3.6, 4.8, 1.4)],
+  // Büyüteçten bakan göz kocaman
+  magnify: [pill(3.6, 7), pill(4.6, 9.4)],
 };
 
 interface EyeProps {

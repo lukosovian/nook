@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.6"
+version = "0.2.7"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -52,6 +52,7 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_Shutdown",
   "Win32_Media_Audio",
   "Win32_Devices_Bluetooth",
+  "Win32_Devices_Display",
 ] }
 # "Şu an çalan" (GSMTC) — Tauri zaten bu sürümü derliyor
 windows = { version = "0.62", features = [

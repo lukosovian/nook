@@ -42,6 +42,27 @@ const MOUTH: Partial<Record<Expression, TargetAndTransition>> = {
     transition: { duration: 0.55, repeat: Infinity, ease: "easeInOut" },
   },
   bored: { ...base, width: 4, height: 1.2, ...corners(1, 1, 1, 1) },
+  // "Ha… ha… hapşu!": yavaşça açılır, sonra birden kapanır
+  sneeze: {
+    ...base,
+    width: [3, 4.5, 5.5, 2.5, 3],
+    height: [1.5, 4, 5.5, 1, 1.4],
+    ...corners(3, 3, 3, 3),
+    transition: { duration: ANTIC_MS.sneeze / 1000, times: [0, 0.3, 0.55, 0.62, 1], ease: "easeInOut" },
+  },
+  // Sakız balonunu üfleyen minik "o"
+  gum: { ...base, width: 2.6, height: 2.6, ...corners(2, 2, 2, 2) },
+  spin: smile(6, 2.8),
+  campfire: smile(5, 2.2),
+  // Sıcaktan dili dışarıda soluyor
+  hot: {
+    ...base,
+    width: 4.2,
+    height: [2.6, 3.4, 2.6],
+    backgroundColor: "rgba(0,0,0,1)",
+    ...corners(2, 2, 2.4, 2.4),
+    transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" },
+  },
   hum: {
     ...base,
     width: [2.4, 3.2, 2.4],

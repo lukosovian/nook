@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy, Languages, Pipette } from "lucide-react";
+import { Check, Copy, Languages, Pipette, X } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
-import { copyText } from "../../lib/bridge";
+import { copyText, setInteractive } from "../../lib/bridge";
 import { spring } from "../../lib/motion";
 import { useNook, type ClipItem } from "../../store/nook";
 import { ACCENT, EmptyState, TextButton, tintBg, tintText } from "../ui/primitives";
 
 export function ClipboardPanel() {
+  const scroller = useRef<HTMLDivElement>(null);
+  useScrollMemory("clip", scroller);
   const clips = useNook((s) => s.clips);
   const clearClips = useNook((s) => s.clearClips);
+  const removeClip = useNook((s) => s.removeClip);
   const [copied, setCopied] = useState<string | null>(null);
   const timer = useRef(0);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -38,37 +42,50 @@ export function ClipboardPanel() {
       {!clips.length ? (
         <EmptyState title="Pano boş" hint="Kopyaladığın metinler ve renkler burada birikir" color={ACCENT.purple} />
       ) : (
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+        <div ref={scroller} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {colors.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               <AnimatePresence initial={false}>
                 {colors.map((c) => (
-                  <motion.button
+                  <motion.div
                     key={c.id}
                     layout
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
-                    whileTap={{ scale: 0.92 }}
                     transition={spring.pop}
-                    onClick={() => copy(c)}
-                    title={`${c.text} — kopyala`}
-                    className="flex h-7 items-center gap-1.5 rounded-full border py-1 pl-1 pr-2.5"
+                    className="group flex h-7 items-center rounded-full border"
                     style={{ background: tintBg(c.color!, 12), borderColor: tintBg(c.color!, 35) }}
                   >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: c.color!, boxShadow: `0 0 8px -1px ${c.color}` }}>
-                      <AnimatePresence>
-                        {copied === c.id && (
-                          <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                            <Check size={11} strokeWidth={3.5} className="text-white mix-blend-difference" />
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </span>
-                    <span className="font-mono text-[11px] font-medium" style={{ color: tintText(c.color!) }}>
-                      {c.color}
-                    </span>
-                  </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      transition={spring.pop}
+                      onClick={() => copy(c)}
+                      title={`${c.text} — kopyala`}
+                      className="flex h-full items-center gap-1.5 py-1 pl-1 pr-1.5"
+                    >
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: c.color!, boxShadow: `0 0 8px -1px ${c.color}` }}>
+                        <AnimatePresence>
+                          {copied === c.id && (
+                            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                              <Check size={11} strokeWidth={3.5} className="text-white mix-blend-difference" />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </span>
+                      <span className="font-mono text-[11px] font-medium" style={{ color: tintText(c.color!) }}>
+                        {c.color}
+                      </span>
+                    </motion.button>
+                    {/* Sil: üzerine gelince belirir */}
+                    <button
+                      onClick={() => removeClip(c.id)}
+                      title="Rengi sil"
+                      className="mr-1 flex h-4 w-4 items-center justify-center rounded-full text-label-3 opacity-40 transition hover:bg-white/10 hover:text-label group-hover:opacity-100"
+                    >
+                      <X size={10} strokeWidth={3} />
+                    </button>
+                  </motion.div>
                 ))}
               </AnimatePresence>
             </div>
@@ -131,6 +148,10 @@ function PickColor() {
   const ED = (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper;
   if (!ED) return <span />;
   const pick = async () => {
+    // Seçerken imleç adanın dışına çıkar: ada açık ve pencere tıklanabilir kalsın, yoksa seçici kapanır
+    const st = useNook.getState();
+    st.setHold("eyedropper", true);
+    await setInteractive(true);
     try {
       const { sRGBHex } = await new ED().open();
       const hex = sRGBHex.toUpperCase();
@@ -139,6 +160,9 @@ function PickColor() {
       playAntic("wink");
     } catch {
       // Esc ile vazgeçildi
+    } finally {
+      useNook.getState().setHold("eyedropper", false);
+      void setInteractive(false);
     }
   };
   return (

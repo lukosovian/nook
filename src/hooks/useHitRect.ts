@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { setHitRect } from "../lib/bridge";
+import { setHitRect, type Rect } from "../lib/bridge";
 import { HIT_PADDING } from "../lib/layout";
 
 /**
@@ -15,6 +15,14 @@ function layoutRect(el: HTMLElement) {
     y += n.offsetTop;
   }
   return { x, y, width: el.offsetWidth, height: el.offsetHeight };
+}
+
+/** Adaya bağlı ek alan (yandaki Argus kartı); değişince sınırlar yeniden gönderilir. */
+let extra: Rect | null = null;
+let onExtra: (() => void) | null = null;
+export function setHitExtra(rect: Rect | null) {
+  extra = rect;
+  onExtra?.();
 }
 
 /**
@@ -36,7 +44,7 @@ export function useHitRect(ref: RefObject<HTMLElement | null>) {
         y: r.y - HIT_PADDING,
         width: r.width + HIT_PADDING * 2,
         height: r.height + HIT_PADDING * 2,
-      });
+      }, extra);
     };
     const schedule = () => {
       if (!raf) raf = requestAnimationFrame(push);
@@ -45,11 +53,13 @@ export function useHitRect(ref: RefObject<HTMLElement | null>) {
     const ro = new ResizeObserver(schedule);
     ro.observe(el);
     window.addEventListener("resize", schedule);
+    onExtra = schedule;
     schedule();
 
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", schedule);
+      onExtra = null;
       cancelAnimationFrame(raf);
     };
   }, [ref]);
