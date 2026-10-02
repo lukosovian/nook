@@ -205,8 +205,10 @@ export const setInteractive = (on: boolean) => (inTauri ? invoke<void>("set_inte
 export const argusSnapshot = (profile: string, today: string, dir: string) =>
   inTauri ? invoke<import("./argus").ArgusSnapshot | null>("argus_snapshot", { profile, today, dir }) : Promise.resolve(null);
 export const argusCheckDir = (dir: string) => invoke<string | null>("argus_check_dir", { dir });
-export const argusMark = (rowId: string, today: string, season?: number, episode?: number) =>
-  invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode });
+export const argusMark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
+  invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode, status });
+/** Adanın sağındaki izleme kartı penceresi (x, y: bu pencereye göre mantıksal konum) */
+export const argusCard = (show: boolean, x: number, y: number) => invoke<void>("argus_card", { show, x, y });
 export const argusInstall = () => invoke<void>("argus_install");
 export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
 /** Tanıtım ekranı için pencereyi büyüt; argümansız çağrı varsayılan boyuta döndürür. */

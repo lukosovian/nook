@@ -111,6 +111,47 @@ function WatchedButton({ item, ep, label = "İzledim" }: { item: ArgusItem; ep?:
   );
 }
 
+/** İzledikten sonra hangi durum işaretlensin — Argus'taki kendi durumların */
+function StatusChoice({ item, ep }: { item: ArgusItem; ep: { season: number; episode: number } | null }) {
+  const statuses = useArgus((s) => s.snap?.statuses ?? []);
+  const busy = useArgus((s) => s.busy === item.id);
+  const chip = "flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium disabled:opacity-50";
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      {ep && (
+        <motion.button
+          whileTap={{ scale: 0.92 }}
+          disabled={busy}
+          onClick={() => void markWatched(item, ep)}
+          className={chip}
+          style={{ background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }}
+          title="Yalnızca bölümü işaretle"
+        >
+          <Check size={10} strokeWidth={2.8} />
+          Bölüm
+        </motion.button>
+      )}
+      {statuses.map((st) => (
+        <motion.button
+          key={st}
+          whileTap={{ scale: 0.92 }}
+          disabled={busy}
+          onClick={() => void markWatched(item, ep, st)}
+          className={chip}
+          style={
+            item.status === st
+              ? { background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }
+              : { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-2)" }
+          }
+          title={ep ? `Bölümü işaretle, durumu ${st} yap` : `${st} olarak yaz (bugünün tarihiyle)`}
+        >
+          {st}
+        </motion.button>
+      ))}
+    </div>
+  );
+}
+
 /** "Lanterns S1B8 bitti mi?" — tarayıcıda izlediği tanındığında */
 function SuggestionBanner() {
   const sug = useArgus((s) => s.suggestion);
@@ -122,21 +163,23 @@ function SuggestionBanner() {
     <motion.div
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2 rounded-[12px] border px-2 py-1.5"
+      className="rounded-[12px] border px-2 py-1.5"
       style={{ background: tintBg(COLOR, 10), borderColor: tintBg(COLOR, 30) }}
     >
-      <Poster item={item} w={22} h={32} />
-      <div className="min-w-0 flex-1 leading-tight">
-        <p className="truncate text-[11.5px] font-medium" style={{ color: tintText(COLOR) }}>
-          {item.title}
-          {ep ? ` ${epLabel(ep)}` : ""} bitti mi?
-        </p>
-        <p className="text-[10px] text-label-3">İzlediğini fark ettim</p>
+      <div className="flex items-center gap-2">
+        <Poster item={item} w={18} h={26} />
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-[11.5px] font-medium" style={{ color: tintText(COLOR) }}>
+            {item.title}
+            {ep ? ` ${epLabel(ep)}` : ""} bitti mi?
+          </p>
+          <p className="text-[10px] text-label-3">Argus'a hangi durumla yazayım?</p>
+        </div>
+        <button onClick={() => useArgus.setState({ suggestion: null })} title="Hayır" className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+          <X size={12} />
+        </button>
       </div>
-      <WatchedButton item={item} ep={ep} label="İşaretle" />
-      <button onClick={() => useArgus.setState({ suggestion: null })} title="Hayır" className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
-        <X size={12} />
-      </button>
+      <StatusChoice item={item} ep={ep} />
     </motion.div>
   );
 }

@@ -49,6 +49,7 @@ pub fn run() {
             commands::set_window_size,
             argus::argus_snapshot,
             argus::argus_mark,
+            argus::argus_card,
             argus::argus_open,
             argus::argus_install,
             argus::argus_check_dir,

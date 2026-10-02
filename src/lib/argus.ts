@@ -11,7 +11,10 @@ import { create } from "zustand";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../hooks/useAntics";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
-import { argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
+import { emitTo } from "@tauri-apps/api/event";
+import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
+import type { IslandMode } from "./layout";
+import { ISLAND, ISLAND_TOP } from "./layout";
 import { dayKey, useNook } from "../store/nook";
 
 export interface ArgusEp {
@@ -55,6 +58,8 @@ export interface ArgusSnapshot {
   running: boolean;
   items: ArgusItem[];
   episodeDays: Record<string, number>;
+  /** Durum seçenekleri, Argus'taki sırayla */
+  statuses: string[];
 }
 
 export interface ArgusSuggestion {
@@ -232,9 +237,8 @@ export function matchTitle(snap: ArgusSnapshot | null, text: string, pool?: Argu
 export function matchMedia(snap: ArgusSnapshot | null, title: string, artist: string): ArgusSuggestion | null {
   if (!snap) return null;
   const text = `${title} ${artist}`;
-  // İzlenen/izlenecek/yarım kalanlar; İzlendi olan filmler hariç (tekrar izleme nadiren işaretlenir)
-  const pool = snap.items.filter((i) => !isStatus(i, "izlendi") || i.series);
-  const item = matchTitle(snap, text, pool);
+  // Her durumdaki kayıt — İzlendi olanlar da (tekrar izleme)
+  const item = matchTitle(snap, text);
   if (!item) return null;
   if (!item.series) return { itemId: item.id };
   const ep = parseEpisode(text) ?? item.series.next;
@@ -243,17 +247,18 @@ export function matchMedia(snap: ArgusSnapshot | null, title: string, artist: st
 
 // ------------------------------------------------------------------ yazma
 
-export async function markWatched(item: ArgusItem, ep?: { season: number; episode: number } | null) {
+/** `status`: işaretlenecek durum (Argus'taki etiket); verilmezse filmde İzlendi, bölümde dokunulmaz */
+export async function markWatched(item: ArgusItem, ep?: { season: number; episode: number } | null, status?: string) {
   if (useArgus.getState().busy) return;
   useArgus.setState({ busy: item.id });
   const s = useNook.getState();
   s.setBusy("argus", true);
   try {
-    const r = await argusMark(item.id, dayKey(), ep?.season, ep?.episode);
-    const what = ep ? `${item.title} ${epLabel(ep)}` : item.title;
+    const r = await argusMark(item.id, dayKey(), ep?.season, ep?.episode, status);
+    const what = `${ep ? `${item.title} ${epLabel(ep)}` : item.title}${status ? ` · ${status}` : ""}`;
     s.pushToast({
       kind: "argus",
-      title: ep ? "İzlendi olarak işaretlendi" : "Film izlendi",
+      title: ep ? "Bölüm işaretlendi" : status ? "Argus'a yazıldı" : "Film izlendi",
       detail: r.completed && ep ? `${item.title}: bütün bölümler bitti!` : what,
       ms: 4500,
     });
@@ -453,4 +458,56 @@ ${m.artist}`;
     }, TICK_MS);
     return () => window.clearInterval(t);
   }, []);
+}
+
+// ------------------------------------------------------------------ yan kart
+
+/** Yan kart penceresine giden bilgi */
+export interface ArgusCardData {
+  visible: boolean;
+  title: string;
+  episode: string | null;
+  poster: string | null;
+  meta: string[];
+  status: string | null;
+  playedMs: number;
+  needMs: number;
+}
+
+const CARD_GAP = 10;
+
+/**
+ * Ada açıkken ve Argus'taki bir şey çalarken adanın sağında afişli kart gösterir
+ * (ayrı, tıklanamaz pencere — adanın içinde yer yok).
+ */
+export function useArgusCard(mode: IslandMode) {
+  const live = useArgus((s) => s.live);
+  const snap = useArgus((s) => s.snap);
+  const show = isPrimary && inTauri && mode === "expanded" && !!live;
+  useEffect(() => {
+    if (!isPrimary || !inTauri) return;
+    const item = live ? snap?.items.find((i) => i.id === live.itemId) : null;
+    if (show && live && item) {
+      const ep = live.season && live.episode ? item.series?.upcoming.concat(item.series.next ? [item.series.next] : []).find((e) => e.season === live.season && e.episode === live.episode) : null;
+      const year = item.release?.slice(0, 4);
+      const data: ArgusCardData = {
+        visible: true,
+        title: item.title,
+        episode: live.season && live.episode ? `${epLabel(live as { season: number; episode: number })}${ep?.name ? ` · ${ep.name}` : ""}` : null,
+        poster: posterSrc(item),
+        meta: [year, item.runtime && !item.series ? `${item.runtime} dk` : null, item.genres.slice(0, 2).join(", ") || null, item.score ? `★ ${item.score.toFixed(1)}` : null].filter((x): x is string => !!x),
+        status: item.status,
+        playedMs: live.playedMs,
+        needMs: live.needMs,
+      };
+      void argusCard(true, window.innerWidth / 2 + ISLAND.expanded.width / 2 + CARD_GAP, ISLAND_TOP)
+        .then(() => emitTo("argus-card", "nook://argus-card", data))
+        .catch(() => {});
+      return;
+    }
+    // Önce kart kendi çıkış animasyonunu oynasın, sonra pencere gizlensin
+    void emitTo("argus-card", "nook://argus-card", { visible: false }).catch(() => {});
+    const t = window.setTimeout(() => void argusCard(false, 0, 0).catch(() => {}), 260);
+    return () => window.clearTimeout(t);
+  }, [show, live, snap]);
 }

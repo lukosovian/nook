@@ -4,6 +4,7 @@ import { playAntic } from "../hooks/useAntics";
 import { CHEW_MS } from "../hooks/useFeeding";
 import { useHitRect } from "../hooks/useHitRect";
 import { useIslandMode } from "../hooks/useIslandMode";
+import { useArgusCard } from "../lib/argus";
 import { isPrimary } from "../lib/bridge";
 import { FACE, ISLAND, ISLAND_TOP, MEDIA_COLLAPSED_WIDTH, mascotPose, tourPose, type IslandMode } from "../lib/layout";
 import { spring } from "../lib/motion";
@@ -50,6 +51,7 @@ function jelly(mood: Mood, away: boolean): TargetAndTransition {
 
 export function Island() {
   const mode = useIslandMode();
+  useArgusCard(mode);
   const mood = useNook((s) => s.mood);
   const relocating = useNook((s) => s.relocating);
   const expression = useNook(expressionOf);

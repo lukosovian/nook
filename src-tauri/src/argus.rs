@@ -84,6 +84,8 @@ pub struct Snapshot {
     items: Vec<Item>,
     /// Gün → o gün izlenen bölüm sayısı (son 60 gün)
     episode_days: HashMap<String, u32>,
+    /// Durum sütununun seçenekleri (Argus'taki sırayla) — izledikten sonra hangisi işaretlensin
+    statuses: Vec<String>,
 }
 
 /// Yazmak için gereken sütun/seçenek kimlikleri
@@ -92,6 +94,8 @@ struct Meta {
     durum: Option<String>,
     izlendi: Option<String>,
     izleme: Option<String>,
+    /// (seçenek kimliği, etiket)
+    statuses: Vec<(String, String)>,
 }
 
 struct Cache {
@@ -507,12 +511,18 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
     let kategori = role("kategori");
     let tur = role("tur");
     let mut durum_opts = options(durum);
+    let order: Vec<String> = durum
+        .and_then(|d| d.get("options"))
+        .and_then(|o| o.as_array())
+        .map(|a| a.iter().filter_map(|o| s(o.get("id")?)).collect())
+        .unwrap_or_default();
     // İzlenecek/İzleniyor/İzlendi seçenekleri farklı adlandırılmışsa (Argus'ta statusOptions) standart ada çevir
     for (key, label) in STATUS_LABELS {
         if let Some(id) = status_option(board, durum, key) {
             durum_opts.insert(id, label.to_owned());
         }
     }
+    let statuses: Vec<(String, String)> = order.iter().filter_map(|id| Some((id.clone(), durum_opts.get(id)?.clone()))).collect();
     let kat_opts = options(kategori);
     let tur_opts = options(tur);
     let (durum_id, kat_id, tur_id) = (pid_of(durum), pid_of(kategori), pid_of(tur));
@@ -642,8 +652,9 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
         running: false,
         items,
         episode_days,
+        statuses: statuses.iter().map(|(_, l)| l.clone()).collect(),
     };
-    Some((snap, Meta { durum: durum_id, izlendi, izleme: izleme_id }))
+    Some((snap, Meta { durum: durum_id, izlendi, izleme: izleme_id, statuses }))
 }
 
 fn server_up() -> bool {
@@ -675,6 +686,7 @@ pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: Stri
             running: server_up(),
             items: Vec::new(),
             episode_days: HashMap::new(),
+            statuses: Vec::new(),
         };
         let Some((pid, pname)) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned() else {
             return Some(empty());
@@ -770,7 +782,7 @@ pub struct MarkResult {
 
 /// Bir bölümü (season/episode) ya da filmi (ikisi de yoksa) bugün izlendi olarak işaretler.
 #[tauri::command]
-pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, today: String) -> Result<MarkResult, String> {
+pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<MarkResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let dir = argus_dir().ok_or("Argus bulunamadı")?;
         let (pid, board_id, meta) = {
@@ -778,8 +790,23 @@ pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32
             let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
             (c.snap.profile_id.clone(), c.snap.board_id.clone(), c.meta.clone())
         };
+        // İstenen durum (etiket) → seçenek kimliği
+        let status_id = match status.as_deref().filter(|l| !l.trim().is_empty()) {
+            Some(l) => Some(meta.statuses.iter().find(|(_, x)| same_name(x, l)).map(|(id, _)| id.clone()).ok_or("Argus'ta bu durum yok")?),
+            None => None,
+        };
         let server = Server::ensure(&dir)?;
         let booted = server.0.is_some();
+        // Kaydın değerlerini sunucudan alıp günceller
+        let update_row = |f: &mut dyn FnMut(&mut Map<String, Value>, &mut Vec<String>)| -> Result<(), String> {
+            let rows = get_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows"))?;
+            let row = rows.as_array().and_then(|a| a.iter().find(|r| r.get("id").and_then(|v| v.as_str()) == Some(&row_id))).ok_or("Kayıt bulunamadı")?;
+            let mut values = row.get("values").and_then(|v| v.as_object().cloned()).unwrap_or_default();
+            let mut changed = Vec::new();
+            f(&mut values, &mut changed);
+            put_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows/{row_id}"), json!({ "values": values, "_changed": changed }))?;
+            Ok(())
+        };
         let completed = match (season, episode) {
             (Some(sn), Some(en)) => {
                 let all = get_json(&format!("/api/profiles/{pid}/watched"))?;
@@ -791,27 +818,34 @@ pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32
                 }
                 row.insert(key, Value::Array(dates));
                 let res = put_json(&format!("/api/profiles/{pid}/watched/{row_id}"), Value::Object(row))?;
-                res.get("autoWatched").is_some_and(|v| !v.is_null())
+                let auto = res.get("autoWatched").is_some_and(|v| !v.is_null());
+                // Kullanıcının seçtiği durum, Argus'un kendiliğinden verdiğinin önüne geçer
+                if let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id.clone()) {
+                    update_row(&mut |values, changed| {
+                        values.insert(durum.clone(), Value::String(sid.clone()));
+                        changed.push(durum.clone());
+                    })?;
+                }
+                auto
             }
             _ => {
-                let (Some(durum), Some(izlendi)) = (meta.durum.clone(), meta.izlendi.clone()) else {
+                let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id.clone().or(meta.izlendi.clone())) else {
                     return Err("Argus'ta Durum sütunu bulunamadı".into());
                 };
-                let rows = get_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows"))?;
-                let row = rows.as_array().and_then(|a| a.iter().find(|r| r.get("id").and_then(|v| v.as_str()) == Some(&row_id))).ok_or("Kayıt bulunamadı")?;
-                let mut values = row.get("values").and_then(|v| v.as_object().cloned()).unwrap_or_default();
-                values.insert(durum.clone(), Value::String(izlendi));
-                let mut changed = vec![durum];
-                if let Some(iz) = meta.izleme {
-                    let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
-                    if !dates.iter().any(|d| d.as_str() == Some(&today)) {
-                        dates.push(Value::String(today.clone()));
+                update_row(&mut |values, changed| {
+                    values.insert(durum.clone(), Value::String(sid.clone()));
+                    changed.push(durum.clone());
+                    // İzlediği gün izleme tarihine yazılır (tekrar izlemede yeni tarih eklenir)
+                    if let Some(iz) = meta.izleme.clone() {
+                        let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+                        if !dates.iter().any(|d| d.as_str() == Some(&today)) {
+                            dates.push(Value::String(today.clone()));
+                        }
+                        values.insert(iz.clone(), Value::Array(dates));
+                        changed.push(iz);
                     }
-                    values.insert(iz.clone(), Value::Array(dates));
-                    changed.push(iz);
-                }
-                put_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows/{row_id}"), json!({ "values": values, "_changed": changed }))?;
-                true
+                })?;
+                Some(&sid) == meta.izlendi.as_ref()
             }
         };
         // Bir sonraki özet dosyalardan yeniden okunsun
@@ -851,3 +885,50 @@ pub fn argus_open() -> Result<bool, String> {
 
 
 
+
+/// İzlenen dizi/film kartı: adanın sağında ayrı, tıklanamaz küçük pencere.
+/// `x`, `y`: çağıran ada penceresine göre mantıksal konum.
+pub const CARD: &str = "argus-card";
+pub const CARD_W: f64 = 184.0;
+pub const CARD_H: f64 = 360.0;
+
+#[tauri::command]
+pub fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
+    let app = window.app_handle();
+    if !show {
+        if let Some(c) = app.get_webview_window(CARD) {
+            c.hide().map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    }
+    let card = match app.get_webview_window(CARD) {
+        Some(c) => c,
+        None => {
+            let c = tauri::WebviewWindowBuilder::new(app, CARD, tauri::WebviewUrl::App("index.html".into()))
+                .title("Nook")
+                .inner_size(CARD_W, CARD_H)
+                .resizable(false)
+                .maximizable(false)
+                .minimizable(false)
+                .decorations(false)
+                .transparent(true)
+                .shadow(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .focused(false)
+                .visible(false)
+                .build()
+                .map_err(|e| e.to_string())?;
+            c.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
+            c
+        }
+    };
+    let pos = window.outer_position().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    card.set_position(tauri::PhysicalPosition::new(pos.x + (x * scale).round() as i32, pos.y + (y * scale).round() as i32))
+        .map_err(|e| e.to_string())?;
+    if !card.is_visible().unwrap_or(false) {
+        card.show().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

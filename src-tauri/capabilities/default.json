@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Nook ada penceresinin izinleri",
-  "windows": ["island", "island-*"],
+  "windows": ["island", "island-*", "argus-card"],
   "permissions": [
     "core:default",
     "clipboard-manager:allow-write-text",
