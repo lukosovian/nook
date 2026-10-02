@@ -44,7 +44,15 @@ function jelly(mood: Mood, away: boolean): TargetAndTransition {
         transition: { duration: CHEW_MS / 1000, ease: "easeInOut" },
       };
     case "hungry":
-      return { y: 0, opacity: 1, scaleX: 1, scaleY: 1, scale: [1, 1.025, 1], transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } };
+      // Yalnızca scale döner — sabit opacity tekrarlanırsa tarayıcı onu ekran hızında boşuna çizer
+      return {
+        y: 0,
+        opacity: 1,
+        scaleX: 1,
+        scaleY: 1,
+        scale: [1, 1.025, 1],
+        transition: { scale: { duration: 1.1, repeat: Infinity, ease: "easeInOut" }, default: spring.island },
+      };
     default:
       return { y: 0, scale: 1, opacity: 1, scaleX: 1, scaleY: 1, transition: spring.island };
   }

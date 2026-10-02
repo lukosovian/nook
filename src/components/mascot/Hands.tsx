@@ -11,7 +11,20 @@ type Pose = TargetAndTransition;
 const sec = (ms: number) => ms / 1000;
 
 const HIDE: Pose = { scale: 0, x: 0, y: 3, rotate: 0, opacity: 0 };
-const show = (p: Pose): Pose => ({ scale: 1, opacity: 1, rotate: 0, x: 0, y: 2, ...p });
+const SETTLE = { type: "spring", stiffness: 420, damping: 18 } as const;
+
+/**
+ * Sonsuz tekrarda yalnızca gerçekten değişen (dizi) değerler döner. Sabit opacity/scale da
+ * "tekrarla" denirse Motion onu tarayıcıya sonsuz animasyon olarak verir ve tarayıcı ekran
+ * hızında (240 Hz) boşuna çizer — Nook dans ederken WebView'un yükünün asıl kaynağı buydu.
+ */
+const show = (p: Pose): Pose => {
+  const pose: Pose = { scale: 1, opacity: 1, rotate: 0, x: 0, y: 2, ...p };
+  const t = p.transition;
+  if (!t?.repeat) return pose;
+  const fixed = Object.keys(pose).filter((k) => k !== "transition" && !Array.isArray(pose[k as keyof Pose]));
+  return { ...pose, transition: { ...t, ...Object.fromEntries(fixed.map((k) => [k, SETTLE])) } };
+};
 
 /** [sol, sağ] */
 const POSES: Partial<Record<Expression, [Pose, Pose]>> = {

@@ -10,26 +10,49 @@
 let interval = 1000 / 60;
 // Kare zamanlamasındaki titremeye pay — 60 Hz ekranda hiçbir kare atlanmasın
 const SLACK = 2;
+// Zamanlayıcı geç kalabilir — sıradaki kareden bu kadar (ms) önce uyan
+const WAKE_EARLY = 4;
+
+// Motion opacity/filter gibi değerleri tarayıcıya (WAAPI) devreder; onlar sınırsız, ekran hızında
+// çizilir. Motion bunu `Element.prototype.animate` var mı diye bakarak seçer: yöntemi alt
+// sınıflara taşıyınca her şey aşağıdaki 60'lık döngüden geçer, `el.animate()` yine çalışır.
+const waapi = Object.getOwnPropertyDescriptor(Element.prototype, "animate");
+if (waapi) {
+  Object.defineProperty(HTMLElement.prototype, "animate", waapi);
+  Object.defineProperty(SVGElement.prototype, "animate", waapi);
+  delete (Element.prototype as { animate?: unknown }).animate;
+}
 
 const native = window.requestAnimationFrame.bind(window);
 const nativeCancel = window.cancelAnimationFrame.bind(window);
 
 let queue = new Map<number, FrameRequestCallback>();
 let nextId = 1;
-let scheduled = 0;
+let raf = 0;
+let timer = 0;
 let last = 0;
 let paused = false;
 
 function ensure() {
-  if (!scheduled && !paused && queue.size) scheduled = native(pump);
+  if (!raf && !timer && !paused && queue.size) raf = native(pump);
 }
 
 function pump(t: number) {
-  scheduled = 0;
+  raf = 0;
   if (paused) return;
   const elapsed = t - last;
   if (elapsed < interval - SLACK) {
-    scheduled = native(pump);
+    // Atlanacak karelerde tarayıcıyı hiç uyandırma (240 Hz'te saniyede 240 uyanış demek):
+    // sıradaki kareye az kalana kadar zamanlayıcıyla bekle, sonra ekran yenilemesine hizalan
+    const wait = interval - SLACK - elapsed - WAKE_EARLY;
+    if (wait > 1) {
+      timer = window.setTimeout(() => {
+        timer = 0;
+        if (!paused) raf = native(pump);
+      }, wait);
+    } else {
+      raf = native(pump);
+    }
     return;
   }
   // 60'lık ızgarada ilerle (144 Hz gibi tam bölünmeyen hızlarda da ortalama 60);
@@ -70,9 +93,10 @@ export function setFrameRate(fps: number) {
 export function pauseFrames(on: boolean) {
   if (on === paused) return;
   paused = on;
-  if (on && scheduled) {
-    nativeCancel(scheduled);
-    scheduled = 0;
+  if (on) {
+    if (raf) nativeCancel(raf);
+    window.clearTimeout(timer);
+    raf = timer = 0;
   }
   ensure();
 }
