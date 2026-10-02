@@ -42,9 +42,18 @@ $Manifest = [ordered]@{
 # BOM'suz UTF-8 (Tauri'nin JSON okuyucusu BOM'u sevmez)
 [IO.File]::WriteAllText("$Out\latest.json", ($Manifest | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
 
-if (Get-Command gh -ErrorAction SilentlyContinue) {
-  gh release create $Tag "$Out\$Setup" "$Out\latest.json" --repo $Repo --title "Nook $Version" --notes $Notes
-  if ($LASTEXITCODE -eq 0) { Write-Host "Yayinlandi: https://github.com/$Repo/releases/tag/$Tag" -ForegroundColor Green; exit 0 }
+# Kodu gonder, sonra surumu GitHub'a yukle. git'in kayitli girisi (Git Credential Manager) kullanilir, ek arac gerekmez.
+git -C $Root push origin main
+$Token = ("protocol=https`nhost=github.com`n`n" | git credential fill 2>$null | Where-Object { $_ -like "password=*" }) -replace "^password=", ""
+if ($Token) {
+  $H = @{ Authorization = "Bearer $Token"; Accept = "application/vnd.github+json" }
+  $Body = [Text.Encoding]::UTF8.GetBytes((@{ tag_name = $Tag; target_commitish = "main"; name = "Nook $Version"; body = $Notes } | ConvertTo-Json))
+  $Rel = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$Repo/releases" -Headers $H -Body $Body -ContentType "application/json; charset=utf-8"
+  foreach ($f in @($Setup, "latest.json")) {
+    Invoke-RestMethod -Method Post -Uri "https://uploads.github.com/repos/$Repo/releases/$($Rel.id)/assets?name=$f" -Headers $H -InFile "$Out\$f" -ContentType "application/octet-stream" | Out-Null
+  }
+  Write-Host "Yayinlandi: $($Rel.html_url)" -ForegroundColor Green
+  exit 0
 }
 
 Write-Host ""
