@@ -417,29 +417,102 @@ fn options(prop: Option<&Value>) -> HashMap<String, String> {
         .unwrap_or_default()
 }
 
+/// Argus'un sütun görevleri (app/server/roles.js ile aynı tablo ve çözüm sırası:
+/// açık kayıt → eski statMapping → varsayılan ad). (görev, türler, varsayılan ad, eski anahtar)
+const ROLE_DEFS: &[(&str, &[&str], &str, Option<&str>)] = &[
+    ("durum", &["select"], "Durum", Some("durumId")),
+    ("kategori", &["select"], "Kategori", Some("kategoriId")),
+    ("tur", &["multiselect", "select"], "Tür", Some("turId")),
+    ("vizyon", &["date"], "Vizyon Tarihi", Some("vizyonId")),
+    ("izlemeTarihi", &["multidate", "date"], "İzleme Tarihi", None),
+    ("sure", &["number"], "Süre", Some("sureId")),
+    ("puan", &["rating"], "Puan", Some("puanId")),
+    ("orjinalAdi", &["text"], "Orjinal Adı", None),
+    ("poster", &["image"], "Poster", None),
+];
+
+const STATUS_LABELS: [(&str, &str); 3] = [("izlenecek", "İzlenecek"), ("izleniyor", "İzleniyor"), ("izlendi", "İzlendi")];
+
+fn same_name(a: &str, b: &str) -> bool {
+    let n = |x: &str| x.trim().replace('İ', "i").replace('I', "ı").to_lowercase().replace('\u{307}', "");
+    n(a) == n(b)
+}
+
+fn resolve_role<'a>(board: &'a Value, key: &str) -> Option<&'a Value> {
+    let &(_, types, name, legacy) = ROLE_DEFS.iter().find(|d| d.0 == key)?;
+    let props = board.get("properties")?.as_array()?;
+    let typed = |p: &&Value| p.get("type").and_then(|t| t.as_str()).is_some_and(|t| types.contains(&t));
+    let by_id = |id: &str| props.iter().find(|p| p.get("id").and_then(|v| v.as_str()) == Some(id));
+    // null = kullanıcı bu görevi bilerek kapattı
+    match board.pointer(&format!("/roles/{key}")) {
+        Some(Value::Null) => return None,
+        Some(Value::String(id)) => {
+            if let Some(p) = by_id(id) {
+                return typed(&p).then_some(p);
+            }
+        }
+        _ => {}
+    }
+    if let Some(l) = legacy {
+        match board.pointer(&format!("/statMapping/{l}")) {
+            Some(Value::Null) => return None,
+            Some(Value::String(id)) => {
+                if let Some(p) = by_id(id).filter(typed) {
+                    return Some(p);
+                }
+            }
+            _ => {}
+        }
+    }
+    props.iter().find(|p| typed(p) && same_name(p.get("name").and_then(|v| v.as_str()).unwrap_or(""), name))
+}
+
+/// Durum sütunundaki İzlenecek/İzleniyor/İzlendi seçeneğinin kimliği (önce statusOptions, sonra etiket)
+fn status_option(board: &Value, durum: Option<&Value>, key: &str) -> Option<String> {
+    let opts = durum?.get("options")?.as_array()?;
+    let has = |id: &str| opts.iter().any(|o| o.get("id").and_then(|v| v.as_str()) == Some(id));
+    if let Some(id) = board.pointer(&format!("/statusOptions/{key}")).and_then(|v| v.as_str()).filter(|id| has(id)) {
+        return Some(id.to_owned());
+    }
+    let label = STATUS_LABELS.iter().find(|(k, _)| *k == key)?.1;
+    opts.iter()
+        .find(|o| same_name(o.get("label").or(o.get("name")).and_then(|v| v.as_str()).unwrap_or(""), label))
+        .and_then(|o| s(o.get("id")?))
+}
+
 fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> Option<(Snapshot, Meta)> {
     let pdir = dir.join("data").join("profiles").join(pid);
     let boards = read_json(&pdir.join("boards.json"))?;
-    // Medya arşivi: "durum" rolü olan ilk arşiv
-    let board = boards.as_array()?.iter().find(|b| b.pointer("/roles/durum").is_some())?;
+    // Medya arşivi: Durum sütunu çözülebilen ilk arşiv
+    let board = boards.as_array()?.iter().find(|b| resolve_role(b, "durum").is_some())?;
     let board_id = s(board.get("id")?)?;
     let props: Vec<&Value> = board.get("properties")?.as_array()?.iter().collect();
-    let by_id = |id: &str| props.iter().copied().find(|p| p.get("id").and_then(|v| v.as_str()) == Some(id));
     let by_name = |names: &[&str]| {
         props.iter().copied().find(|p| {
             let n = p.get("name").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
             names.iter().any(|x| n.contains(x))
         })
     };
-    let role = |r: &str| board.pointer(&format!("/roles/{r}")).and_then(|v| v.as_str()).and_then(by_id);
+    let role = |r: &str| resolve_role(board, r);
     let pid_of = |p: Option<&Value>| p.and_then(|p| s(p.get("id")?));
 
-    let title_id = board.get("titlePropertyId").and_then(|v| v.as_str()).unwrap_or("").to_owned();
-    let original_id = pid_of(by_name(&["orjinal", "original", "orijinal"]));
+    let title_id = board
+        .get("titlePropertyId")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
+        .or_else(|| props.iter().find(|p| p.get("type").and_then(|v| v.as_str()) == Some("title")).and_then(|p| s(p.get("id")?)))
+        .unwrap_or_default();
+    let original_id = pid_of(role("orjinalAdi").or_else(|| by_name(&["orjinal", "original", "orijinal"])));
     let durum = role("durum");
     let kategori = role("kategori");
     let tur = role("tur");
-    let durum_opts = options(durum);
+    let mut durum_opts = options(durum);
+    // İzlenecek/İzleniyor/İzlendi seçenekleri farklı adlandırılmışsa (Argus'ta statusOptions) standart ada çevir
+    for (key, label) in STATUS_LABELS {
+        if let Some(id) = status_option(board, durum, key) {
+            durum_opts.insert(id, label.to_owned());
+        }
+    }
     let kat_opts = options(kategori);
     let tur_opts = options(tur);
     let (durum_id, kat_id, tur_id) = (pid_of(durum), pid_of(kategori), pid_of(tur));
@@ -447,8 +520,8 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
     let sure_id = pid_of(role("sure"));
     let puan_id = pid_of(role("puan"));
     let izleme_id = pid_of(role("izlemeTarihi"));
-    let poster_id = pid_of(by_name(&["poster", "afiş"])).or_else(|| board.get("coverPropertyId").and_then(s));
-    let izlendi = durum_opts.iter().find(|(_, l)| l.to_lowercase().replace('\u{307}', "") == "izlendi").map(|(k, _)| k.clone());
+    let poster_id = pid_of(role("poster").or_else(|| by_name(&["poster", "afiş"]))).or_else(|| board.get("coverPropertyId").and_then(s));
+    let izlendi = status_option(board, durum, "izlendi");
 
     let rows = read_json(&pdir.join("rows").join(format!("{board_id}.json")))?;
     let episodes = read_json(&pdir.join("episodes.json")).unwrap_or(Value::Null);
@@ -772,6 +845,7 @@ pub fn argus_open() -> Result<bool, String> {
     crate::shell::open_path(dir.join("ARGUS.exe").to_string_lossy().into_owned())?;
     Ok(true)
 }
+
 
 
 

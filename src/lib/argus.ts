@@ -146,8 +146,12 @@ export function dayLabel(date: string) {
   return d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
 }
 
-/** Çıkmış mı (Argus'un "ne izlesem" kuralı: yayınlanmamışı önerme) */
-const released = (it: ArgusItem) => (it.series ? it.series.aired > 0 : !!it.release && it.release <= dayKey());
+/** Çıkmış mı — Argus'un "ne izlesem" kuralı: vizyon tarihi gelecekteyse önerme, tarihi boşsa öner */
+const released = (it: ArgusItem) => {
+  // Bölüm listesi var ama hiçbiri yayınlanmamış
+  if (it.series && it.series.aired === 0 && it.series.upcoming.length > 0) return false;
+  return !(it.release && /^\d{4}-\d{2}-\d{2}/.test(it.release) && it.release.slice(0, 10) > dayKey());
+};
 const isSeries = (it: ArgusItem) => !!it.series || /dizi|show|yarışma/i.test(it.kind ?? "");
 
 export interface PickFilter {
