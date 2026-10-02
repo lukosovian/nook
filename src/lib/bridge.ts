@@ -206,6 +206,7 @@ export const argusSnapshot = (profile: string, today: string) =>
   inTauri ? invoke<import("./argus").ArgusSnapshot | null>("argus_snapshot", { profile, today }) : Promise.resolve(null);
 export const argusMark = (rowId: string, today: string, season?: number, episode?: number) =>
   invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode });
+export const argusInstall = () => invoke<void>("argus_install");
 export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
 /** Tanıtım ekranı için pencereyi büyüt; argümansız çağrı varsayılan boyuta döndürür. */
 export const setWindowSize = (width?: number, height?: number) => (inTauri ? invoke<void>("set_window_size", { width, height }) : noop());

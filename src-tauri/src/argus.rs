@@ -37,6 +37,8 @@ pub struct Series {
     /// Yayınlanmış bölüm sayısı ve bunlardan izlenenler
     aired: u32,
     seen: u32,
+    /// En son izlenen bölümün sırası (1'den) — ilerleme çubuğu için
+    position: u32,
     /// İzlenecek sıradaki (yayınlanmış, izlenmemiş ilk) bölüm
     next: Option<Ep>,
     /// En son yayınlanan bölüm (bugün çıktıysa "yeni bölüm")
@@ -271,7 +273,9 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
             let last_seen = seen_map.and_then(|m| {
                 m.values().filter_map(|v| v.as_array()).flatten().filter_map(|d| d.as_str()).max().map(str::to_owned)
             });
-            let (mut aired, mut seen, mut next, mut latest, mut upcoming) = (0, 0, None, None, Vec::new());
+            let (mut aired, mut seen, mut latest, mut upcoming) = (0, 0, None, Vec::new());
+            // Yayınlanmış bölümler sırayla: (bölüm, izlendi mi)
+            let mut order: Vec<(Ep, bool)> = Vec::new();
             for season in seasons {
                 let sn = season.get("seasonNumber").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 if sn < 1 {
@@ -285,18 +289,22 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
                         Some(d) if d <= today => {
                             aired += 1;
                             latest = Some(ep());
-                            if is_seen(&format!("{sn}-{en}")) {
-                                seen += 1;
-                            } else if next.is_none() {
-                                next = Some(ep());
-                            }
+                            let w = is_seen(&format!("{sn}-{en}"));
+                            seen += w as u32;
+                            order.push((ep(), w));
                         }
                         Some(d) if d <= horizon.as_str() && upcoming.len() < 4 => upcoming.push(ep()),
                         _ => {}
                     }
                 }
             }
-            Series { aired, seen, next, latest, upcoming, last_seen }
+            // Sıradaki bölüm: en son izlenen bölümden sonraki ilk izlenmemiş bölüm. Eski sezonların
+            // tarihleri hatırlanmadığı için boş bırakılmış olabilir — onlar "sıradaki" sayılmaz.
+            let last = order.iter().rposition(|(_, w)| *w);
+            let from = last.map_or(0, |i| i + 1);
+            let next = order[from..].iter().find(|(_, w)| !w).map(|(e, _)| e.clone());
+            let position = last.map_or(0, |i| i as u32 + 1);
+            Series { aired, seen, position, next, latest, upcoming, last_seen }
         });
 
         items.push(Item {
@@ -339,7 +347,14 @@ pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: Stri
         let dir = argus_dir()?;
         let all = profiles(&dir);
         let want = profile.unwrap_or_default().to_lowercase();
-        let (pid, pname) = all.iter().find(|(_, n)| n.to_lowercase() == want).or(all.first()).cloned()?;
+        // Profil seçilmemişse (ya da yoksa) en son kullanılan profil
+        let active = || {
+            all.iter().max_by_key(|(id, _)| {
+                let d = dir.join("data").join("profiles").join(id);
+                mtime(&d.join("watched.json")).max(mtime(&d.join("recent-watch.json"))).max(mtime(&d.join("boards.json")))
+            })
+        };
+        let (pid, pname) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned()?;
         let pdir = dir.join("data").join("profiles").join(&pid);
         let key = format!(
             "{pid}|{today}|{}|{}|{}|{}|{}",
@@ -481,6 +496,19 @@ pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32
     .map_err(|e| e.to_string())?
 }
 
+/// Argus'u kurar: Argus'un kendi kurulum betiği (Git yoksa kurar, Argus'u masaüstüne indirir,
+/// kısayol ekler, ilk kez açar) görünür bir pencerede çalışır — soru sorarsa kullanıcı cevaplar.
+#[tauri::command]
+pub fn argus_install() -> Result<(), String> {
+    if argus_dir().is_some() {
+        return Err("Argus zaten kurulu".into());
+    }
+    let bat = std::env::temp_dir().join("ARGUS Kur.bat");
+    std::fs::write(&bat, include_bytes!("../argus-kur.bat")).map_err(|e| e.to_string())?;
+    Command::new("cmd").args(["/c", "start", "ARGUS Kurulum"]).arg(&bat).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Argus uygulamasını açar (zaten açıksa false döner).
 #[tauri::command]
 pub fn argus_open() -> Result<bool, String> {
@@ -491,5 +519,6 @@ pub fn argus_open() -> Result<bool, String> {
     crate::shell::open_path(dir.join("ARGUS.exe").to_string_lossy().into_owned())?;
     Ok(true)
 }
+
 
 

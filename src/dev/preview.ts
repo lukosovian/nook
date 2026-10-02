@@ -25,7 +25,7 @@ function demoArgus() {
   const ep = (season: number, episode: number, name: string, date: string) => ({ season, episode, name, date });
   const show = (id: string, title: string, aired: number, seen: number, next: ReturnType<typeof ep> | null, upcoming: ReturnType<typeof ep>[], latest = next): ArgusItem => ({
     id, title, original: null, status: "İzleniyor", kind: "Dizi", genres: ["Bilim Kurgu", "Dram"], release: "2024-05-01", runtime: 50, score: 8.4, poster: null,
-    recent: Date.now() - aired * 1000, watchDates: [], series: { aired, seen, next, latest, upcoming, lastSeen: day(-1) },
+    recent: Date.now() - aired * 1000, watchDates: [], series: { aired, seen, position: seen, next, latest, upcoming, lastSeen: day(-1) },
   });
   const items: ArgusItem[] = [
     show("a", "Star Trek: Starfleet Academy", 10, 8, ep(1, 9, "300. Gece", day(-7)), []),
@@ -41,7 +41,7 @@ function demoArgus() {
 }
 
 export function applyPreview(mode: string) {
-  demoArgus();
+  if (!new URLSearchParams(location.search).has("noargus")) demoArgus();
   document.documentElement.style.background = "#3a4a5c";
   // Ekran görüntüsü animasyonun ortasında çekilmesin
   if (new URLSearchParams(location.search).has("still")) MotionGlobalConfig.skipAnimations = true;

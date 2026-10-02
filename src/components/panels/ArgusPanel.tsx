@@ -19,6 +19,7 @@ import { sendChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, EmptyState, Segmented, tintBg, tintText } from "../ui/primitives";
+import { ArgusPromo } from "../ArgusPromo";
 
 const COLOR = ACCENT.orange;
 
@@ -38,7 +39,7 @@ export function ArgusPanel() {
   // Bölümden çıkınca aramadan açılan ayrıntı kapansın
   useEffect(() => () => useArgus.setState({ focusId: null }), []);
 
-  if (!snap) return <EmptyState title="Argus bulunamadı" hint="Masaüstünde Argus klasörü olunca burada görünür" color={COLOR} />;
+  if (!snap) return <ArgusPromo />;
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -143,7 +144,7 @@ function Watching() {
               <p className="truncate text-[10.5px] text-label-3">
                 {s.next ? `Sıradaki ${epLabel(s.next)}${s.next.name ? ` · ${s.next.name}` : ""}` : soon?.date ? `Güncelsin · yeni bölüm ${dayLabel(soon.date)}` : "Güncelsin"}
               </p>
-              <Bar pct={s.aired ? (s.seen / s.aired) * 100 : 0} color={COLOR} className="mt-1" />
+              <Bar pct={s.aired ? (s.position / s.aired) * 100 : 0} color={COLOR} className="mt-1" />
             </div>
             {s.next && <WatchedButton item={it} ep={s.next} />}
           </div>

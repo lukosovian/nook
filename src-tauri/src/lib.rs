@@ -49,6 +49,7 @@ pub fn run() {
             argus::argus_snapshot,
             argus::argus_mark,
             argus::argus_open,
+            argus::argus_install,
             commands::inspect_paths,
             commands::drag_icon_path,
             shell::open_path,

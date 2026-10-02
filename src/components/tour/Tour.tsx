@@ -7,11 +7,14 @@ import { easeOut, spring } from "../../lib/motion";
 import { endTour } from "../../lib/tour";
 import { useNook, type Antic } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
-import { AiArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, ModulesArt, MoodArt } from "./TourArt";
+import { useArgus } from "../../lib/argus";
+import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, ModulesArt, MoodArt } from "./TourArt";
 
 interface Step {
   title: string;
   text: string;
+  /** Argus yoksa bunun yerine (Argus adımı) */
+  alt?: { title: string; text: string };
   color: string;
   antic: Antic;
   /** Nook ortada kocaman (ilk ve son adım) */
@@ -77,6 +80,17 @@ export const STEPS: Step[] = [
     Art: MoodArt,
   },
   {
+    title: "Argus'la birlikte çalışırım",
+    text: "Argus, izlediğin dizi ve filmlerin arşivi; ikimiz aynı ailedeniz. Sıradaki bölümünü, yeni çıkanları ve \"ne izlesem?\" sorusunu ben hallederim, \"İzledim\" dediğinde Argus'a yazarım.",
+    alt: {
+      title: "Argus'la tanış",
+      text: "Argus, izlediğin dizi ve filmleri takip ettiğin arşiv uygulaması; benim kardeşim. Kurarsan yeni bölümleri haber verir, ne izleyeceğini seçer, izlediklerini işaretlerim.",
+    },
+    color: "#1a8cff",
+    antic: "wink",
+    Art: ArgusArt,
+  },
+  {
     title: "Hazırız!",
     text: "Artık seninleyim. Bu tanıtımı istediğin zaman Ayarlar'daki \"Nook nedir?\" ile yeniden açabilirsin.",
     color: ACCENT.green,
@@ -89,12 +103,14 @@ export const STEPS: Step[] = [
 export function Tour() {
   const step = useNook((s) => s.tourStep);
   const setStep = useNook((s) => s.setTourStep);
-  const cur = STEPS[step] ?? STEPS[0];
+  const hasArgus = useArgus((s) => !!s.snap);
+  const base = STEPS[step] ?? STEPS[0];
+  const cur = base.alt && !hasArgus ? { ...base, ...base.alt } : base;
   const last = step === STEPS.length - 1;
 
   useEffect(() => {
-    playAntic(cur.antic);
-  }, [cur]);
+    playAntic(base.antic);
+  }, [base]);
 
   const next = () => (last ? endTour() : setStep(step + 1));
   const back = () => step > 0 && setStep(step - 1);

@@ -195,8 +195,10 @@ export interface Settings extends NativeSettings {
   gameSummary: boolean;
   /** Nook sıkılınca oyun teklif etsin */
   playOffers: boolean;
-  /** Argus profili (kullanıcı adı) */
+  /** Argus profili (kullanıcı adı); boşsa en son kullanılan */
   argusProfile: string;
+  /** Argus'u olmayanlara Argus'u tanıt (ana sayfa çipi) */
+  argusPromo: boolean;
   /** Takip ettiğin dizilerin yeni bölüm haberleri */
   argusNews: boolean;
   /** Tarayıcıda izlediğini Argus'la eşleştirip işaretlemeyi teklif et */
@@ -234,7 +236,8 @@ export const DEFAULT_SETTINGS: Settings = {
   dailySummary: true,
   gameSummary: true,
   playOffers: true,
-  argusProfile: "Luko",
+  argusProfile: "",
+  argusPromo: true,
   argusNews: true,
   argusDetect: true,
 };

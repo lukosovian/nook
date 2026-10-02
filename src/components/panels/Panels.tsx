@@ -144,7 +144,10 @@ function ModuleGrid() {
   const lukonnect = useNook((s) => hasLukonnect(s.devices));
   const sub = useModuleStatus();
   const argus = useArgus((s) => !!s.snap);
-  const modules = MODULES.filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus));
+  const promo = useNook((s) => s.settings.argusPromo);
+  const modules = MODULES.filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo)).map((m) =>
+    m.id === "argus" && !argus ? { ...m, label: "Argus", color: "#1a8cff" } : m,
+  );
   return (
     <div className="-mr-1.5 grid h-full auto-rows-[41px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5">
       {modules.map((m, i) => (
@@ -209,7 +212,9 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
     play: { text: best ? `Rekor ${best}` : "Yakala · Hafıza" },
     report: { text: active ? `Bugün ${active >= 60 ? `${Math.floor(active / 60)} sa ${active % 60} dk` : `${active} dk`}` : "Bu hafta" },
     argus: {
-      text: newToday.length
+      text: !argusSnap
+        ? "Keşfet"
+        : newToday.length
         ? `Bugün ${newToday[0].item.title} ${epLabel(newToday[0].ep)}`
         : watchingList.length
           ? `${watchingList.length} dizi izliyorsun`

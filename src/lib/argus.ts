@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../hooks/useAntics";
-import { argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
+import { argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
 import { dayKey, useNook } from "../store/nook";
 
 export interface ArgusEp {
@@ -36,6 +36,8 @@ export interface ArgusItem {
   series: {
     aired: number;
     seen: number;
+    /** En son izlenen bölümün sırası */
+    position: number;
     next: ArgusEp | null;
     latest: ArgusEp | null;
     upcoming: ArgusEp[];
@@ -251,6 +253,18 @@ export async function markWatched(item: ArgusItem, ep?: { season: number; episod
     useArgus.setState({ busy: null });
     s.setBusy("argus", false);
     await refreshArgus();
+  }
+}
+
+/** Argus'un kurulum betiğini açar; kurulunca Nook dakikada bir yoklarken kendiliğinden bulur. */
+export async function installArgus() {
+  const s = useNook.getState();
+  try {
+    await argusInstall();
+    s.pushToast({ kind: "argus", title: "Argus kuruluyor", detail: "Açılan penceredeki adımları izle", ms: 6000 });
+    playAntic("hop");
+  } catch (e) {
+    s.pushToast({ kind: "argus", title: "Argus kurulamadı", detail: String(e), ms: 6000 });
   }
 }
 

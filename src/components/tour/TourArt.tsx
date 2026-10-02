@@ -27,6 +27,8 @@ import { useGemini } from "../../hooks/useGemini";
 import { openPath } from "../../lib/bridge";
 import { SULK_BELOW, useNook } from "../../store/nook";
 import { KeyInput, TextInput } from "../panels/SettingsPanel";
+import { ArgusLinked, ArgusPromo } from "../ArgusPromo";
+import { epLabel, posterSrc, useArgus, watching } from "../../lib/argus";
 import { ACCENT, Bar, MiniNook, Segmented, tintBg, tintText, Toggle } from "../ui/primitives";
 
 const LOOP = { repeat: Infinity, ease: "easeInOut" } as const;
@@ -547,6 +549,22 @@ export function MoodArt() {
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------- Argus
+
+export function ArgusArt() {
+  const snap = useArgus((s) => s.snap);
+  if (!snap) return <ArgusPromo big />;
+  const list = watching(snap)
+    .slice(0, 4)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      poster: posterSrc(i),
+      sub: i.series?.next ? `Sıradaki ${epLabel(i.series.next)}${i.series.next.name ? ` · ${i.series.next.name}` : ""}` : "Güncelsin",
+    }));
+  return <ArgusLinked watching={list} />;
 }
 
 // ---------------------------------------------------------------- İlk ve son adım

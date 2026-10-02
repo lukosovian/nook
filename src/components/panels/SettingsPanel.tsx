@@ -4,7 +4,7 @@ import { useGemini } from "../../hooks/useGemini";
 import { alarmRing, listMonitors, type MonitorInfo } from "../../lib/bridge";
 import { startTour } from "../../lib/tour";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
-import { openArgus, useArgus } from "../../lib/argus";
+import { installArgus, openArgus, useArgus } from "../../lib/argus";
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle } from "../ui/primitives";
 
@@ -186,15 +186,26 @@ function ArgusSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const snap = useArgus((st) => st.snap);
-  if (!snap) return null;
+  if (!snap)
+    return (
+      <Section title="Argus">
+        <Row label="Dizi/film arşivi: Argus">
+          <TextButton onClick={() => void installArgus()}>Kur</TextButton>
+        </Row>
+        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">Nook'un kardeşi. Kurarsan yeni bölümleri haber veririm, ne izleyeceğini seçerim.</p>
+      </Section>
+    );
   return (
     <Section title="Argus">
       <Row label="Profil">
         <select
-          value={snap.profile}
+          value={s.argusProfile && snap.profiles.includes(s.argusProfile) ? s.argusProfile : ""}
           onChange={(e) => update({ argusProfile: e.target.value })}
           className="rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label outline-none"
         >
+          <option value="" className="bg-neutral-900">
+            Otomatik ({snap.profile})
+          </option>
           {snap.profiles.map((p) => (
             <option key={p} value={p} className="bg-neutral-900">
               {p}
