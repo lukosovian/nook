@@ -5,7 +5,7 @@
 # (git ile GitHub girisi kayitliysa otomatik; degilse release\vX klasorunu elle yuklersin).
 # Once degisiklikleri commit'le; betik main'i de gonderir.
 
-param([string]$Notes = "Yeni surum")
+param([string]$Notes = "Yeni surum", [switch]$SkipBuild)
 
 $ErrorActionPreference = "Stop"
 $Repo = "lukosovian/nook"
@@ -21,7 +21,7 @@ Write-Host "Nook $Version derleniyor..." -ForegroundColor Cyan
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 $env:TAURI_SIGNING_PRIVATE_KEY = $Key
 Push-Location $Root
-try { npm run tauri build; if ($LASTEXITCODE -ne 0) { throw "Derleme basarisiz" } } finally { Pop-Location }
+try { if (-not $SkipBuild) { npm run tauri build; if ($LASTEXITCODE -ne 0) { throw "Derleme basarisiz" } } } finally { Pop-Location }
 
 $Setup = "Nook_${Version}_x64-setup.exe"
 $Bundle = "$Root\src-tauri\target\release\bundle\nsis"
@@ -45,7 +45,13 @@ $Manifest = [ordered]@{
 
 # Kodu gonder, sonra surumu GitHub'a yukle. git'in kayitli girisi (Git Credential Manager) kullanilir, ek arac gerekmez.
 git -C $Root push origin main
-$Token = ("protocol=https`nhost=github.com`n`n" | git credential fill 2>$null | Where-Object { $_ -like "password=*" }) -replace "^password=", ""
+$ErrorActionPreference = "Continue"
+# PowerShell 5.1 git'e satirlari bozarak aktariyor; istek LF satirli bir dosyadan okutulur
+$CredFile = Join-Path $env:TEMP "nook-cred.txt"
+[IO.File]::WriteAllText($CredFile, "protocol=https`nhost=github.com`n`n")
+$Token = (cmd /c "git credential fill < `"$CredFile`"" 2>$null | Where-Object { $_ -like "password=*" }) -replace "^password=", ""
+Remove-Item $CredFile -ErrorAction SilentlyContinue
+$ErrorActionPreference = "Stop"
 if ($Token) {
   $H = @{ Authorization = "Bearer $Token"; Accept = "application/vnd.github+json" }
   $Body = [Text.Encoding]::UTF8.GetBytes((@{ tag_name = $Tag; target_commitish = "main"; name = "Nook $Version"; body = $Notes } | ConvertTo-Json))
