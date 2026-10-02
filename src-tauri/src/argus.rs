@@ -111,7 +111,8 @@ fn is_argus(d: &Path) -> bool {
 static CUSTOM: Mutex<Option<PathBuf>> = Mutex::new(None);
 static FOUND: Mutex<Option<PathBuf>> = Mutex::new(None);
 static LAST_SCAN: Mutex<Option<Instant>> = Mutex::new(None);
-/// Bulunamazsa en fazla bu sıklıkla yeniden aranır (tarama PowerShell çalıştırır)
+static DISK_SCANNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Bulunamazsa kısayol/işlem kontrolü en fazla bu sıklıkla tekrarlanır
 const RESCAN: Duration = Duration::from_secs(600);
 
 /// Argus nerede? Seçilen klasör › önceden bulunan › masaüstleri › kısayollar/çalışan Argus › kısa tarama.
@@ -130,7 +131,8 @@ pub fn argus_dir() -> Option<PathBuf> {
         }
         *last = Some(Instant::now());
         drop(last);
-        from_shortcuts_and_processes().or_else(scan)
+        // Disk taraması oturum başına bir kez: Argus'u olmayan bilgisayarda sürekli disk gezmesin
+        from_shortcuts_and_processes().or_else(|| (!DISK_SCANNED.swap(true, std::sync::atomic::Ordering::Relaxed)).then(scan).flatten())
     })?;
     *FOUND.lock().unwrap() = Some(found.clone());
     Some(found)
@@ -181,28 +183,123 @@ fn root_of(path: &Path) -> Option<PathBuf> {
     path.ancestors().take(7).find(|a| is_argus(a)).map(Path::to_path_buf)
 }
 
-/// Argus'un masaüstü/Başlat kısayolları (ARGUS.lnk) ve çalışan Argus işlemleri
+/// Argus'un masaüstü/Başlat kısayolları (ARGUS.lnk) ve çalışan Argus işlemleri.
+/// PowerShell/COM kullanmaz: gizli betik çalıştırmak antivirüslerde yanlış alarma yol açıyordu.
 fn from_shortcuts_and_processes() -> Option<PathBuf> {
-    let script = r#"
-$sh = New-Object -ComObject WScript.Shell
-$dirs = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'), [Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('StartMenu'))
-foreach ($d in $dirs) { if ($d -and (Test-Path $d)) { Get-ChildItem -Path $d -Filter '*.lnk' -Recurse -Depth 1 -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'argus' } | ForEach-Object { $s = $sh.CreateShortcut($_.FullName); $s.TargetPath; $s.WorkingDirectory; $s.Arguments } } }
-Get-Process electron, node -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }
-"#;
-    let mut cmd = Command::new("powershell");
-    cmd.args(["-NoProfile", "-NonInteractive", "-Command", script]);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000);
+    shortcut_targets().into_iter().chain(running_exes()).find_map(|p| root_of(&p))
+}
+
+/// Adında "argus" geçen .lnk dosyalarının içindeki yollar (hedef ve çalışma klasörü .lnk'de düz metin durur)
+fn shortcut_targets() -> Vec<PathBuf> {
+    let mut dirs = desktops();
+    let env = |k: &str| std::env::var_os(k).map(PathBuf::from);
+    if let Some(p) = env("PUBLIC") {
+        dirs.push(p.join("Desktop"));
     }
-    let out = cmd.output().ok()?;
-    let text = String::from_utf8_lossy(&out.stdout).into_owned();
-    text.lines()
-        .flat_map(|l| l.split('"'))
-        .map(str::trim)
-        .filter(|l| l.len() > 3 && l.contains(':'))
-        .find_map(|l| root_of(Path::new(l)))
+    if let Some(p) = env("APPDATA") {
+        dirs.push(p.join(r"Microsoft\Windows\Start Menu\Programs"));
+    }
+    if let Some(p) = env("ProgramData") {
+        dirs.push(p.join(r"Microsoft\Windows\Start Menu\Programs"));
+    }
+    let mut lnks = Vec::new();
+    for d in dirs {
+        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                if let Ok(sub) = std::fs::read_dir(&p) {
+                    lnks.extend(sub.flatten().map(|e| e.path()));
+                }
+            } else {
+                lnks.push(p);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for l in lnks {
+        let name = l.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        if !name.ends_with(".lnk") || !name.contains("argus") {
+            continue;
+        }
+        if let Ok(bytes) = std::fs::read(&l) {
+            out.extend(lnk_paths(&bytes));
+        }
+    }
+    out
+}
+
+/// .lnk baytlarından "X:\..." biçimli yolları çıkarır (ANSI ve UTF-16 parçalar)
+fn lnk_paths(bytes: &[u8]) -> Vec<PathBuf> {
+    let mut texts: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    for &b in bytes {
+        if (0x20..0x7f).contains(&b) {
+            cur.push(b as char);
+        } else if !cur.is_empty() {
+            texts.push(std::mem::take(&mut cur));
+        }
+    }
+    texts.push(cur);
+    let mut cur16: Vec<u16> = Vec::new();
+    for ch in bytes.chunks_exact(2) {
+        let u = u16::from_le_bytes([ch[0], ch[1]]);
+        if u >= 0x20 && u != 0xffff && !(0xd800..0xe000).contains(&u) {
+            cur16.push(u);
+        } else if !cur16.is_empty() {
+            texts.push(String::from_utf16_lossy(&std::mem::take(&mut cur16)));
+        }
+    }
+    texts.push(String::from_utf16_lossy(&cur16));
+    texts
+        .into_iter()
+        .filter_map(|t| {
+            let i = t.find(":\\")?;
+            let start = i.checked_sub(1)?;
+            Some(PathBuf::from(t[start..].trim_matches('"').trim()))
+        })
+        .collect()
+}
+
+/// Çalışan electron/node işlemlerinin dosya yolları
+#[cfg(windows)]
+fn running_exes() -> Vec<PathBuf> {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
+    use windows_sys::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION};
+    let mut out = Vec::new();
+    unsafe {
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snap == INVALID_HANDLE_VALUE {
+            return out;
+        }
+        let mut e: PROCESSENTRY32W = std::mem::zeroed();
+        e.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut ok = Process32FirstW(snap, &mut e) != 0;
+        while ok {
+            let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
+            let name = String::from_utf16_lossy(&e.szExeFile[..len]).to_lowercase();
+            if name == "electron.exe" || name == "node.exe" {
+                let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, e.th32ProcessID);
+                if !h.is_null() {
+                    let mut buf = [0u16; 1024];
+                    let mut n = buf.len() as u32;
+                    if QueryFullProcessImageNameW(h, 0, buf.as_mut_ptr(), &mut n) != 0 {
+                        out.push(PathBuf::from(String::from_utf16_lossy(&buf[..n as usize])));
+                    }
+                    CloseHandle(h);
+                }
+            }
+            ok = Process32NextW(snap, &mut e) != 0;
+        }
+        CloseHandle(snap);
+    }
+    out
+}
+
+#[cfg(not(windows))]
+fn running_exes() -> Vec<PathBuf> {
+    Vec::new()
 }
 
 /// Belgeler, İndirilenler, ev klasörü ve sürücü köklerinde kısa tarama: kökün kendisi, alt klasörleri
@@ -660,6 +757,7 @@ pub fn argus_open() -> Result<bool, String> {
     crate::shell::open_path(dir.join("ARGUS.exe").to_string_lossy().into_owned())?;
     Ok(true)
 }
+
 
 
 
