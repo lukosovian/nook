@@ -70,6 +70,13 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 if let Some((px, py)) = cursor_position(&app) {
                     let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                     let forced = shared.forced.lock().unwrap().clone();
+                    // Tam ekran oyunun ekranında ada açılmaz (alarm çalarken hariç)
+                    let in_game = shared
+                        .game_screen
+                        .lock()
+                        .unwrap()
+                        .is_some_and(|(l, t, r, b)| px >= l as f64 && px < r as f64 && py >= t as f64 && py < b as f64)
+                        && !crate::alarm::imminent(&shared);
 
                     for (label, ws) in windows {
                         let p = prev.entry(label.clone()).or_default();
@@ -77,7 +84,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let (x, y) = ((px - g.x) / g.scale, (py - g.y) / g.scale);
                         // Ada içinde basılıp (metin seçerken, kaydırıcı çekerken) imleç dışarı kayarsa
                         // tuş bırakılana kadar ada kapanmaz.
-                        let over = ws.hit.contains(x, y) || ws.extra.contains(x, y);
+                        let over = !in_game && (ws.hit.contains(x, y) || ws.extra.contains(x, y));
                         let down = left_button_down();
                         if !down {
                             p.drag = false;

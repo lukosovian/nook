@@ -126,6 +126,9 @@ pub struct Shared {
     /// Son CPU ölçümü (%, f32 bitleri) ve bellek doluluğu (%) — oyun oturumu özeti için
     pub cpu: std::sync::atomic::AtomicU32,
     pub mem: std::sync::atomic::AtomicU32,
+    /// Öndeki tam ekran oyunun monitörü (sol, üst, sağ, alt — fiziksel px). İmleç oradayken
+    /// ada açılmaz: pencere etkileşimli olunca tam ekran oyun odağı kaybedip alta düşer.
+    pub game_screen: Mutex<Option<(i32, i32, i32, i32)>>,
 }
 
 impl Shared {

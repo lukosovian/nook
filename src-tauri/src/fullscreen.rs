@@ -123,6 +123,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     }
                 }
 
+                *shared.game_screen.lock().unwrap() = if session.is_some() { detected.as_ref().map(|d| d.0) } else { None };
+
                 let peek = peek_until.is_some_and(|t| Instant::now() < t);
                 let in_game = detected.is_some();
                 let full = if enabled && !peek { detected.map(|d| d.0) } else { None };
