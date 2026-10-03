@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useAnimationControls, type TargetAndTransition
 import { playAntic } from "../hooks/useAntics";
 import { CHEW_MS } from "../hooks/useFeeding";
 import { useHitRect } from "../hooks/useHitRect";
+import { boostFrames } from "../lib/frameCap";
 import { useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
 import { isPrimary } from "../lib/bridge";
@@ -105,12 +106,18 @@ export function Island() {
   // Açılış: parçacıklar toplanır, Nook doğar ve el sallar. İlk kurulumda ardından tanıtım açılır.
   useEffect(() => {
     if (!useNook.getState().intro) return;
+    // Hızlı geçen gemi/parçacıklar 60'lık sınırda yüksek Hz ekranda takılır — açılış boyunca serbest
+    boostFrames(true);
     const t = window.setTimeout(() => {
+      boostFrames(false);
       useNook.getState().setIntro(false);
       playAntic(INTRO_ANTIC[introKind()]);
       if (isPrimary && !useNook.getState().toured) window.setTimeout(() => void startTour(), 900);
     }, introMs());
-    return () => window.clearTimeout(t);
+    return () => {
+      window.clearTimeout(t);
+      boostFrames(false);
+    };
   }, []);
 
   const shape = ISLAND[mode];

@@ -8,6 +8,8 @@
  */
 
 let interval = 1000 / 60;
+/** Kısa, hızlı animasyonlar (açılış) sırasında sınır kalkar — ekranın kendi hızında akıcı çizilir */
+let boosted = false;
 // Kare zamanlamasındaki titremeye pay — 60 Hz ekranda hiçbir kare atlanmasın
 const SLACK = 2;
 // Zamanlayıcı geç kalabilir — sıradaki kareden bu kadar (ms) önce uyan
@@ -41,7 +43,7 @@ function pump(t: number) {
   raf = 0;
   if (paused) return;
   const elapsed = t - last;
-  if (elapsed < interval - SLACK) {
+  if (!boosted && elapsed < interval - SLACK) {
     // Atlanacak karelerde tarayıcıyı hiç uyandırma (240 Hz'te saniyede 240 uyanış demek):
     // sıradaki kareye az kalana kadar zamanlayıcıyla bekle, sonra ekran yenilemesine hizalan
     const wait = interval - SLACK - elapsed - WAKE_EARLY;
@@ -87,6 +89,11 @@ window.cancelAnimationFrame = (id) => {
 /** Saniyedeki en fazla kare (pilde / enerji tasarrufunda 30) */
 export function setFrameRate(fps: number) {
   interval = 1000 / fps;
+}
+
+/** Açılış gibi kısa ve hızlı hareketlerde kare sınırını geçici olarak kaldırır */
+export function boostFrames(on: boolean) {
+  boosted = on;
 }
 
 /** Gizliyken kareleri tamamen durdurur; açılınca bekleyen animasyonlar kaldığı yerden sürer. */

@@ -325,7 +325,7 @@ function Flash({ delay, color }: { delay: number; color: string }) {
 /** Genel bir yıldız gemisi silueti (yandan): daire tabla, gövde, iki motor */
 function Starship() {
   return (
-    <svg width="64" height="26" viewBox="0 0 64 26" style={{ filter: "drop-shadow(0 0 4px rgba(160,200,255,0.55))" }}>
+    <svg width="64" height="26" viewBox="0 0 64 26" style={{ overflow: "visible" }}>
       {/* Motorlar ve direkleri */}
       <path d="M22 15 L17 8 M26 15 L21 8" stroke="#c9ced6" strokeWidth="1.6" strokeLinecap="round" />
       <rect x="2" y="5" width="25" height="4" rx="2" fill="#dfe3ea" />
@@ -382,12 +382,19 @@ function Trek() {
       {/* Gemi geçer, sağda ışık hızına geçip kaybolur */}
       <motion.div
         className="absolute left-1/2 top-1/2"
-        style={{ marginLeft: -32, marginTop: -13 }}
-        initial={{ x: -170, y: 6, opacity: 0 }}
-        animate={{ x: [-170, -20, 40, 190], y: [6, 0, -2, -4], opacity: [0, 1, 1, 1], scaleX: [1, 1, 1, 2.6] }}
-        transition={{ duration: 1.25, times: [0, 0.55, 0.8, 1], ease: "easeInOut" }}
+        style={{ marginLeft: -32, marginTop: -13, willChange: "transform" }}
+        initial={{ x: -160, y: 4, opacity: 0 }}
+        animate={{ x: 40, y: -1, opacity: 1 }}
+        transition={{ x: { duration: 1.0, ease: [0.25, 0.1, 0.35, 1] }, y: { duration: 1.0, ease: "easeOut" }, opacity: { duration: 0.25 } }}
       >
-        <Starship />
+        {/* Warp: süzülüş bitince bir anda gerilip sağa fırlar */}
+        <motion.div
+          style={{ originX: 0, willChange: "transform" }}
+          animate={{ x: [0, 0, 170], scaleX: [1, 1.15, 2.4], opacity: [1, 1, 0] }}
+          transition={{ duration: 1.3, times: [0, 0.8, 1], ease: "easeIn" }}
+        >
+          <Starship />
+        </motion.div>
       </motion.div>
       {/* Warp parlaması */}
       <motion.span
@@ -395,7 +402,7 @@ function Trek() {
         style={{ right: -10, width: 140, marginTop: -2, background: "linear-gradient(90deg, transparent, #9fd0ff, #fff)", originX: 1 }}
         initial={{ opacity: 0, scaleX: 0 }}
         animate={{ opacity: [0, 1, 0], scaleX: [0, 1, 1.2] }}
-        transition={{ duration: 0.35, delay: 1.05, ease: "easeOut" }}
+        transition={{ duration: 0.35, delay: 1.12, ease: "easeOut" }}
       />
       {/* Işınlanma sütunu */}
       <Dot
