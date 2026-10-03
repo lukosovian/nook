@@ -159,6 +159,8 @@ export function applyPreview(mode: string) {
     s.setMedia(null);
     const v = { osd: [0.62, false, 1], osddown: [0.3, false, -1], osdloud: [0.92, false, 1], osdmute: [0.4, true, -1], osdlight: [0.7, false, 1] }[mode] ?? [0.62, false, 1];
     useNook.setState({ media: null, osd: { kind: mode === "osdlight" ? "brightness" : "volume", value: v[0] as number, muted: v[1] as boolean, dir: v[2] as number } });
+  } else if (mode === "welcome") {
+    useNook.setState({ media: null, toasts: [{ id: "w", kind: "welcome", title: "Az daha kayıp ilanı veriyordum, 1 saat 20 dakikadır yoktun", detail: "Luko, bir daha bu kadar uzun gitme, tamam mı?", ms: 99999 }] });
   } else if (mode === "toast") {
     useNook.setState({ media: null, toasts: [{ id: "t", kind: "device-low", title: "Mouse pili azalıyor", detail: "%10 kaldı" }] });
   } else if (mode === "search") {

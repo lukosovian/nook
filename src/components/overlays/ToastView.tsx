@@ -24,6 +24,7 @@ import {
   Usb,
   Video,
   type LucideIcon,
+  Heart,
 } from "lucide-react";
 import type { SysEventKind } from "../../lib/bridge";
 import { useNook } from "../../store/nook";
@@ -58,6 +59,7 @@ const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
   play: { icon: Gamepad2, color: ACCENT.pink },
   update: { icon: Download, color: ACCENT.green },
   argus: { icon: Clapperboard, color: ACCENT.orange },
+  welcome: { icon: Heart, color: ACCENT.pink },
 };
 
 /** Sistem olayı kartı: solda Nook (rozetli), ortada metin, sağda renkli mini avatar. */

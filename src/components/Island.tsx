@@ -59,6 +59,23 @@ function jelly(mood: Mood, away: boolean): TargetAndTransition {
   }
 }
 
+/** Kartın yazısı kırpılmasın: metne göre genişler (tuval ile ölçülür), en fazla 580 px (pencere 600) */
+const measure = (() => {
+  let ctx: CanvasRenderingContext2D | null = null;
+  return (text: string, font: string) => {
+    ctx ??= document.createElement("canvas").getContext("2d");
+    if (!ctx) return text.length * 7.4;
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  };
+})();
+function toastFit(title?: string, detail?: string) {
+  if (!title) return ISLAND.toast.width;
+  const text = Math.max(measure(title, "500 13px 'Inter Variable', sans-serif"), detail ? measure(detail, "11px 'Inter Variable', sans-serif") : 0);
+  // Solda Nook (52) + sağda avatar ve boşluklar (~56)
+  return Math.round(Math.min(580, Math.max(ISLAND.toast.width, 52 + text + 60)));
+}
+
 export function Island() {
   const mode = useIslandMode();
   useArgusCard(mode);
@@ -93,7 +110,8 @@ export function Island() {
   const miniDownload = collapsed && downloading && !miniListen;
   const miniFocus = collapsed && focusing && !miniListen && !miniDownload;
   const miniPlayer = collapsed && playing && !miniListen && !miniDownload && !miniFocus;
-  const width = miniPlayer || miniDownload || miniFocus || miniListen ? MEDIA_COLLAPSED_WIDTH : shape.width;
+  const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail));
+  const width = miniPlayer || miniDownload || miniFocus || miniListen ? MEDIA_COLLAPSED_WIDTH : mode === "toast" ? toastWidth : shape.width;
   const transition = mode === "feeding" ? spring.stretch : spring.island;
   const view = useNook((s) => (s.tab === "home" ? "home" : "module"));
   const tourStep = useNook((s) => s.tourStep);

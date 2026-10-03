@@ -122,7 +122,8 @@ export type SysEventKind =
   | "game"
   | "play"
   | "update"
-  | "argus";
+  | "argus"
+  | "welcome";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {

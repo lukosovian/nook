@@ -25,7 +25,79 @@ import { fetchWeather } from "../lib/weather";
 import { isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
 import { playAntic } from "./useAntics";
 
-/** Sistem uzun süre boşta → Nook uyur. Uyanınca uzun uyuduysa "özledim", kısaysa şaşırır. */
+/** "12 dakikadır", "1 saat 20 dakikadır", "3 saattir" — ve ek almadan: "12 dakika", "3 saat" */
+function awayText(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const since = !h ? `${m} dakikadır` : !m ? `${h} saattir` : `${h} saat ${m} dakikadır`;
+  const plain = !h ? `${m} dakika` : !m ? `${h} saat` : `${h} saat ${m} dakika`;
+  return { since, plain };
+}
+
+type Line = (t: string, d: string) => string;
+/** Dönüş karşılamaları: ne kadar uzun kalındıysa o kadar meraklı/özlemiş */
+const WELCOME: { upTo: number; antic: Antic; titles: Line[]; details: string[] }[] = [
+  {
+    upTo: 20,
+    antic: "surprised",
+    titles: [
+      (t) => `${t} yoktun, sıkılmaya başlamıştım`,
+      (t) => `Hop, geldin! ${t} bekliyordum`,
+      (t) => `${t} neredeydin? Ben burada saydım`,
+      (t) => `Çay mı demledin? ${t} yoktun`,
+      (t) => `Geldin mi? ${t} tavana bakıyordum`,
+      (t) => `${t} ortalıkta yoktun, ne yaptın?`,
+    ],
+    details: ["Neyse ki döndün", "Bana da getirseydin bari", "Kaldığın yerden devam", "Ben hiç kıpırdamadım, söz"],
+  },
+  {
+    upTo: 60,
+    antic: "shy",
+    titles: [
+      (t) => `${t} neredeydin sen? Korktum!`,
+      (t) => `Beni unuttun sandım, ${t} yoktun`,
+      (t) => `Oh be, geldin! ${t} merak ettim`,
+      (t) => `${t} kayıptın, haber verseydin ya`,
+      (_, d) => `Sensiz ${d} geçti, çok sessizdi`,
+      (t) => `${t} ekrana tek başıma baktım`,
+    ],
+    details: ["Bir dahakine söyle, meraktan öldüm", "Neyse, döndün ya, gerisi önemsiz", "Seni görünce içim rahatladı", "Gel bakalım, neler kaçırdın"],
+  },
+  {
+    upTo: 180,
+    antic: "love",
+    titles: [
+      (t) => `${t} yoktun, seni çok özledim!`,
+      (_, d) => `Neredeydin ${d} boyunca? Arıyordum seni`,
+      (t) => `Sonunda! ${t} bekliyorum, korkmuştum`,
+      (_, d) => `${d} sonra geri dönüş, hoş geldin!`,
+      (t) => `Az daha kayıp ilanı veriyordum, ${t} yoktun`,
+      (t) => `${t} pencereden bakıp durdum`,
+    ],
+    details: ["Bir daha bu kadar uzun gitme, tamam mı?", "Sarılmak serbest", "Su içmeyi unutma, uzun ara verdin", "Geldin ya, günüm şenlendi"],
+  },
+  {
+    upTo: Infinity,
+    antic: "love",
+    titles: [
+      (t) => `${t} neredeydin sen?! Çok korktum`,
+      (_, d) => `Bütün gün seni bekledim, tam ${d}`,
+      (t) => `Hoş geldin! ${t} yalnızdım`,
+      (_, d) => `${d} oldu ya! Beni bırakıp gittin sandım`,
+      (t) => `${t} uyuyamadım bile, nihayet geldin`,
+    ],
+    details: ["Bir dahakine beni de götür", "Seni görünce kalbim yerine geldi", "Neler yaptın, anlat bakalım", "Hadi, bugün neler var bakalım"],
+  },
+];
+
+const pick = <T,>(xs: T[], last: number) => {
+  let i = Math.floor(Math.random() * xs.length);
+  if (xs.length > 1 && i === last) i = (i + 1) % xs.length;
+  return i;
+};
+let lastTitle = -1;
+
+/** Sistem uzun süre boşta → Nook uyur. Uyanınca uzun uyuduysa "özledim", kısaysa şaşırır; çok uzunsa karşılar. */
 export function useIdleFeed() {
   useEffect(() => {
     let sleptAt = 0;
@@ -33,8 +105,26 @@ export function useIdleFeed() {
       const st = useNook.getState();
       const wasSleeping = isSleeping(st);
       st.setAsleep(asleep);
-      if (asleep) sleptAt = Date.now();
-      else if (sleptAt && wasSleeping) playAntic(Date.now() - sleptAt > 3 * 60_000 ? "love" : "surprised");
+      if (asleep) {
+        sleptAt = Date.now();
+        return;
+      }
+      if (!sleptAt || !wasSleeping) return;
+      // Uyku, son dokunuştan "uyku süresi" sonra başlar — gerçek uzaklık ondan fazla
+      const mins = Math.round((Date.now() - sleptAt + st.settings.sleepAfterSec * 1000) / 60_000);
+      sleptAt = 0;
+      const every = st.settings.welcomeBack;
+      if (!isPrimary || !every || mins < every || st.fullscreen) {
+        playAntic(mins > 3 ? "love" : "surprised");
+        return;
+      }
+      const tier = WELCOME.find((w) => mins <= w.upTo)!;
+      const { since, plain } = awayText(mins);
+      lastTitle = pick(tier.titles, lastTitle);
+      const name = st.settings.userName.trim();
+      const detail = tier.details[Math.floor(Math.random() * tier.details.length)];
+      st.pushToast({ kind: "welcome", title: tier.titles[lastTitle](since, plain), detail: name ? `${name}, ${detail.charAt(0).toLocaleLowerCase("tr")}${detail.slice(1)}` : detail, ms: 6500 });
+      playAntic(tier.antic);
     });
   }, []);
 }

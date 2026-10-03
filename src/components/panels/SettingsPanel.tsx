@@ -23,6 +23,13 @@ const SLEEP: { id: number; label: string }[] = [
   { id: 0, label: "Hiç" },
 ];
 
+const WELCOME: { id: number; label: string }[] = [
+  { id: 0, label: "Yok" },
+  { id: 5, label: "5 dk" },
+  { id: 10, label: "10 dk" },
+  { id: 30, label: "30 dk" },
+];
+
 const GAME_BREAK: { id: number; label: string }[] = [
   { id: 0, label: "Yok" },
   { id: 60, label: "1 sa" },
@@ -148,6 +155,9 @@ export function SettingsPanel() {
         </Row>
         <Row label="Günün ilk açılışında özet">
           <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
+        </Row>
+        <Row label="Uzun süre yokken dönünce karşıla">
+          <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
         </Row>
         <Row label="Oyun açılınca özet">
           <Toggle on={s.gameIntro} onChange={(v) => update({ gameIntro: v })} />
