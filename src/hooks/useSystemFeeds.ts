@@ -22,6 +22,7 @@ import {
 import { looksForeign, translateToTurkish } from "../lib/assist";
 import { note } from "../lib/log";
 import { fetchWeather } from "../lib/weather";
+import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
 import { playAntic } from "./useAntics";
 
@@ -258,12 +259,34 @@ export function useOsdFeed() {
   }, []);
 }
 
-/** "İmleci takip et": pencere taşınmadan önce ada kaybolur, sonra yeni ekranda belirir. */
+/** "İmleci takip et": pencere taşınmadan önce ada bir efektle kaybolur, sonra yeni ekranda belirir. */
 export function useRelocateFeed() {
-  useEffect(
-    () => subscribe<"out" | "in">(EVENTS.relocate, (phase) => useNook.getState().setRelocating(phase === "out")),
-    [],
-  );
+  useEffect(() => {
+    let done = 0;
+    const off = subscribe<string>(EVENTS.relocate, (msg) => {
+      const [phase, d] = msg.split(":");
+      const dir = d === "-1" ? -1 : 1;
+      const st = useNook.getState();
+      window.clearTimeout(done);
+      if (phase === "out") {
+        st.setRelocating(true);
+        st.setMove({ kind: pickMove(st.settings.moveStyle), dir, phase: "out" });
+        return;
+      }
+      st.setRelocating(false);
+      const kind = st.move?.kind ?? pickMove(st.settings.moveStyle);
+      st.setMove({ kind, dir, phase: "in" });
+      // Belirme bitince olağan hâline döner
+      done = window.setTimeout(() => {
+        useNook.getState().setMove(null);
+        playAntic(MOVE_ANTIC[kind]);
+      }, 850);
+    });
+    return () => {
+      off();
+      window.clearTimeout(done);
+    };
+  }, []);
 }
 
 /** Genel kısayol → hızlı arama. */

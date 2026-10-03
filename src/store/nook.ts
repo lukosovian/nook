@@ -217,6 +217,8 @@ export interface Settings extends NativeSettings {
   welcomeBack: number;
   /** Açılış animasyonu: "random" ya da bir efekt (overlays/Intro) */
   introStyle: "random" | "dust" | "warp" | "ripple" | "orbit" | "confetti" | "sparkle" | "bubbles" | "trek";
+  /** Ekranlar arası geçiş efekti: "random" ya da bir efekt (lib/moveFx) */
+  moveStyle: "random" | "beam" | "warp" | "portal" | "jump" | "slide" | "glitch";
   /** Pilde / enerji tasarrufunda animasyonları yavaşlat */
   powerSaver: boolean;
   /** Argus profili (kullanıcı adı); boşsa en son kullanılan */
@@ -266,6 +268,7 @@ export const DEFAULT_SETTINGS: Settings = {
   playOffers: true,
   welcomeBack: 10,
   introStyle: "random",
+  moveStyle: "random",
   powerSaver: true,
   argusProfile: "",
   argusPromo: true,
@@ -303,6 +306,8 @@ interface NookState {
   hovered: boolean;
   searching: boolean;
   relocating: boolean;
+  /** Ekran geçiş efekti (kaybolma/belirme) */
+  move: import("../lib/moveFx").Move | null;
   tab: Tab;
   shelf: ShelfItem[];
   clips: ClipItem[];
@@ -378,6 +383,7 @@ interface NookState {
   setHovered: (hovered: boolean) => void;
   setSearching: (searching: boolean) => void;
   setRelocating: (relocating: boolean) => void;
+  setMove: (move: import("../lib/moveFx").Move | null) => void;
   setTab: (tab: Tab) => void;
   addFiles: (files: FileMeta[]) => void;
   revalidateShelf: (alive: FileMeta[]) => void;
@@ -454,6 +460,7 @@ export const useNook = create<NookState>()(
       hovered: false,
       searching: false,
       relocating: false,
+      move: null,
       tab: "home",
       shelf: [],
       clips: [],
@@ -506,6 +513,7 @@ export const useNook = create<NookState>()(
       setHovered: (hovered) => set({ hovered }),
       setSearching: (searching) => set({ searching }),
       setRelocating: (relocating) => set({ relocating }),
+      setMove: (move) => set({ move }),
       setTab: (tab) => set({ tab }),
 
       addFiles: (files) =>

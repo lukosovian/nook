@@ -33,7 +33,8 @@ pub fn width_of(label: &str) -> f64 {
     }
 }
 /// Ekranlar arası geçişte "çıkış" animasyonunun süresi (frontend ile aynı).
-const RELOCATE_OUT: Duration = Duration::from_millis(240);
+/// Ada kaybolma animasyonu (ekran geçiş efektleri) bitene kadar pencere yerinde bekler.
+const RELOCATE_OUT: Duration = Duration::from_millis(470);
 
 /// Pencereyi verilen monitörün üst-orta noktasına yapıştırır.
 pub fn place_on(win: &WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
@@ -198,8 +199,14 @@ pub fn relocate(app: &AppHandle, shared: Arc<Shared>, label: String, monitor: Mo
         return;
     }
     let app = app.clone();
+    // Geçiş yönü (1 = sağdaki ekrana, -1 = soldakine) — efektler o yöne gider
+    let dir = app
+        .get_webview_window(&label)
+        .and_then(|w| w.outer_position().ok())
+        .map(|p| if monitor.position().x >= p.x { 1 } else { -1 })
+        .unwrap_or(1);
     thread::spawn(move || {
-        let _ = app.emit_to(label.as_str(), "nook://relocate", "out");
+        let _ = app.emit_to(label.as_str(), "nook://relocate", format!("out:{dir}"));
         thread::sleep(RELOCATE_OUT);
         if let Some(win) = app.get_webview_window(&label) {
             let _ = place_on(&win, &monitor);
@@ -207,7 +214,7 @@ pub fn relocate(app: &AppHandle, shared: Arc<Shared>, label: String, monitor: Mo
             thread::sleep(Duration::from_millis(60));
             let _ = place_on(&win, &monitor);
         }
-        let _ = app.emit_to(label.as_str(), "nook://relocate", "in");
+        let _ = app.emit_to(label.as_str(), "nook://relocate", format!("in:{dir}"));
         shared.relocating.store(false, Ordering::Release);
     });
 }

@@ -18,6 +18,8 @@ import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { FocusMini } from "./overlays/FocusMini";
 import { ListenMini } from "./overlays/ListenMini";
+import { MoveFx } from "./overlays/MoveFx";
+import { moveTarget } from "../lib/moveFx";
 import { Intro, INTRO_ANTIC, INTRO_MS, introKind, introMs, TREK_BEAM } from "./overlays/Intro";
 import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
@@ -31,7 +33,14 @@ import { STEPS, Tour } from "./tour/Tour";
 const SHADOW = "0 14px 34px -12px rgba(0,0,0,0.8)";
 
 /** Transform katmanı (layout'tan bağımsız): çiğnerken squash & stretch, açken nefes, ekran değiştirirken kaçış. */
+/** Ekran geçiş efektlerinden kalabilecek dönüş/kayma/renk izlerini sıfırlar */
+const CLEAN = { x: 0, rotate: 0, skewX: 0, filter: "none" };
+
 function jelly(mood: Mood, away: boolean): TargetAndTransition {
+  return { ...CLEAN, ...jellyPose(mood, away) };
+}
+
+function jellyPose(mood: Mood, away: boolean): TargetAndTransition {
   if (away) {
     return { y: -40, scale: 0.5, opacity: 0, scaleX: 1, scaleY: 1, transition: { duration: 0.22, ease: "easeIn" } };
   }
@@ -92,7 +101,7 @@ export function Island() {
   const mode = useIslandMode();
   useArgusCard(mode);
   const mood = useNook((s) => s.mood);
-  const relocating = useNook((s) => s.relocating);
+  const move = useNook((s) => s.move);
   const expression = useNook(expressionOf);
   const status = useNook(statusOf);
   const media = useNook((s) => s.media);
@@ -157,11 +166,12 @@ export function Island() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 flex justify-center" style={{ paddingTop: ISLAND_TOP }}>
+      <AnimatePresence>{move && <MoveFx key={`${move.kind}-${move.phase}`} move={move} />}</AnimatePresence>
       <motion.div
         className="pointer-events-auto"
         style={{ originY: 0 }}
         initial={{ scale: 0.4, opacity: 0 }}
-        animate={jelly(mood, relocating || fullscreen)}
+        animate={fullscreen ? jelly(mood, true) : move ? moveTarget(move) : jelly(mood, false)}
       >
         {/* Ekrana yapışık çentik: saf siyah, üst köşeler düz, yalnızca alt köşeler yuvarlak */}
         <motion.div

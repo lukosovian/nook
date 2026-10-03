@@ -9,6 +9,7 @@ import { chooseArgusDir, installArgus, openArgus, useArgus } from "../../lib/arg
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle, Dropdown } from "../ui/primitives";
 import { INTRO_KINDS } from "../overlays/Intro";
+import { MOVE_KINDS } from "../../lib/moveFx";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: "Ana" },
@@ -151,6 +152,14 @@ export function SettingsPanel() {
         </Row>
         <Row label="Günün ilk açılışında özet">
           <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
+        </Row>
+        <Row label="Ekranlar arası geçiş">
+          <Dropdown
+            value={s.moveStyle}
+            onChange={(v) => update({ moveStyle: v })}
+            color={ACCENT.blue}
+            options={[{ id: "random" as const, label: "Her seferinde farklı" }, ...MOVE_KINDS]}
+          />
         </Row>
         <Row label="Açılış animasyonu">
           <Dropdown

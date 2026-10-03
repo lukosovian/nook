@@ -146,7 +146,21 @@ export function applyPreview(mode: string) {
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
 
-  if (mode === "brief") {
+  if (mode === "move") {
+    // ?preview=move&fx=beam → kaybolup belirmeyi döngüde oynatır (fx yoksa sırayla hepsi)
+    useNook.setState({ media: null });
+    const fx = params.get("fx");
+    const kinds = ["beam", "warp", "portal", "jump", "slide", "glitch"] as const;
+    let i = 0;
+    const cycle = () => {
+      const kind = (fx as (typeof kinds)[number]) || kinds[i++ % kinds.length];
+      useNook.setState({ move: { kind, dir: 1, phase: "out" }, relocating: true });
+      window.setTimeout(() => useNook.setState({ move: { kind, dir: 1, phase: "in" }, relocating: false }), 700);
+      window.setTimeout(() => useNook.setState({ move: null }), 1600);
+    };
+    cycle();
+    window.setInterval(cycle, 2400);
+  } else if (mode === "brief") {
     // ?dry → bugün su yok (taşma denetimi)
     if (params.has("dry")) {
       const days = useNook.getState().days;
