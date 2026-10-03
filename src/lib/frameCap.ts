@@ -59,7 +59,9 @@ function pump(t: number) {
   }
   // 60'lık ızgarada ilerle (144 Hz gibi tam bölünmeyen hızlarda da ortalama 60);
   // geride kalırsa ızgarayı öne çek ki birikmiş kareler art arda çalışmasın
-  last = Math.max(last + interval, t - SLACK);
+  // Sınırsızken ızgara ilerletilmez — yoksa her ekran karesinde bir 60'lık adım eklenir, 240 Hz'te
+  // saat gerçeğin saniyelerce önüne geçer ve sınır dönünce tüm animasyonlar o kadar donar
+  last = boosted ? t : Math.max(last + interval, t - SLACK);
   const run = queue;
   queue = new Map();
   run.forEach((cb) => {
@@ -94,6 +96,7 @@ export function setFrameRate(fps: number) {
 /** Açılış gibi kısa ve hızlı hareketlerde kare sınırını geçici olarak kaldırır */
 export function boostFrames(on: boolean) {
   boosted = on;
+  if (!on) last = Math.min(last, performance.now());
 }
 
 /** Gizliyken kareleri tamamen durdurur; açılınca bekleyen animasyonlar kaldığı yerden sürer. */

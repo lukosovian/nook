@@ -144,7 +144,7 @@ export function applyPreview(mode: string) {
   // ?busy → Nook düşünür (yörünge gözler + mavi rozet)
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
   // Açılış animasyonu yalnızca ?preview=intro'da
-  useNook.setState({ intro: mode === "intro", settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
+  useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
 
   if (mode === "brief") {
     // ?dry → bugün su yok (taşma denetimi)
