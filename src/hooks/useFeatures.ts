@@ -19,6 +19,7 @@ import {
 import { transcribe } from "../lib/assist";
 import { note } from "../lib/log";
 import { sendChat } from "../lib/chat";
+import { openBrief } from "../lib/brief";
 import { nextPhase, remaining } from "../lib/focus";
 import { dayKey, isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
@@ -290,12 +291,11 @@ export function usePlayOffers() {
   }, []);
 }
 
-/** Açılışın ardından özetin ne kadar beklenip ne kadar açık kalacağı */
+/** Açılış animasyonundan sonra özet bu kadar bekler (hava, Argus yüklensin) */
 const SUMMARY_DELAY_MS = 2500;
-const SUMMARY_HOLD_MS = 15_000;
 /** Yeni özet tanıtılırken bir kez, o gün zaten açılmış olsa da göster (güncellemenin ardından) */
 const SHOWCASE_KEY = "nook-summary-showcase";
-const SHOWCASE = "0.2.10";
+const SHOWCASE = "0.2.11";
 const showcaseDue = () => {
   try {
     return localStorage.getItem(SHOWCASE_KEY) !== SHOWCASE;
@@ -304,52 +304,40 @@ const showcaseDue = () => {
   }
 };
 
-/**
- * Günün ilk açılışında ada kendiliğinden açılıp günün özetini gösterir.
- * Üzerine gelinirse bırakır (imleç çıkınca kapanır); gelinmezse süre dolunca kapanır.
- */
+/** Günün özeti bugün daha gösterilmedi mi */
+export function summaryDue() {
+  const s = useNook.getState();
+  return s.settings.dailySummary && (s.summaryDay !== dayKey() || showcaseDue()) && new Date().getHours() >= 5;
+}
+
+/** Günün ilk açılışında ada büyüyüp günün özetini gösterir (bkz. lib/brief). */
 export function useDailySummaryOpen() {
   useEffect(() => {
     if (!isPrimary) return;
     let wait: number | undefined;
-    let close: number | undefined;
     let done = false;
-    const release = () => {
-      window.clearTimeout(close);
-      useNook.getState().setHold("summary", false);
-    };
-    const due = () => {
-      const s = useNook.getState();
-      return s.settings.dailySummary && (s.summaryDay !== dayKey() || showcaseDue()) && new Date().getHours() >= 5;
-    };
     const tryOpen = () => {
       const s = useNook.getState();
       // İlk kurulumda tanıtım var; oyun/alarm sırasında araya girme — ilk üzerine gelişte açılır
-      if (done || !due() || s.intro || s.tour || !s.toured || s.fullscreen || s.ringing || s.hovered) return;
+      if (done || !summaryDue() || s.intro || s.tour || !s.toured || s.fullscreen || s.ringing) return;
       done = true;
       try {
         localStorage.setItem(SHOWCASE_KEY, SHOWCASE);
       } catch {
         /* önemsiz */
       }
-      // Bugün zaten gösterildiyse Panels kendisi seçmez
-      if (s.summaryDay === dayKey()) s.setPendingTab("today");
-      s.setHold("summary", true);
-      close = window.setTimeout(release, SUMMARY_HOLD_MS);
+      void openBrief();
     };
     const unsub = useNook.subscribe((st, prev) => {
       if (prev.intro && !st.intro) {
         window.clearTimeout(wait);
         wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);
       }
-      // Fare devraldı ya da oyun başladı
-      if (st.holds.includes("summary") && ((st.hovered && !prev.hovered) || st.fullscreen)) release();
     });
     if (!useNook.getState().intro) wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);
     return () => {
       unsub();
       window.clearTimeout(wait);
-      release();
     };
   }, []);
 }

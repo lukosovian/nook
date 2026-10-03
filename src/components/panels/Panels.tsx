@@ -14,7 +14,8 @@ import { FocusPanel } from "./FocusPanel";
 import { NotifyPanel } from "./NotifyPanel";
 import { PlayPanel } from "./PlayPanel";
 import { ReportPanel } from "./ReportPanel";
-import { TodayPanel } from "./TodayPanel";
+import { openBrief } from "../../lib/brief";
+import { summaryDue } from "../../hooks/useFeatures";
 import { ChatPanel } from "./ChatPanel";
 import { ClipboardPanel } from "./ClipboardPanel";
 import { ControlPanel } from "./ControlPanel";
@@ -62,7 +63,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   notify: NotifyPanel,
   play: PlayPanel,
   report: ReportPanel,
-  today: TodayPanel,
+  today: TodayRedirect,
   devices: DevicesPanel,
   control: ControlPanel,
   stats: StatsPanel,
@@ -97,14 +98,12 @@ export function Panels() {
   useLayoutEffect(() => {
     const s = useNook.getState();
     const playing = !!s.media?.playing;
-    const today = dayKey();
     // "Ekrana sor" sohbeti zaten seçti
     if (s.pinned) {
       // dokunma
-    } else if (s.settings.dailySummary && s.summaryDay !== today && new Date().getHours() >= 5) {
-      // Günün ilk açılışı: önce özet
-      s.setSummaryDay(today);
-      s.setTab("today");
+    } else if (summaryDue()) {
+      // Günün ilk açılışı (kendiliğinden açılamadıysa): büyük özet
+      void openBrief();
     } else if (s.pendingTab) {
       s.setTab(s.pendingTab);
       s.setPendingTab(null);
@@ -137,6 +136,15 @@ export function Panels() {
       </AnimatePresence>
     </Frame>
   );
+}
+
+/** "Bugün" artık büyük adada açılır (bkz. Brief) — sekme seçilirse oraya yönlendir. */
+function TodayRedirect() {
+  useLayoutEffect(() => {
+    useNook.getState().setTab("home");
+    void openBrief();
+  }, []);
+  return <></>;
 }
 
 /** Ana sayfa: Grok Bot'taki renkli ajan çipleri gibi — her modül bir mini Nook, yanında canlı bilgi. */

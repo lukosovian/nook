@@ -10,6 +10,8 @@ export function useIslandMode(): IslandMode {
     if (s.tour && isPrimary) return "tour";
     if (s.mood === "hungry" || s.mood === "chewing") return "feeding";
     if (s.searching) return "search";
+    // Günün özeti: üzerine gelinse de büyük kalır
+    if (s.brief && isPrimary) return "brief";
     // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
     if (s.reminder) return "reminder";
     if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";

@@ -23,6 +23,7 @@ import { PrivacyDots } from "./overlays/PrivacyDots";
 import { ReminderView } from "./overlays/ReminderView";
 import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
+import { Brief } from "./brief/Brief";
 import { SearchPanel } from "./search/SearchPanel";
 import { STEPS, Tour } from "./tour/Tour";
 
@@ -146,6 +147,7 @@ export function Island() {
             {mode === "expanded" && <Panels key="panels" />}
             {mode === "search" && <SearchPanel key="search" />}
             {mode === "tour" && <Tour key="tour" />}
+            {mode === "brief" && <Brief key="brief" />}
           </AnimatePresence>
 
           {/* Nook'un arkasındaki parıltı: duruma göre renkli, yoksa çok hafif beyaz */}
@@ -223,7 +225,7 @@ function Halo({
 }) {
   // Kapalı adada parıltı küçük ve yalnızca durum varken; açıkken her zaman (beyaz/renkli)
   const size = FACE * pose.scale * 2.8;
-  const visible = color ? 1 : mode === "expanded" || mode === "search" || mode === "feeding" ? 0.55 : 0;
+  const visible = color ? 1 : mode === "expanded" || mode === "search" || mode === "feeding" || mode === "brief" ? 0.55 : 0;
   return (
     <motion.div
       className="pointer-events-none absolute z-[5] rounded-full"

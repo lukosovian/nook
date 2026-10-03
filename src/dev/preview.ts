@@ -138,7 +138,10 @@ export function applyPreview(mode: string) {
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", settings: { ...useNook.getState().settings, weather: false } });
 
-  if (mode === "tour") {
+  if (mode === "brief") {
+    useNook.setState({ media: null, brief: true, settings: { ...useNook.getState().settings, weather: false, userName: "Luko" } });
+    window.setTimeout(() => useNook.setState({ weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() } }), 300);
+  } else if (mode === "tour") {
     useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
   } else if (TABS.includes(mode as Tab)) {
     useNook.setState({ hovered: true, tab: mode as Tab });

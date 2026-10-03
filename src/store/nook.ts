@@ -360,6 +360,8 @@ interface NookState {
   pendingTab: Tab | null;
   /** Günlük özetin en son gösterildiği gün */
   summaryDay: string;
+  /** Günün özeti büyük adada açık */
+  brief: boolean;
   /** Son oyun teklifinin zamanı */
   lastOffer: number;
 
@@ -428,6 +430,7 @@ interface NookState {
   setListening: (listening: boolean) => void;
   setAttachment: (image: string | null) => void;
   setPendingTab: (tab: Tab | null) => void;
+  setBrief: (brief: boolean) => void;
   setSummaryDay: (day: string) => void;
   setLastOffer: (at: number) => void;
   patchClip: (id: string, patch: Partial<ClipItem>) => void;
@@ -487,6 +490,7 @@ export const useNook = create<NookState>()(
       attachment: null,
       pendingTab: null,
       summaryDay: "",
+      brief: false,
       lastOffer: 0,
 
       setMood: (mood) => set({ mood }),
@@ -635,6 +639,7 @@ export const useNook = create<NookState>()(
       setAttachment: (attachment) => set({ attachment }),
       setPendingTab: (pendingTab) => set({ pendingTab }),
       setSummaryDay: (summaryDay) => set({ summaryDay }),
+      setBrief: (brief) => set({ brief }),
       setLastOffer: (lastOffer) => set({ lastOffer }),
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       setBusy: (key, on) =>

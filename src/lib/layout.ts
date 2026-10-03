@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -21,6 +21,17 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   reminder: { width: 440, height: 66, radius: 26 },
   /** "Nook nedir?" tanıtımı: ada ekrana yayılır */
   tour: { width: 900, height: 520, radius: 40 },
+  /** Günün özeti: ada büyür, solda kocaman Nook, sağda kartlar */
+  brief: { width: 880, height: 440, radius: 38 },
+};
+
+/** Günün özeti düzeni (adaya göre) */
+export const BRIEF = {
+  header: 46,
+  hero: { x: 16, y: 46, w: 252, h: 378 },
+  content: { x: 278, y: 46, w: 586, h: 378 },
+  /** Nook'un kahraman kartındaki merkezi ve ölçeği */
+  face: { cx: 16 + 126, cy: 46 + 72, scale: 3.6 },
 };
 
 /** Tanıtım sırasında pencere (gölge payıyla) */
@@ -87,6 +98,8 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
         ? center(h.x + 52, h.y + h.h / 2 - 4, HERO_SCALE)
         : center(h.x + h.w / 2, h.y + 16 + (FACE * HERO_SCALE) / 2, HERO_SCALE);
     }
+    case "brief":
+      return center(BRIEF.face.cx, BRIEF.face.cy, BRIEF.face.scale);
     case "intro":
       return center(width / 2, height / 2, 1.5);
     case "feeding":
