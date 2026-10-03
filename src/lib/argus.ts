@@ -279,7 +279,7 @@ export async function markWatched(item: ArgusItem, ep?: { season: number; episod
     });
     playAntic(r.completed ? "love" : "nod");
     const sug = useArgus.getState().suggestion;
-    if (sug?.itemId === item.id) useArgus.setState({ suggestion: null });
+    if (sug?.itemId === item.id) answerSuggestion(sug);
   } catch (e) {
     s.pushToast({ kind: "argus", title: "Argus'a yazılamadı", detail: String(e), ms: 6000 });
     playAntic("suspicious");
@@ -386,12 +386,16 @@ const IDLE_END_MS = 8000;
 
 /** Bugün bölüm/film başına oynatılan süre — Nook yeniden açılsa da, duraklatıp dönülse de kaybolmaz */
 const PLAYED_KEY = "nook-argus-played";
-type PlayedStore = { day: string; ms: Record<string, number>; asked: string[] };
+/** `asked`: cevaplanan (işaretlenen ya da "hayır" denen) — bir daha sorulmaz. `lastAsk`: son soruda izlenen süre */
+type PlayedStore = { day: string; ms: Record<string, number>; asked: string[]; lastAsk?: Record<string, number> };
+/** Soru cevapsız kaldıysa: bu kadar daha izleyip durdurunca yeniden sor */
+const REASK_AFTER_MS = 2 * 60_000;
 
 function loadPlayed(): PlayedStore {
   try {
     const v = JSON.parse(localStorage.getItem(PLAYED_KEY) ?? "null") as PlayedStore | null;
-    if (v && v.day === dayKey()) return v;
+    // Eski kayıtta "sorulan" = cevaplanmış sayılıyordu; cevapsızlar yeniden sorulabilsin (işaretlenenleri seenToday eler)
+    if (v && v.day === dayKey()) return v.lastAsk ? v : { ...v, asked: [], lastAsk: {} };
   } catch {
     /* bozuksa sıfırdan */
   }
@@ -407,6 +411,23 @@ function savePlayed(p: PlayedStore) {
 }
 
 const sugKey = (sug: ArgusSuggestion) => `${sug.itemId}:${sug.season ?? ""}:${sug.episode ?? ""}`;
+
+/** Bugünün izleme kaydı — tek kopya, cevaplar da buraya yazılır */
+let playedStore: PlayedStore | null = null;
+const currentPlayed = () => {
+  if (!playedStore || playedStore.day !== dayKey()) playedStore = loadPlayed();
+  return playedStore;
+};
+
+/** "Bitti mi?" sorusu cevaplandı (işaretlendi ya da hayır dendi) — bu bölüm için bir daha sorma */
+export function answerSuggestion(sug: ArgusSuggestion | null = useArgus.getState().suggestion) {
+  if (!sug) return;
+  const store = currentPlayed();
+  const key = sugKey(sug);
+  if (!store.asked.includes(key)) store.asked.push(key);
+  savePlayed(store);
+  useArgus.setState({ suggestion: null });
+}
 // 15 dk'dan kısa bölümlerde neredeyse tamamı yeter
 const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, duration * 0.9) : MIN_WATCH_MS);
 
@@ -418,7 +439,7 @@ const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, dur
 export function useArgusDetect() {
   useEffect(() => {
     if (!isPrimary || !inTauri) return;
-    let store = loadPlayed();
+    let store = currentPlayed();
     let cur: { key: string; sug: ArgusSuggestion; duration: number; idleSince: number | null } | null = null;
     let lastText = "";
     let lastMatch: ArgusSuggestion | null = null;
@@ -432,14 +453,19 @@ export function useArgusDetect() {
       if (c) ask(c);
     };
 
-    /** Süre dolduysa (bu bölüm için daha önce sorulmadıysa) Argus'a yazmayı önerir */
+    /**
+     * Süre dolduysa Argus'a yazmayı önerir. Cevaplandıysa bir daha sormaz; cevapsız kaldıysa
+     * izlemeye devam edilip yeniden durdurulunca tekrar sorar.
+     */
     const ask = (c: NonNullable<typeof cur>) => {
       if (store.asked.includes(c.key)) return;
+      const prev = store.lastAsk?.[c.key];
+      if (prev !== undefined && played(c.key) - prev < REASK_AFTER_MS) return;
       const item = findItem(c.sug.itemId);
       if (!item || played(c.key) < needFor(c.duration)) return;
       // Bu bölümü bugün Argus'ta zaten işaretlemiş — sormaya gerek yok
       if (c.sug.season && item.series?.seenToday.includes(`${c.sug.season}-${c.sug.episode}`)) return;
-      store.asked.push(c.key);
+      store.lastAsk = { ...store.lastAsk, [c.key]: played(c.key) };
       savePlayed(store);
       useArgus.setState({ suggestion: c.sug });
       const s = useNook.getState();
@@ -457,7 +483,7 @@ export function useArgusDetect() {
       const s = useNook.getState();
       const snap = useArgus.getState().snap;
       if (!s.settings.argusDetect || !snap) return;
-      if (store.day !== dayKey()) store = loadPlayed();
+      if (store.day !== dayKey()) store = currentPlayed();
       const m = s.media;
       if (m?.playing) {
         const text = `${m.title}

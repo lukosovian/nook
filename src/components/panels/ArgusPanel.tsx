@@ -15,6 +15,7 @@ import {
   watching,
   type ArgusItem,
   type PickFilter,
+  answerSuggestion,
 } from "../../lib/argus";
 import { sendChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
@@ -178,7 +179,7 @@ function SuggestionBanner() {
           </p>
           <p className="text-[10px] text-label-3">Argus'a hangi durumla yazayım?</p>
         </div>
-        <button onClick={() => useArgus.setState({ suggestion: null })} title="Hayır" className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+        <button onClick={() => answerSuggestion(sug)} title="Hayır" className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
           <X size={12} />
         </button>
       </div>
