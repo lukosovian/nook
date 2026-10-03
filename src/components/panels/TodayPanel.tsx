@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { AlarmClock, Bell, Clapperboard, CloudSun, Droplet, Headphones, Mouse, Target, type LucideIcon } from "lucide-react";
-import { calendar, dayLabel, epLabel, useArgus } from "../../lib/argus";
+import { AlarmClock, Bell, CalendarDays, Clapperboard, CloudSun, Download, Droplet, Gamepad2, Headphones, Mouse, Sparkles, Target, Tv, Umbrella, type LucideIcon } from "lucide-react";
+import { calendar, dayLabel, epLabel, markNewsSeen, useArgus, weekStats } from "../../lib/argus";
+import { installUpdate, useUpdate } from "../../lib/update";
 import { drankWater } from "../../hooks/useFeatures";
 import { generateOnce, pickQuickModel } from "../../lib/ai";
 import { systemPrompt } from "../../lib/aiTools";
@@ -56,7 +57,7 @@ function useTodayLine() {
   return line;
 }
 
-/** Günün özeti: selam, hava, bugünkü alarmlar, bildirimler, cihaz pilleri, dünkü odak. */
+/** Günün özeti: selam, hava, yeni/yaklaşan bölümler, alarmlar, bildirimler, cihaz pilleri, dün, güncelleme. */
 export function TodayPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("today", scroller);
@@ -74,23 +75,39 @@ export function TodayPanel() {
   const w = s.weather;
   const argus = useArgus((st) => st.snap);
 
-  const items: { icon: LucideIcon; color: string; text: string; action?: { label: string; run: () => void } }[] = [];
-  if (w) items.push({ icon: CloudSun, color: ACCENT.yellow, text: `${w.temp}° ${SKY_LABEL[w.sky].toLocaleLowerCase("tr")} · ${w.high}°/${w.low}° · yağış %${w.rainChance}` });
+  const update = useUpdate((u) => u.available);
+  const updating = useUpdate((u) => u.progress !== null);
+
+  type Item = { icon: LucideIcon; color: string; text: string; action?: { label: string; run: () => void } };
+  const items: Item[] = [];
+  if (w) items.push({ icon: CloudSun, color: ACCENT.yellow, text: `${w.city ? `${w.city} ` : ""}${w.temp}° ${SKY_LABEL[w.sky].toLocaleLowerCase("tr")} · ${w.high}°/${w.low}° · yağış %${w.rainChance}` });
+  if (w && w.rainChance >= 50) items.push({ icon: Umbrella, color: ACCENT.blue, text: "Bugün yağmur bekleniyor, şemsiyeni al" });
+
+  // Argus: bugün çıkanlar tek tek, sonra önümüzdeki hafta
+  const cal = calendar(argus);
+  const fresh = cal.filter((e) => e.date === dayKey());
+  const weekOut = new Date(now);
+  weekOut.setDate(weekOut.getDate() + 7);
+  const soon = cal.filter((e) => e.date !== dayKey() && e.date <= dayKey(weekOut)).slice(0, 4);
+  for (const e of fresh)
+    items.push({ icon: Clapperboard, color: ACCENT.orange, text: `Bugün yeni: ${e.item.title} ${epLabel(e.ep)}${e.ep.name ? ` · ${e.ep.name}` : ""}` });
+  // Bir hafta içinde: "Yarın", gün adı ("Çarşamba"), tam bir hafta sonrası "Haftaya Cumartesi"
+  const soonLabel = (date: string) => {
+    if (dayLabel(date) === "Yarın") return "Yarın";
+    const name = new Date(`${date}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long" });
+    return date === dayKey(weekOut) ? `Haftaya ${name}` : name;
+  };
+  for (const e of soon) items.push({ icon: CalendarDays, color: ACCENT.orange, text: `${soonLabel(e.date)}: ${e.item.title} ${epLabel(e.ep)}` });
+  if (argus && !fresh.length && !soon.length) items.push({ icon: Clapperboard, color: ACCENT.orange, text: "Bu hafta takip ettiğin dizilerde yeni bölüm yok" });
+  const week = weekStats(argus);
+  if (week && (week.episodes || week.movies))
+    items.push({ icon: Tv, color: ACCENT.orange, text: `Son 7 günde ${[week.episodes && `${week.episodes} bölüm`, week.movies && `${week.movies} film`].filter(Boolean).join(", ")} izledin` });
+
   items.push({
     icon: AlarmClock,
     color: ACCENT.orange,
     text: alarms.length ? `Bugün ${alarms.map((a) => `${clock(a)}${a.label ? ` ${a.label}` : ""}`).join(", ")}` : "Bugün alarm yok",
   });
-  const shows = calendar(argus).slice(0, 3);
-  if (shows.length) {
-    const first = shows[0].date;
-    const same = shows.filter((e) => e.date === first);
-    items.push({
-      icon: Clapperboard,
-      color: ACCENT.orange,
-      text: `${dayLabel(first)} yeni bölüm: ${same.map((e) => `${e.item.title} ${epLabel(e.ep)}`).join(", ")}`,
-    });
-  }
   if (s.notifications.length) {
     const since = s.notifications.filter((n) => n.at > Date.now() - 12 * 3600_000).length;
     if (since) items.push({ icon: Bell, color: ACCENT.purple, text: `Gece ${since} bildirim geldi` });
@@ -105,6 +122,23 @@ export function TodayPanel() {
     action: { label: "İçtim", run: drankWater },
   });
   if (yesterday?.focus) items.push({ icon: Target, color: ACCENT.red, text: `Dün ${yesterday.focus} dk odaklandın (${yesterday.pomodoros} tur)` });
+  if (yesterday?.game) items.push({ icon: Gamepad2, color: ACCENT.purple, text: `Dün ${yesterday.game >= 60 ? `${Math.floor(yesterday.game / 60)} sa ${yesterday.game % 60} dk` : `${yesterday.game} dk`} oyun oynadın` });
+  const wd = now.getDay();
+  items.push({ icon: Sparkles, color: ACCENT.yellow, text: wd === 0 || wd === 6 ? "Hafta sonu, keyfini çıkar" : wd === 5 ? "Bugün cuma, hafta sonu kapıda" : `Hafta sonuna ${6 - wd} gün` });
+  // Güncelleme en üstte — gözden kaçmasın
+  if (update)
+    items.unshift({
+      icon: Download,
+      color: ACCENT.blue,
+      text: updating ? "Güncelleniyor…" : `Nook'un yeni sürümü hazır: ${update}`,
+      action: updating ? undefined : { label: "Güncelle", run: () => void installUpdate() },
+    });
+
+  // Bugünün bölümleri burada görüldü — ayrıca haber kartı çıkmasın
+  const freshCount = fresh.length;
+  useEffect(() => {
+    if (freshCount) markNewsSeen();
+  }, [freshCount]);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -147,7 +181,7 @@ export function TodayPanel() {
                 className="ml-auto shrink-0 rounded-full border px-2 py-px text-[10.5px] font-medium"
                 style={{ background: tintBg(it.color, 14), borderColor: tintBg(it.color, 36), color: tintText(it.color) }}
               >
-                + {it.action.label}
+                {it.action.label === "Güncelle" ? "" : "+ "}{it.action.label}
               </button>
             )}
           </div>

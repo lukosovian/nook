@@ -339,12 +339,23 @@ export function useArgusFeed() {
   }, [profile, dir]);
 }
 
+/** Bugünün bölümleri başka yerde (günün özeti) gösterildi — ayrıca haber kartı çıkmasın */
+export function markNewsSeen() {
+  try {
+    localStorage.setItem(NEWS_KEY, dayKey());
+  } catch {
+    /* önemsiz */
+  }
+}
+
 function announceNews() {
   if (!isPrimary) return;
   const s = useNook.getState();
   const snap = useArgus.getState().snap;
   if (!snap || !s.settings.argusNews || new Date().getHours() < 8) return;
   const today = dayKey();
+  // Günün özeti henüz gösterilmediyse haberi o verecek
+  if (s.settings.dailySummary && s.summaryDay !== today && new Date().getHours() >= 5) return;
   try {
     if (localStorage.getItem(NEWS_KEY) === today) return;
   } catch {

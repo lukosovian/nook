@@ -12,6 +12,7 @@ import {
   useGameFeed,
   useNotificationFeed,
   useOnlineFeed,
+  useDailySummaryOpen,
   usePlayOffers,
   useVoiceFeed,
 } from "./hooks/useFeatures";
@@ -69,6 +70,7 @@ export default function App() {
   useOnlineFeed();
   useGameFeed();
   usePlayOffers();
+  useDailySummaryOpen();
   useUpdateCheck();
   useArgusFeed();
   useArgusDetect();
