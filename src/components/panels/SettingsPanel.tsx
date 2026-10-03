@@ -7,7 +7,8 @@ import { startTour } from "../../lib/tour";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
 import { chooseArgusDir, installArgus, openArgus, useArgus } from "../../lib/argus";
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
-import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle } from "../ui/primitives";
+import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle, Dropdown } from "../ui/primitives";
+import { INTRO_KINDS } from "../overlays/Intro";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: "Ana" },
@@ -121,18 +122,13 @@ export function SettingsPanel() {
         </Row>
         {s.monitorMode === "fixed" && (
           <Row label="Hangi ekran">
-            <select
+            <Dropdown
               value={s.monitorName ?? ""}
-              onChange={(e) => update({ monitorName: e.target.value || null })}
-              className="max-w-[150px] rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label outline-none"
-            >
-              <option value="" className="bg-neutral-900">Ana ekran</option>
-              {monitors.map((m, i) => (
-                <option key={m.name + i} value={m.name} className="bg-neutral-900">
-                  {i + 1}. ekran · {m.width}×{m.height}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update({ monitorName: v || null })}
+              maxWidth={150}
+              color={ACCENT.blue}
+              options={[{ id: "", label: "Ana ekran" }, ...monitors.map((m, i) => ({ id: m.name, label: `${i + 1}. ekran · ${m.width}×${m.height}` }))]}
+            />
           </Row>
         )}
       </Section>
@@ -156,6 +152,14 @@ export function SettingsPanel() {
         <Row label="Günün ilk açılışında özet">
           <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
         </Row>
+        <Row label="Açılış animasyonu">
+          <Dropdown
+            value={s.introStyle}
+            onChange={(v) => update({ introStyle: v })}
+            color={ACCENT.yellow}
+            options={[{ id: "random" as const, label: "Her seferinde farklı" }, ...INTRO_KINDS]}
+          />
+        </Row>
         <Row label="Uzun süre yokken dönünce karşıla">
           <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
         </Row>
@@ -173,20 +177,12 @@ export function SettingsPanel() {
         </Row>
         <Row label="Alarm sesi">
           <div className="flex items-center gap-1">
-            <select
+            <Dropdown
               value={s.alarmSound}
-              onChange={(e) => update({ alarmSound: Number(e.target.value) })}
-              className="rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label outline-none"
-            >
-              <option value={0} className="bg-neutral-900">
-                Sessiz
-              </option>
-              {Array.from({ length: 10 }, (_, i) => (
-                <option key={i} value={i + 1} className="bg-neutral-900">
-                  Alarm {i + 1}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update({ alarmSound: v })}
+              color={ACCENT.orange}
+              options={[{ id: 0, label: "Sessiz" }, ...Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Alarm ${i + 1}` }))]}
+            />
             <button
               disabled={s.alarmSound === 0}
               onClick={() => void alarmRing(true, s.alarmSound, true)}
@@ -230,20 +226,12 @@ function ArgusSection() {
   return (
     <Section title="Argus">
       <Row label="Profil">
-        <select
+        <Dropdown
           value={s.argusProfile && snap.profiles.includes(s.argusProfile) ? s.argusProfile : ""}
-          onChange={(e) => update({ argusProfile: e.target.value })}
-          className="rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label outline-none"
-        >
-          <option value="" className="bg-neutral-900">
-            Otomatik ({snap.profile})
-          </option>
-          {snap.profiles.map((p) => (
-            <option key={p} value={p} className="bg-neutral-900">
-              {p}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => update({ argusProfile: v })}
+          color={ACCENT.orange}
+          options={[{ id: "", label: `Otomatik (${snap.profile})` }, ...snap.profiles.map((p) => ({ id: p, label: p }))]}
+        />
       </Row>
       <Row label="Yeni bölüm haberleri">
         <Toggle on={s.argusNews} onChange={(v) => update({ argusNews: v })} color={ACCENT.orange} />
@@ -404,17 +392,12 @@ function AiSection() {
       </p>
       {gemini.status === "ok" && (
         <Row label="Model">
-          <select
+          <Dropdown
             value={s.aiModel}
-            onChange={(e) => update({ aiModel: e.target.value })}
-            className="max-w-[170px] rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label outline-none"
-          >
-            {gemini.models.map((m) => (
-              <option key={m.id} value={m.id} className="bg-neutral-900">
-                {m.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => update({ aiModel: v })}
+            color={ACCENT.purple}
+            options={gemini.models.map((m) => ({ id: m.id, label: m.label }))}
+          />
         </Row>
       )}
       <Row label="Adın">

@@ -215,6 +215,8 @@ export interface Settings extends NativeSettings {
   playOffers: boolean;
   /** Bu kadar dakika uzakta kalınca dönüşte karşılasın (0 = kapalı) */
   welcomeBack: number;
+  /** Açılış animasyonu: "random" ya da bir efekt (overlays/Intro) */
+  introStyle: "random" | "dust" | "warp" | "ripple" | "orbit" | "confetti" | "sparkle" | "bubbles" | "trek";
   /** Pilde / enerji tasarrufunda animasyonları yavaşlat */
   powerSaver: boolean;
   /** Argus profili (kullanıcı adı); boşsa en son kullanılan */
@@ -263,6 +265,7 @@ export const DEFAULT_SETTINGS: Settings = {
   breakReminderMin: 120,
   playOffers: true,
   welcomeBack: 10,
+  introStyle: "random",
   powerSaver: true,
   argusProfile: "",
   argusPromo: true,

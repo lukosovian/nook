@@ -126,6 +126,14 @@ export function applyPreview(mode: string) {
   // ?ask=… → soruyu yerel yapay zekâya gönder (uçtan uca sohbet testi)
   const ask = params.get("ask");
   if (ask) window.setTimeout(() => void import("../lib/chat").then((m) => m.sendChat(ask)), 800);
+  // ?dd=N → N. açılır seçimi aç (menü adanın içinde mi denetimi)
+  const dd = params.get("dd");
+  if (dd)
+    window.setTimeout(() => {
+      const b = document.querySelectorAll<HTMLButtonElement>("[data-dropdown]")[Number(dd)];
+      b?.scrollIntoView({ block: "center" });
+      window.setTimeout(() => b?.click(), 150);
+    }, 900);
   const expr = params.get("expr");
   if (expr) useNook.setState({ antic: expr as never });
   // ?sleep=blanket|bubble|nap → uyku; ?talk → sohbette cevap yazıyor; ?dance=N → dans figürü
@@ -136,7 +144,7 @@ export function applyPreview(mode: string) {
   // ?busy → Nook düşünür (yörünge gözler + mavi rozet)
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
   // Açılış animasyonu yalnızca ?preview=intro'da
-  useNook.setState({ intro: mode === "intro", settings: { ...useNook.getState().settings, weather: false } });
+  useNook.setState({ intro: mode === "intro", settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
 
   if (mode === "brief") {
     // ?dry → bugün su yok (taşma denetimi)

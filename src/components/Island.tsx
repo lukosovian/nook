@@ -17,7 +17,7 @@ import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { FocusMini } from "./overlays/FocusMini";
 import { ListenMini } from "./overlays/ListenMini";
-import { Intro, INTRO_ANTIC, INTRO_MS, introKind } from "./overlays/Intro";
+import { Intro, INTRO_ANTIC, INTRO_MS, introKind, introMs, TREK_BEAM } from "./overlays/Intro";
 import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
 import { ReminderView } from "./overlays/ReminderView";
@@ -59,6 +59,17 @@ function jelly(mood: Mood, away: boolean): TargetAndTransition {
   }
 }
 
+/** Nook'un doğuşu: çoğu efektte ortada "pop"; Star Trek'te ışınlanır gibi titreşerek belirir */
+function nookBirth() {
+  if (!useNook.getState().intro || introKind() !== "trek")
+    return { initial: { scale: 0 }, animate: { scale: 1 }, transition: { type: "spring" as const, stiffness: 380, damping: 14, delay: (INTRO_MS / 1000) * 0.55 } };
+  return {
+    initial: { opacity: 0, scale: 1 },
+    animate: { opacity: [0, 0.25, 0.1, 0.5, 0.3, 0.8, 0.65, 1], filter: ["brightness(2.2)", "brightness(2.2)", "brightness(1)"] },
+    transition: { delay: TREK_BEAM.at, duration: TREK_BEAM.dur, ease: "linear" as const, filter: { delay: TREK_BEAM.at, duration: TREK_BEAM.dur + 0.3, times: [0, 0.6, 1] } },
+  };
+}
+
 /** Kartın yazısı kırpılmasın: metne göre genişler (tuval ile ölçülür), en fazla 580 px (pencere 600) */
 const measure = (() => {
   let ctx: CanvasRenderingContext2D | null = null;
@@ -96,9 +107,9 @@ export function Island() {
     if (!useNook.getState().intro) return;
     const t = window.setTimeout(() => {
       useNook.getState().setIntro(false);
-      playAntic(INTRO_ANTIC[introKind]);
+      playAntic(INTRO_ANTIC[introKind()]);
       if (isPrimary && !useNook.getState().toured) window.setTimeout(() => void startTour(), 900);
-    }, INTRO_MS);
+    }, introMs());
     return () => window.clearTimeout(t);
   }, []);
 
@@ -148,6 +159,7 @@ export function Island() {
         {/* Ekrana yapışık çentik: saf siyah, üst köşeler düz, yalnızca alt köşeler yuvarlak */}
         <motion.div
           ref={ref}
+          data-island
           className="relative overflow-hidden bg-black"
           initial={false}
           animate={{
@@ -173,7 +185,7 @@ export function Island() {
 
           {/* z-10: panellerin katmanı yüzün tıklamalarını yutmasın */}
           <motion.div className="absolute z-10" initial={false} animate={pose} transition={transition}>
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 14, delay: (INTRO_MS / 1000) * 0.55 }}>
+            <motion.div {...nookBirth()}>
               <motion.div animate={nudge}>
               <Nook
                 expression={expression}

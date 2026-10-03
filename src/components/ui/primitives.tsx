@@ -1,7 +1,10 @@
 /** Tüm panellerin paylaştığı görsel yapı taşları — Grok Bot'tan ilham alan dil. */
-import { motion } from "motion/react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { spring } from "../../lib/motion";
+import { useNook } from "../../store/nook";
 
 /** Vurgu renkleri */
 export const ACCENT = {
@@ -253,5 +256,125 @@ export function Bar({ pct, color, className = "" }: { pct: number; color: string
         transition={{ type: "spring", stiffness: 120, damping: 20 }}
       />
     </div>
+  );
+}
+
+/**
+ * Açılır seçim — Windows'un kendi listesi adanın (pencerenin) dışına taşıyordu; imleç oraya
+ * gidince ada kapanıp seçim yapılamıyordu. Bu liste her zaman adanın içinde açılır.
+ */
+export function Dropdown<T extends string | number>({
+  options,
+  value,
+  onChange,
+  color = ACCENT.teal,
+  maxWidth = 170,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  color?: string;
+  maxWidth?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; width: number; maxHeight: number } | null>(null);
+  const current = options.find((o) => o.id === value);
+
+  // Açıkken ada kapanmasın
+  useEffect(() => {
+    useNook.getState().setHold("dropdown", open);
+    return () => useNook.getState().setHold("dropdown", false);
+  }, [open]);
+
+  // Adanın sınırları içinde: altta yer varsa aşağı, yoksa yukarı açılır
+  useLayoutEffect(() => {
+    if (!open || !button.current) return;
+    const b = button.current.getBoundingClientRect();
+    const island = button.current.closest("[data-island]")?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+    const pad = 8;
+    const want = options.length * 26 + 8;
+    const below = island.bottom - pad - (b.bottom + 4);
+    const above = b.top - 4 - (island.top + 36);
+    const down = below >= want || below >= above;
+    const maxHeight = Math.max(60, Math.min(want, down ? below : above));
+    const width = Math.max(b.width, 150);
+    const left = Math.min(Math.max(island.left + pad, b.right - width), island.right - pad - width);
+    setPos({ left, top: down ? b.bottom + 4 : b.top - 4 - maxHeight, width, maxHeight });
+  }, [open, options.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !button.current?.contains(t)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    // Arkadaki liste tekerlekle kaydırılırsa menü yerinde kalmasın (programlı kaydırmalar kapatmaz)
+    const scroll = (e: Event) => !menu.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener("pointerdown", outside, true);
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("wheel", scroll, true);
+    return () => {
+      window.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("wheel", scroll, true);
+    };
+  }, [open]);
+
+  // Seçili olan görünsün
+  useEffect(() => {
+    if (open && pos) menu.current?.querySelector("[data-selected]")?.scrollIntoView({ block: "nearest" });
+  }, [open, pos]);
+
+  return (
+    <>
+      <button
+        ref={button}
+        data-dropdown
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-w-0 items-center gap-1 rounded-full bg-well py-0.5 pl-2.5 pr-1.5 text-[11px] font-medium text-label transition-colors hover:bg-well-hi"
+        style={{ maxWidth }}
+      >
+        <span className="min-w-0 truncate">{current?.label ?? "Seç"}</span>
+        <ChevronDown size={11} strokeWidth={2.6} className={`shrink-0 text-label-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {createPortal(
+        <AnimatePresence>
+          {open && pos && (
+            <motion.div
+              ref={menu}
+              className="fixed z-[100] overflow-y-auto rounded-[14px] border border-white/10 p-1 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.9)]"
+              style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxHeight, background: "#161618" }}
+              initial={{ opacity: 0, scale: 0.96, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.14 }}
+            >
+              {options.map((o) => {
+                const sel = o.id === value;
+                return (
+                  <button
+                    key={String(o.id)}
+                    data-selected={sel || undefined}
+                    onClick={() => {
+                      onChange(o.id);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center gap-1.5 rounded-[10px] px-2 py-[5px] text-left text-[11.5px] transition-colors hover:bg-well-hi"
+                    style={sel ? { color: tintText(color), background: tintBg(color, 12) } : { color: "var(--color-label-2)" }}
+                  >
+                    <span className="min-w-0 flex-1">{o.label}</span>
+                    {sel && <Check size={12} strokeWidth={2.6} className="shrink-0" />}
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+    </>
   );
 }
