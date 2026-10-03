@@ -295,7 +295,7 @@ export function usePlayOffers() {
 const SUMMARY_DELAY_MS = 2500;
 /** Yeni özet tanıtılırken bir kez, o gün zaten açılmış olsa da göster (güncellemenin ardından) */
 const SHOWCASE_KEY = "nook-summary-showcase";
-const SHOWCASE = "0.2.11";
+const SHOWCASE = "0.2.12";
 const showcaseDue = () => {
   try {
     return localStorage.getItem(SHOWCASE_KEY) !== SHOWCASE;

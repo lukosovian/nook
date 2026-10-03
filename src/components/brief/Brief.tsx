@@ -144,28 +144,30 @@ export function Brief() {
             {greet}
             {s.settings.userName ? `, ${s.settings.userName}` : ""}!
           </h2>
-          {line !== "" && (line || s.settings.geminiKey) ? (
-            <p
-              className="relative mx-auto mt-2 line-clamp-3 rounded-[14px] px-3 py-2 text-center text-[11.5px] leading-snug"
-              style={{ background: tintBg(ACCENT.yellow, 10), color: tintText(ACCENT.yellow) }}
-            >
-              {line ?? "Bugünü düşünüyorum…"}
-            </p>
-          ) : (
-            <p className="relative mt-1.5 text-center text-[11.5px] text-label-3">Bugün senin için neler var, bir bakalım</p>
-          )}
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-2">
+            {line !== "" && (line || s.settings.geminiKey) ? (
+              <p
+                className="rounded-[14px] px-3 py-2 text-center text-[11.5px] leading-snug"
+                style={{ background: tintBg(ACCENT.yellow, 10), color: tintText(ACCENT.yellow) }}
+              >
+                {line ?? "Bugünü düşünüyorum…"}
+              </p>
+            ) : (
+              <p className="text-center text-[11.5px] leading-snug text-label-3">Bugün senin için neler var, bir bakalım</p>
+            )}
+          </div>
 
-          <div className="relative mt-auto">
+          <div className="relative shrink-0">
             {w ? (
               <div className="rounded-[16px] border px-3.5 py-2.5" style={{ background: tintBg(ACCENT.yellow, 7), borderColor: tintBg(ACCENT.yellow, 20) }}>
                 <div className="flex items-end justify-between gap-2">
                   <span className="font-display text-[34px] font-semibold leading-none tracking-[-0.04em] text-label tabular-nums">{w.temp}°</span>
                   <span className="min-w-0 text-right leading-tight">
-                    <span className="block truncate text-[12px] font-medium text-label">{SKY_LABEL[w.sky]}</span>
-                    <span className="block truncate text-[10.5px] text-label-3">{w.city}</span>
+                    <span className="block text-[12px] font-medium text-label">{SKY_LABEL[w.sky]}</span>
+                    <span className="block text-[10.5px] text-label-3">{w.city}</span>
                   </span>
                 </div>
-                <div className="mt-2 flex gap-1.5 text-[10.5px] tabular-nums">
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[10.5px] tabular-nums">
                   <Chip color={ACCENT.orange}>↑ {w.high}°</Chip>
                   <Chip color={ACCENT.teal}>↓ {w.low}°</Chip>
                   <Chip color={ACCENT.blue}>{w.rainChance >= 50 ? `Şemsiye al · %${w.rainChance}` : `Yağış %${w.rainChance}`}</Chip>
@@ -230,7 +232,7 @@ export function Brief() {
 
 function Chip({ color, children }: { color: string; children: React.ReactNode }) {
   return (
-    <span className="truncate rounded-full px-2 py-[2px]" style={{ background: tintBg(color, 14), color: tintText(color) }}>
+    <span className="whitespace-nowrap rounded-full px-2 py-[2px]" style={{ background: tintBg(color, 14), color: tintText(color) }}>
       {children}
     </span>
   );
@@ -250,7 +252,7 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
   const hue = [ACCENT.orange, ACCENT.purple, ACCENT.blue, ACCENT.pink][i % 4];
   return (
     <div className="min-w-0">
-      <div className="relative h-[104px] overflow-hidden rounded-[12px]" style={{ background: `linear-gradient(160deg, ${tintBg(hue, 34)} 0%, ${tintBg(hue, 8)} 100%)` }}>
+      <div className="relative h-[88px] overflow-hidden rounded-[12px]" style={{ background: `linear-gradient(160deg, ${tintBg(hue, 34)} 0%, ${tintBg(hue, 8)} 100%)` }}>
         {src ? (
           <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
         ) : (
@@ -266,8 +268,8 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
         </span>
         <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/60 px-1.5 py-px text-[9.5px] font-medium tabular-nums text-label">{epLabel(e.ep)}</span>
       </div>
-      <p className="mt-1.5 truncate text-[11.5px] font-medium text-label">{e.item.title}</p>
-      <p className="truncate text-[10px] text-label-3">{e.ep.name || `${e.ep.season}. sezon ${e.ep.episode}. bölüm`}</p>
+      <p className="mt-1.5 text-[11.5px] font-medium leading-snug text-label">{e.item.title}</p>
+      <p className="text-[10px] leading-snug text-label-3">{e.ep.name || `${e.ep.season}. sezon ${e.ep.episode}. bölüm`}</p>
     </div>
   );
 }
@@ -289,8 +291,8 @@ function Tile({ label, value, color, eyes = "open", action }: TileData) {
     >
       <MiniNook color={color} size={30} eyes={eyes} />
       <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-[10.5px] text-label-3">{label}</span>
-        <span className="block truncate text-[13px] font-medium" style={{ color: tintText(color) }}>
+        <span className="block text-[10.5px] text-label-3">{label}</span>
+        <span className="block text-[12.5px] font-medium leading-snug" style={{ color: tintText(color) }}>
           {value}
         </span>
       </span>

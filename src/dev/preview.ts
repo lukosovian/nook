@@ -139,6 +139,14 @@ export function applyPreview(mode: string) {
   useNook.setState({ intro: mode === "intro", settings: { ...useNook.getState().settings, weather: false } });
 
   if (mode === "brief") {
+    // ?dry → bugün su yok (taşma denetimi)
+    if (params.has("dry")) {
+      const days = useNook.getState().days;
+      useNook.setState({ days: { ...days, [dayKey()]: { ...days[dayKey()], water: 0 } } });
+    }
+    // ?longline → uzun günün mesajı (taşma denetimi)
+    if (params.has("longline"))
+      localStorage.setItem("nook-today-line", JSON.stringify({ day: dayKey(), text: "Günaydın Luko! Bugün İstanbul parçalı bulutlu, akşam Lanterns'in yeni bölümü var; önce suyunu içmeyi unutma, sonra keyfine bak." }));
     useNook.setState({ media: null, brief: true, settings: { ...useNook.getState().settings, weather: false, userName: "Luko" } });
     window.setTimeout(() => useNook.setState({ weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() } }), 300);
   } else if (mode === "tour") {
