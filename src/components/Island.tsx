@@ -17,7 +17,7 @@ import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { FocusMini } from "./overlays/FocusMini";
 import { ListenMini } from "./overlays/ListenMini";
-import { Intro, INTRO_MS } from "./overlays/Intro";
+import { Intro, INTRO_ANTIC, INTRO_MS, introKind } from "./overlays/Intro";
 import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
 import { ReminderView } from "./overlays/ReminderView";
@@ -96,7 +96,7 @@ export function Island() {
     if (!useNook.getState().intro) return;
     const t = window.setTimeout(() => {
       useNook.getState().setIntro(false);
-      playAntic("hop");
+      playAntic(INTRO_ANTIC[introKind]);
       if (isPrimary && !useNook.getState().toured) window.setTimeout(() => void startTour(), 900);
     }, INTRO_MS);
     return () => window.clearTimeout(t);
