@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { normalizeColor, normalizeLook, useShowcase } from "../lib/look";
+import { normalizeColor, normalizeLook } from "../lib/look";
 import { AnimatePresence, motion, useAnimationControls, type TargetAndTransition } from "motion/react";
 import { playAntic } from "../hooks/useAntics";
 import { CHEW_MS } from "../hooks/useFeeding";
@@ -134,8 +134,6 @@ export function Island() {
   const playing = !!media?.playing;
   // Görünüm düzenlenirken dans etmesin: seçilen gözler görünsün
   const lookTab = useNook((s) => s.tab === "look");
-  // Tanıtımda: büyük Nook hazır görünümlere bürünür
-  const showcase = useShowcase((s) => s.pick);
   // Kapalı adada solda/sağda yer isteyenler: dinleme > indirme > odak > müzik
   const collapsed = mode === "collapsed";
   const miniListen = collapsed && listening;
@@ -213,8 +211,8 @@ export function Island() {
                 expression={expression}
                 status={status}
                 grooving={playing && !(mode === "expanded" && lookTab)}
-                color={showcase && mode === "tour" ? showcase.color : normalizeColor(settings.faceColor)}
-                look={showcase && mode === "tour" ? showcase.look : normalizeLook(settings.look)}
+                color={normalizeColor(settings.faceColor)}
+                look={normalizeLook(settings.look)}
                 bounds={ref}
               />
               </motion.div>

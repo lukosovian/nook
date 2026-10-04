@@ -1,8 +1,11 @@
 import type { CSSProperties } from "react";
 import { normalizeColor, normalizeLook, type Look } from "../../lib/look";
-import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, SPAN, useBodyImage } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, SPAN, useBodyImageQueued } from "../../lib/nook3d";
 import { useNook, type Expression } from "../../store/nook";
 import { eyesFor } from "./Eye";
+
+/** Küçük Nook'un çizim çözünürlüğü (önceden çizerken de aynısı kullanılır) */
+export const figureRes = (size: number) => (size > 40 ? 256 : 160);
 
 /**
  * Kıpırdamayan küçük 3B Nook: büyük Nook'la aynı gövde resmi ve gözler. `size` gövdenin çapı (px);
@@ -24,7 +27,7 @@ export function NookFigure({
   className?: string;
   style?: CSSProperties;
 }) {
-  const img = useBodyImage(look, color, size > 40 ? 256 : 160);
+  const img = useBodyImageQueued(look, color, figureRes(size));
   const [eye, , shine] = eyesFor(expression, look.eyes);
   const span = (size * SPAN) / 2;
   const unit = size / 2; // 1 birim (yüz yarıçapı) kaç px
@@ -34,7 +37,7 @@ export function NookFigure({
   return (
     <span className={`relative inline-block shrink-0 ${className}`} style={{ width: size, height: size, ...style }}>
       {img ? (
-        <span className="absolute" style={{ width: span, height: span, left: (size - span) / 2, top: (size - span) / 2 }}>
+        <span className="nook-fade absolute" style={{ width: span, height: span, left: (size - span) / 2, top: (size - span) / 2 }}>
           <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />
           {look.glasses !== "shades" &&
             [-1, 1].map((side) => (
@@ -54,9 +57,7 @@ export function NookFigure({
               </span>
             ))}
         </span>
-      ) : (
-        <span className="absolute inset-0 rounded-full" style={{ background: color }} />
-      )}
+      ) : null}
     </span>
   );
 }

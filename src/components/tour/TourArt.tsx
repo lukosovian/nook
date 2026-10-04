@@ -31,9 +31,10 @@ import { ArgusLinked, ArgusPromo } from "../ArgusPromo";
 import { epLabel, posterSrc, useArgus, watching } from "../../lib/argus";
 import { ACCENT, Bar, MiniNook, Segmented, tintBg, tintText, Toggle } from "../ui/primitives";
 import { MyNook, NookFigure } from "../mascot/Figure";
-import { DEFAULT_LOOK, SHOWCASE, useShowcase, type Look } from "../../lib/look";
+import { SHOWCASE, TOUR_CHIPS } from "../../lib/look";
 import { endTour } from "../../lib/tour";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { Shuffle } from "lucide-react";
 
 const LOOP = { repeat: Infinity, ease: "easeInOut" } as const;
@@ -558,51 +559,73 @@ export function MoodArt() {
 
 // ---------------------------------------------------------------- Kendi Nook'un
 
-const SHOWCASE_MS = 1900;
+/** Ürettiği her Nook'un yuvaya varışı arasında */
+const SPAWN_GAP = 0.14;
 
 /**
- * Hazır görünümlerden bir vitrin. Soldaki büyük Nook da sırayla onlara bürünür (Island, useShowcase);
- * adımdan çıkınca kendi görünümüne döner.
+ * Üstte Nook'un ilk hâli; ondan sırayla farklı Nook'lar çıkıp aşağıda yan yana dizilir.
+ * Seçilen (üzerine gelinen) kart, ilk hâlin yanında adıyla gösterilir.
  */
 export function LookArt() {
-  const [i, setI] = useState(1);
-  useEffect(() => {
-    const t = window.setInterval(() => setI((n) => (n + 1) % SHOWCASE.length), SHOWCASE_MS);
-    return () => window.clearInterval(t);
-  }, []);
-  useEffect(() => {
-    useShowcase.setState({ pick: { look: SHOWCASE[i].look, color: SHOWCASE[i].color } });
-  }, [i]);
-  useEffect(() => () => useShowcase.setState({ pick: null }), []);
+  const variants = SHOWCASE.slice(1);
+  const first = SHOWCASE[0];
+  const [hover, setHover] = useState<number | null>(null);
+  const shown = hover === null ? null : variants[hover];
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      <div className="grid flex-1 grid-cols-3 gap-2">
-        {SHOWCASE.map((m, n) => {
-          const on = n === i;
-          return (
-            <motion.button
-              key={m.name}
-              onClick={() => setI(n)}
-              className="relative flex flex-col items-center justify-end overflow-hidden rounded-[18px] border pb-2.5"
-              style={{ background: on ? tintBg(m.color, 16) : "rgb(255 255 255 / 0.04)", borderColor: on ? tintBg(m.color, 55) : "rgb(255 255 255 / 0.06)" }}
-              initial={{ opacity: 0, y: 10, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 420, damping: 28, delay: 0.06 + n * 0.05 }}
-            >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-2/3" style={{ background: `radial-gradient(60% 70% at 50% 40%, ${tintBg(m.color, on ? 30 : 12)} 0%, transparent 70%)` }} />
-              <motion.div className="relative mb-3" animate={{ y: on ? [0, -4, 0] : 0, scale: on ? 1.08 : 1 }} transition={on ? { duration: 1.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}>
-                <NookFigure look={m.look} color={m.color} size={54} expression={on ? "happy" : "idle"} />
+    <div className="flex h-full flex-col">
+      {/* İlk hâl */}
+      <div className="relative flex flex-1 flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(40% 55% at 50% 45%, rgb(255 255 255 / 0.07) 0%, transparent 70%)" }} />
+        <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>
+          <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={shown?.name ?? "first"}
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.7, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 26 }}
+              >
+                <NookFigure look={(shown ?? first).look} color={(shown ?? first).color} size={92} expression={shown ? "happy" : "idle"} />
               </motion.div>
-              <span className="relative text-[12.5px] font-semibold" style={{ color: on ? tintText(m.color) : undefined }}>
-                {m.name}
-              </span>
-              <span className="relative text-[10.5px] text-label-3">{m.note}</span>
-            </motion.button>
-          );
-        })}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+        <p className="relative mt-5 text-[13px] font-semibold text-label">{shown ? shown.name : "İlk hâlim"}</p>
+        <p className="relative mt-0.5 text-[11px] text-label-3">{shown ? shown.note : "Aşağıdakilerin hepsi yine benim"}</p>
       </div>
-      <div className="flex items-center gap-2">
+
+      {/* Ondan çıkan Nook'lar: aşağıda yan yana */}
+      <div className="relative mt-2 rounded-[18px] bg-well px-2 pb-2.5 pt-3">
+        <div className="grid grid-cols-5">
+          {variants.map((m, n) => {
+            // Yuvanın ortası ile kartın ortası arası: Nook üstteki ilk hâlden çıkıp yuvasına süzülür
+            const dx = (2 - n) * 102;
+            return (
+              <motion.button
+                key={m.name}
+                onHoverStart={() => setHover(n)}
+                onHoverEnd={() => setHover((h) => (h === n ? null : h))}
+                onFocus={() => setHover(n)}
+                onBlur={() => setHover((h) => (h === n ? null : h))}
+                className="flex flex-col items-center gap-1.5 rounded-[14px] py-1.5"
+                initial={{ x: dx, y: -150, scale: 0.3, opacity: 0 }}
+                animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 170, damping: 19, delay: 0.45 + n * SPAWN_GAP }}
+                whileHover={{ y: -4 }}
+              >
+                <NookFigure look={m.look} color={m.color} size={46} expression={hover === n ? "happy" : "idle"} />
+                <span className="text-[11px] font-medium" style={{ color: hover === n ? tintText(m.color) : undefined }}>
+                  {m.name}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex items-center gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap gap-1">
           {["İsim", "6 gövde", "Vinil · peluş", "10 renk", "5 göz", "Gözlük", "Şapka", "Papyon"].map((t) => (
             <span key={t} className="rounded-full bg-well px-2 py-0.5 text-[10.5px] text-label-2">
@@ -646,13 +669,8 @@ export function ArgusArt() {
 
 export function HelloChips() {
   // Her çipte başka bir Nook: kendi Nook'unu da böyle giydirebileceğinin habercisi
-  const items: { color: string; label: string; body: string; look: Look }[] = [
-    { color: ACCENT.pink, label: "Müzik", body: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
-    { color: ACCENT.teal, label: "Dosya rafı", body: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead" } },
-    { color: ACCENT.purple, label: "Yapay zekâ", body: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "triangle", glasses: "round" } },
-    { color: ACCENT.yellow, label: "Alarm", body: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
-    { color: ACCENT.red, label: "Odak", body: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "bean", head: "bowler" } },
-  ];
+  const tints = [ACCENT.pink, ACCENT.teal, ACCENT.purple, ACCENT.yellow, ACCENT.red];
+  const items = TOUR_CHIPS.map((c, i) => ({ ...c, color: tints[i] }));
   return (
     <div className="flex flex-wrap justify-center gap-1.5">
       {items.map((c, i) => (

@@ -4,7 +4,7 @@
  * kıpırdayan her şey (zıplama, eğilme) bu resmin CSS dönüşümüdür, yani her karede GPU çalışmaz.
  * WebGL yoksa null döner ve Nook eski CSS küresine düşer.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 import shader from "./nook3d.glsl?raw";
 import type { Look } from "./look";
 
@@ -101,9 +101,11 @@ function create(): Renderer | null {
 const cache = new Map<string, string | null>();
 const MAX_CACHE = 80;
 
+const keyOf = (look: Look, color: string, size: number) => `${look.shape}|${look.texture}|${look.glasses}|${look.head}|${look.neck}|${color}|${size}`;
+
 /** Görünümün resmi (data URL); WebGL yoksa null. Aynı görünüm bir kez çizilir. */
 export function bodyImage(look: Look, color: string, size: number): string | null {
-  const key = `${look.shape}|${look.texture}|${look.glasses}|${look.head}|${look.neck}|${color}|${size}`;
+  const key = keyOf(look, color, size);
   if (cache.has(key)) return cache.get(key)!;
   if (renderer === undefined) renderer = create();
   const url = renderer ? renderer.draw(look, color, size) : null;
@@ -114,4 +116,58 @@ export function bodyImage(look: Look, color: string, size: number): string | nul
 
 export function useBodyImage(look: Look, color: string, size: number) {
   return useMemo(() => bodyImage(look, color, size), [look.shape, look.texture, look.glasses, look.head, look.neck, color, size]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// ------------------------------------------------------------------ sıralı çizim
+
+/**
+ * Küçük Nook'lar (seçenekler, tanıtım, çipler) ekrana birden çok girer; hepsini aynı anda çizmek
+ * animasyonu takır. Sıraya alınır, her karede bir tane çizilir; hazır olunca bileşen yenilenir.
+ */
+const STILL = import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.search).has("still");
+const queue: { key: string; look: Look; color: string; size: number }[] = [];
+const waiting = new Map<string, Set<() => void>>();
+let pumping = false;
+
+function pump() {
+  const job = queue.shift();
+  if (!job) {
+    pumping = false;
+    return;
+  }
+  if (!cache.has(job.key)) bodyImage(job.look, job.color, job.size);
+  waiting.get(job.key)?.forEach((fn) => fn());
+  waiting.delete(job.key);
+  window.setTimeout(pump, 16);
+}
+
+function request(look: Look, color: string, size: number, done?: () => void) {
+  const key = keyOf(look, color, size);
+  if (cache.has(key)) return;
+  if (done) {
+    if (!waiting.has(key)) waiting.set(key, new Set());
+    waiting.get(key)!.add(done);
+  }
+  if (!queue.some((j) => j.key === key)) queue.push({ key, look, color, size });
+  if (!pumping) {
+    pumping = true;
+    window.setTimeout(pump, 16);
+  }
+}
+
+/** Önceden çiz (ör. tanıtım açılırken): sonra ekrana girdiklerinde beklemeden hazır olurlar */
+export const prefetchBodies = (items: { look: Look; color: string; size: number }[]) => items.forEach((i) => request(i.look, i.color, i.size));
+
+/** Sıralı çizimle resim: hazır değilse null döner, hazır olunca bileşen yenilenir */
+export function useBodyImageQueued(look: Look, color: string, size: number): string | null {
+  const key = keyOf(look, color, size);
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  // Geliştirme önizlemesinin ekran görüntüsü beklemez: orada hemen çiz
+  if (STILL && !cache.has(key)) bodyImage(look, color, size);
+  useEffect(() => {
+    if (cache.has(key)) return;
+    request(look, color, size, bump);
+    return () => void waiting.get(key)?.delete(bump);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return cache.get(key) ?? null;
 }

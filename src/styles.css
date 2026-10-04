@@ -100,3 +100,14 @@ button {
   background: rgb(255 255 255 / 0.12);
   border-radius: 2px;
 }
+
+/* Sıralı çizilen küçük 3B Nook'lar hazır olunca yumuşakça belirir */
+.nook-fade {
+  animation: nook-fade 0.25s ease-out;
+}
+@keyframes nook-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}

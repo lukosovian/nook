@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { alarmNext, alarmRing, isPrimary } from "../lib/bridge";
+import { alarmNext, alarmRing, isPrimary, subscribe } from "../lib/bridge";
 import { useNook } from "../store/nook";
 
 /** Alarm bu kadar çalınca (kimse dokunmazsa) kendiliğinden susar. */
@@ -24,7 +24,7 @@ export function useAlarms() {
     const unsub = useNook.subscribe((st, prev) => st.alarms !== prev.alarms && report());
 
     let autoStop = 0;
-    const t = window.setInterval(() => {
+    const check = () => {
       const s = useNook.getState();
       if (s.ringing) return;
       const now = Date.now();
@@ -36,10 +36,14 @@ export function useAlarms() {
       void alarmRing(true, due.silent ? 0 : s.settings.alarmSound);
       window.clearTimeout(autoStop);
       autoStop = window.setTimeout(() => stopAlarm(), AUTO_STOP_MS);
-    }, 1000);
+    };
+    const t = window.setInterval(check, 1000);
+    // Oyunda ada gizliyken sayfanın saati yavaşlar; vakti gelince Rust haber verir, beklemeden çal
+    const off = subscribe<number>("nook://alarm-due", () => check());
 
     return () => {
       window.clearInterval(t);
+      off();
       window.clearTimeout(autoStop);
       unsub();
     };

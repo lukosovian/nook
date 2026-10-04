@@ -12,7 +12,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::Shared;
 
@@ -81,10 +81,18 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut session: Option<Session> = None;
             // Ada oyunun üstünde kısa süre görünsün (açılış özeti, mola hatırlatması)
             let mut peek_until: Option<Instant> = None;
+            // Vakti gelen alarm bir kez bildirilir: gizliyken sayfanın saati yavaşlar (Chromium arka plan kısıtlaması)
+            let mut rung_for: i64 = 0;
             loop {
                 thread::sleep(POLL);
                 let settings = shared.settings();
                 let alarm = crate::alarm::imminent(&shared);
+                let next = shared.next_alarm.load(Ordering::Relaxed);
+                let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+                if next > 0 && now_ms >= next && rung_for != next {
+                    rung_for = next;
+                    let _ = app.emit("nook://alarm-due", next);
+                }
                 let enabled = settings.hide_in_fullscreen && !alarm;
                 let mut break_due: Option<GamePeek> = None;
                 let detected = imp::fullscreen_monitor(&shared);
@@ -142,11 +150,15 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     if covered && hidden.insert(label.clone()) {
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", true);
                         let hwnd = ws.hwnd;
+                        let (app, label) = (app.clone(), label.clone());
                         thread::spawn(move || {
                             thread::sleep(HIDE_AFTER);
                             imp::show(hwnd, false);
+                            webview_visible(&app, &label, false);
                         });
                     } else if !covered && hidden.remove(&label) {
+                        // Önce WebView2 uyansın (çizim ve zamanlayıcılar hemen dönsün), sonra pencere
+                        webview_visible(&app, &label, true);
                         imp::show(ws.hwnd, true);
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", false);
                     }
@@ -162,6 +174,19 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             }
         })
         .expect("fullscreen thread başlatılamadı");
+}
+
+/// WebView2'ye de görünürlüğü söyle: gizliyken çizmeyi bıraksın (oyunda yük olmasın), açılınca
+/// beklemeden çizsin. Yalnızca pencereyi gizleyip göstermek yetmiyor; sayfa bir süre arka planda kalıyordu.
+fn webview_visible(app: &AppHandle, label: &str, on: bool) {
+    #[cfg(windows)]
+    if let Some(w) = app.get_webview_window(label) {
+        let _ = w.with_webview(move |pv| unsafe {
+            let _ = pv.controller().SetIsVisible(on);
+        });
+    }
+    #[cfg(not(windows))]
+    let _ = (app, label, on);
 }
 
 #[cfg(windows)]

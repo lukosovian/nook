@@ -3,7 +3,6 @@
  * biçimini, dokusunu (vinil / peluş), rengini, gözlerini ve siyah parlak aksesuarlarını seçer.
  * Gövde ve aksesuarlar lib/nook3d'de 3B çizilir; gözler ifadeleriyle birlikte DOM'da kalır.
  */
-import { create } from "zustand";
 import { useNook } from "../store/nook";
 
 export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean";
@@ -214,5 +213,11 @@ export const SHOWCASE: { name: string; color: string; look: Look; note: string }
   { name: "Ritim", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "bean", eyes: "sparkle", head: "headphones" }, note: "Kulaklık" },
 ];
 
-/** Tanıtımdaki "kendi Nook'unu yarat" adımında büyük Nook bu görünüme bürünür (null = kullanıcınınki) */
-export const useShowcase = create<{ pick: { look: Look; color: string } | null }>(() => ({ pick: null }));
+/** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */
+export const TOUR_CHIPS: { label: string; body: string; look: Look }[] = [
+  { label: "Müzik", body: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
+  { label: "Dosya rafı", body: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead" } },
+  { label: "Yapay zekâ", body: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "triangle", glasses: "round" } },
+  { label: "Alarm", body: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
+  { label: "Odak", body: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "bean", head: "bowler" } },
+];
