@@ -14,13 +14,13 @@ import { useLook } from "../../hooks/useLook";
 import { setInteractive } from "../../lib/bridge";
 import { FACE } from "../../lib/layout";
 import { spring } from "../../lib/motion";
-import { radii, roundBody, SHAPES, type BodyShape, type Look } from "../../lib/look";
-import { DEFAULT_SETTINGS, useNook, type Expression, type Status } from "../../store/nook";
+import { DEFAULT_LOOK, radii, roundBody, type BodyShape, type Look } from "../../lib/look";
+import { ANCHORS, SPAN, useBodyImage } from "../../lib/nook3d";
+import { useNook, type Expression, type Status } from "../../store/nook";
 import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
 import { Mouth } from "./Mouth";
 import { Props, type SleepStyle } from "./Props";
-import { EYE_GAP, EYE_GAP_GLASSES, EYE_SCALE_GLASSES, Glasses, HeadWear, NeckWear } from "./Wear";
 
 /** Durum renkleri (rozet, alt ton, ada parıltısı) */
 export const STATUS_COLOR: Record<Status, string> = {
@@ -38,14 +38,26 @@ const BOX_SHAPE: Partial<Record<Expression, BodyShape>> = {
   chewing: { width: 26, height: 22, borderRadius: radii([7, 7, 7, 7]) },
 };
 
-/** Seçilen gövde; gerinirken basılıp yayılır, uyurken biraz çöker. */
-function bodyFor(expression: Expression, base: BodyShape): BodyShape {
+/** CSS gövde (3B resim yoksa): gerinirken basılıp yayılır, uyurken biraz çöker. */
+function bodyFor(expression: Expression): BodyShape {
   const box = BOX_SHAPE[expression];
   if (box) return box;
-  if (expression === "stretch") return base.borderRadius === SHAPES.sphere.body.borderRadius ? roundBody(28, 21) : { ...base, width: base.width + 4, height: base.height - 3 };
-  if (expression === "sleepy") return { ...base, height: base.height - 1 };
-  return base;
+  if (expression === "stretch") return roundBody(28, 21);
+  if (expression === "sleepy") return roundBody(24, 23);
+  return roundBody(FACE);
 }
+
+/** 3B gövde resminin aynı esnemeleri */
+const IMG_SQUASH: Partial<Record<Expression, { scaleX: number; scaleY: number }>> = {
+  stretch: { scaleX: 1.14, scaleY: 0.86 },
+  sleepy: { scaleX: 1, scaleY: 0.96 },
+};
+
+/** 3B gövde resminin ekrandaki boyu (px) ve çizim çözünürlüğü (büyük adada da keskin kalsın) */
+const IMG = (FACE * SPAN) / 2;
+const IMG_RES = 384;
+/** Gözlük camının ardında gözler küçülür */
+const EYE_SCALE_GLASSES = 0.72;
 
 /** Bütün yüzün hareketleri. */
 const BODY: Record<Expression, TargetAndTransition> = {
@@ -204,7 +216,7 @@ interface NookProps {
   bounds?: RefObject<HTMLElement | null>;
 }
 
-export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wear = DEFAULT_SETTINGS.look, bounds }: NookProps) {
+export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wear = DEFAULT_LOOK, bounds }: NookProps) {
   const ref = useRef<HTMLDivElement>(null);
   const look = useLook(ref, !NO_LOOK.has(expression));
   const lid = useBlink(BLINKS.has(expression));
@@ -212,8 +224,12 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
 
   // --- 3B kafa çevirme: gözler kenara kayar ve kısalır, ışık ters yöne gider
   const eyesX = useTransform(look.x, (v) => v * 6.4);
-  const eyesY = useTransform(look.y, (v) => v * 4.4 + 1.2);
-  const baseGap = wear.glasses === "none" ? EYE_GAP : EYE_GAP_GLASSES;
+  const img = useBodyImage(wear, color, IMG_RES);
+  // 3B gövdede gözler biçime göre yerleşir (kalpte yukarıda, üçgende aşağıda)
+  const anchor = ANCHORS[wear.shape];
+  const eyeY = img ? -anchor.y * (FACE / 2) : 1.2;
+  const baseGap = img ? anchor.gap * (FACE / 2) : 3.9;
+  const eyesY = useTransform(look.y, (v) => v * 4.4 + eyeY);
   const gap = useTransform(look.x, (v) => baseGap * (1 - Math.abs(v) * 0.32));
   const leftX = useTransform([gap, eyesX], ([g, x]: number[]) => x - g);
   const rightX = useTransform([gap, eyesX], ([g, x]: number[]) => x + g);
@@ -224,7 +240,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const shade = `color-mix(in srgb, ${color} 62%, #5d5d6b)`;
   const sphere = useMotionTemplate`radial-gradient(circle at ${hx}% ${hy}%, #ffffff 0%, ${color} 34%, ${shade} 100%)`;
 
-  const lens = wear.glasses === "none" ? 1 : EYE_SCALE_GLASSES;
+  const lens = img && wear.glasses !== "none" ? EYE_SCALE_GLASSES : 1;
   const attentionScale = useTransform(look.attention, (a) => (1 + a * 0.16) * lens);
   const scaleYL = useTransform([lid, attentionScale], ([l, a]: number[]) => l * a);
   const scaleYR = scaleYL;
@@ -240,11 +256,15 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const rightSX = useTransform([rightScaleX, attentionScale], ([s, a]: number[]) => s * a);
 
   const [left, right, shineL, shineR] = eyesFor(expression, wear.eyes);
-  const body = bodyFor(expression, SHAPES[wear.shape].body);
+  const body = bodyFor(expression);
   // Balon şişirerek uyurken "z" çıkmaz
   const floater = expression === "sleepy" && sleepStyle === "bubble" ? undefined : FLOATER[expression];
   const tint = status ? STATUS_COLOR[status] : null;
   const isBox = expression === "hungry" || expression === "chewing";
+  /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
+  const solid = !!img && !isBox;
+  /** Güneş gözlüğünün ardındaki gözler görünmez */
+  const hideEyes = solid && wear.glasses === "shades";
 
   return (
     // Dış katman: sürükle-fırlat. Bırakınca yay ile yerine döner.
@@ -269,31 +289,57 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
         initial={false}
         animate={wave ? DANCES[dance] : expression === "sleepy" && sleepStyle === "nap" ? NAP : BODY[expression]}
       >
-        <Hands expression={expression} dance={wave ? dance : null} />
+        <Hands expression={expression} dance={wave ? dance : null} color={color} />
 
-        {/* Küre (ya da kutu) yüz */}
+        {/* 3B gövde: biçim, doku ve aksesuarlar tek resimde (lib/nook3d) */}
+        {img && (
+          <motion.div
+            className="pointer-events-none absolute"
+            style={{ left: (FACE - IMG) / 2, top: (FACE - IMG) / 2, width: IMG, height: IMG }}
+            initial={false}
+            animate={{ opacity: isBox ? 0 : 1, ...(IMG_SQUASH[expression] ?? { scaleX: 1, scaleY: 1 }) }}
+            transition={spring.eye}
+          >
+            <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.55))" }} />
+            {/* Duruma göre alttan renk tonu — gövdenin biçimiyle kırpılır */}
+            <motion.div
+              className="absolute inset-0"
+              style={{ WebkitMaskImage: `url(${img})`, maskImage: `url(${img})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }}
+              initial={false}
+              animate={{
+                opacity: tint ? 0.75 : 0,
+                backgroundImage: `radial-gradient(42% 30% at 50% 74%, ${tint ?? "#ffffff"} 0%, transparent 100%)`,
+              }}
+              transition={{ duration: 0.4 }}
+            />
+          </motion.div>
+        )}
+
+        {/* Yüz: CSS küre (3B yoksa) ya da kutu; 3B gövdede yalnızca gözlerin katmanı */}
         <motion.div
-          className="absolute left-1/2 top-1/2 overflow-hidden"
+          className={`absolute left-1/2 top-1/2 ${solid ? "" : "overflow-hidden"}`}
           style={{
-            backgroundImage: sphere,
+            backgroundImage: solid ? "none" : sphere,
             translateX: "-50%",
             translateY: "-50%",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.55), inset -1.5px -2.5px 4px rgba(0,0,0,0.16)",
+            boxShadow: solid ? "none" : "0 2px 6px rgba(0,0,0,0.55), inset -1.5px -2.5px 4px rgba(0,0,0,0.16)",
           }}
           initial={false}
           animate={{ ...body }}
           transition={spring.eye}
         >
           {/* Duruma göre alttan renk tonu */}
-          <motion.div
-            className="pointer-events-none absolute inset-0"
-            initial={false}
-            animate={{
-              opacity: tint ? 0.85 : 0,
-              backgroundImage: `radial-gradient(120% 75% at 50% 112%, ${tint ?? "#ffffff"} 0%, transparent 72%)`,
-            }}
-            transition={{ duration: 0.4 }}
-          />
+          {!solid && (
+            <motion.div
+              className="pointer-events-none absolute inset-0"
+              initial={false}
+              animate={{
+                opacity: tint ? 0.85 : 0,
+                backgroundImage: `radial-gradient(120% 75% at 50% 112%, ${tint ?? "#ffffff"} 0%, transparent 72%)`,
+              }}
+              transition={{ duration: 0.4 }}
+            />
+          )}
 
           {/* Utangaçken yanaklar pembeleşir */}
           <motion.div
@@ -310,13 +356,12 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
           {/* Gözler */}
           <motion.div className="absolute inset-0" style={{ y: eyesY }}>
             <motion.div className="absolute inset-0" initial={false} animate={EYE_OFFSET[expression] ?? { x: 0, y: 0 }} transition={spring.eye}>
-              <motion.div className="absolute inset-0" initial={false} animate={{ opacity: wave ? 0 : 1 }} transition={{ duration: 0.15 }}>
+              <motion.div className="absolute inset-0" initial={false} animate={{ opacity: wave || hideEyes ? 0 : 1 }} transition={{ duration: 0.15 }}>
                 <Eye shape={left} shine={shineL} x={leftX} scaleX={leftSX} scaleY={scaleYL} />
                 <Eye shape={right} shine={shineR} x={rightX} scaleX={rightSX} scaleY={scaleYR} />
               </motion.div>
             </motion.div>
           </motion.div>
-          <Glasses id={wear.glasses} accent={wear.accent} style={{ x: eyesX, y: eyesY }} />
           <Mouth expression={expression} />
 
           <AnimatePresence>
@@ -326,14 +371,6 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
             {expression === "downloading" && <ProgressDots key="dl" />}
           </AnimatePresence>
         </motion.div>
-
-        {/* Giydikleri: başlık ve boyun (kutuya dönüşünce kapağın yerini alır, çıkarır) */}
-        {!isBox && (
-          <>
-            <NeckWear id={wear.neck} accent={wear.accent} body={body} />
-            <HeadWear id={wear.head} accent={wear.accent} body={body} />
-          </>
-        )}
 
         {/* Eşyalar: yorgan, kitap, kamp ateşi, şemsiye, kâğıt-kalem, büyüteç… */}
         <Props expression={expression} sleepStyle={sleepStyle} />

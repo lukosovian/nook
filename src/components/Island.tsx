@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { normalizeColor, normalizeLook } from "../lib/look";
 import { AnimatePresence, motion, useAnimationControls, type TargetAndTransition } from "motion/react";
 import { playAntic } from "../hooks/useAntics";
 import { CHEW_MS } from "../hooks/useFeeding";
@@ -210,8 +211,8 @@ export function Island() {
                 expression={expression}
                 status={status}
                 grooving={playing && !(mode === "expanded" && lookTab)}
-                color={settings.faceColor}
-                look={settings.look}
+                color={normalizeColor(settings.faceColor)}
+                look={normalizeLook(settings.look)}
                 bounds={ref}
               />
               </motion.div>

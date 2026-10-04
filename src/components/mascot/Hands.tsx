@@ -148,12 +148,12 @@ export const DANCE_HANDS: [Pose, Pose][] = [
   [show({ x: -2, y: -3, rotate: 35 }), show({ x: 2, y: -3, rotate: -35 })],
 ];
 
-export function Hands({ expression, dance = null }: { expression: Expression; dance?: number | null }) {
+export function Hands({ expression, dance = null, color = "#FFFFFF" }: { expression: Expression; dance?: number | null; color?: string }) {
   const [l, r] = (dance != null ? DANCE_HANDS[dance] : null) ?? POSES[expression] ?? [HIDE, HIDE];
   return (
     <>
-      <Hand side={-1} pose={l} />
-      <Hand side={1} pose={r} />
+      <Hand side={-1} pose={l} color={color} />
+      <Hand side={1} pose={r} color={color} />
     </>
   );
 }
@@ -161,7 +161,8 @@ export function Hands({ expression, dance = null }: { expression: Expression; da
 const W = 6.4;
 const H = 5.2;
 
-function Hand({ side, pose }: { side: -1 | 1; pose: Pose }) {
+/** Eller gövdenin renginde, aynı yumuşak ışıkla */
+function Hand({ side, pose, color }: { side: -1 | 1; pose: Pose; color: string }) {
   return (
     <motion.div
       className="pointer-events-none absolute left-1/2 top-1/2 rounded-full"
@@ -170,7 +171,7 @@ function Hand({ side, pose }: { side: -1 | 1; pose: Pose }) {
         height: H,
         marginLeft: side * (FACE / 2 + 4.5) - W / 2,
         marginTop: -H / 2,
-        background: "radial-gradient(circle at 35% 30%, #ffffff 0%, #e4e4ea 55%, #a9a9b4 100%)",
+        background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${color}, white 55%) 0%, ${color} 55%, color-mix(in srgb, ${color}, black 30%) 100%)`,
         boxShadow: "0 1px 2px rgba(0,0,0,0.45)",
       }}
       initial={false}

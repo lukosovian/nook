@@ -3,22 +3,23 @@ import { motion } from "motion/react";
 import { Shuffle } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import {
-  ACCENT_COLORS,
   BODY_COLORS,
   EYE_STYLES,
   GLASSES,
   HEADS,
   NAME_MAX,
   NECKS,
+  normalizeColor,
+  normalizeLook,
   randomLook,
   SHAPES,
+  TEXTURES,
   type Look,
-  type ShapeId,
 } from "../../lib/look";
 import { spring } from "../../lib/motion";
+import { ANCHORS, SPAN, useBodyImage } from "../../lib/nook3d";
 import { useNook } from "../../store/nook";
 import { eyesFor } from "../mascot/Eye";
-import { EYE_GAP, EYE_GAP_GLASSES, EYE_SCALE_GLASSES, Glasses, HeadWear, NeckWear } from "../mascot/Wear";
 import { ACCENT } from "../ui/primitives";
 
 /**
@@ -28,8 +29,8 @@ import { ACCENT } from "../ui/primitives";
 export function LookPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("look", scroller);
-  const look = useNook((s) => s.settings.look);
-  const color = useNook((s) => s.settings.faceColor);
+  const look = normalizeLook(useNook((s) => s.settings.look));
+  const color = normalizeColor(useNook((s) => s.settings.faceColor));
   const update = useNook((s) => s.updateSettings);
   const set = (patch: Partial<Look>) => update({ look: { ...look, ...patch } });
 
@@ -52,21 +53,29 @@ export function LookPanel() {
       </div>
 
       <Group title="Gövde">
-        {(Object.keys(SHAPES) as ShapeId[]).map((id) => (
-          <Option key={id} label={SHAPES[id].label} on={look.shape === id} onClick={() => set({ shape: id })}>
-            <Figure look={{ ...look, shape: id, glasses: "none", head: "none", neck: "none" }} color={color} />
+        {SHAPES.map((o) => (
+          <Option key={o.id} label={o.label} on={look.shape === o.id} onClick={() => set({ shape: o.id })}>
+            <Figure look={{ ...bare(look), shape: o.id }} color={color} />
+          </Option>
+        ))}
+      </Group>
+
+      <Group title="Doku">
+        {TEXTURES.map((o) => (
+          <Option key={o.id} label={o.label} on={look.texture === o.id} onClick={() => set({ texture: o.id })}>
+            <Figure look={{ ...bare(look), texture: o.id }} color={color} />
           </Option>
         ))}
       </Group>
 
       <Group title="Renk">
-        <Swatches colors={BODY_COLORS} value={color} onChange={(c) => update({ faceColor: c })} sphere />
+        <Swatches value={color} onChange={(c) => update({ faceColor: c })} />
       </Group>
 
       <Group title="Gözler">
         {EYE_STYLES.map((o) => (
           <Option key={o.id} label={o.label} on={look.eyes === o.id} onClick={() => set({ eyes: o.id })}>
-            <Figure look={{ ...look, eyes: o.id, glasses: "none", head: "none", neck: "none" }} color={color} zoom />
+            <Figure look={{ ...bare(look), eyes: o.id }} color={color} zoom />
           </Option>
         ))}
       </Group>
@@ -74,7 +83,7 @@ export function LookPanel() {
       <Group title="Gözlük">
         {GLASSES.map((o) => (
           <Option key={o.id} label={o.label} on={look.glasses === o.id} onClick={() => set({ glasses: o.id })}>
-            <Figure look={{ ...look, glasses: o.id, head: "none", neck: "none" }} color={color} zoom />
+            <Figure look={{ ...bare(look), glasses: o.id }} color={color} zoom />
           </Option>
         ))}
       </Group>
@@ -82,7 +91,7 @@ export function LookPanel() {
       <Group title="Başlık">
         {HEADS.map((o) => (
           <Option key={o.id} label={o.label} on={look.head === o.id} onClick={() => set({ head: o.id })}>
-            <Figure look={{ ...look, head: o.id, neck: "none" }} color={color} />
+            <Figure look={{ ...bare(look), head: o.id }} color={color} drop={4} />
           </Option>
         ))}
       </Group>
@@ -90,17 +99,16 @@ export function LookPanel() {
       <Group title="Boyun">
         {NECKS.map((o) => (
           <Option key={o.id} label={o.label} on={look.neck === o.id} onClick={() => set({ neck: o.id })}>
-            <Figure look={{ ...look, neck: o.id, head: "none" }} color={color} />
+            <Figure look={{ ...bare(look), neck: o.id }} color={color} />
           </Option>
         ))}
-      </Group>
-
-      <Group title="Aksesuar rengi">
-        <Swatches colors={ACCENT_COLORS} value={look.accent} onChange={(c) => set({ accent: c })} />
       </Group>
     </div>
   );
 }
+
+/** Bir seçeneği gösterirken öbür aksesuarlar kalabalık etmesin */
+const bare = (look: Look): Look => ({ ...look, glasses: "none", head: "none", neck: "none" });
 
 function NameInput() {
   const name = useNook((s) => s.settings.nookName);
@@ -148,25 +156,23 @@ function Option({ label, on, onClick, children }: { label: string; on: boolean; 
       className={`flex w-[52px] flex-col items-center gap-0.5 rounded-[12px] pb-1 pt-1.5 transition-colors ${on ? "bg-white/[0.12]" : "bg-well hover:bg-well-hi"}`}
       style={on ? { boxShadow: `inset 0 0 0 1px ${ACCENT.teal}` } : undefined}
     >
-      <span className="flex h-[34px] w-[40px] items-center justify-center overflow-hidden">{children}</span>
+      <span className="relative flex h-[40px] w-[46px] items-center justify-center overflow-hidden">{children}</span>
       <span className={`text-[10px] font-medium ${on ? "text-label" : "text-label-3"}`}>{label}</span>
     </motion.button>
   );
 }
 
-function Swatches({ colors, value, onChange, sphere = false }: { colors: string[]; value: string; onChange: (c: string) => void; sphere?: boolean }) {
+function Swatches({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5 py-0.5">
-      {colors.map((c) => (
+      {BODY_COLORS.map((c) => (
         <button
           key={c}
           onClick={() => onChange(c)}
           aria-label={c}
-          className="h-[18px] w-[18px] rounded-full transition-transform hover:scale-110"
+          className="h-[20px] w-[20px] rounded-full transition-transform hover:scale-110"
           style={{
-            background: sphere
-              ? `radial-gradient(circle at 35% 30%, #fff 0%, ${c} 45%, color-mix(in srgb, ${c} 62%, #5d5d6b) 100%)`
-              : `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${c}, white 35%) 0%, ${c} 50%, color-mix(in srgb, ${c}, black 30%) 100%)`,
+            background: `radial-gradient(circle at 34% 28%, color-mix(in srgb, ${c}, white 45%) 0%, ${c} 42%, color-mix(in srgb, ${c}, black 28%) 100%)`,
             boxShadow: value.toLowerCase() === c.toLowerCase() ? `0 0 0 1.5px #000, 0 0 0 3px ${ACCENT.teal}` : "inset 0 0 0 0.5px rgba(255,255,255,0.12)",
           }}
         />
@@ -176,45 +182,38 @@ function Swatches({ colors, value, onChange, sphere = false }: { colors: string[
 }
 
 /**
- * Seçenek kartındaki küçük, kıpırdamayan Nook: büyük Nook'la aynı gövde, göz ve giysiler.
- * `zoom`: gözler/gözlük seçilirken yüze yaklaş.
+ * Seçenek kartındaki küçük, kıpırdamayan Nook: büyük Nook'la aynı 3B gövde ve DOM gözler.
+ * `zoom`: gözler, gözlük, doku seçilirken yüze yaklaş.
  */
-export function Figure({ look, color, zoom = false }: { look: Look; color: string; zoom?: boolean }) {
-  const body = SHAPES[look.shape].body;
+export function Figure({ look, color, zoom = false, drop = 0 }: { look: Look; color: string; zoom?: boolean; drop?: number }) {
+  const size = zoom ? 76 : 50;
+  const img = useBodyImage(look, color, 160);
   const [eye, , shine] = eyesFor("idle", look.eyes);
-  const gap = look.glasses === "none" ? EYE_GAP : EYE_GAP_GLASSES;
-  const shade = `color-mix(in srgb, ${color} 62%, #5d5d6b)`;
+  const unit = size / SPAN; // 1 birim kaç px
+  const a = ANCHORS[look.shape];
+  const k = unit / 12; // DOM göz ölçüleri yüz yarıçapı 12 px'e göre
+  const lens = look.glasses === "none" ? 1 : 0.72;
+  if (!img) return <span className="h-6 w-6 rounded-full" style={{ background: color }} />;
   return (
-    <div className="relative shrink-0" style={{ width: 24, height: 24, transform: `scale(${zoom ? 1.55 : 1.05})`, marginTop: zoom ? 6 : 3 }}>
-      <div
-        className="absolute left-1/2 top-1/2 overflow-hidden"
-        style={{
-          width: body.width,
-          height: body.height,
-          borderRadius: body.borderRadius,
-          transform: "translate(-50%, -50%)",
-          backgroundImage: `radial-gradient(circle at 36% 30%, #ffffff 0%, ${color} 34%, ${shade} 100%)`,
-          boxShadow: "0 2px 6px rgba(0,0,0,0.55), inset -1.5px -2.5px 4px rgba(0,0,0,0.16)",
-        }}
-      >
-        {[-1, 1].map((side) => (
+    <span className="absolute left-1/2 top-1/2" style={{ width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2 + (zoom ? 2 : 1) + drop }}>
+      <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />
+      {look.glasses !== "shades" &&
+        [-1, 1].map((side) => (
           <span
             key={side}
-            className="absolute left-1/2 top-1/2 bg-black"
+            className="absolute bg-black"
             style={{
-              width: eye.width,
-              height: eye.height,
-              borderRadius: `${eye.borderTopLeftRadius}px ${eye.borderTopRightRadius}px ${eye.borderBottomRightRadius}px ${eye.borderBottomLeftRadius}px`,
-              transform: `translate(calc(-50% + ${side * gap}px), calc(-50% + ${1.2 + eye.marginTop / 2}px)) rotate(${eye.rotate}deg) scale(${look.glasses === "none" ? 1 : EYE_SCALE_GLASSES})`,
+              left: size / 2 + side * a.gap * unit,
+              top: size / 2 - a.y * unit,
+              width: eye.width * k,
+              height: eye.height * k,
+              borderRadius: `${eye.borderTopLeftRadius * k}px ${eye.borderTopRightRadius * k}px ${eye.borderBottomRightRadius * k}px ${eye.borderBottomLeftRadius * k}px`,
+              transform: `translate(-50%, calc(-50% + ${(eye.marginTop / 2) * k}px)) rotate(${eye.rotate}deg) scale(${lens})`,
             }}
           >
-            {shine && <span className="absolute rounded-full bg-white/90" style={{ width: 1.3, height: 1.3, left: "16%", top: "14%" }} />}
+            {shine && <span className="absolute rounded-full bg-white/90" style={{ width: 1.3 * k, height: 1.3 * k, left: "16%", top: "14%" }} />}
           </span>
         ))}
-        <Glasses id={look.glasses} accent={look.accent} style={{ y: 1.2 }} />
-      </div>
-      <NeckWear id={look.neck} accent={look.accent} body={body} />
-      <HeadWear id={look.head} accent={look.accent} body={body} />
-    </div>
+    </span>
   );
 }

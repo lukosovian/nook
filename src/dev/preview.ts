@@ -146,13 +146,13 @@ export function applyPreview(mode: string) {
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
   // ?scroll=px → görünüm panelinin aşağısı
-  if (params.get("scroll")) window.setTimeout(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 600);
-  // ?look=şekil,göz,gözlük,başlık,boyun,aksesuar&color=… &name=…
+  if (params.get("scroll")) window.setInterval(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 500);
+  // ?look=şekil,göz,gözlük,başlık,boyun,doku&color=… &name=…
   const q = new URLSearchParams(location.search);
   const lk = q.get("look")?.split(",");
   if (lk || q.get("color") || q.get("name")) {
     const cur = useNook.getState().settings;
-    const look = lk ? { shape: lk[0], eyes: lk[1] ?? "pill", glasses: lk[2] ?? "none", head: lk[3] ?? "none", neck: lk[4] ?? "none", accent: lk[5] ?? cur.look.accent } : cur.look;
+    const look = lk ? { shape: lk[0], eyes: lk[1] ?? "pill", glasses: lk[2] ?? "none", head: lk[3] ?? "none", neck: lk[4] ?? "none", texture: lk[5] ?? "smooth" } : cur.look;
     useNook.setState({ settings: { ...cur, look: look as typeof cur.look, faceColor: q.get("color") ?? cur.faceColor, nookName: q.get("name") ?? cur.nookName } });
   }
 

@@ -1,26 +1,29 @@
 /**
- * Nook'un görünümü: her kullanıcı kendi Nook'unu isimlendirir, gövdesini, gözlerini,
- * gözlüğünü ve aksesuarlarını seçer. Çizimler mascot/Wear.tsx'te; ölçüler küre çapı 24'e göre.
+ * Nook'un görünümü (ChatGPT Dots'tan ilhamla): her kullanıcı kendi Nook'unu isimlendirir; gövde
+ * biçimini, dokusunu (vinil / peluş), rengini, gözlerini ve siyah parlak aksesuarlarını seçer.
+ * Gövde ve aksesuarlar lib/nook3d'de 3B çizilir; gözler ifadeleriyle birlikte DOM'da kalır.
  */
 import { useNook } from "../store/nook";
 
-export type ShapeId = "sphere" | "pillow" | "capsule" | "egg" | "pebble" | "drop";
+export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean";
+export type Texture = "smooth" | "plush";
 export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm";
 export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle";
-export type HeadId = "none" | "beanie" | "beret" | "headphones" | "sprout" | "crown" | "antenna" | "bow";
-export type NeckId = "none" | "bowtie" | "scarf" | "pendant";
+export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow";
+export type NeckId = "none" | "bowtie";
 
 export interface Look {
   shape: ShapeId;
+  texture: Texture;
   eyes: EyeStyle;
   glasses: GlassesId;
   head: HeadId;
   neck: NeckId;
-  /** Şapka, atkı, papyon ve kalın çerçevenin rengi */
-  accent: string;
 }
 
-/** Gövde: boyut + köşe yarıçapları [sol üst, sağ üst, sağ alt, sol alt], yatay ve dikey ayrı (yumurta, çakıl için). */
+export const DEFAULT_LOOK: Look = { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none" };
+
+/** CSS gövde (WebGL yoksa ya da Nook kutuya dönüşünce) */
 export interface BodyShape {
   width: number;
   height: number;
@@ -34,14 +37,19 @@ export const roundBody = (w: number, h = w): BodyShape => {
   return { width: w, height: h, borderRadius: radii([r, r, r, r]) };
 };
 
-export const SHAPES: Record<ShapeId, { label: string; body: BodyShape }> = {
-  sphere: { label: "Küre", body: roundBody(24) },
-  pillow: { label: "Yastık", body: { width: 24, height: 23, borderRadius: radii([8.5, 8.5, 8.5, 8.5]) } },
-  capsule: { label: "Kapsül", body: roundBody(28, 21) },
-  egg: { label: "Yumurta", body: { width: 22, height: 25, borderRadius: radii([11, 11, 11, 11], [14.5, 14.5, 10.5, 10.5]) } },
-  pebble: { label: "Çakıl", body: { width: 26, height: 22, borderRadius: radii([14, 12, 13, 12], [12, 10, 11, 11]) } },
-  drop: { label: "Damla", body: { width: 24, height: 24, borderRadius: radii([12, 3, 12, 12]) } },
-};
+export const SHAPES: { id: ShapeId; label: string }[] = [
+  { id: "sphere", label: "Küre" },
+  { id: "cloud", label: "Bulut" },
+  { id: "heart", label: "Kalp" },
+  { id: "triangle", label: "Üçgen" },
+  { id: "flower", label: "Çiçek" },
+  { id: "bean", label: "Fasulye" },
+];
+
+export const TEXTURES: { id: Texture; label: string }[] = [
+  { id: "smooth", label: "Vinil" },
+  { id: "plush", label: "Peluş" },
+];
 
 export const EYE_STYLES: { id: EyeStyle; label: string }[] = [
   { id: "pill", label: "Hap" },
@@ -61,11 +69,9 @@ export const GLASSES: { id: GlassesId; label: string }[] = [
 
 export const HEADS: { id: HeadId; label: string }[] = [
   { id: "none", label: "Yok" },
-  { id: "beanie", label: "Bere" },
-  { id: "beret", label: "Fransız" },
+  { id: "beret", label: "Bere" },
+  { id: "bowler", label: "Melon" },
   { id: "headphones", label: "Kulaklık" },
-  { id: "sprout", label: "Filiz" },
-  { id: "crown", label: "Taç" },
   { id: "antenna", label: "Anten" },
   { id: "bow", label: "Fiyonk" },
 ];
@@ -73,34 +79,43 @@ export const HEADS: { id: HeadId; label: string }[] = [
 export const NECKS: { id: NeckId; label: string }[] = [
   { id: "none", label: "Yok" },
   { id: "bowtie", label: "Papyon" },
-  { id: "scarf", label: "Atkı" },
-  { id: "pendant", label: "Kolye" },
 ];
 
-/** Gövde renkleri: yumuşak, açık tonlar (siyah gözler her birinde okunur) */
-export const BODY_COLORS = ["#FFFFFF", "#BFF5DC", "#BDE3FF", "#D9CCFF", "#FFC9D9", "#FFD6BA", "#FFF1A8", "#CFE8A9", "#A9E5E0", "#E4E1DA"];
+/** Gövde renkleri: Nook'un beyazı + Dots gibi canlı, doygun tonlar */
+export const BODY_COLORS = ["#F4F4F6", "#2B8CFF", "#E23BD6", "#FFD21F", "#FF6A3D", "#8FE03A", "#9B7BFF", "#FF5C8A", "#2FD4C0", "#FF8A1F"];
 
-/** Aksesuar renkleri: koyu, doymuş — açık gövdenin üstünde öne çıksın */
-export const ACCENT_COLORS = ["#1f1f25", "#26355e", "#7d1f35", "#3e5b3a", "#b5532f", "#c99a2e", "#5b3f8c", "#efe6d6"];
+/** Eski sürümlerden kalan ya da bozuk kaydı geçerli bir görünüme çevirir */
+export function normalizeLook(raw: Partial<Look> | undefined): Look {
+  const ok = <T extends string>(v: unknown, list: { id: T }[], d: T): T => (list.some((o) => o.id === v) ? (v as T) : d);
+  return {
+    shape: ok(raw?.shape, SHAPES, DEFAULT_LOOK.shape),
+    texture: ok(raw?.texture, TEXTURES, DEFAULT_LOOK.texture),
+    eyes: ok(raw?.eyes, EYE_STYLES, DEFAULT_LOOK.eyes),
+    glasses: ok(raw?.glasses, GLASSES, DEFAULT_LOOK.glasses),
+    head: ok(raw?.head, HEADS, DEFAULT_LOOK.head),
+    neck: ok(raw?.neck, NECKS, DEFAULT_LOOK.neck),
+  };
+}
+
+/** Renk geçersizse (eski pastel paletten kalmış olabilir) olduğu gibi kullanılır; yalnızca biçim denetlenir */
+export const normalizeColor = (c: string | undefined) => (c && /^#[0-9a-f]{6}$/i.test(c) ? c : BODY_COLORS[0]);
 
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
 
-/** "Şaşırt beni": uyumlu rastgele bir görünüm (çok kalabalık olmasın diye bazı yuvalar boş kalır) */
+/** "Şaşırt beni": Dots gibi sade — en fazla iki aksesuar */
 export function randomLook(): { look: Look; color: string } {
-  const head = Math.random() < 0.75 ? pick(HEADS.slice(1)).id : "none";
-  const glasses = Math.random() < 0.45 ? pick(GLASSES.slice(1)).id : "none";
-  // Kulaklık ve atkı ya da başlık + gözlük + kolye üst üste fazla kalabalık
-  const neck = Math.random() < (head === "none" || glasses === "none" ? 0.5 : 0.2) ? pick(NECKS.slice(1)).id : "none";
+  const slots = ["glasses", "head", "neck"].sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.3 ? 1 : 2);
+  const glasses = slots.includes("glasses") ? pick(GLASSES.slice(1)).id : "none";
   return {
     look: {
-      shape: pick(Object.keys(SHAPES) as ShapeId[]),
-      eyes: glasses === "shades" ? "pill" : pick(EYE_STYLES).id,
+      shape: pick(SHAPES).id,
+      texture: Math.random() < 0.35 ? "plush" : "smooth",
+      eyes: pick(EYE_STYLES).id,
       glasses,
-      head,
-      neck,
-      accent: pick(ACCENT_COLORS),
+      head: slots.includes("head") ? pick(HEADS.slice(1)).id : "none",
+      neck: slots.includes("neck") ? "bowtie" : "none",
     },
-    color: pick(BODY_COLORS),
+    color: pick(BODY_COLORS.slice(1)),
   };
 }
 
@@ -151,39 +166,37 @@ export function ek(name: string, suffix: "la" | "a" | "un") {
 // ------------------------------------------------------------------ yapay zekâya tarif
 
 const COLOR_NAMES: Record<string, string> = {
+  "#F4F4F6": "beyaz",
   "#FFFFFF": "beyaz",
-  "#BFF5DC": "nane yeşili",
-  "#BDE3FF": "açık mavi",
-  "#D9CCFF": "lila",
-  "#FFC9D9": "pembe",
-  "#FFD6BA": "şeftali",
-  "#FFF1A8": "açık sarı",
-  "#CFE8A9": "fıstık yeşili",
-  "#A9E5E0": "turkuaz",
-  "#E4E1DA": "kum rengi",
+  "#2B8CFF": "elektrik mavisi",
+  "#E23BD6": "fuşya",
+  "#FFD21F": "limon sarısı",
+  "#FF6A3D": "mercan",
+  "#8FE03A": "fıstık yeşili",
+  "#9B7BFF": "lavanta",
+  "#FF5C8A": "pembe",
+  "#2FD4C0": "turkuaz",
+  "#FF8A1F": "turuncu",
 };
-const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", pillow: "yastık gibi yumuşak köşeli", capsule: "kapsül gibi yayvan", egg: "yumurta biçimli", pebble: "çakıl taşı gibi", drop: "damla biçimli" };
+const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli" };
 const EYE_WORDS: Record<EyeStyle, string> = { pill: "iki siyah hap göz", bead: "parlak boncuk gözler", diamond: "elmas biçimli gözler", sparkle: "iri, parıltılı gözler", calm: "sakin, yarı kapalı gözler" };
 const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
-  round: "yuvarlak gözlük",
+  round: "yuvarlak tel gözlük",
   bold: "kalın çerçeveli gözlük",
   shades: "güneş gözlüğü",
   monocle: "monokl",
-  beanie: "ponponlu bere",
   beret: "Fransız beresi",
+  bowler: "melon şapka",
   headphones: "kulaklık",
-  sprout: "başında küçük bir filiz",
-  crown: "minik bir taç",
   antenna: "anten",
   bow: "fiyonk",
   bowtie: "papyon",
-  scarf: "atkı",
-  pendant: "kolye",
 };
 
-/** Sistem isteminde: "açık mavi, yumurta biçimli; iri, parıltılı gözler; Fransız beresi ve atkı" */
-export function describeLook(look: Look, color = useNook.getState().settings.faceColor) {
+/** Sistem isteminde: "elektrik mavisi, peluş, kabarık bir bulut gövde, parlak boncuk gözler; üstünde siyah Fransız beresi" */
+export function describeLook(raw: Look, color = useNook.getState().settings.faceColor) {
+  const look = normalizeLook(raw);
   const tone = COLOR_NAMES[color.toUpperCase()] ?? "renkli";
   const wear = [look.glasses, look.head, look.neck].map((k) => WEAR_WORDS[k]).filter(Boolean);
-  return `${tone}, ${SHAPE_WORDS[look.shape]} bir gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde ${wear.join(", ")}` : ""}`;
+  return `${tone}${look.texture === "plush" ? ", peluş" : ""}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde siyah ${wear.join(", ")}` : ""}`;
 }
