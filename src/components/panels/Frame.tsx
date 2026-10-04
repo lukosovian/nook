@@ -21,6 +21,8 @@ import {
   Search,
   Settings,
   Heart,
+  Maximize2,
+  Minimize2,
   Sparkles,
   Sun,
   Target,
@@ -30,7 +32,9 @@ import {
 } from "lucide-react";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { formatSize } from "../../lib/format";
-import { EXPANDED, type View } from "../../lib/layout";
+import type { View } from "../../lib/layout";
+import { useExpanded } from "../../hooks/useExpanded";
+import { toggleBig } from "../../lib/big";
 import { easeOut } from "../../lib/motion";
 import { SKY_LABEL, type Sky } from "../../lib/weather";
 import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
@@ -44,7 +48,9 @@ const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
  * Büyük Nook'un kendisi Island'da çizilir (kapalıyken küçük olan aynı Nook büyüyüp karta yerleşir).
  */
 export function Frame({ view, title, children }: { view: View; title?: string; children: React.ReactNode }) {
-  const { hero: h, content: c } = EXPANDED.views[view];
+  const ex = useExpanded();
+  const { hero: h, content: c } = ex.views[view];
+  const z = ex.zoom;
   const lookTab = useNook((s) => s.tab === "look");
   return (
     <motion.div
@@ -53,8 +59,10 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
       animate={{ opacity: 1, transition: { delay: 0.06, duration: 0.22, ease: easeOut } }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
     >
-      <HeaderNav title={title} />
-      <StatusBar />
+      <div className="absolute inset-x-0 top-0" style={{ zoom: z }}>
+        <HeaderNav title={title} />
+        <StatusBar />
+      </div>
 
       <motion.div
         className="absolute"
@@ -63,7 +71,9 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
         transition={CARD_SPRING}
       >
         <Card className="relative h-full w-full overflow-hidden">
-          {lookTab ? <NameTag /> : <Activity view={view} />}
+          <div className="absolute inset-0" style={{ zoom: z }}>
+            {lookTab ? <NameTag /> : <Activity view={view} />}
+          </div>
         </Card>
       </motion.div>
 
@@ -73,7 +83,10 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
         animate={{ left: c.x, top: c.y, width: c.w, height: c.h, opacity: 1 }}
         transition={{ ...CARD_SPRING, delay: 0.03 }}
       >
-        <Card className="h-full w-full overflow-hidden p-3">{children}</Card>
+        <Card className="h-full w-full overflow-hidden p-3">
+          {/* Tam ekranda içerik yakınlaşır: yazılar, düğmeler, liste satırları birlikte büyür */}
+          {z === 1 ? children : <div style={{ zoom: z, width: (c.w - 24) / z, height: (c.h - 24) / z }}>{children}</div>}
+        </Card>
       </motion.div>
     </motion.div>
   );
@@ -190,7 +203,24 @@ function StatusBar() {
         </span>
       )}
       <span className="text-label-2">{now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
+      <BigToggle />
     </div>
+  );
+}
+
+/** Tam ekran: ada ekrana yayılır; tekrar basınca (ya da Esc) eski boyutuna döner */
+function BigToggle() {
+  const big = useNook((s) => !!s.big);
+  const Icon = big ? Minimize2 : Maximize2;
+  return (
+    <motion.button
+      whileTap={{ scale: 0.88 }}
+      onClick={toggleBig}
+      title={big ? "Küçült (Esc)" : "Tam ekran"}
+      className="-my-1 -mr-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 transition-colors hover:bg-white/[0.08] hover:text-label"
+    >
+      <Icon size={11} strokeWidth={2.4} />
+    </motion.button>
   );
 }
 
@@ -206,6 +236,7 @@ interface Item {
  * Ana sayfada Nook'un sağında dikey ortalı, bölüm görünümünde Nook'un altında.
  */
 function Activity({ view }: { view: View }) {
+  const ex = useExpanded();
   const media = useNook((s) => s.media);
   const downloads = useNook((s) => s.downloads);
   const privacy = useNook((s) => s.privacy);
@@ -254,7 +285,7 @@ function Activity({ view }: { view: View }) {
   return (
     <motion.div
       className={home ? "absolute bottom-0 right-3 top-0 flex flex-col justify-center gap-1.5" : "absolute inset-x-3 bottom-3 space-y-1"}
-      style={home ? { left: 100 } : undefined}
+      style={home ? { left: ex.homeListX / ex.zoom } : undefined}
       layout
       transition={CARD_SPRING}
     >

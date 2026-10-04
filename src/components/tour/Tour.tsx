@@ -81,7 +81,7 @@ export const STEPS: Step[] = [
   },
   {
     title: "Beni kendine göre giydir",
-    text: "Bana bir isim ver; bulut, kalp, üçgen gibi bir gövde, vinil ya da peluş doku ve renk seç. Gözlük, şapka, kulaklık, papyon da takarım. Sağ tık › Görünüm ya da Ayarlar'dan istediğin zaman değiştirirsin.",
+    text: "Bana bir isim ver; bulut, kalp, damla gibi bir gövde, vinil ya da peluş doku ve renk seç. Gözlük, kep, tavşan kulağı, filiz, çiçek tokası da takarım. Üzerimize gelip tanış; Sağ tık › Görünüm'den istediğin zaman değiştirirsin.",
     color: ACCENT.pink,
     antic: "spin",
     Art: LookArt,

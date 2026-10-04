@@ -6,13 +6,13 @@
  */
 import { useEffect, useMemo, useReducer } from "react";
 import shader from "./nook3d.glsl?raw";
-import type { Look } from "./look";
+import { capColor, type Look } from "./look";
 
 /** Resmin kapsadığı alan, yüz çapının (2 birim) kaç katı: şapka, kulaklık, papyon sığsın */
 export const SPAN = 3.2;
 
-const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5 };
-const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5 };
+const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5, blob: 6 };
+const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11 };
 const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4 };
 const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1 };
 
@@ -24,6 +24,7 @@ export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number 
   triangle: { y: -0.16, gap: 0.3, z: 0.62 },
   flower: { y: -0.02, gap: 0.33, z: 0.66 },
   bean: { y: 0.02, gap: 0.31, z: 0.74 },
+  blob: { y: -0.1, gap: 0.33, z: 0.72 },
 };
 
 /** Gözlük takılınca iki cam arasında köprüye yer kalsın diye gözler biraz açılır */
@@ -82,7 +83,9 @@ function create(): Renderer | null {
         gl.uniform1i(u("uGlasses"), GLASSES_ID[look.glasses]);
         gl.uniform1i(u("uNeck"), NECK_ID[look.neck]);
         gl.uniform1f(u("uFur"), look.texture === "plush" ? 1 : 0);
-        gl.uniform3fv(u("uColor"), [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255));
+        const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+        gl.uniform3fv(u("uColor"), rgb(color));
+        gl.uniform3fv(u("uAcc"), rgb(capColor(color)));
         gl.uniform4f(u("uEye"), a.y, eyeGap(look), a.z, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         out.width = out.height = size;

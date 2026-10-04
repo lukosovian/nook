@@ -5,11 +5,11 @@
  */
 import { useNook } from "../store/nook";
 
-export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean";
+export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob";
 export type Texture = "smooth" | "plush";
 export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm";
 export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle";
-export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow";
+export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks";
 export type NeckId = "none" | "bowtie";
 
 export interface Look {
@@ -44,6 +44,7 @@ export const SHAPES: { id: ShapeId; label: string }[] = [
   { id: "triangle", label: "Üçgen" },
   { id: "flower", label: "Çiçek" },
   { id: "bean", label: "Fasulye" },
+  { id: "blob", label: "Damla" },
 ];
 
 export const TEXTURES: { id: Texture; label: string }[] = [
@@ -74,7 +75,16 @@ export const HEADS: { id: HeadId; label: string }[] = [
   { id: "headphones", label: "Kulaklık" },
   { id: "antenna", label: "Anten" },
   { id: "bow", label: "Fiyonk" },
+  { id: "cap", label: "Kep" },
+  { id: "ears", label: "Kulak" },
+  { id: "sprout", label: "Filiz" },
+  { id: "flower", label: "Çiçek" },
+  { id: "star", label: "Yıldız" },
+  { id: "stalks", label: "Salyangoz" },
 ];
+
+/** Kepin rengi: gövdeyle karışmasın diye mavi gövdede mercan, öbürlerinde koyu mavi (Dots'taki gibi) */
+export const capColor = (body: string) => (["#2B8CFF", "#9B7BFF", "#E23BD6"].includes(body.toUpperCase()) ? "#FF6A3D" : "#2F5BFF");
 
 export const NECKS: { id: NeckId; label: string }[] = [
   { id: "none", label: "Yok" },
@@ -178,7 +188,7 @@ const COLOR_NAMES: Record<string, string> = {
   "#2FD4C0": "turkuaz",
   "#FF8A1F": "turuncu",
 };
-const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli" };
+const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli", blob: "damla biçimli, tombul" };
 const EYE_WORDS: Record<EyeStyle, string> = { pill: "iki siyah hap göz", bead: "parlak boncuk gözler", diamond: "elmas biçimli gözler", sparkle: "iri, parıltılı gözler", calm: "sakin, yarı kapalı gözler" };
 const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
   round: "yuvarlak tel gözlük",
@@ -191,6 +201,12 @@ const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
   antenna: "anten",
   bow: "fiyonk",
   bowtie: "papyon",
+  cap: "kep",
+  ears: "tavşan kulakları",
+  sprout: "başında filiz",
+  flower: "çiçek tokası",
+  star: "yıldız tokası",
+  stalks: "salyangoz gibi saplı gözler",
 };
 
 /** Sistem isteminde: "elektrik mavisi, peluş, kabarık bir bulut gövde, parlak boncuk gözler; üstünde siyah Fransız beresi" */
@@ -198,19 +214,30 @@ export function describeLook(raw: Look, color = useNook.getState().settings.face
   const look = normalizeLook(raw);
   const tone = COLOR_NAMES[color.toUpperCase()] ?? "renkli";
   const wear = [look.glasses, look.head, look.neck].map((k) => WEAR_WORDS[k]).filter(Boolean);
-  return `${tone}${look.texture === "plush" ? ", peluş" : ""}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde siyah ${wear.join(", ")}` : ""}`;
+  return `${tone}${look.texture === "plush" ? ", peluş" : ""}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde ${wear.join(", ")}` : ""}`;
 }
 
 // ------------------------------------------------------------------ vitrin (tanıtım)
 
-/** Tanıtımda gösterilen hazır görünümler */
-export const SHOWCASE: { name: string; color: string; look: Look; note: string }[] = [
-  { name: "Pamuk", color: "#F4F4F6", look: { ...DEFAULT_LOOK }, note: "Klasik Nook" },
-  { name: "Bulut", color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead", head: "beret" }, note: "Peluş · bere" },
-  { name: "Fıstık", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", glasses: "shades" }, note: "Güneş gözlüğü" },
-  { name: "Profesör", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "triangle", eyes: "calm", glasses: "round", neck: "bowtie" }, note: "Gözlük · papyon" },
-  { name: "Mercan", color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "flower", texture: "plush", glasses: "monocle" }, note: "Peluş · monokl" },
-  { name: "Ritim", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "bean", eyes: "sparkle", head: "headphones" }, note: "Kulaklık" },
+/**
+ * Tanıtımdaki Nook kalabalığı (Dots afişi gibi): arkada bir sıra, önde daha iri bir sıra; alttan
+ * kesilerek iç içe dizilirler. x, y: gövde merkezinin sahnedeki yeri (px), size: gövde çapı.
+ */
+export const SHOWCASE: { name: string; color: string; look: Look; x: number; y: number; size: number; mood?: "happy" | "wink" | "love" }[] = [
+  // arka sıra
+  { name: "Pamuk", color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush" }, x: 64, y: 250, size: 100 },
+  { name: "Mandalina", color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "flower" }, x: 166, y: 218, size: 104, mood: "happy" },
+  { name: "Lila", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "stalks" }, x: 272, y: 242, size: 92, mood: "happy" },
+  { name: "Kaptan", color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "cap" }, x: 374, y: 228, size: 98 },
+  { name: "Pembiş", color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "ears" }, x: 474, y: 234, size: 94 },
+  { name: "Filiz", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", head: "sprout" }, x: 556, y: 270, size: 88 },
+  // ön sıra
+  { name: "Yıldız", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", head: "star" }, x: 44, y: 356, size: 112 },
+  { name: "Bulut", color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "beret" }, x: 172, y: 362, size: 134 },
+  { name: "Fıstık", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", eyes: "bead", head: "stalks" }, x: 296, y: 370, size: 104 },
+  { name: "Profesör", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "triangle", texture: "plush", eyes: "calm", glasses: "round" }, x: 398, y: 362, size: 118 },
+  { name: "Kalp", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", texture: "plush", glasses: "shades" }, x: 496, y: 364, size: 112 },
+  { name: "Kiraz", color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush" }, x: 572, y: 366, size: 100, mood: "wink" },
 ];
 
 /** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */

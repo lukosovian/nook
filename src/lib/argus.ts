@@ -553,7 +553,9 @@ export function useArgusCard(mode: IslandMode) {
   const snap = useArgus((s) => s.snap);
   // Tam ekranda ada gizli: imleç üste gidince kart tek başına çıkmasın
   const fullscreen = useNook((s) => s.fullscreen);
-  const show = isPrimary && inTauri && mode === "expanded" && !!live && !fullscreen;
+  // Ada tam ekrana yayılınca yanında yer kalmaz
+  const big = useNook((s) => !!s.big);
+  const show = isPrimary && inTauri && mode === "expanded" && !!live && !fullscreen && !big;
   useEffect(() => {
     if (!isPrimary || !inTauri) return;
     const item = live ? snap?.items.find((i) => i.id === live.itemId) : null;

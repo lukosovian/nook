@@ -11,6 +11,8 @@ import { isPrimary } from "../lib/bridge";
 import { FACE, ISLAND, ISLAND_TOP, MEDIA_COLLAPSED_WIDTH, mascotPose, tourPose, type IslandMode } from "../lib/layout";
 import { spring } from "../lib/motion";
 import { startTour } from "../lib/tour";
+import { exitBig } from "../lib/big";
+import { useExpanded } from "../hooks/useExpanded";
 import { expressionOf, statusOf, useNook, type Mood } from "../store/nook";
 import { Nook, STATUS_COLOR } from "./mascot/Nook";
 import { MiniPlayer } from "./media/MiniPlayer";
@@ -130,7 +132,20 @@ export function Island() {
     };
   }, []);
 
-  const shape = ISLAND[mode];
+  const ex = useExpanded();
+  const big = mode === "expanded" || mode === "search";
+  const shape = big ? { width: ex.width, height: ex.height, radius: ex.radius } : ISLAND[mode];
+  // Tam ekran yalnızca ada açıkken: kapanınca (imleç çıkınca, arama/tanıtım/özet açılınca) biter
+  const bigOn = useNook((s) => !!s.big);
+  useEffect(() => {
+    if (bigOn && !big) exitBig();
+  }, [bigOn, big]);
+  useEffect(() => {
+    if (!bigOn) return;
+    const key = (e: KeyboardEvent) => e.key === "Escape" && exitBig();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [bigOn]);
   const playing = !!media?.playing;
   // Görünüm düzenlenirken dans etmesin: seçilen gözler görünsün
   const lookTab = useNook((s) => s.tab === "look");
@@ -145,7 +160,7 @@ export function Island() {
   const transition = mode === "feeding" ? spring.stretch : spring.island;
   const view = useNook((s) => (s.tab === "home" ? "home" : "module"));
   const tourStep = useNook((s) => s.tourStep);
-  const pose = mode === "tour" ? tourPose(!!STEPS[tourStep]?.centered) : mascotPose(mode, width, view);
+  const pose = mode === "tour" ? tourPose(!!STEPS[tourStep]?.centered) : mascotPose(mode, width, view, ex);
 
   const ref = useRef<HTMLDivElement>(null);
   useHitRect(ref);

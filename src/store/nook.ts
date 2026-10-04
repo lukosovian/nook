@@ -344,6 +344,8 @@ interface NookState {
   intro: boolean;
   /** Kalıcı hatırlatma (su): kullanıcı cevaplayana kadar adada durur */
   reminder: { kind: "water"; phase: "due" | "drinking" } | null;
+  /** Açık adanın "tam ekran" hâli: ada ekrana yayılır (boyutu pencere büyüyünce ölçülür) */
+  big: { width: number; height: number } | null;
   /** "Nook nedir?" tanıtımı açık */
   tour: boolean;
   tourStep: number;
@@ -419,6 +421,7 @@ interface NookState {
   setGrabbed: (grabbed: boolean) => void;
   setIntro: (intro: boolean) => void;
   setTour: (tour: boolean) => void;
+  setBig: (big: NookState["big"]) => void;
   setReminder: (reminder: NookState["reminder"]) => void;
   setTourStep: (tourStep: number) => void;
   setBusy: (key: string, on: boolean) => void;
@@ -490,6 +493,7 @@ export const useNook = create<NookState>()(
       grabbed: false,
       intro: true,
       tour: false,
+      big: null,
       reminder: null,
       tourStep: 0,
       toured: false,
@@ -601,6 +605,7 @@ export const useNook = create<NookState>()(
       setIntro: (intro) => set({ intro }),
       setTour: (tour) => set(tour ? { tour, tourStep: 0 } : { tour, toured: true }),
       setTourStep: (tourStep) => set({ tourStep }),
+      setBig: (big) => set({ big }),
       setReminder: (reminder) => set({ reminder }),
       addAlarm: ({ at, ...a }) =>
         set((s) => ({

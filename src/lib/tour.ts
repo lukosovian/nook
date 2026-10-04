@@ -20,9 +20,10 @@ export async function startTour() {
   const mine = { look: normalizeLook(s.settings.look), color: normalizeColor(s.settings.faceColor), size: figureRes(20) };
   prefetchBodies([
     mine,
-    ...SHOWCASE.map((m, i) => ({ look: m.look, color: m.color, size: figureRes(i === 0 ? 92 : 46) })),
+    ...SHOWCASE.map((m) => ({ look: m.look, color: m.color, size: figureRes(m.size) })),
     ...TOUR_CHIPS.map((c) => ({ look: c.look, color: c.body, size: figureRes(20) })),
   ]);
+  s.setBig(null);
   s.setHovered(false);
   s.setSearching(false);
   await setWindowSize(TOUR_WINDOW.width, TOUR_WINDOW.height).catch(() => undefined);

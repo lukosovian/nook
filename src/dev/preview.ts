@@ -44,7 +44,12 @@ export function applyPreview(mode: string) {
   if (!new URLSearchParams(location.search).has("noargus")) demoArgus();
   document.documentElement.style.background = "#3a4a5c";
   // Ekran görüntüsü animasyonun ortasında çekilmesin
-  if (new URLSearchParams(location.search).has("still")) MotionGlobalConfig.skipAnimations = true;
+  if (new URLSearchParams(location.search).has("still")) {
+    MotionGlobalConfig.skipAnimations = true;
+    const st = document.createElement("style");
+    st.textContent = ".nook-fade{animation:none!important}";
+    document.head.appendChild(st);
+  }
   const s = useNook.getState();
   const now = performance.now();
 
@@ -185,6 +190,8 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
   } else if (TABS.includes(mode as Tab)) {
     useNook.setState({ hovered: true, tab: mode as Tab });
+    // ?big → tam ekran
+    if (params.has("big")) window.setTimeout(() => void import("../lib/big").then((m) => m.enterBig()), 100);
     // Panels açılınca çalan müzik yüzünden medyaya geçer; istenen sekmeye geri dön
     window.setTimeout(() => useNook.getState().setTab(mode as Tab), 50);
   } else if (mode.startsWith("osd")) {

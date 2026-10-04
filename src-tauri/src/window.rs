@@ -19,8 +19,8 @@ pub const ISLAND: &str = "island";
 /// Ek ekranlardaki adaların etiket öneki ("island-1", "island-2"…)
 const EXTRA_PREFIX: &str = "island-";
 /// Varsayılan pencere boyutu (mantıksal px); ada bu şeffaf tuvalin içinde animasyonla büyür.
-pub const WIN_W: f64 = 600.0;
-pub const WIN_H: f64 = 320.0;
+pub const WIN_W: f64 = 680.0;
+pub const WIN_H: f64 = 350.0;
 /// Ana pencerenin şu anki mantıksal genişliği (f64 bitleri). Tanıtım sırasında büyür.
 static CUR_W: AtomicU64 = AtomicU64::new(WIN_W.to_bits());
 

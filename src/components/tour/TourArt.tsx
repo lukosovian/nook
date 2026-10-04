@@ -559,95 +559,127 @@ export function MoodArt() {
 
 // ---------------------------------------------------------------- Kendi Nook'un
 
-/** Ürettiği her Nook'un yuvaya varışı arasında */
-const SPAWN_GAP = 0.14;
+/** Kalabalık ortadan dışa doğru sırayla belirir */
+const POP_GAP = 0.07;
 
 /**
- * Üstte Nook'un ilk hâli; ondan sırayla farklı Nook'lar çıkıp aşağıda yan yana dizilir.
- * Seçilen (üzerine gelinen) kart, ilk hâlin yanında adıyla gösterilir.
+ * Dots afişi gibi: siyah sahnede parlayan "nook" yazısı, altında iç içe dizilmiş rengârenk,
+ * peluş Nook kalabalığı. Üzerine gelinen Nook öne çıkar, gülümser ve adını söyler.
  */
 export function LookArt() {
-  const variants = SHOWCASE.slice(1);
-  const first = SHOWCASE[0];
   const [hover, setHover] = useState<number | null>(null);
-  const shown = hover === null ? null : variants[hover];
+  // Ortadakiler önce: sahne ortadan kenarlara dolar
+  const order = (x: number) => Math.abs(x - 300) / 300;
 
   return (
-    <div className="flex h-full flex-col">
-      {/* İlk hâl */}
-      <div className="relative flex flex-1 flex-col items-center justify-center">
-        <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(40% 55% at 50% 45%, rgb(255 255 255 / 0.07) 0%, transparent 70%)" }} />
-        <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>
-          <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={shown?.name ?? "first"}
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.7, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 26 }}
-              >
-                <NookFigure look={(shown ?? first).look} color={(shown ?? first).color} size={92} expression={shown ? "happy" : "idle"} />
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
+    <div className="relative -m-[18px] h-[calc(100%+36px)] overflow-hidden bg-black">
+      {/* Parlayan yazı: arkada bulanık gökkuşağı, önde sütlü beyaz */}
+      <div className="pointer-events-none absolute inset-x-0 top-[34px] flex justify-center">
+        <motion.div className="relative" initial={{ opacity: 0, scale: 0.92, filter: "blur(10px)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} transition={{ duration: 0.9, ease: "easeOut" }}>
+          <span aria-hidden className="absolute inset-0 select-none text-[104px] font-semibold leading-none tracking-[-0.04em]" style={{ ...RAINBOW_GLOW, filter: "blur(30px)", opacity: 0.8 }}>
+            nook
+          </span>
+          <span aria-hidden className="absolute inset-0 select-none text-[104px] font-semibold leading-none tracking-[-0.04em]" style={RAINBOW_GLOW}>
+            nook
+          </span>
+          <span className="relative select-none text-[104px] font-semibold leading-none tracking-[-0.04em]" style={MILK_TEXT}>
+            nook
+          </span>
         </motion.div>
-        <p className="relative mt-5 text-[13px] font-semibold text-label">{shown ? shown.name : "İlk hâlim"}</p>
-        <p className="relative mt-0.5 text-[11px] text-label-3">{shown ? shown.note : "Aşağıdakilerin hepsi yine benim"}</p>
       </div>
 
-      {/* Ondan çıkan Nook'lar: aşağıda yan yana */}
-      <div className="relative mt-2 rounded-[18px] bg-well px-2 pb-2.5 pt-3">
-        <div className="grid grid-cols-5">
-          {variants.map((m, n) => {
-            // Yuvanın ortası ile kartın ortası arası: Nook üstteki ilk hâlden çıkıp yuvasına süzülür
-            const dx = (2 - n) * 102;
-            return (
+      {/* Kalabalık */}
+      {SHOWCASE.map((m, n) => {
+        const on = hover === n;
+        return (
+          <motion.div
+            key={m.name}
+            className="absolute"
+            style={{ left: m.x - m.size / 2, top: m.y - m.size / 2, width: m.size, height: m.size, zIndex: on ? 30 : n < 6 ? 1 : 2 }}
+            initial={{ y: 170, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 160, damping: 17, delay: 0.35 + order(m.x) * 6 * POP_GAP + (n < 6 ? 0.12 : 0) }}
+          >
+            <motion.div
+              className="h-full w-full"
+              animate={{ y: [0, -3 - (n % 3), 0], rotate: [0, n % 2 ? 1.5 : -1.5, 0] }}
+              transition={{ duration: 2.6 + (n % 4) * 0.45, repeat: Infinity, ease: "easeInOut", delay: (n % 5) * 0.3 }}
+            >
               <motion.button
-                key={m.name}
+                className="relative block h-full w-full rounded-full outline-none"
                 onHoverStart={() => setHover(n)}
                 onHoverEnd={() => setHover((h) => (h === n ? null : h))}
                 onFocus={() => setHover(n)}
                 onBlur={() => setHover((h) => (h === n ? null : h))}
-                className="flex flex-col items-center gap-1.5 rounded-[14px] py-1.5"
-                initial={{ x: dx, y: -150, scale: 0.3, opacity: 0 }}
-                animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 170, damping: 19, delay: 0.45 + n * SPAWN_GAP }}
-                whileHover={{ y: -4 }}
+                animate={on ? { y: -14, scale: 1.07 } : { y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 420, damping: 22 }}
               >
-                <NookFigure look={m.look} color={m.color} size={46} expression={hover === n ? "happy" : "idle"} />
-                <span className="text-[11px] font-medium" style={{ color: hover === n ? tintText(m.color) : undefined }}>
-                  {m.name}
-                </span>
+                <NookFigure look={m.look} color={m.color} size={m.size} expression={on ? "happy" : (m.mood ?? "idle")} smile={on || m.mood === "happy" || m.mood === "wink"} />
               </motion.button>
-            );
-          })}
-        </div>
+            </motion.div>
+            <AnimatePresence>
+              {on && (
+                <motion.span
+                  className="pointer-events-none absolute left-1/2 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-semibold"
+                  style={{ bottom: m.size + 6 + (m.look.head === "ears" || m.look.head === "stalks" || m.look.head === "sprout" ? m.size * 0.28 : 0), x: "-50%", background: m.color, color: "#111" }}
+                  initial={{ opacity: 0, y: 6, scale: 0.85 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 520, damping: 28 }}
+                >
+                  {m.name}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        );
+      })}
+
+      {/* Alttan yumuşak gölge: kalabalık sahnenin dibinde kaybolsun */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-10" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }} />
+
+      <div className="absolute inset-x-0 top-[142px] z-[4] flex flex-col items-center gap-2.5">
+        <motion.p className="text-[12px] text-label-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
+          Hepsi ben. Gövde, doku, renk, göz, şapka, toka… sen seç.
+        </motion.p>
       </div>
 
-      <div className="mt-2.5 flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap gap-1">
-          {["İsim", "6 gövde", "Vinil · peluş", "10 renk", "5 göz", "Gözlük", "Şapka", "Papyon"].map((t) => (
-            <span key={t} className="rounded-full bg-well px-2 py-0.5 text-[10.5px] text-label-2">
-              {t}
-            </span>
-          ))}
-        </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            useNook.getState().setPendingTab("look");
-            endTour();
-          }}
-          className="shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-medium"
-          style={{ background: tintBg(ACCENT.pink, 18), borderColor: tintBg(ACCENT.pink, 45), color: tintText(ACCENT.pink) }}
-        >
-          Şimdi giydir
-        </motion.button>
-      </div>
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.04 }}
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.9 }}
+        onClick={() => {
+          useNook.getState().setPendingTab("look");
+          endTour();
+        }}
+        className="absolute right-3.5 top-3.5 z-[40] flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium"
+        style={{ background: tintBg(ACCENT.pink, 18), borderColor: tintBg(ACCENT.pink, 45), color: tintText(ACCENT.pink) }}
+      >
+        <Shuffle size={12} strokeWidth={2.4} />
+        Şimdi giydir
+      </motion.button>
     </div>
   );
 }
+
+const RAINBOW_GLOW: React.CSSProperties = {
+  background: "linear-gradient(90deg, #6f8bff 0%, #5ff0c0 28%, #ffe36b 52%, #ff7ad0 76%, #a774ff 100%)",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  color: "transparent",
+  filter: "blur(9px)",
+  opacity: 1,
+  transform: "scale(1.03)",
+};
+
+const MILK_TEXT: React.CSSProperties = {
+  background: "linear-gradient(90deg, #e9eeff 0%, #effff8 30%, #fffbe9 55%, #fff0fa 80%, #f3ecff 100%)",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  color: "transparent",
+};
 
 // ---------------------------------------------------------------- Argus
 

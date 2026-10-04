@@ -18,6 +18,7 @@ export function NookFigure({
   expression = "idle",
   className = "",
   style,
+  smile = false,
 }: {
   look: Look;
   color: string;
@@ -26,6 +27,8 @@ export function NookFigure({
   expression?: Expression;
   className?: string;
   style?: CSSProperties;
+  /** Gözlerin altında küçük bir gülümseme (tanıtımdaki kalabalık için) */
+  smile?: boolean;
 }) {
   const img = useBodyImageQueued(look, color, figureRes(size));
   const [eye, , shine] = eyesFor(expression, look.eyes);
@@ -35,7 +38,8 @@ export function NookFigure({
   const k = unit / 12; // göz ölçüleri yüz yarıçapı 12 px'e göre
   const lens = look.glasses === "none" ? 1 : EYE_SCALE_GLASSES;
   return (
-    <span className={`relative inline-block shrink-0 ${className}`} style={{ width: size, height: size, ...style }}>
+    // Konumu çağıran belirleyebilsin (absolute); yoksa relative. İkisi birden verilirse CSS sırası relative'i seçer ve Nook kayar.
+    <span className={`${/\b(absolute|fixed)\b/.test(className) ? "" : "relative "}inline-block shrink-0 ${className}`} style={{ width: size, height: size, ...style }}>
       {img ? (
         <span className="nook-fade absolute" style={{ width: span, height: span, left: (size - span) / 2, top: (size - span) / 2 }}>
           <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />
@@ -56,6 +60,20 @@ export function NookFigure({
                 {shine && <span className="absolute rounded-full bg-white/90" style={{ width: 1.3 * k, height: 1.3 * k, left: "16%", top: "14%" }} />}
               </span>
             ))}
+          {smile && (
+            <span
+              className="absolute border-black"
+              style={{
+                left: span / 2,
+                top: span / 2 - a.y * unit + 0.3 * unit,
+                width: 0.26 * unit,
+                height: 0.13 * unit,
+                borderBottomWidth: Math.max(1.2, 0.055 * unit),
+                borderRadius: `0 0 ${0.13 * unit}px ${0.13 * unit}px`,
+                transform: "translateX(-50%)",
+              }}
+            />
+          )}
         </span>
       ) : null}
     </span>

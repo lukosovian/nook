@@ -9,8 +9,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   /** Açılış: parçacıklar toplanıp Nook doğarken */
   intro: { width: 220, height: 74, radius: 30 },
   feeding: { width: 196, height: 66, radius: 26 },
-  expanded: { width: 540, height: 252, radius: 28 },
-  search: { width: 540, height: 252, radius: 28 },
+  expanded: { width: 620, height: 290, radius: 30 },
+  search: { width: 620, height: 290, radius: 30 },
   /** Ses/parlaklık göstergesi */
   osd: { width: 280, height: 34, radius: 14 },
   /** Sistem olayı kartı (şarj, USB, kulaklık…) */
@@ -75,28 +75,74 @@ export const FACE = 24;
  */
 export type View = "home" | "module";
 type Box = { x: number; y: number; w: number; h: number };
-export const EXPANDED: { header: number; views: Record<View, { hero: Box; content: Box }> } = {
-  header: 38,
-  views: {
-    home: { hero: { x: 12, y: 38, w: 250, h: 202 }, content: { x: 270, y: 38, w: 258, h: 202 } },
-    module: { hero: { x: 12, y: 38, w: 150, h: 202 }, content: { x: 170, y: 38, w: 358, h: 202 } },
-  },
-};
+export interface Expanded {
+  width: number;
+  height: number;
+  radius: number;
+  header: number;
+  /** İçerik kartının yakınlaştırması: tam ekranda yazılar ve düğmeler de büyür */
+  zoom: number;
+  /** Büyük Nook'un kahraman kartındaki ölçeği */
+  heroScale: number;
+  /** Ana sayfada Nook'un merkezi ve "şu an" listesinin başı (kahraman kartının solundan) */
+  homeNookX: number;
+  homeListX: number;
+  views: Record<View, { hero: Box; content: Box }>;
+}
 
-/** Büyük Nook'un kahraman kartındaki ölçeği */
-const HERO_SCALE = 2.6;
+/** Tam ekranda adanın en büyük hâli (ekran daha küçükse ekrana sığar) */
+export const BIG_MAX = { width: 1360, height: 820 };
+/** Tam ekran için pencere: ekrandan büyük istenir, Rust ekrana sığdırır */
+export const BIG_WINDOW = { width: 4000, height: 3000 };
 
-export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: View = "module") {
+/** Açık adanın ölçüleri; `big` verilirse ada o boyuta yayılır, kartlar ve Nook orantılı büyür */
+export function expandedLayout(big: { width: number; height: number } | null = null): Expanded {
+  const width = big?.width ?? ISLAND.expanded.width;
+  const height = big?.height ?? ISLAND.expanded.height;
+  const k = big ? Math.min(width / ISLAND.expanded.width, height / ISLAND.expanded.height) : 1;
+  const header = big ? 50 : 38;
+  const pad = Math.round(12 * Math.min(k, 1.6));
+  const gap = Math.round(8 * Math.min(k, 1.6));
+  const h = height - header - pad;
+  const box = (heroW: number) => ({
+    hero: { x: pad, y: header, w: heroW, h },
+    content: { x: pad + heroW + gap, y: header, w: width - pad * 2 - heroW - gap, h },
+  });
+  const heroScale = big ? Math.min(7, 2.9 * k * 0.85) : 2.9;
+  const homeHero = Math.round(width * (big ? 0.42 : 0.46));
+  const nookX = big ? Math.round(homeHero * 0.3) : FACE * heroScale * 0.84;
+  return {
+    width,
+    height,
+    homeNookX: nookX,
+    // Nook'un sağ eli de sığsın
+    homeListX: nookX + FACE * heroScale * (big ? 1.05 : 0.76),
+    radius: big ? 44 : ISLAND.expanded.radius,
+    header,
+    zoom: big ? Math.min(1.7, Math.max(1, Math.round(k * 0.62 * 100) / 100)) : 1,
+    heroScale,
+    views: {
+      home: box(homeHero),
+      module: box(big ? Math.round(width * 0.25) : 168),
+    },
+  };
+}
+
+export const EXPANDED = expandedLayout();
+
+
+export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: View = "module", ex: Expanded = EXPANDED) {
   const { height } = ISLAND[mode];
   const center = (cx: number, cy: number, scale: number) => ({ left: cx - FACE / 2, top: cy - FACE / 2, scale });
   switch (mode) {
     case "expanded":
     case "search": {
       const v = mode === "search" ? "module" : view;
-      const h = EXPANDED.views[v].hero;
+      const h = ex.views[v].hero;
+      const s = ex.heroScale;
       return v === "home"
-        ? center(h.x + 52, h.y + h.h / 2 - 4, HERO_SCALE)
-        : center(h.x + h.w / 2, h.y + 16 + (FACE * HERO_SCALE) / 2, HERO_SCALE);
+        ? center(h.x + ex.homeNookX, h.y + h.h / 2 - 4, s)
+        : center(h.x + h.w / 2, h.y + (24 * s) / 2.6 + (FACE * s) / 2, s);
     }
     case "brief":
       return center(BRIEF.face.cx, BRIEF.face.cy, BRIEF.face.scale);

@@ -56,7 +56,7 @@ const IMG_SQUASH: Partial<Record<Expression, { scaleX: number; scaleY: number }>
 
 /** 3B gövde resminin ekrandaki boyu (px) ve çizim çözünürlüğü (büyük adada da keskin kalsın) */
 const IMG = (FACE * SPAN) / 2;
-const IMG_RES = 384;
+const IMG_RES = 512;
 /** Bütün yüzün hareketleri. */
 const BODY: Record<Expression, TargetAndTransition> = {
   idle: { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 },
