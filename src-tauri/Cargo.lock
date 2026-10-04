@@ -2499,7 +2499,7 @@ dependencies = [
 
 [[package]]
 name = "nook"
-version = "0.2.23"
+version = "0.2.24"
 dependencies = [
  "base64 0.22.1",
  "jpeg-encoder",
@@ -2518,6 +2518,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "ureq",
+ "webview2-com",
  "windows 0.62.2",
  "windows-core 0.62.2",
  "windows-sys 0.59.0",

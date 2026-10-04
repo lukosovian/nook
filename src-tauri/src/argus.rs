@@ -943,6 +943,7 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
                 .build()
                 .map_err(|e| e.to_string())?;
             c.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
+            crate::window::clear_background(&c);
             c
         }
     };

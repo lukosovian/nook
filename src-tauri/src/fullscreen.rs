@@ -184,6 +184,9 @@ fn webview_visible(app: &AppHandle, label: &str, on: bool) {
         let _ = w.with_webview(move |pv| unsafe {
             let _ = pv.controller().SetIsVisible(on);
         });
+        if on {
+            crate::window::clear_background(&w);
+        }
     }
     #[cfg(not(windows))]
     let _ = (app, label, on);

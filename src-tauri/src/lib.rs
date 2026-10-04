@@ -86,6 +86,7 @@ pub fn run() {
             }
             // Başlangıçta tamamen tıklama-geçirgen; tracker imleç adaya girince kapatır.
             island.set_ignore_cursor_events(true)?;
+            window::clear_background(&island);
 
             let shared = app.state::<Arc<Shared>>().inner().clone();
             shared.register(&island);

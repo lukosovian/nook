@@ -50,7 +50,10 @@ pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_
 /// Tanıtım ekranı için pencereyi büyütür; bitince varsayılan boyuta döner.
 #[tauri::command]
 pub fn set_window_size(window: WebviewWindow, width: Option<f64>, height: Option<f64>) -> Result<(), String> {
-    window::resize_island(&window, width.unwrap_or(window::WIN_W), height.unwrap_or(window::WIN_H)).map_err(|e| e.to_string())
+    window::resize_island(&window, width.unwrap_or(window::WIN_W), height.unwrap_or(window::WIN_H)).map_err(|e| e.to_string())?;
+    // Büyüyen pencerenin yeni alanı beyaz görünmesin
+    window::clear_background(&window);
+    Ok(())
 }
 
 #[tauri::command]

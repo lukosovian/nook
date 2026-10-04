@@ -41,7 +41,10 @@ pub fn place_on(win: &WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
     let width = (width_of(win.label()) * monitor.scale_factor()).round() as i32;
     let origin = monitor.position();
     let x = origin.x + (monitor.size().width as i32 - width) / 2;
-    win.set_position(PhysicalPosition::new(x, origin.y))
+    win.set_position(PhysicalPosition::new(x, origin.y))?;
+    // Ekran değişince (ölçek, HDR) WebView2 beyaz zemine dönebiliyor
+    clear_background(win);
+    Ok(())
 }
 
 pub fn primary_monitor(app: &AppHandle) -> Option<Monitor> {
@@ -190,6 +193,7 @@ fn create_island(app: &AppHandle, label: &str) -> tauri::Result<WebviewWindow> {
         .visible(true)
         .build()?;
     win.set_ignore_cursor_events(true)?;
+    clear_background(&win);
     Ok(win)
 }
 
@@ -237,4 +241,19 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     }
     tray.build(app)?;
     Ok(())
+}
+
+/// WebView2'nin varsayılan arka planını şeffaf yap. Şeffaf pencerede bile bazen (gizle-göster,
+/// uyku dönüşü, ekran değişimi) WebView2 kendi beyaz zeminine dönüp adanın arkasını beyaz boyuyordu.
+pub fn clear_background(win: &WebviewWindow) {
+    #[cfg(windows)]
+    let _ = win.with_webview(|pv| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Controller2, COREWEBVIEW2_COLOR};
+        use windows_core::Interface;
+        if let Ok(c2) = pv.controller().cast::<ICoreWebView2Controller2>() {
+            let _ = c2.SetDefaultBackgroundColor(COREWEBVIEW2_COLOR { A: 0, R: 0, G: 0, B: 0 });
+        }
+    });
+    #[cfg(not(windows))]
+    let _ = win;
 }
