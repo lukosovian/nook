@@ -15,6 +15,7 @@ import { NotifyPanel } from "./NotifyPanel";
 import { PlayPanel } from "./PlayPanel";
 import { ReportPanel } from "./ReportPanel";
 import { openBrief } from "../../lib/brief";
+import { ek, useNookName } from "../../lib/look";
 import { summaryDue } from "../../hooks/useFeatures";
 import { ChatPanel } from "./ChatPanel";
 import { ClipboardPanel } from "./ClipboardPanel";
@@ -25,6 +26,7 @@ import { Frame } from "./Frame";
 import { MediaPanel } from "./MediaPanel";
 import { ScratchPanel } from "./ScratchPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { LookPanel } from "./LookPanel";
 import { ShelfPanel } from "./ShelfPanel";
 import { StatsPanel } from "./StatsPanel";
 
@@ -68,13 +70,14 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   control: ControlPanel,
   stats: StatsPanel,
   argus: ArgusPanel,
+  look: LookPanel,
   settings: SettingsPanel,
 };
 
 const TITLE = {
   ...Object.fromEntries(MODULES.map((m) => [m.id, m.label])),
   settings: "Ayarlar",
-  chat: "Nook'la sohbet",
+  look: "Görünüm",
   today: "Günün özeti",
   report: "Haftalık karne",
   argus: "Argus",
@@ -116,10 +119,11 @@ export function Panels() {
   }, []);
 
   const home = tab === "home";
+  const name = useNookName();
   const Active = home ? ModuleGrid : (PANEL[tab as Module] ?? ModuleGrid);
 
   return (
-    <Frame view={home ? "home" : "module"} title={home ? undefined : TITLE[tab as Module]}>
+    <Frame view={home ? "home" : "module"} title={home ? undefined : tab === "chat" ? `${ek(name, "la")} sohbet` : TITLE[tab as Module]}>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={tab}

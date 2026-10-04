@@ -18,6 +18,7 @@ import { formatSize } from "../../lib/format";
 import { spring } from "../../lib/motion";
 import { dragOut, thumbnailSrc } from "../../lib/shelf";
 import { useNook, type ShelfItem } from "../../store/nook";
+import { ek, useNookName } from "../../lib/look";
 import { ACCENT, EmptyState, TextButton } from "../ui/primitives";
 
 /** Bu kadar px hareket etmeden sürükleme başlamaz (tıklama ile karışmasın). */
@@ -26,9 +27,10 @@ const DRAG_THRESHOLD = 5;
 export function ShelfPanel() {
   const shelf = useNook((s) => s.shelf);
   const clearShelf = useNook((s) => s.clearShelf);
+  const name = useNookName();
 
   if (!shelf.length) {
-    return <EmptyState title="Raf boş" hint="Bir dosyayı Nook'a sürükle — kutuya dönüşüp yutar" color={ACCENT.teal} />;
+    return <EmptyState title="Raf boş" hint={`Bir dosyayı ${ek(name, "a")} sürükle — kutuya dönüşüp yutar`} color={ACCENT.teal} />;
   }
 
   return (

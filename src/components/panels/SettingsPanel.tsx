@@ -46,8 +46,6 @@ const WATER: { id: number; label: string }[] = [
   { id: 90, label: "90 dk" },
 ];
 
-const COLORS = ["#FFFFFF", "#BFF5DC", "#FFD6BA", "#D9CCFF", "#FFF1A8", "#BDE3FF"];
-
 export function SettingsPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("settings", scroller);
@@ -60,21 +58,8 @@ export function SettingsPanel() {
     <div ref={scroller} className="h-full space-y-3 overflow-y-auto pr-1.5">
       <Section title="Nook">
         <Affection />
-        <Row label="Rengi">
-          <div className="flex gap-1.5">
-            {COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => update({ faceColor: c })}
-                aria-label={c}
-                className="h-4 w-4 rounded-full transition-transform hover:scale-110"
-                style={{
-                  background: `radial-gradient(circle at 35% 30%, #fff 0%, ${c} 45%, color-mix(in srgb, ${c} 62%, #5d5d6b) 100%)`,
-                  boxShadow: s.faceColor === c ? `0 0 0 1.5px #000, 0 0 0 3px ${ACCENT.teal}` : undefined,
-                }}
-              />
-            ))}
-          </div>
+        <Row label="Adı ve görünümü">
+          <TextButton onClick={() => useNook.getState().setTab("look")}>Düzenle</TextButton>
         </Row>
         <Row label="Uyuma süresi">
           <Segmented id="sleep" options={SLEEP} value={s.sleepAfterSec} onChange={(v) => update({ sleepAfterSec: v })} />

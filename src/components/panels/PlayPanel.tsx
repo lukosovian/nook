@@ -4,6 +4,7 @@ import { ChevronLeft, Trophy } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
+import { ek, useNookName } from "../../lib/look";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 
 type Game = "catch" | "simon";
@@ -17,13 +18,14 @@ const GAMES: { id: Game; title: string; hint: string; color: string }[] = [
 export function PlayPanel() {
   const [game, setGame] = useState<Game | null>(null);
   const scores = useNook((s) => s.scores);
+  const name = useNookName();
 
   if (game === "catch") return <Catch onBack={() => setGame(null)} />;
   if (game === "simon") return <Simon onBack={() => setGame(null)} />;
 
   return (
     <div className="flex h-full flex-col gap-2">
-      <p className="text-[10.5px] text-label-3">Birlikte oynayınca Nook'un keyfi yerine gelir</p>
+      <p className="text-[10.5px] text-label-3">Birlikte oynayınca {ek(name, "un")} keyfi yerine gelir</p>
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
         {GAMES.map((g) => (
           <motion.button

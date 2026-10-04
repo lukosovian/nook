@@ -7,7 +7,7 @@ import { MotionGlobalConfig } from "motion/react";
 import { dayKey, useNook, type Tab } from "../store/nook";
 import { useArgus, type ArgusItem } from "../lib/argus";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "settings"];
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "settings"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -145,6 +145,16 @@ export function applyPreview(mode: string) {
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
+  // ?scroll=px → görünüm panelinin aşağısı
+  if (params.get("scroll")) window.setTimeout(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 600);
+  // ?look=şekil,göz,gözlük,başlık,boyun,aksesuar&color=… &name=…
+  const q = new URLSearchParams(location.search);
+  const lk = q.get("look")?.split(",");
+  if (lk || q.get("color") || q.get("name")) {
+    const cur = useNook.getState().settings;
+    const look = lk ? { shape: lk[0], eyes: lk[1] ?? "pill", glasses: lk[2] ?? "none", head: lk[3] ?? "none", neck: lk[4] ?? "none", accent: lk[5] ?? cur.look.accent } : cur.look;
+    useNook.setState({ settings: { ...cur, look: look as typeof cur.look, faceColor: q.get("color") ?? cur.faceColor, nookName: q.get("name") ?? cur.nookName } });
+  }
 
   if (mode === "move") {
     // ?preview=move&fx=beam → kaybolup belirmeyi döngüde oynatır (fx yoksa sırayla hepsi)

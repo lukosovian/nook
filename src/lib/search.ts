@@ -2,6 +2,7 @@ import type { AppEntry } from "./bridge";
 import type { ArgusItem } from "./argus";
 import { evaluate, formatNumber } from "./calc";
 import { convert } from "./convert";
+import { ek, nookName } from "./look";
 import { searchEmoji } from "./emoji";
 import { convertCurrency, parseCurrency, translate } from "./online";
 
@@ -85,7 +86,7 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
   }
 
   // Yerel yapay zekâya sor
-  out.push({ id: "ask", kind: "ask", title: q, subtitle: "Nook'a sor", payload: q });
+  out.push({ id: "ask", kind: "ask", title: q, subtitle: `${ek(nookName(), "a")} sor`, payload: q });
 
   const isUrl = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i.test(q) && !/\s/.test(q);
   out.push(

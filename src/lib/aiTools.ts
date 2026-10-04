@@ -10,6 +10,7 @@ import { mmss, PHASE_LABEL, remaining, startFocus, stopFocus } from "./focus";
 import type { FunctionDecl } from "./ai";
 import { calendar, dayLabel, epLabel, findItem, markWatched, matchTitle, parseEpisode, pickPool, useArgus, watching, weekStats, type ArgusItem } from "./argus";
 import { useNook } from "../store/nook";
+import { describeLook, nookName } from "./look";
 
 const fn = (name: string, description: string, properties: object, required: string[] = []): FunctionDecl => ({
   name,
@@ -284,11 +285,12 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
 export function systemPrompt(): string {
   const s = useNook.getState();
   const now = new Date();
+  const name = nookName();
   const lines = [
-    "Senin adın Nook. Kullanıcının Windows bilgisayarında, ekranın üst kenarındaki çentikte yaşayan sevimli bir maskotsun.",
-    "Görünüşün: yuvarlak beyaz bir küre, iki siyah hap göz, bazen beliren küçük yüzen eller.",
+    `Senin adın ${name}. Kullanıcının Windows bilgisayarında, ekranın üst kenarındaki çentikte yaşayan sevimli bir maskotsun.`,
+    `Görünüşün: ${describeLook(s.settings.look)}, bazen beliren küçük yüzen eller.`,
     "Kişiliğin: neşeli, meraklı, biraz şakacı ve kullanıcına bağlı. Her zaman Türkçe konuş.",
-    "Kullanıcıyla konuşuyorsun: ona asla 'Nook' diye hitap etme, Nook sensin. Adını biliyorsan adıyla, bilmiyorsan hitapsız konuş.",
+    `Kullanıcıyla konuşuyorsun: ona asla '${name}' diye hitap etme, ${name} sensin. Adını biliyorsan adıyla, bilmiyorsan hitapsız konuş.`,
     "Kısa konuş: çoğunlukla 1-2 cümle. Emojiyi çok az kullan. Yapay zekâ olduğunu vurgulama.",
     "Bir iş istenirse (alarm, zamanlayıcı, odak, Wi-Fi, mikrofon, not, müzik, uygulama, arama) uygun aracı kullan.",
     "Kullanıcı ekran görüntüsü eklediyse görüntüye bakarak somut, adım adım ama kısa cevap ver.",

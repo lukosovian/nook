@@ -35,6 +35,7 @@ import { easeOut } from "../../lib/motion";
 import { SKY_LABEL, type Sky } from "../../lib/weather";
 import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
 import { ACCENT, Card } from "../ui/primitives";
+import { ek, useNookName } from "../../lib/look";
 
 const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
 
@@ -44,6 +45,7 @@ const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
  */
 export function Frame({ view, title, children }: { view: View; title?: string; children: React.ReactNode }) {
   const { hero: h, content: c } = EXPANDED.views[view];
+  const lookTab = useNook((s) => s.tab === "look");
   return (
     <motion.div
       className="absolute inset-0"
@@ -61,7 +63,7 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
         transition={CARD_SPRING}
       >
         <Card className="relative h-full w-full overflow-hidden">
-          <Activity view={view} />
+          {lookTab ? <NameTag /> : <Activity view={view} />}
         </Card>
       </motion.div>
 
@@ -77,10 +79,25 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
   );
 }
 
+/** Görünüm düzenlenirken büyük Nook'un altında adı */
+function NameTag() {
+  const name = useNookName();
+  const custom = useNook((s) => !!s.settings.nookName.trim());
+  return (
+    <div className="absolute inset-x-3 bottom-4 text-center">
+      <motion.p key={name} className="truncate text-[17px] font-semibold tracking-tight text-label" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={CARD_SPRING}>
+        {name}
+      </motion.p>
+      <p className="mt-0.5 text-[10px] text-label-3">{custom ? "senin Nook'un" : "bir isim ver"}</p>
+    </div>
+  );
+}
+
 /** Sol üst: Grok Bot'taki gibi üç küçük ikon (Ana sayfa · Arama · Ayarlar) ve bulunulan bölüm. */
 function HeaderNav({ title }: { title?: string }) {
   const tab = useNook((s) => s.tab);
   const searching = useNook((s) => s.searching);
+  const name = useNookName();
   const go = (t: "home" | "settings" | "chat") => {
     const s = useNook.getState();
     if (s.searching) s.setSearching(false);
@@ -89,7 +106,7 @@ function HeaderNav({ title }: { title?: string }) {
   return (
     <div className="absolute left-3.5 top-[9px] flex items-center gap-0.5">
       <HeaderIcon icon={House} label="Ana sayfa" active={!searching && tab === "home"} onClick={() => go("home")} />
-      <HeaderIcon icon={MessageCircle} label="Nook'la sohbet" active={!searching && tab === "chat"} onClick={() => go("chat")} />
+      <HeaderIcon icon={MessageCircle} label={`${ek(name, "la")} sohbet`} active={!searching && tab === "chat"} onClick={() => go("chat")} />
       <HeaderIcon icon={Search} label="Ara" active={searching} onClick={() => useNook.getState().setSearching(true)} />
       <HeaderIcon icon={Settings} label="Ayarlar" active={!searching && tab === "settings"} onClick={() => go("settings")} />
       <AnimatePresence mode="wait" initial={false}>

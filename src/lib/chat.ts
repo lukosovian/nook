@@ -6,6 +6,7 @@ import { GeminiError, inlinePart, pickFallbackModel, streamChat, type Content, t
 import { modelsFor } from "../hooks/useGemini";
 import { functions, runTool, systemPrompt } from "./aiTools";
 import { useNook, type ChatItem } from "../store/nook";
+import { nookName } from "./look";
 
 /** Modele gönderilen geçmiş (son N mesaj). */
 const HISTORY = 20;
@@ -140,7 +141,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
     if (!final && !st.chat.find((m) => m.id === replyId)?.notes?.length) st.patchChat(replyId, { text: "…" });
     // Ada kapalıyken cevap bittiyse küçük bir kartla haber ver
     if (!st.hovered && final) {
-      st.pushToast({ kind: "chat", title: "Nook", detail: final.length > 70 ? `${final.slice(0, 70)}…` : final });
+      st.pushToast({ kind: "chat", title: nookName(), detail: final.length > 70 ? `${final.slice(0, 70)}…` : final });
     }
   }
 }

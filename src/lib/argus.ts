@@ -551,7 +551,9 @@ if (isPrimary && inTauri) void listen("nook://argus-card-ready", () => void send
 export function useArgusCard(mode: IslandMode) {
   const live = useArgus((s) => s.live);
   const snap = useArgus((s) => s.snap);
-  const show = isPrimary && inTauri && mode === "expanded" && !!live;
+  // Tam ekranda ada gizli: imleç üste gidince kart tek başına çıkmasın
+  const fullscreen = useNook((s) => s.fullscreen);
+  const show = isPrimary && inTauri && mode === "expanded" && !!live && !fullscreen;
   useEffect(() => {
     if (!isPrimary || !inTauri) return;
     const item = live ? snap?.items.find((i) => i.id === live.itemId) : null;

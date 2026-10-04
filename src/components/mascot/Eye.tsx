@@ -1,5 +1,6 @@
 import { motion, type MotionValue } from "motion/react";
 import { spring } from "../../lib/motion";
+import type { EyeStyle } from "../../lib/look";
 import type { Expression } from "../../store/nook";
 
 /** Göz şekli: boyut + 4 köşe yarıçapı + dikey kayma (düşük göz kapağı için). Ölçüler küre çapı 24'e göre. */
@@ -11,6 +12,8 @@ export type EyeShape = {
   borderBottomRightRadius: number;
   borderBottomLeftRadius: number;
   marginTop: number;
+  /** Elmas göz için 45° */
+  rotate: number;
 };
 
 /** Hap göz */
@@ -22,6 +25,7 @@ const pill = (w: number, h: number, dy = 0, r = Math.min(w, h) / 2): EyeShape =>
   borderBottomRightRadius: r,
   borderBottomLeftRadius: r,
   marginTop: dy,
+  rotate: 0,
 });
 
 /** Kapalı mutlu göz "∩" */
@@ -33,11 +37,31 @@ const arch = (w: number, h: number): EyeShape => ({
   borderBottomRightRadius: 0.4,
   borderBottomLeftRadius: 0.4,
   marginTop: -0.5,
+  rotate: 0,
 });
 
 const OPEN = pill(3.6, 7.6);
 const SHUT = pill(5, 1.6, 1);
 const HIDDEN = pill(0.1, 0.1);
+
+/** Kullanıcının seçtiği göz: yalnızca "açık, olağan" bakışın yerine geçer; ifadeler (mutlu, uykulu…) aynı kalır. */
+const OPEN_STYLES: Record<EyeStyle, EyeShape> = {
+  pill: OPEN,
+  bead: pill(4.4, 4.6, 0.6),
+  diamond: { ...pill(4, 4, 0.5, 0.9), rotate: 45 },
+  sparkle: pill(4.2, 8),
+  calm: { ...pill(4.6, 4, 1.2), borderTopLeftRadius: 0.9, borderTopRightRadius: 0.9 },
+};
+/** Bu gözlerde küçük ışık parıltısı var */
+const SHINES = new Set<EyeStyle>(["bead", "sparkle"]);
+
+/** [sol, sağ] göz ve parıltı */
+export function eyesFor(expression: Expression, style: EyeStyle): [EyeShape, EyeShape, boolean, boolean] {
+  const [l, r] = EYES[expression];
+  const s = OPEN_STYLES[style];
+  const shine = SHINES.has(style);
+  return [l === OPEN ? s : l, r === OPEN ? s : r, shine && l === OPEN, shine && r === OPEN];
+}
 
 /** [sol, sağ] göz. */
 export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
@@ -108,6 +132,7 @@ export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
 
 interface EyeProps {
   shape: EyeShape;
+  shine?: boolean;
   scaleX: MotionValue<number>;
   scaleY: MotionValue<number>;
   x: MotionValue<number>;
@@ -117,16 +142,18 @@ interface EyeProps {
  * Tek göz. Konumu ve 3B kısalması (scaleX) Nook'tan gelir.
  * Sıfır boyutlu bir merkez noktası üzerinde durur — şekli değişse de ortası kaymaz.
  */
-export function Eye({ shape, scaleX, scaleY, x }: EyeProps) {
+export function Eye({ shape, shine = false, scaleX, scaleY, x }: EyeProps) {
   return (
     <motion.div className="absolute left-1/2 top-1/2 flex h-0 w-0 items-center justify-center" style={{ x }}>
       <motion.div
-        className="shrink-0 bg-black"
+        className="relative shrink-0 bg-black"
         style={{ scaleX, scaleY }}
         initial={false}
         animate={shape}
         transition={spring.eye}
-      />
+      >
+        {shine && <span className="absolute rounded-full bg-white/90" style={{ width: 1.3, height: 1.3, left: "16%", top: "14%" }} />}
+      </motion.div>
     </motion.div>
   );
 }

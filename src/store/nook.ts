@@ -14,6 +14,7 @@ import type {
 import { nextFire, type Alarm } from "../lib/alarm";
 import type { ToolNote } from "../lib/aiTools";
 import type { Weather } from "../lib/weather";
+import type { Look } from "../lib/look";
 import { detectColor } from "../lib/format";
 
 /** Olay güdümlü ruh hali (dosya yutma). */
@@ -107,6 +108,7 @@ export type Tab =
   | "report"
   | "today"
   | "argus"
+  | "look"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -181,6 +183,10 @@ export interface Settings extends NativeSettings {
   osd: boolean;
   events: boolean;
   faceColor: string;
+  /** Kullanıcının Nook'a verdiği isim (boş = "Nook") */
+  nookName: string;
+  /** Gövde, gözler, gözlük, aksesuarlar (lib/look) */
+  look: Look;
   weather: boolean;
   /** Boşsa konum IP'den tahmin edilir */
   weatherCity: string;
@@ -245,6 +251,8 @@ export const DEFAULT_SETTINGS: Settings = {
   osd: true,
   events: true,
   faceColor: "#FFFFFF",
+  nookName: "",
+  look: { shape: "sphere", eyes: "pill", glasses: "none", head: "none", neck: "none", accent: "#26355e" },
   hideInFullscreen: true,
   weather: true,
   weatherCity: "",
@@ -687,6 +695,7 @@ export const useNook = create<NookState>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<NookState>;
         const settings = { ...DEFAULT_SETTINGS, ...p.settings };
+        settings.look = { ...DEFAULT_SETTINGS.look, ...p.settings?.look };
         // Yerel (Ollama) dönemden kalan model adı Gemini'de yok
         if (!settings.aiModel.startsWith("gemini")) settings.aiModel = "";
         // İlk sürümün varsayılanı birçok bilgisayarda başka programlarca tutuluyordu

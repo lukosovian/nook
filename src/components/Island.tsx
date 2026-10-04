@@ -131,6 +131,8 @@ export function Island() {
 
   const shape = ISLAND[mode];
   const playing = !!media?.playing;
+  // Görünüm düzenlenirken dans etmesin: seçilen gözler görünsün
+  const lookTab = useNook((s) => s.tab === "look");
   // Kapalı adada solda/sağda yer isteyenler: dinleme > indirme > odak > müzik
   const collapsed = mode === "collapsed";
   const miniListen = collapsed && listening;
@@ -207,8 +209,9 @@ export function Island() {
               <Nook
                 expression={expression}
                 status={status}
-                grooving={playing}
+                grooving={playing && !(mode === "expanded" && lookTab)}
                 color={settings.faceColor}
+                look={settings.look}
                 bounds={ref}
               />
               </motion.div>

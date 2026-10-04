@@ -14,11 +14,13 @@ import { useLook } from "../../hooks/useLook";
 import { setInteractive } from "../../lib/bridge";
 import { FACE } from "../../lib/layout";
 import { spring } from "../../lib/motion";
-import { useNook, type Expression, type Status } from "../../store/nook";
-import { Eye, EYES } from "./Eye";
+import { radii, roundBody, SHAPES, type BodyShape, type Look } from "../../lib/look";
+import { DEFAULT_SETTINGS, useNook, type Expression, type Status } from "../../store/nook";
+import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
 import { Mouth } from "./Mouth";
 import { Props, type SleepStyle } from "./Props";
+import { EYE_GAP, EYE_GAP_GLASSES, EYE_SCALE_GLASSES, Glasses, HeadWear, NeckWear } from "./Wear";
 
 /** Durum renkleri (rozet, alt ton, ada parıltısı) */
 export const STATUS_COLOR: Record<Status, string> = {
@@ -30,15 +32,20 @@ export const STATUS_COLOR: Record<Status, string> = {
 };
 
 const sec = (ms: number) => ms / 1000;
-const round = (w: number, h = w) => ({ width: w, height: h, borderRadius: Math.min(w, h) / 2 });
-
-/** Yüzün biçimi: çoğunlukla küre; dosya gelince kutuya dönüşür. */
-const BODY_SHAPE: Partial<Record<Expression, { width: number; height: number; borderRadius: number }>> = {
-  hungry: { width: 26, height: 23, borderRadius: 7 },
-  chewing: { width: 26, height: 22, borderRadius: 7 },
-  stretch: round(28, 21),
-  sleepy: round(24, 23),
+/** Dosya gelince yüz kutuya dönüşür (seçilen gövde ne olursa olsun). */
+const BOX_SHAPE: Partial<Record<Expression, BodyShape>> = {
+  hungry: { width: 26, height: 23, borderRadius: radii([7, 7, 7, 7]) },
+  chewing: { width: 26, height: 22, borderRadius: radii([7, 7, 7, 7]) },
 };
+
+/** Seçilen gövde; gerinirken basılıp yayılır, uyurken biraz çöker. */
+function bodyFor(expression: Expression, base: BodyShape): BodyShape {
+  const box = BOX_SHAPE[expression];
+  if (box) return box;
+  if (expression === "stretch") return base.borderRadius === SHAPES.sphere.body.borderRadius ? roundBody(28, 21) : { ...base, width: base.width + 4, height: base.height - 3 };
+  if (expression === "sleepy") return { ...base, height: base.height - 1 };
+  return base;
+}
 
 /** Bütün yüzün hareketleri. */
 const BODY: Record<Expression, TargetAndTransition> = {
@@ -191,11 +198,13 @@ interface NookProps {
   /** Müzik çalıyor */
   grooving?: boolean;
   color?: string;
+  /** Gövde, gözler, gözlük, aksesuarlar */
+  look?: Look;
   /** Sürükleme sınırı (ada) — Nook bunun içinde tutulup fırlatılabilir */
   bounds?: RefObject<HTMLElement | null>;
 }
 
-export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", bounds }: NookProps) {
+export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wear = DEFAULT_SETTINGS.look, bounds }: NookProps) {
   const ref = useRef<HTMLDivElement>(null);
   const look = useLook(ref, !NO_LOOK.has(expression));
   const lid = useBlink(BLINKS.has(expression));
@@ -204,7 +213,8 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   // --- 3B kafa çevirme: gözler kenara kayar ve kısalır, ışık ters yöne gider
   const eyesX = useTransform(look.x, (v) => v * 6.4);
   const eyesY = useTransform(look.y, (v) => v * 4.4 + 1.2);
-  const gap = useTransform(look.x, (v) => 3.9 * (1 - Math.abs(v) * 0.32));
+  const baseGap = wear.glasses === "none" ? EYE_GAP : EYE_GAP_GLASSES;
+  const gap = useTransform(look.x, (v) => baseGap * (1 - Math.abs(v) * 0.32));
   const leftX = useTransform([gap, eyesX], ([g, x]: number[]) => x - g);
   const rightX = useTransform([gap, eyesX], ([g, x]: number[]) => x + g);
   const leftScaleX = useTransform(look.x, (v) => 1 - Math.max(0, -v) * 0.45 - Math.abs(v) * 0.08);
@@ -214,7 +224,8 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const shade = `color-mix(in srgb, ${color} 62%, #5d5d6b)`;
   const sphere = useMotionTemplate`radial-gradient(circle at ${hx}% ${hy}%, #ffffff 0%, ${color} 34%, ${shade} 100%)`;
 
-  const attentionScale = useTransform(look.attention, (a) => 1 + a * 0.16);
+  const lens = wear.glasses === "none" ? 1 : EYE_SCALE_GLASSES;
+  const attentionScale = useTransform(look.attention, (a) => (1 + a * 0.16) * lens);
   const scaleYL = useTransform([lid, attentionScale], ([l, a]: number[]) => l * a);
   const scaleYR = scaleYL;
 
@@ -228,7 +239,8 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const leftSX = useTransform([leftScaleX, attentionScale], ([s, a]: number[]) => s * a);
   const rightSX = useTransform([rightScaleX, attentionScale], ([s, a]: number[]) => s * a);
 
-  const [left, right] = EYES[expression];
+  const [left, right, shineL, shineR] = eyesFor(expression, wear.eyes);
+  const body = bodyFor(expression, SHAPES[wear.shape].body);
   // Balon şişirerek uyurken "z" çıkmaz
   const floater = expression === "sleepy" && sleepStyle === "bubble" ? undefined : FLOATER[expression];
   const tint = status ? STATUS_COLOR[status] : null;
@@ -269,7 +281,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
             boxShadow: "0 2px 6px rgba(0,0,0,0.55), inset -1.5px -2.5px 4px rgba(0,0,0,0.16)",
           }}
           initial={false}
-          animate={BODY_SHAPE[expression] ?? round(FACE)}
+          animate={{ ...body }}
           transition={spring.eye}
         >
           {/* Duruma göre alttan renk tonu */}
@@ -299,11 +311,12 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
           <motion.div className="absolute inset-0" style={{ y: eyesY }}>
             <motion.div className="absolute inset-0" initial={false} animate={EYE_OFFSET[expression] ?? { x: 0, y: 0 }} transition={spring.eye}>
               <motion.div className="absolute inset-0" initial={false} animate={{ opacity: wave ? 0 : 1 }} transition={{ duration: 0.15 }}>
-                <Eye shape={left} x={leftX} scaleX={leftSX} scaleY={scaleYL} />
-                <Eye shape={right} x={rightX} scaleX={rightSX} scaleY={scaleYR} />
+                <Eye shape={left} shine={shineL} x={leftX} scaleX={leftSX} scaleY={scaleYL} />
+                <Eye shape={right} shine={shineR} x={rightX} scaleX={rightSX} scaleY={scaleYR} />
               </motion.div>
             </motion.div>
           </motion.div>
+          <Glasses id={wear.glasses} accent={wear.accent} style={{ x: eyesX, y: eyesY }} />
           <Mouth expression={expression} />
 
           <AnimatePresence>
@@ -313,6 +326,14 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
             {expression === "downloading" && <ProgressDots key="dl" />}
           </AnimatePresence>
         </motion.div>
+
+        {/* Giydikleri: başlık ve boyun (kutuya dönüşünce kapağın yerini alır, çıkarır) */}
+        {!isBox && (
+          <>
+            <NeckWear id={wear.neck} accent={wear.accent} body={body} />
+            <HeadWear id={wear.head} accent={wear.accent} body={body} />
+          </>
+        )}
 
         {/* Eşyalar: yorgan, kitap, kamp ateşi, şemsiye, kâğıt-kalem, büyüteç… */}
         <Props expression={expression} sleepStyle={sleepStyle} />

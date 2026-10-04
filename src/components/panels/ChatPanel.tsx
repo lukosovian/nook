@@ -9,6 +9,7 @@ import type { ToolNote } from "../../lib/aiTools";
 import { sendChat, stopChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
 import { useNook, type ChatItem } from "../../store/nook";
+import { ek, useNookName } from "../../lib/look";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 
 const SUGGESTIONS = ["Bana bir şaka anlat", "Yarın 8'de alarm kur", "25 dakika odaklanalım", "Mikrofonumu kapat", "Şu an ne çalıyor?"];
@@ -42,6 +43,7 @@ export function ChatPanel() {
   const model = useNook((s) => s.settings.aiModel);
   const attachment = useNook((s) => s.attachment);
   const listening = useNook((s) => s.listening);
+  const name = useNookName();
   const [draft, setDraft] = useState("");
   const gemini = useGemini();
   const list = useRef<HTMLDivElement>(null);
@@ -132,7 +134,7 @@ export function ChatPanel() {
           }}
           disabled={!ready}
           spellCheck={false}
-          placeholder={!ready ? "Yapay zekâ hazır değil" : listening ? "Dinliyorum… bitince tekrar bas" : attachment ? "Ekran hakkında sor…" : "Nook'a yaz…"}
+          placeholder={!ready ? "Yapay zekâ hazır değil" : listening ? "Dinliyorum… bitince tekrar bas" : attachment ? "Ekran hakkında sor…" : `${ek(name, "a")} yaz…`}
           className="min-w-0 flex-1 bg-transparent text-[12.5px] text-label outline-none placeholder:text-label-3"
         />
         <motion.button

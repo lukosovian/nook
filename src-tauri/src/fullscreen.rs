@@ -52,6 +52,7 @@ struct GameSession {
 
 struct Session {
     exe: String,
+    pid: u32,
     started: Instant,
     /// Gösterilen mola hatırlatması sayısı
     breaks: u64,
@@ -89,13 +90,16 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 let detected = imp::fullscreen_monitor(&shared);
 
                 // --- Oyun oturumu
-                let exe = detected.as_ref().and_then(|d| d.1.clone());
-                let game = exe.filter(|e| {
+                let game = detected.as_ref().and_then(|d| d.1.clone()).filter(|(_, e)| {
                     let stem = e.rsplit(['\\', '/']).next().unwrap_or(e).to_lowercase();
                     !NOT_GAMES.contains(&stem.trim_end_matches(".exe"))
                 });
+                // Alt-Tab ile oyundan çıkıldıysa ama oyun hâlâ açıksa oturum sürer — dönünce baştan saymaz
+                let away = game.is_none() && session.as_ref().is_some_and(|s| imp::alive(s.pid, &s.exe));
+                let in_session_game = matches!((&session, &game), (Some(s), Some((_, g))) if s.exe == *g);
                 match (&mut session, game) {
-                    (Some(s), Some(g)) if s.exe == g => {
+                    _ if away => {}
+                    (Some(s), Some((_, g))) if s.exe == g => {
                         s.peak_cpu = s.peak_cpu.max(f32::from_bits(shared.cpu.load(Ordering::Relaxed)));
                         s.peak_mem = s.peak_mem.max(shared.mem.load(Ordering::Relaxed));
                         let mins = s.started.elapsed().as_secs() / 60;
@@ -115,15 +119,15 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                                 );
                             }
                         }
-                        if let (Some(exe), true) = (&next, settings.game_intro) {
+                        if let (Some((_, exe)), true) = (&next, settings.game_intro) {
                             peek_until = Some(Instant::now() + INTRO_PEEK);
                             let _ = app.emit("nook://game-start", GamePeek { app: pretty(exe), mins: 0 });
                         }
-                        *cur = next.map(|exe| Session { exe, started: Instant::now(), breaks: 0, peak_cpu: 0.0, peak_mem: 0 });
+                        *cur = next.map(|(pid, exe)| Session { exe, pid, started: Instant::now(), breaks: 0, peak_cpu: 0.0, peak_mem: 0 });
                     }
                 }
 
-                *shared.game_screen.lock().unwrap() = if session.is_some() { detected.as_ref().map(|d| d.0) } else { None };
+                *shared.game_screen.lock().unwrap() = if in_session_game { detected.as_ref().map(|d| d.0) } else { None };
 
                 let peek = peek_until.is_some_and(|t| Instant::now() < t);
                 let in_game = detected.is_some();
@@ -181,8 +185,8 @@ mod imp {
         "XamlExplorerHostIslandWindow",
     ];
 
-    /// Tam ekran bir pencerenin kapladığı monitör (sol, üst, sağ, alt — fiziksel px) ve exe yolu.
-    pub fn fullscreen_monitor(shared: &Shared) -> Option<((i32, i32, i32, i32), Option<String>)> {
+    /// Tam ekran bir pencerenin kapladığı monitör (sol, üst, sağ, alt — fiziksel px), süreç kimliği ve exe yolu.
+    pub fn fullscreen_monitor(shared: &Shared) -> Option<((i32, i32, i32, i32), Option<(u32, String)>)> {
         unsafe {
             let fg = GetForegroundWindow();
             if fg.is_null() || shared.is_ours(fg as isize) || IsWindowVisible(fg) == 0 || IsIconic(fg) != 0 {
@@ -212,7 +216,7 @@ mod imp {
             // Nook'un kendi açtığı tam ekran katmanlar (ekrandan renk seçici) adayı gizlemesin
             let owner = GetAncestor(fg, GA_ROOTOWNER);
             let exe = exe_of(fg);
-            let webview = exe.as_deref().is_some_and(|e| e.to_lowercase().ends_with("msedgewebview2.exe"));
+            let webview = exe.as_ref().is_some_and(|(_, e)| e.to_lowercase().ends_with("msedgewebview2.exe"));
             if shared.is_ours(owner as isize) || webview {
                 return None;
             }
@@ -220,26 +224,38 @@ mod imp {
         }
     }
 
-    /// Pencerenin sahibi sürecin tam yolu.
-    fn exe_of(hwnd: HWND) -> Option<String> {
-        use windows_sys::Win32::Foundation::CloseHandle;
-        use windows_sys::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION};
+    /// Pencerenin sahibi sürecin kimliği ve tam yolu.
+    fn exe_of(hwnd: HWND) -> Option<(u32, String)> {
         use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+        if pid == 0 {
+            return None;
+        }
+        Some((pid, path_of(pid)?))
+    }
+
+    /// Süreç hâlâ çalışıyor ve aynı exe mi (kimlik başka sürece verilmiş olmasın)?
+    pub fn alive(pid: u32, exe: &str) -> bool {
+        path_of(pid).is_some_and(|p| p == exe)
+    }
+
+    /// Çalışan sürecin tam yolu; kapanmışsa None.
+    fn path_of(pid: u32) -> Option<String> {
+        use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+        use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION};
         unsafe {
-            let mut pid = 0u32;
-            GetWindowThreadProcessId(hwnd, &mut pid);
-            if pid == 0 {
-                return None;
-            }
             let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
             if h.is_null() {
                 return None;
             }
             let mut buf = [0u16; 520];
             let mut len = buf.len() as u32;
+            let mut code = 0u32;
+            let running = GetExitCodeProcess(h, &mut code) != 0 && code == STILL_ACTIVE as u32;
             let ok = QueryFullProcessImageNameW(h, 0, buf.as_mut_ptr(), &mut len);
             CloseHandle(h);
-            (ok != 0).then(|| String::from_utf16_lossy(&buf[..len as usize]))
+            (ok != 0 && running).then(|| String::from_utf16_lossy(&buf[..len as usize]))
         }
     }
 
@@ -261,8 +277,11 @@ mod imp {
 #[cfg(not(windows))]
 mod imp {
     use crate::state::Shared;
-    pub fn fullscreen_monitor(_shared: &Shared) -> Option<((i32, i32, i32, i32), Option<String>)> {
+    pub fn fullscreen_monitor(_shared: &Shared) -> Option<((i32, i32, i32, i32), Option<(u32, String)>)> {
         None
+    }
+    pub fn alive(_pid: u32, _exe: &str) -> bool {
+        false
     }
     pub fn show(_hwnd: isize, _visible: bool) {}
     pub fn raise(_hwnd: isize) {}
