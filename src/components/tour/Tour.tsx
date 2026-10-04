@@ -8,7 +8,7 @@ import { endTour } from "../../lib/tour";
 import { useNook, type Antic } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { useArgus } from "../../lib/argus";
-import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, ModulesArt, MoodArt } from "./TourArt";
+import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, LookArt, ModulesArt, MoodArt } from "./TourArt";
 
 interface Step {
   title: string;
@@ -78,6 +78,13 @@ export const STEPS: Step[] = [
     color: ACCENT.orange,
     antic: "shy",
     Art: MoodArt,
+  },
+  {
+    title: "Beni kendine göre giydir",
+    text: "Bana bir isim ver; bulut, kalp, üçgen gibi bir gövde, vinil ya da peluş doku ve renk seç. Gözlük, şapka, kulaklık, papyon da takarım. Sağ tık › Görünüm ya da Ayarlar'dan istediğin zaman değiştirirsin.",
+    color: ACCENT.pink,
+    antic: "spin",
+    Art: LookArt,
   },
   {
     title: "Argus'la birlikte çalışırım",

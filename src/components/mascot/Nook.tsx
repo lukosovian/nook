@@ -4,6 +4,7 @@ import {
   motion,
   useAnimationFrame,
   useMotionTemplate,
+  useMotionValue,
   useTransform,
   type MotionValue,
   type TargetAndTransition,
@@ -15,7 +16,7 @@ import { setInteractive } from "../../lib/bridge";
 import { FACE } from "../../lib/layout";
 import { spring } from "../../lib/motion";
 import { DEFAULT_LOOK, radii, roundBody, type BodyShape, type Look } from "../../lib/look";
-import { ANCHORS, SPAN, useBodyImage } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, SPAN, useBodyImage } from "../../lib/nook3d";
 import { useNook, type Expression, type Status } from "../../store/nook";
 import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
@@ -56,9 +57,6 @@ const IMG_SQUASH: Partial<Record<Expression, { scaleX: number; scaleY: number }>
 /** 3B gövde resminin ekrandaki boyu (px) ve çizim çözünürlüğü (büyük adada da keskin kalsın) */
 const IMG = (FACE * SPAN) / 2;
 const IMG_RES = 384;
-/** Gözlük camının ardında gözler küçülür */
-const EYE_SCALE_GLASSES = 0.72;
-
 /** Bütün yüzün hareketleri. */
 const BODY: Record<Expression, TargetAndTransition> = {
   idle: { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 },
@@ -223,25 +221,38 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const press = useGrab();
 
   // --- 3B kafa çevirme: gözler kenara kayar ve kısalır, ışık ters yöne gider
-  const eyesX = useTransform(look.x, (v) => v * 6.4);
   const img = useBodyImage(wear, color, IMG_RES);
+  const isBox = expression === "hungry" || expression === "chewing";
+  /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
+  const solid = !!img && !isBox;
+  /** Gözlük resmin içinde sabit: gözler camın dışına kaymasın diye az oynar */
+  const glassesOn = solid && wear.glasses !== "none";
   // 3B gövdede gözler biçime göre yerleşir (kalpte yukarıda, üçgende aşağıda)
   const anchor = ANCHORS[wear.shape];
-  const eyeY = img ? -anchor.y * (FACE / 2) : 1.2;
-  const baseGap = img ? anchor.gap * (FACE / 2) : 3.9;
-  const eyesY = useTransform(look.y, (v) => v * 4.4 + eyeY);
-  const gap = useTransform(look.x, (v) => baseGap * (1 - Math.abs(v) * 0.32));
+  const eyeY = solid ? -anchor.y * (FACE / 2) : 1.2;
+  const baseGap = solid ? eyeGap(wear) * (FACE / 2) : 3.9;
+  // Görünüm değişince imleç kıpırdamasa da gözler hemen yerine geçsin
+  const eyeYMv = useMotionValue(eyeY);
+  const gapMv = useMotionValue(baseGap);
+  const moveMv = useMotionValue(glassesOn ? 0.12 : 1);
+  useEffect(() => {
+    eyeYMv.set(eyeY);
+    gapMv.set(baseGap);
+    moveMv.set(glassesOn ? 0.12 : 1);
+  }, [eyeYMv, gapMv, moveMv, eyeY, baseGap, glassesOn]);
+  const eyesX = useTransform([look.x, moveMv], ([v, m]: number[]) => v * 6.4 * m);
+  const eyesY = useTransform([look.y, moveMv, eyeYMv], ([v, m, y]: number[]) => v * 4.4 * m + y);
+  const gap = useTransform([look.x, moveMv, gapMv], ([v, m, g]: number[]) => g * (1 - Math.abs(v) * 0.32 * m));
   const leftX = useTransform([gap, eyesX], ([g, x]: number[]) => x - g);
   const rightX = useTransform([gap, eyesX], ([g, x]: number[]) => x + g);
-  const leftScaleX = useTransform(look.x, (v) => 1 - Math.max(0, -v) * 0.45 - Math.abs(v) * 0.08);
-  const rightScaleX = useTransform(look.x, (v) => 1 - Math.max(0, v) * 0.45 - Math.abs(v) * 0.08);
+  const leftScaleX = useTransform([look.x, moveMv], ([v, m]: number[]) => 1 - (Math.max(0, -v) * 0.45 + Math.abs(v) * 0.08) * m);
+  const rightScaleX = useTransform([look.x, moveMv], ([v, m]: number[]) => 1 - (Math.max(0, v) * 0.45 + Math.abs(v) * 0.08) * m);
   const hx = useTransform(look.x, (v) => 36 - v * 20);
   const hy = useTransform(look.y, (v) => 30 - v * 18);
   const shade = `color-mix(in srgb, ${color} 62%, #5d5d6b)`;
   const sphere = useMotionTemplate`radial-gradient(circle at ${hx}% ${hy}%, #ffffff 0%, ${color} 34%, ${shade} 100%)`;
 
-  const lens = img && wear.glasses !== "none" ? EYE_SCALE_GLASSES : 1;
-  const attentionScale = useTransform(look.attention, (a) => (1 + a * 0.16) * lens);
+  const attentionScale = useTransform([look.attention, moveMv], ([a, m]: number[]) => (1 + a * 0.16 * m) * (m < 1 ? EYE_SCALE_GLASSES : 1));
   const scaleYL = useTransform([lid, attentionScale], ([l, a]: number[]) => l * a);
   const scaleYR = scaleYL;
 
@@ -260,9 +271,6 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   // Balon şişirerek uyurken "z" çıkmaz
   const floater = expression === "sleepy" && sleepStyle === "bubble" ? undefined : FLOATER[expression];
   const tint = status ? STATUS_COLOR[status] : null;
-  const isBox = expression === "hungry" || expression === "chewing";
-  /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
-  const solid = !!img && !isBox;
   /** Güneş gözlüğünün ardındaki gözler görünmez */
   const hideEyes = solid && wear.glasses === "shades";
 
@@ -355,7 +363,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
 
           {/* Gözler */}
           <motion.div className="absolute inset-0" style={{ y: eyesY }}>
-            <motion.div className="absolute inset-0" initial={false} animate={EYE_OFFSET[expression] ?? { x: 0, y: 0 }} transition={spring.eye}>
+            <motion.div className="absolute inset-0" initial={false} animate={damp(EYE_OFFSET[expression] ?? { x: 0, y: 0 }, glassesOn ? 0.25 : 1)} transition={spring.eye}>
               <motion.div className="absolute inset-0" initial={false} animate={{ opacity: wave || hideEyes ? 0 : 1 }} transition={{ duration: 0.15 }}>
                 <Eye shape={left} shine={shineL} x={leftX} scaleX={leftSX} scaleY={scaleYL} />
                 <Eye shape={right} shine={shineR} x={rightX} scaleX={rightSX} scaleY={scaleYR} />
@@ -364,12 +372,15 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
           </motion.div>
           <Mouth expression={expression} />
 
-          <AnimatePresence>
-            {wave && <WaveEyes key="wave" />}
-            {expression === "thinking" && <Orbit key="orbit" />}
-            {expression === "dizzy" && <Spirals key="spirals" />}
-            {expression === "downloading" && <ProgressDots key="dl" />}
-          </AnimatePresence>
+          {/* Gözlerin yerine geçen çizimler gözlerin hizasında; gözlükte camlara sığsın */}
+          <div className="pointer-events-none absolute inset-0" style={{ transform: `translateY(${eyeY - 1.2}px) scale(${glassesOn ? 0.7 : 1})` }}>
+            <AnimatePresence>
+              {wave && <WaveEyes key="wave" />}
+              {expression === "thinking" && <Orbit key="orbit" />}
+              {expression === "dizzy" && <Spirals key="spirals" />}
+              {expression === "downloading" && <ProgressDots key="dl" />}
+            </AnimatePresence>
+          </div>
         </motion.div>
 
         {/* Eşyalar: yorgan, kitap, kamp ateşi, şemsiye, kâğıt-kalem, büyüteç… */}
@@ -522,6 +533,13 @@ function ProgressDots() {
       ))}
     </motion.div>
   );
+}
+
+/** Gözlerin kayma hareketini (x, y) k kadar küçült — gözlüklüyken camdan taşmasın */
+function damp(t: TargetAndTransition, k: number): TargetAndTransition {
+  if (k === 1) return t;
+  const scale = (v: unknown) => (typeof v === "number" ? v * k : Array.isArray(v) ? v.map((n) => (typeof n === "number" ? n * k : n)) : v);
+  return { ...t, x: scale(t.x), y: scale(t.y) } as TargetAndTransition;
 }
 
 /** Uyurken bir yana devrilmiş şekerleme */

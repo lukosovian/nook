@@ -25,11 +25,16 @@ import {
 } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
 import { openPath } from "../../lib/bridge";
-import { SULK_BELOW, useNook } from "../../store/nook";
+import { SULK_BELOW, useNook, type Expression } from "../../store/nook";
 import { KeyInput, TextInput } from "../panels/SettingsPanel";
 import { ArgusLinked, ArgusPromo } from "../ArgusPromo";
 import { epLabel, posterSrc, useArgus, watching } from "../../lib/argus";
 import { ACCENT, Bar, MiniNook, Segmented, tintBg, tintText, Toggle } from "../ui/primitives";
+import { MyNook, NookFigure } from "../mascot/Figure";
+import { DEFAULT_LOOK, SHOWCASE, useShowcase, type Look } from "../../lib/look";
+import { endTour } from "../../lib/tour";
+import { useEffect, useState } from "react";
+import { Shuffle } from "lucide-react";
 
 const LOOP = { repeat: Infinity, ease: "easeInOut" } as const;
 
@@ -96,7 +101,7 @@ export function HoverArt() {
       <Screen height={308}>
         <Notch animate={{ width: [70, 70, 330, 330, 70, 70], height: [17, 17, 132, 132, 17, 17], borderBottomLeftRadius: [8, 8, 20, 20, 8, 8], borderBottomRightRadius: [8, 8, 20, 20, 8, 8] }} transition={HOVER_T}>
           <motion.div className="absolute" animate={{ left: [29, 29, 18, 18, 29, 29], top: [2.5, 2.5, 18, 18, 2.5, 2.5], scale: [1, 1, 2.4, 2.4, 1, 1] }} transition={HOVER_T} style={{ originX: 0, originY: 0 }}>
-            <MiniNook color="#ffffff" size={12} />
+            <MyNook size={12} />
           </motion.div>
           <motion.div className="absolute left-[70px] right-3 top-4 grid grid-cols-2 gap-1.5" animate={{ opacity: [0, 0, 1, 1, 0, 0] }} transition={HOVER_T}>
             {[ACCENT.yellow, ACCENT.pink, ACCENT.red, ACCENT.teal, ACCENT.purple, ACCENT.orange].map((c, i) => (
@@ -210,7 +215,7 @@ export function FeedArt() {
           transition={FEED_T}
         >
           <motion.div animate={{ scale: [1, 1, 2.2, 1.9, 2.1, 1, 1] }} transition={FEED_T}>
-            <MiniNook color="#ffffff" size={12} eyes="open" />
+            <MyNook size={12} />
           </motion.div>
         </Notch>
         <motion.div
@@ -347,7 +352,7 @@ export function AiArt() {
           Yarın sabah 8'e alarm kurar mısın?
         </motion.p>
         <motion.div className="flex items-end gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
-          <MiniNook color="#ffffff" size={20} eyes="happy" />
+          <MyNook size={20} expression="happy" />
           <p className="max-w-[160px] rounded-[14px] rounded-bl-[4px] bg-white/[0.08] px-3 py-1.5 text-[11.5px] text-label">
             Kurdum! Yarın 08:00'de seni uyandırırım.
           </p>
@@ -362,7 +367,7 @@ export function AiArt() {
           Alarm · 08:00
         </motion.span>
         <motion.div className="mt-1 flex items-end gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.9 }}>
-          <MiniNook color="#ffffff" size={20} />
+          <MyNook size={20} />
           <p className="max-w-[160px] rounded-[14px] rounded-bl-[4px] bg-white/[0.08] px-3 py-1.5 text-[11.5px] text-label">"Şunu hatırla…" dersen aklımda tutarım.</p>
         </motion.div>
       </div>
@@ -440,7 +445,7 @@ function MiniToast({ icon, color, title, detail, delay }: { icon: LucideIcon; co
       animate={{ y: [-60, -60, 0, 0, -60, -60], opacity: [0, 0, 1, 1, 0, 0] }}
       transition={{ duration: 6, times: [0, delay, delay + 0.06, delay + 0.36, delay + 0.42, 1], ...LOOP }}
     >
-      <MiniNook color="#ffffff" size={26} />
+      <MyNook size={26} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium leading-tight" style={{ color: tintText(color) }}>
           {title}
@@ -497,11 +502,11 @@ function CareRow({ icon, color, title, sub, children }: { icon: LucideIcon; colo
 
 // ---------------------------------------------------------------- Keyif
 
-const MOODS: { icon: LucideIcon; color: string; eyes: "open" | "happy" | "closed" | "side"; act: string; result: string }[] = [
-  { icon: MousePointerClick, color: ACCENT.orange, eyes: "closed", act: "Bir kez tıkla", result: "Şaplak! (3 kez üst üste: kızarım)" },
-  { icon: Hand, color: ACCENT.purple, eyes: "side", act: "Tut ve fırlat", result: "Sert fırlatırsan başım döner" },
-  { icon: FileText, color: ACCENT.pink, eyes: "happy", act: "Dosya yedir", result: "En sevdiğim şey" },
-  { icon: Moon, color: ACCENT.blue, eyes: "closed", act: "Gece yarısından sonra", result: "Uykum gelir, esnerim" },
+const MOODS: { icon: LucideIcon; color: string; expression: Expression; act: string; result: string }[] = [
+  { icon: MousePointerClick, color: ACCENT.orange, expression: "slap", act: "Bir kez tıkla", result: "Şaplak! (3 kez üst üste: kızarım)" },
+  { icon: Hand, color: ACCENT.purple, expression: "suspicious", act: "Tut ve fırlat", result: "Sert fırlatırsan başım döner" },
+  { icon: FileText, color: ACCENT.pink, expression: "happy", act: "Dosya yedir", result: "En sevdiğim şey" },
+  { icon: Moon, color: ACCENT.blue, expression: "sleepy", act: "Gece yarısından sonra", result: "Uykum gelir, esnerim" },
 ];
 
 export function MoodArt() {
@@ -511,7 +516,7 @@ export function MoodArt() {
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center gap-3 rounded-[16px] bg-well px-3.5 py-3">
-        <MiniNook color={color} size={30} eyes={sulky ? "closed" : affection >= 80 ? "happy" : "open"} />
+        <MyNook size={30} expression={sulky ? "sulk" : affection >= 80 ? "happy" : "idle"} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between text-[12.5px]">
             <span className="font-medium text-label">Keyfim</span>
@@ -535,7 +540,7 @@ export function MoodArt() {
             transition={{ type: "spring", stiffness: 400, damping: 30, delay: 0.08 + i * 0.06 }}
           >
             <div className="flex items-center justify-between">
-              <MiniNook color={m.color} size={30} eyes={m.eyes} />
+              <MyNook size={30} expression={m.expression} />
               <m.icon size={16} style={{ color: tintText(m.color) }} />
             </div>
             <div>
@@ -546,6 +551,76 @@ export function MoodArt() {
             </div>
           </motion.div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Kendi Nook'un
+
+const SHOWCASE_MS = 1900;
+
+/**
+ * Hazır görünümlerden bir vitrin. Soldaki büyük Nook da sırayla onlara bürünür (Island, useShowcase);
+ * adımdan çıkınca kendi görünümüne döner.
+ */
+export function LookArt() {
+  const [i, setI] = useState(1);
+  useEffect(() => {
+    const t = window.setInterval(() => setI((n) => (n + 1) % SHOWCASE.length), SHOWCASE_MS);
+    return () => window.clearInterval(t);
+  }, []);
+  useEffect(() => {
+    useShowcase.setState({ pick: { look: SHOWCASE[i].look, color: SHOWCASE[i].color } });
+  }, [i]);
+  useEffect(() => () => useShowcase.setState({ pick: null }), []);
+
+  return (
+    <div className="flex h-full flex-col gap-3">
+      <div className="grid flex-1 grid-cols-3 gap-2">
+        {SHOWCASE.map((m, n) => {
+          const on = n === i;
+          return (
+            <motion.button
+              key={m.name}
+              onClick={() => setI(n)}
+              className="relative flex flex-col items-center justify-end overflow-hidden rounded-[18px] border pb-2.5"
+              style={{ background: on ? tintBg(m.color, 16) : "rgb(255 255 255 / 0.04)", borderColor: on ? tintBg(m.color, 55) : "rgb(255 255 255 / 0.06)" }}
+              initial={{ opacity: 0, y: 10, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 420, damping: 28, delay: 0.06 + n * 0.05 }}
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-2/3" style={{ background: `radial-gradient(60% 70% at 50% 40%, ${tintBg(m.color, on ? 30 : 12)} 0%, transparent 70%)` }} />
+              <motion.div className="relative mb-3" animate={{ y: on ? [0, -4, 0] : 0, scale: on ? 1.08 : 1 }} transition={on ? { duration: 1.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}>
+                <NookFigure look={m.look} color={m.color} size={54} expression={on ? "happy" : "idle"} />
+              </motion.div>
+              <span className="relative text-[12.5px] font-semibold" style={{ color: on ? tintText(m.color) : undefined }}>
+                {m.name}
+              </span>
+              <span className="relative text-[10.5px] text-label-3">{m.note}</span>
+            </motion.button>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+          {["İsim", "6 gövde", "Vinil · peluş", "10 renk", "5 göz", "Gözlük", "Şapka", "Papyon"].map((t) => (
+            <span key={t} className="rounded-full bg-well px-2 py-0.5 text-[10.5px] text-label-2">
+              {t}
+            </span>
+          ))}
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            useNook.getState().setPendingTab("look");
+            endTour();
+          }}
+          className="shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-medium"
+          style={{ background: tintBg(ACCENT.pink, 18), borderColor: tintBg(ACCENT.pink, 45), color: tintText(ACCENT.pink) }}
+        >
+          Şimdi giydir
+        </motion.button>
       </div>
     </div>
   );
@@ -570,12 +645,13 @@ export function ArgusArt() {
 // ---------------------------------------------------------------- İlk ve son adım
 
 export function HelloChips() {
-  const items = [
-    { color: ACCENT.pink, label: "Müzik" },
-    { color: ACCENT.teal, label: "Dosya rafı" },
-    { color: ACCENT.purple, label: "Yapay zekâ" },
-    { color: ACCENT.yellow, label: "Alarm" },
-    { color: ACCENT.red, label: "Odak" },
+  // Her çipte başka bir Nook: kendi Nook'unu da böyle giydirebileceğinin habercisi
+  const items: { color: string; label: string; body: string; look: Look }[] = [
+    { color: ACCENT.pink, label: "Müzik", body: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
+    { color: ACCENT.teal, label: "Dosya rafı", body: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead" } },
+    { color: ACCENT.purple, label: "Yapay zekâ", body: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "triangle", glasses: "round" } },
+    { color: ACCENT.yellow, label: "Alarm", body: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
+    { color: ACCENT.red, label: "Odak", body: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "bean", head: "bowler" } },
   ];
   return (
     <div className="flex flex-wrap justify-center gap-1.5">
@@ -588,7 +664,7 @@ export function HelloChips() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ type: "spring", stiffness: 450, damping: 26, delay: 0.25 + i * 0.06 }}
         >
-          <MiniNook color={c.color} size={20} />
+          <NookFigure look={c.look} color={c.body} size={20} />
           {c.label}
         </motion.span>
       ))}
@@ -600,6 +676,7 @@ export function DoneTips() {
   const tips = [
     { color: ACCENT.blue, icon: MousePointer2, text: "Üst ortaya gel → açılırım" },
     { color: ACCENT.purple, icon: Settings, text: "Ayarlar › Nook nedir? → bu tanıtım" },
+    { color: ACCENT.pink, icon: Shuffle, text: "Sağ tık › Görünüm → beni giydir" },
     { color: ACCENT.gray, icon: ExternalLink, text: "Sağ alttaki tepsi simgesi → çıkış" },
   ];
   return (

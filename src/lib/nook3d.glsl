@@ -64,20 +64,21 @@ float acc(vec3 p){
   float d=1e3;
   vec3 eL=vec3(-uEye.y,uEye.x,uEye.z), eR=vec3(uEye.y,uEye.x,uEye.z);
   // gözlükler
+  // Cam yarıçapı R; köprü iki camın iç kenarını yukarıdan kemerle bağlar
+  float R=.27;
+  float inner=uEye.y-R;
   if(uGlasses==1||uGlasses==2||uGlasses==4){
-    float side = uEye.y+.31;
-    d=min(d,sdCaps(p,vec3(-side,uEye.x+.04,uEye.z),vec3(-side-.12,uEye.x+.08,uEye.z-.5),.035));
-    d=min(d,sdCaps(p,vec3(side,uEye.x+.04,uEye.z),vec3(side+.12,uEye.x+.08,uEye.z-.5),.035));
+    float side = uEye.y+R;
+    d=min(d,sdCaps(p,vec3(-side,uEye.x+.04,uEye.z),vec3(-side-.12,uEye.x+.08,uEye.z-.5),.032));
+    d=min(d,sdCaps(p,vec3(side,uEye.x+.04,uEye.z),vec3(side+.12,uEye.x+.08,uEye.z-.5),.032));
+    d=min(d,sdCaps(p,vec3(-inner,uEye.x+.05,uEye.z),vec3(0.,uEye.x+.1,uEye.z+.03),.026));
+    d=min(d,sdCaps(p,vec3(inner,uEye.x+.05,uEye.z),vec3(0.,uEye.x+.1,uEye.z+.03),.026));
   }
-  if(uGlasses==1){ d=min(d,sdTorus(p-eL,vec2(.3,.042))); d=min(d,sdTorus(p-eR,vec2(.3,.042)));
-     d=min(d,sdCaps(p,vec3(-uEye.y+.29,uEye.x+.06,uEye.z),vec3(0.,uEye.x+.12,uEye.z+.03),.03));
-     d=min(d,sdCaps(p,vec3(uEye.y-.29,uEye.x+.06,uEye.z),vec3(0.,uEye.x+.12,uEye.z+.03),.03)); }
-  if(uGlasses==2){ d=min(d,sdCylZ(p-eL,.31,.05,.04)); d=min(d,sdCylZ(p-eR,.31,.05,.04));
-     d=min(d,sdCaps(p,vec3(-.1,uEye.x+.08,uEye.z+.02),vec3(.1,uEye.x+.08,uEye.z+.02),.035)); }
+  if(uGlasses==1){ d=min(d,sdTorus(p-eL,vec2(R,.038))); d=min(d,sdTorus(p-eR,vec2(R,.038))); }
+  if(uGlasses==2){ d=min(d,sdCylZ(p-eL,R+.02,.05,.04)); d=min(d,sdCylZ(p-eR,R+.02,.05,.04)); }
   if(uGlasses==4){
-     for(int s=0;s<2;s++){ vec3 c=s==0?eL:eR; vec3 q=p-c; float f=abs(sdBox2(q.xy,vec2(.31,.27),.1))-.045; d=min(d,max(f,abs(q.z)-.05)-.0); }
-     d=min(d,sdCaps(p,vec3(-.08,uEye.x+.06,uEye.z),vec3(.08,uEye.x+.06,uEye.z),.04)); }
-  if(uGlasses==3){ d=min(d,sdTorus(p-eR,vec2(.31,.045)));
+     for(int s=0;s<2;s++){ vec3 c=s==0?eL:eR; vec3 q=p-c; float f=abs(sdBox2(q.xy,vec2(R,R-.04),.09))-.042; d=min(d,max(f,abs(q.z)-.05)); } }
+  if(uGlasses==3){ d=min(d,sdTorus(p-eR,vec2(.3,.045)));
      vec3 c=eR+vec3(.2,-.24,0.);
      for(int i=0;i<6;i++){ float t=float(i)/6.; vec3 a=c+vec3(.12*t+.1*sin(t*5.),-.5*t,-.25*t); vec3 b=c+vec3(.12*(t+.17)+.1*sin((t+.17)*5.),-.5*(t+.17),-.25*(t+.17)); d=min(d,sdCaps(p,a,b,.022)); } }
   // başlıklar

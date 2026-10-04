@@ -26,6 +26,11 @@ export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number 
   bean: { y: 0.02, gap: 0.31, z: 0.74 },
 };
 
+/** Gözlük takılınca iki cam arasında köprüye yer kalsın diye gözler biraz açılır */
+export const eyeGap = (look: Look) => (look.glasses === "none" ? ANCHORS[look.shape].gap : Math.max(ANCHORS[look.shape].gap, 0.38));
+/** Gözlük camının ardında gözler küçülür */
+export const EYE_SCALE_GLASSES = 0.6;
+
 const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
 
 interface Renderer {
@@ -78,7 +83,7 @@ function create(): Renderer | null {
         gl.uniform1i(u("uNeck"), NECK_ID[look.neck]);
         gl.uniform1f(u("uFur"), look.texture === "plush" ? 1 : 0);
         gl.uniform3fv(u("uColor"), [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255));
-        gl.uniform4f(u("uEye"), a.y, a.gap, a.z, 0);
+        gl.uniform4f(u("uEye"), a.y, eyeGap(look), a.z, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         out.width = out.height = size;
         ctx.clearRect(0, 0, size, size);

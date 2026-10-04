@@ -3,6 +3,7 @@
  * biçimini, dokusunu (vinil / peluş), rengini, gözlerini ve siyah parlak aksesuarlarını seçer.
  * Gövde ve aksesuarlar lib/nook3d'de 3B çizilir; gözler ifadeleriyle birlikte DOM'da kalır.
  */
+import { create } from "zustand";
 import { useNook } from "../store/nook";
 
 export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean";
@@ -200,3 +201,18 @@ export function describeLook(raw: Look, color = useNook.getState().settings.face
   const wear = [look.glasses, look.head, look.neck].map((k) => WEAR_WORDS[k]).filter(Boolean);
   return `${tone}${look.texture === "plush" ? ", peluş" : ""}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde siyah ${wear.join(", ")}` : ""}`;
 }
+
+// ------------------------------------------------------------------ vitrin (tanıtım)
+
+/** Tanıtımda gösterilen hazır görünümler */
+export const SHOWCASE: { name: string; color: string; look: Look; note: string }[] = [
+  { name: "Pamuk", color: "#F4F4F6", look: { ...DEFAULT_LOOK }, note: "Klasik Nook" },
+  { name: "Bulut", color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead", head: "beret" }, note: "Peluş · bere" },
+  { name: "Fıstık", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", glasses: "shades" }, note: "Güneş gözlüğü" },
+  { name: "Profesör", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "triangle", eyes: "calm", glasses: "round", neck: "bowtie" }, note: "Gözlük · papyon" },
+  { name: "Mercan", color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "flower", texture: "plush", glasses: "monocle" }, note: "Peluş · monokl" },
+  { name: "Ritim", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "bean", eyes: "sparkle", head: "headphones" }, note: "Kulaklık" },
+];
+
+/** Tanıtımdaki "kendi Nook'unu yarat" adımında büyük Nook bu görünüme bürünür (null = kullanıcınınki) */
+export const useShowcase = create<{ pick: { look: Look; color: string } | null }>(() => ({ pick: null }));
