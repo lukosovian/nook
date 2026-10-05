@@ -17,7 +17,7 @@ import { easeOut } from "../../lib/motion";
 import { installUpdate, useUpdate } from "../../lib/update";
 import { SKY_LABEL } from "../../lib/weather";
 import { modelsFor } from "../../hooks/useGemini";
-import { dayKey, useNook } from "../../store/nook";
+import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, Card, MiniNook, tintBg, tintText } from "../ui/primitives";
 
 const LINE_KEY = "nook-today-line";
@@ -251,7 +251,7 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
   const badge = today ? "Bugün" : e.date === dayKey(tomorrow) ? "Yarın" : e.date === dayKey(nextWeek) ? `Haftaya ${weekday}` : weekday;
   const hue = [ACCENT.orange, ACCENT.purple, ACCENT.blue, ACCENT.pink][i % 4];
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 cursor-pointer transition-transform hover:-translate-y-0.5" role="button" title="Argus'ta aç" onClick={() => openTab("argus")}>
       <div className="relative h-[88px] overflow-hidden rounded-[12px]" style={{ background: `linear-gradient(160deg, ${tintBg(hue, 34)} 0%, ${tintBg(hue, 8)} 100%)` }}>
         {src ? (
           <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
@@ -280,13 +280,26 @@ interface TileData {
   color: string;
   eyes?: "open" | "happy" | "closed" | "side";
   icon?: LucideIcon;
+  /** Sağdaki + düğmesi (ör. bir bardak su) */
   action?: () => void;
+  /** Karta basınca açılacak bölüm */
+  open?: Tab;
 }
 
-function Tile({ label, value, color, eyes = "open", action }: TileData) {
+/** Özeti kapatıp adayı o bölümle aç (imleç zaten adada — ada açık kalır) */
+function openTab(tab: Tab) {
+  closeBrief();
+  const s = useNook.getState();
+  s.setPendingTab(tab);
+  s.setTab(tab);
+}
+
+function Tile({ label, value, color, eyes = "open", action, open }: TileData) {
   return (
     <div
-      className="flex h-full min-h-0 items-center gap-2.5 rounded-[16px] border px-3"
+      role={open ? "button" : undefined}
+      onClick={open ? () => openTab(open) : undefined}
+      className={`flex h-full min-h-0 items-center gap-2.5 rounded-[16px] border px-3 transition-[filter,transform] ${open ? "cursor-pointer hover:brightness-125 active:scale-[0.98]" : ""}`}
       style={{ background: `linear-gradient(180deg, ${tintBg(color, 11)} 0%, ${tintBg(color, 5)} 100%)`, borderColor: tintBg(color, 24) }}
     >
       <MiniNook color={color} size={30} eyes={eyes} />
@@ -298,7 +311,10 @@ function Tile({ label, value, color, eyes = "open", action }: TileData) {
       </span>
       {action && (
         <button
-          onClick={action}
+          onClick={(e) => {
+            e.stopPropagation();
+            action();
+          }}
           title="Ekle"
           className="flex size-6 shrink-0 items-center justify-center rounded-full border"
           style={{ background: tintBg(color, 18), borderColor: tintBg(color, 40), color: tintText(color) }}
@@ -334,24 +350,26 @@ function useTiles(): TileData[] {
       value: alarms.length ? alarms.map((a) => `${clock(a)}${alarms.length === 1 && a.label ? ` ${a.label}` : ""}`).join(", ") : "Bugün yok",
       color: ACCENT.orange,
       eyes: alarms.length ? "open" : "closed",
+      open: "alarm",
     },
     { label: "Su", value: water ? `${water} bardak içtin` : "Henüz içmedin", color: ACCENT.blue, eyes: water ? "happy" : "side", action: drankWater },
     {
       label: "Dün",
       value: [yesterday?.focus && `${mins(yesterday.focus)} odak`, yesterday?.game && `${mins(yesterday.game)} oyun`].filter(Boolean).join(" · ") || "Dinlenme günüydü",
       color: ACCENT.red,
+      open: "report",
     },
-    { label: "Gece", value: night ? `${night} bildirim geldi` : "Sessizdi", color: ACCENT.purple, eyes: night ? "open" : "closed" },
+    { label: "Gece", value: night ? `${night} bildirim geldi` : "Sessizdi", color: ACCENT.purple, eyes: night ? "open" : "closed", open: "notify" },
   ];
-  if (devs.length) tiles.push({ label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => `%${d.pct}`).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open" });
+  if (devs.length) tiles.push({ label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => `%${d.pct}`).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open", open: "devices" });
   tiles.push({
     label: "Hafta sonu",
     value: wd === 0 || wd === 6 ? "Keyfini çıkar" : wd === 5 ? "Yarın başlıyor" : `${6 - wd} gün kaldı`,
     color: ACCENT.yellow,
     eyes: wd === 0 || wd === 5 || wd === 6 ? "happy" : "open",
   });
-  if (yesterday?.active) tiles.push({ label: "Dün ekranda", value: mins(yesterday.active), color: ACCENT.green });
-  if (!s.focus) tiles.push({ label: "Odak", value: "Bir tur başlat", color: ACCENT.pink, action: () => (startFocus("work", 0), closeBrief()) });
-  if (yesterday?.music) tiles.push({ label: "Dün müzik", value: mins(yesterday.music), color: ACCENT.pink, eyes: "happy" });
+  if (yesterday?.active) tiles.push({ label: "Dün ekranda", value: mins(yesterday.active), color: ACCENT.green, open: "report" });
+  if (!s.focus) tiles.push({ label: "Pomodoro", value: "Bir tur başlat", color: ACCENT.pink, action: () => (startFocus("work", 0), closeBrief()) });
+  if (yesterday?.music) tiles.push({ label: "Dün müzik", value: mins(yesterday.music), color: ACCENT.pink, eyes: "happy", open: "media" });
   return tiles;
 }

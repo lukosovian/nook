@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, PresenceContext } from "motion/react";
 import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { easeOut } from "../../lib/motion";
@@ -8,6 +8,7 @@ import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
 import { ArgusPanel } from "./ArgusPanel";
+import { ARGUS_BLUE } from "../ArgusPromo";
 import { epLabel, todayEpisodes, useArgus, watching } from "../../lib/argus";
 import { AppsPanel } from "./AppsPanel";
 import { FocusPanel } from "./FocusPanel";
@@ -35,9 +36,9 @@ type Module = Exclude<Tab, "home">;
 
 const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "today", label: "Bugün", color: ACCENT.yellow },
-  { id: "media", label: "Müzik", color: ACCENT.pink },
-  { id: "argus", label: "İzliyorum", color: ACCENT.orange },
-  { id: "focus", label: "Odak", color: ACCENT.red },
+  { id: "media", label: "Medya", color: ACCENT.pink },
+  { id: "argus", label: "Argus", color: ARGUS_BLUE },
+  { id: "focus", label: "Pomodoro", color: ACCENT.red },
   { id: "shelf", label: "Raf", color: ACCENT.teal },
   { id: "clip", label: "Pano", color: ACCENT.purple },
   { id: "note", label: "Not", color: ACCENT.orange },
@@ -45,7 +46,7 @@ const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "apps", label: "Kısayollar", color: ACCENT.blue },
   { id: "notify", label: "Bildirimler", color: ACCENT.purple },
   { id: "control", label: "Kontrol", color: ACCENT.green },
-  { id: "devices", label: "Cihazlar", color: ACCENT.blue },
+  { id: "devices", label: "Lukonnect", color: ACCENT.blue },
   { id: "stats", label: "Sistem", color: ACCENT.red },
   { id: "play", label: "Oyun", color: ACCENT.pink },
   { id: "report", label: "Karne", color: ACCENT.teal },
@@ -138,9 +139,14 @@ export function Panels() {
           exit={{ opacity: 0, y: -4, filter: "blur(3px)" }}
           transition={{ duration: 0.16, ease: easeOut }}
         >
-          <Boundary resetKey={tab}>
-            <Active />
-          </Boundary>
+          {/* AnimatePresence initial={false} ilk çizimdeki sekmeye "giriş animasyonu yok" der ve Motion bunu
+              içerideki her öğeye geçirir: ada doğrudan bir sekmeyle açılınca (ya da tam ekrana geçince) o sekmede
+              sonradan beliren her şey — önizlemeler, konfeti, kartlar — animasyonsuz son hâline atlıyordu. */}
+          <PresenceContext.Provider value={null}>
+            <Boundary resetKey={tab}>
+              <Active />
+            </Boundary>
+          </PresenceContext.Provider>
         </motion.div>
       </AnimatePresence>
     </Frame>
@@ -174,9 +180,7 @@ function ModuleGrid() {
   const sub = useModuleStatus();
   const argus = useArgus((s) => !!s.snap);
   const promo = useNook((s) => s.settings.argusPromo);
-  const modules = MODULES.filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo)).map((m) =>
-    m.id === "argus" && !argus ? { ...m, label: "Argus", color: "#1a8cff" } : m,
-  );
+  const modules = MODULES.filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo));
   return (
     <div ref={scroller} className="-mr-1.5 grid h-full auto-rows-[41px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5">
       {modules.map((m, i) => (
@@ -216,7 +220,6 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
   const focus = useNook((s) => s.focus);
   const apps = useNook((s) => s.pinnedApps.length);
   const notifs = useNook((s) => s.notifications.length);
-  const best = useNook((s) => Math.max(0, ...Object.values(s.scores)));
   const active = useNook((s) => s.days[dayKey()]?.active ?? 0);
   const argusSnap = useArgus((s) => s.snap);
   const newToday = todayEpisodes(argusSnap);
@@ -238,7 +241,7 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
     focus: { text: focus ? `${PHASE_LABEL[focus.phase]} · ${mmss(remaining(focus))}` : "Başlat" },
     apps: { text: apps ? `${apps} kısayol` : "Ekle" },
     notify: { text: notifs ? `${notifs} bildirim` : "Sessiz" },
-    play: { text: best ? `Rekor ${best}` : "Yakala · Hafıza" },
+    play: { text: "5 mini oyun" },
     notes: { text: `${latestNote().version} · ${latestNote().headline}` },
     look: { text: "Kostüm, renk, şapka" },
     report: { text: active ? `Bugün ${active >= 60 ? `${Math.floor(active / 60)} sa ${active % 60} dk` : `${active} dk`}` : "Bu hafta" },

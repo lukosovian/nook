@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ek, useNookName } from "../../lib/look";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { Header, Over } from "./games/kit";
+import { Jump, Pairs, Whack } from "./games/MoreGames";
 
-type Game = "catch" | "simon";
+type Game = "catch" | "simon" | "whack" | "pairs" | "jump";
 
 const GAMES: { id: Game; title: string; hint: string; color: string }[] = [
-  { id: "catch", title: "Yakala", hint: "Kaçan Nook'a 20 saniyede kaç kez dokunabilirsin?", color: ACCENT.pink },
-  { id: "simon", title: "Hafıza", hint: "Nook'ların yanma sırasını aklında tut, aynısını tekrarla", color: ACCENT.blue },
+  { id: "catch", title: "Yakala", hint: "20 sn'de kaçan Nook'u yakala", color: ACCENT.pink },
+  { id: "simon", title: "Hafıza", hint: "Yanma sırasını aklında tut, tekrarla", color: ACCENT.blue },
+  { id: "whack", title: "Köstebek", hint: "Çıkanlara dokun, kırmızıdan kaç", color: ACCENT.orange },
+  { id: "pairs", title: "Eşleştir", hint: "Kartları çevir, aynı Nook'ları bul", color: ACCENT.purple },
+  { id: "jump", title: "Zıpla", hint: "Engellerin üstünden atla", color: ACCENT.green },
 ];
 
-/** Nook'la oyun: iki mini oyun ve rekorlar. */
+/** Nook'la oyun: beş mini oyun ve rekorlar. */
 export function PlayPanel() {
   const [game, setGame] = useState<Game | null>(null);
   const scores = useNook((s) => s.scores);
@@ -22,11 +27,14 @@ export function PlayPanel() {
 
   if (game === "catch") return <Catch onBack={() => setGame(null)} />;
   if (game === "simon") return <Simon onBack={() => setGame(null)} />;
+  if (game === "whack") return <Whack onBack={() => setGame(null)} />;
+  if (game === "pairs") return <Pairs onBack={() => setGame(null)} />;
+  if (game === "jump") return <Jump onBack={() => setGame(null)} />;
 
   return (
     <div className="flex h-full flex-col gap-2">
       <p className="text-[10.5px] text-label-3">Birlikte oynayınca {ek(name, "un")} keyfi yerine gelir</p>
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
+      <div className="-mr-1.5 grid min-h-0 flex-1 auto-rows-[minmax(92px,1fr)] grid-cols-3 gap-2 overflow-y-auto pr-1.5">
         {GAMES.map((g) => (
           <motion.button
             key={g.id}
@@ -34,11 +42,11 @@ export function PlayPanel() {
             whileTap={{ scale: 0.96 }}
             transition={spring.pop}
             onClick={() => setGame(g.id)}
-            className="flex flex-col items-start justify-between rounded-[16px] border p-3 text-left"
+            className="flex flex-col items-start justify-between rounded-[16px] border p-2.5 text-left"
             style={{ background: tintBg(g.color, 10), borderColor: tintBg(g.color, 30) }}
           >
             <div className="flex w-full items-center justify-between">
-              <MiniNook color={g.color} size={30} eyes={g.id === "catch" ? "side" : "open"} />
+              <MiniNook color={g.color} size={26} eyes={g.id === "catch" ? "side" : g.id === "pairs" ? "happy" : "open"} />
               {!!scores[g.id] && (
                 <span className="flex items-center gap-1 text-[10.5px] font-medium tabular-nums" style={{ color: tintText(g.color) }}>
                   <Trophy size={10} strokeWidth={2.6} />
@@ -47,44 +55,15 @@ export function PlayPanel() {
               )}
             </div>
             <div>
-              <p className="text-[14px] font-medium" style={{ color: tintText(g.color) }}>
+              <p className="text-[13px] font-medium" style={{ color: tintText(g.color) }}>
                 {g.title}
               </p>
-              <p className="mt-0.5 text-[10.5px] leading-snug text-label-3">{g.hint}</p>
+              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-label-3">{g.hint}</p>
             </div>
           </motion.button>
         ))}
       </div>
     </div>
-  );
-}
-
-function Header({ onBack, title, right }: { onBack: () => void; title: string; right: React.ReactNode }) {
-  return (
-    <div className="flex shrink-0 items-center justify-between">
-      <button onClick={onBack} className="flex items-center gap-0.5 rounded-full py-0.5 pl-1 pr-2 text-[11px] font-medium text-label-2 hover:bg-well-hi hover:text-label">
-        <ChevronLeft size={12} strokeWidth={2.6} />
-        {title}
-      </button>
-      <div className="flex items-center gap-3 text-[11px] font-medium tabular-nums">{right}</div>
-    </div>
-  );
-}
-
-function Over({ score, best, onAgain, color }: { score: number; best: number; onAgain: () => void; color: string }) {
-  const record = score > 0 && score >= best;
-  return (
-    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-      <MiniNook color={color} size={34} eyes={record ? "happy" : "open"} />
-      <p className="text-[15px] font-medium text-label">{record ? `Yeni rekor: ${score}!` : `Skor: ${score}`}</p>
-      <button
-        onClick={onAgain}
-        className="rounded-full border px-3.5 py-1 text-[12px] font-medium"
-        style={{ background: tintBg(color, 18), borderColor: tintBg(color, 45), color: tintText(color) }}
-      >
-        Tekrar oyna
-      </button>
-    </motion.div>
   );
 }
 

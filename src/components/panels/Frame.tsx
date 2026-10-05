@@ -87,7 +87,8 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
       >
         <Card className="h-full w-full overflow-hidden p-3">
           {/* Tam ekranda içerik yakınlaşır: yazılar, düğmeler, liste satırları birlikte büyür */}
-          {z === 1 ? children : <div style={{ zoom: z, width: (c.w - 24) / z, height: (c.h - 24) / z }}>{children}</div>}
+          {/* Hep aynı sarmalayıcı: tam ekrana geçince içerik baştan oluşmasın (kaydırma, girdiler, önizlemeler korunur) */}
+          <div style={{ zoom: z, width: (c.w - 24) / z, height: (c.h - 24) / z }}>{children}</div>
         </Card>
       </motion.div>
     </motion.div>

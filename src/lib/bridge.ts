@@ -177,6 +177,18 @@ export const alarmRing = (on: boolean, sound = 1, preview = false) =>
 /** Varsayılan ses çıkışını değiştir */
 export const quickOutput = (id: string) => (inTauri ? invoke<void>("quick_output", { id }) : Promise.resolve());
 /** Ana ses seviyesi (0–1) */
+/** Uygulama bazlı ses (Windows Ses Karıştırıcısı gibi) */
+export interface AppVolume {
+  key: string;
+  name: string;
+  path: string | null;
+  volume: number;
+  muted: boolean;
+  active: boolean;
+}
+export const mixerList = () => (inTauri ? invoke<AppVolume[]>("mixer_list") : Promise.resolve([] as AppVolume[]));
+export const mixerSet = (key: string, volume?: number, muted?: boolean) => (inTauri ? invoke<void>("mixer_set", { key, volume, muted }) : Promise.resolve());
+
 export const quickVolume = (value: number) => (inTauri ? invoke<void>("quick_volume", { value }) : Promise.resolve());
 /** Ekran parlaklığı 0–100 (dizüstü paneli WMI, harici monitörler DDC/CI); desteklenmiyorsa null */
 export const brightnessGet = () => (inTauri ? invoke<number | null>("brightness_get") : Promise.resolve(70));

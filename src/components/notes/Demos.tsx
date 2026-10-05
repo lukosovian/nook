@@ -382,7 +382,60 @@ function LookChip() {
   );
 }
 
+/** Beş oyunun mini Nook'ları sırayla zıplar */
+function Games() {
+  const n = useTick(500);
+  const games = [
+    { c: ACCENT.pink, t: "Yakala" },
+    { c: ACCENT.blue, t: "Hafıza" },
+    { c: ACCENT.orange, t: "Köstebek" },
+    { c: ACCENT.purple, t: "Eşleştir" },
+    { c: ACCENT.green, t: "Zıpla" },
+  ];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex items-center justify-center gap-2.5">
+        {games.map((g, i) => (
+          <div key={g.t} className="flex flex-col items-center gap-1">
+            <motion.div animate={{ y: n % games.length === i ? -10 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 14 }}>
+              <span className="block h-7 w-7 rounded-full" style={{ background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${g.c} 55%, white) 0%, ${g.c} 45%, color-mix(in srgb, ${g.c} 70%, black) 100%)` }} />
+            </motion.div>
+            <span className="text-[9.5px]" style={{ color: tintText(g.c) }}>
+              {g.t}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Stage>
+  );
+}
+
+/** Uygulama sesleri: kaydırıcılar kendi kendine iner çıkar */
+function Mixer() {
+  const n = useTick(1100);
+  const rows = ["Spotify", "Discord", "Chrome"];
+  return (
+    <Stage>
+      <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 space-y-1.5">
+        {rows.map((r, i) => {
+          const v = [0.8, 0.35, 0.6][i] + (((n + i) % 3) - 1) * 0.15;
+          return (
+            <div key={r} className="flex items-center gap-2 rounded-[10px] bg-white/[0.05] px-2 py-1">
+              <span className="w-[54px] text-[10px] text-label">{r}</span>
+              <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-white/10">
+                <motion.div className="h-full rounded-full" style={{ background: ACCENT.pink }} animate={{ width: `${v * 100}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
+  games: Games,
+  mixer: Mixer,
   drag: Drag,
   lookchip: LookChip,
   halloween: Halloween,

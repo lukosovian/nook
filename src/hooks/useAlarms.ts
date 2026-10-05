@@ -4,6 +4,8 @@ import { useNook } from "../store/nook";
 
 /** Alarm bu kadar çalınca (kimse dokunmazsa) kendiliğinden susar. */
 const AUTO_STOP_MS = 3 * 60_000;
+/** Vakti bundan çok geçmiş alarm çalmaz, "kaçırıldı" diye bildirilir */
+const MISSED_AFTER_MS = 10 * 60_000;
 
 /**
  * Saniyede bir zamanı gelen alarmı arar ve çalar. Yalnızca ana adada çalışır
@@ -30,6 +32,13 @@ export function useAlarms() {
       const now = Date.now();
       const due = s.alarms.find((a) => a.enabled && a.next !== null && a.next <= now);
       if (!due) return;
+      // Bilgisayar uyurken kaçtıysa (Rust'taki gibi 10 dk'dan eski) saatler sonra çalmasın: haber ver, yeniden kur
+      if (now - due.next! > MISSED_AFTER_MS) {
+        s.fireAlarm(due.id);
+        const at = new Date(due.next!);
+        s.pushToast({ kind: "chat", title: `Kaçırılan alarm · ${at.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`, detail: due.label || "Bilgisayar o sırada uykudaydı", ms: 9000 });
+        return;
+      }
       s.fireAlarm(due.id);
       s.setRinging(due);
       // Sessiz alarm ya da "Sessiz" ses ayarı → yalnızca ada açılır

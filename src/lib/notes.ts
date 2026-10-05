@@ -23,7 +23,9 @@ export type DemoId =
   | "glasses"
   | "look"
   | "drag"
-  | "lookchip";
+  | "lookchip"
+  | "games"
+  | "mixer";
 
 export interface NoteItem {
   title: string;
@@ -40,6 +42,29 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.32",
+    date: "6 Ekim 2026",
+    headline: "Yeni oyunlar, uygulama sesi",
+    items: [
+      { title: "Üç yeni oyun", text: "Köstebek, Eşleştir ve Zıpla. Oyun bölümünde artık beş oyun var, her birinin rekoru ayrı.", demo: "games" },
+      {
+        title: "Uygulama bazlı ses",
+        text: "Kontrol › Uygulama sesi: her uygulamanın sesini ayrı ayrı aç, kıs ya da sustur. Parlaklığı değiştirmeye izin vermeyen ekranlarda parlaklık kaydırıcısı artık görünmüyor.",
+        demo: "mixer",
+      },
+      {
+        title: "Bugün'e dokun",
+        text: "Günün özetindeki kartlara dokununca ilgili bölüm açılır: alarm, karne, bildirimler, diziler. Karne'de notun nasıl hesaplandığı da artık görünüyor.",
+        demo: "notes",
+      },
+      {
+        title: "Yeni adlar",
+        text: "Müzik → Medya, İzliyorum → Argus, Odak → Pomodoro, Cihazlar → Lukonnect. Tam ekranda önizlemeler de düzgün oynuyor.",
+        demo: "lookchip",
+      },
+    ],
+  },
   {
     version: "0.2.31",
     date: "5 Ekim 2026",

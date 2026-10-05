@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Bluetooth, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
-import { brightnessGet, brightnessSet, quickAction, quickOutput, quickSet, quickState, quickVolume, type QuickKey, type QuickState } from "../../lib/bridge";
+import { AppWindow, Bluetooth, ChevronLeft, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, SlidersHorizontal, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { brightnessGet, brightnessSet, fileIcon, mixerList, mixerSet, quickAction, quickOutput, quickSet, quickState, quickVolume, type AppVolume, type QuickKey, type QuickState } from "../../lib/bridge";
 import { spring } from "../../lib/motion";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 
@@ -17,16 +17,39 @@ export function ControlPanel() {
   const [error, setError] = useState<string | null>(null);
   // Parlaklık yavaş okunur (DDC/CI) — yalnızca açılışta; desteklenmiyorsa kaydırıcı gizlenir
   const [light, setLight] = useState<number | null | undefined>(undefined);
+  const [mixer, setMixer] = useState(false);
+  const verify = useRef(0);
 
   const refresh = useCallback(() => void quickState().then((s) => s && setState(s)), []);
   useEffect(() => {
     refresh();
-    void brightnessGet()
-      .then((v) => setLight(v ?? null))
-      .catch(() => setLight(null));
+    if (brightnessBroken()) setLight(null);
+    else
+      void brightnessGet()
+        .then((v) => setLight(v ?? null))
+        .catch(() => setLight(null));
     const t = window.setInterval(refresh, 2000);
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearInterval(t);
+      window.clearTimeout(verify.current);
+    };
   }, [refresh]);
+
+  /**
+   * Bazı ekranlar parlaklığı okutur ama değiştirmeye izin vermez (DDC/CI kapalı, masaüstü monitör).
+   * Ayarladıktan sonra geri oku; tutmadıysa kaydırıcıyı kaldır ve bir daha gösterme.
+   */
+  const checkBrightness = (want: number) => {
+    window.clearTimeout(verify.current);
+    verify.current = window.setTimeout(() => {
+      void brightnessGet().then((got) => {
+        if (got != null && Math.abs(got - want) <= 6) return;
+        markBrightnessBroken();
+        setLight(null);
+        setError("Bu ekran parlaklığın uygulamadan ayarlanmasına izin vermiyor — kaydırıcı kaldırıldı");
+      });
+    }, 1500);
+  };
 
   const toggle = async (key: QuickKey, on: boolean) => {
     setBusy(key);
@@ -53,7 +76,7 @@ export function ControlPanel() {
     refresh();
   };
   // Wi-Fi, Bluetooth, ses çıkışı, (ses kaydırıcısı yoksa) Ses + her zaman olan dört düğme
-  const toggles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (nextOutput ? 1 : 0) + (vol == null ? 1 : 0) + 4;
+  const toggles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (nextOutput ? 1 : 0) + (vol == null ? 1 : 0) + 5;
   return (
     <div className="flex h-full gap-1.5">
       {vol != null && (
@@ -78,10 +101,14 @@ export function ControlPanel() {
           onChange={(v) => {
             setLight(Math.round(v * 100));
             void brightnessSet(v * 100);
+            checkBrightness(Math.round(v * 100));
           }}
         />
       )}
 
+      {mixer ? (
+        <AppMixer onBack={() => setMixer(false)} />
+      ) : (
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {/* Az düğme varsa tek sütun (adlar kesilmesin) */}
         <div className={`grid min-h-0 flex-1 auto-rows-[38px] content-center gap-1.5 ${toggles > 4 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -105,10 +132,115 @@ export function ControlPanel() {
           )}
           <Toggle label="Kilitle" icon={Lock} color={ACCENT.teal} action onClick={() => void quickAction("lock")} />
           <Toggle label="Ekranı kapat" icon={MonitorOff} color={ACCENT.teal} action onClick={() => void quickAction("screen-off")} />
+          <Toggle label="Uygulama sesi" icon={SlidersHorizontal} color={ACCENT.pink} action onClick={() => setMixer(true)} />
         </div>
         {error && <p className="truncate text-[10px] text-red/90" title={error}>{error}</p>}
       </div>
+      )}
     </div>
+  );
+}
+
+const BRIGHTNESS_OFF = "nook-brightness-off";
+const brightnessBroken = () => {
+  try {
+    return localStorage.getItem(BRIGHTNESS_OFF) === "1";
+  } catch {
+    return false;
+  }
+};
+const markBrightnessBroken = () => {
+  try {
+    localStorage.setItem(BRIGHTNESS_OFF, "1");
+  } catch {
+    /* önemsiz */
+  }
+};
+
+/**
+ * Uygulama bazlı ses: her uygulama bir satır (ikon, ad, yatay kaydırıcı, sessiz). Çalanlar üstte.
+ * Liste 2 sn'de bir tazelenir — yeni açılan uygulama da gelir.
+ */
+function AppMixer({ onBack }: { onBack: () => void }) {
+  const [apps, setApps] = useState<AppVolume[] | null>(null);
+  // Kaydırırken tazeleme değeri geri itmesin
+  const dragging = useRef<string | null>(null);
+  useEffect(() => {
+    const load = () =>
+      void mixerList().then((l) =>
+        setApps((prev) => (dragging.current && prev ? l.map((a) => (a.key === dragging.current ? (prev.find((p) => p.key === a.key) ?? a) : a)) : l)),
+      );
+    load();
+    const t = window.setInterval(load, 2000);
+    return () => window.clearInterval(t);
+  }, []);
+  const patchApp = (key: string, p: Partial<AppVolume>) => setApps((l) => l?.map((a) => (a.key === key ? { ...a, ...p } : a)) ?? l);
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <div className="mb-1 flex items-center gap-1">
+        <button onClick={onBack} className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title="Geri">
+          <ChevronLeft size={13} strokeWidth={2.4} />
+        </button>
+        <span className="text-[11.5px] font-medium text-label-2">Uygulama sesi</span>
+      </div>
+      <div className="-mr-1.5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1.5">
+        {apps === null && <p className="py-4 text-center text-[11px] text-label-3">Yükleniyor…</p>}
+        {apps?.length === 0 && <p className="py-4 text-center text-[11px] text-label-3">Şu an ses çıkaran bir uygulama yok</p>}
+        {apps?.map((a) => {
+          const pct = Math.round((a.muted ? 0 : a.volume) * 100);
+          return (
+            <div key={a.key} className="flex items-center gap-2 rounded-[12px] bg-well px-2 py-1.5">
+              <AppIcon path={a.path} />
+              <span className="w-[74px] shrink-0 truncate text-[11px] font-medium text-label" title={a.name}>
+                {a.name}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={pct}
+                onPointerDown={() => (dragging.current = a.key)}
+                onPointerUp={() => (dragging.current = null)}
+                onChange={(e) => {
+                  const v = Number(e.target.value) / 100;
+                  patchApp(a.key, { volume: v, muted: false });
+                  void mixerSet(a.key, v, a.muted && v > 0 ? false : undefined);
+                }}
+                className="min-w-0 flex-1"
+                style={{ accentColor: ACCENT.pink }}
+              />
+              <span className="w-[24px] shrink-0 text-right text-[10px] tabular-nums text-label-3">{pct}</span>
+              <button
+                onClick={() => {
+                  patchApp(a.key, { muted: !a.muted });
+                  void mixerSet(a.key, undefined, !a.muted);
+                }}
+                title={a.muted ? "Sesi aç" : "Sessize al"}
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full hover:bg-well-hi"
+                style={{ color: a.muted ? tintText(ACCENT.red) : "var(--color-label-2)" }}
+              >
+                {a.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AppIcon({ path }: { path: string | null }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (path) void fileIcon(path, 32).then(setSrc).catch(() => undefined);
+  }, [path]);
+  return src ? (
+    <img src={src} alt="" className="h-[18px] w-[18px] shrink-0" draggable={false} />
+  ) : (
+    <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-label-3">
+      <AppWindow size={14} />
+    </span>
   );
 }
 

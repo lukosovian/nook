@@ -109,7 +109,7 @@ export function ArgusLinked({ watching }: { watching: { id: string; title: strin
         ))}
         {!watching.length && <p className="text-[12px] text-label-3">Argus'ta İzleniyor olan diziler burada görünecek.</p>}
       </div>
-      <p className="mt-auto text-[11px] text-label-3">Ana sayfadaki "İzliyorum" çipinden açılır · Ayarlar › Argus</p>
+      <p className="mt-auto text-[11px] text-label-3">Ana sayfadaki "Argus" çipinden açılır · Ayarlar › Argus</p>
     </div>
   );
 }

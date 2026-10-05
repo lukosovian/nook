@@ -11,6 +11,7 @@ mod imaging;
 mod log;
 mod lukonnect;
 mod media;
+mod mixer;
 mod net;
 mod notify;
 mod privacy;
@@ -92,6 +93,8 @@ pub fn run() {
             quick::quick_action,
             quick::quick_volume,
             quick::quick_output,
+            mixer::mixer_list,
+            mixer::mixer_set,
             brightness::brightness_get,
             brightness::brightness_set,
             alarm::alarm_ring,

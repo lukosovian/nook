@@ -140,8 +140,8 @@ export function HoverArt() {
 
 const MODULES: { label: string; desc: string; color: string }[] = [
   { label: "Bugün", desc: "Hava, alarm, günün özeti", color: ACCENT.yellow },
-  { label: "Müzik", desc: "Çalan şarkıyı yönet", color: ACCENT.pink },
-  { label: "Odak", desc: "Pomodoro sayacı", color: ACCENT.red },
+  { label: "Medya", desc: "Çalan müziği ve videoyu yönet", color: ACCENT.pink },
+  { label: "Pomodoro", desc: "Odaklanma sayacı", color: ACCENT.red },
   { label: "Raf", desc: "Bana bıraktığın dosyalar", color: ACCENT.teal },
   { label: "Pano", desc: "Kopyaladıkların, çevirisi", color: ACCENT.purple },
   { label: "Not", desc: "Hızlı karalama", color: ACCENT.orange },
