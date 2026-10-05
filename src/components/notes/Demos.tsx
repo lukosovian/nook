@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, Check, Maximize2, RotateCw, ScrollText, Sparkles } from "lucide-react";
+import { Bell, Check, Maximize2, MousePointer2, Move, RotateCw, ScrollText, Sparkles } from "lucide-react";
 import { DEFAULT_LOOK, HALLOWEEN, normalizeColor, normalizeLook, SHOWCASE, type Look } from "../../lib/look";
 import type { DemoId } from "../../lib/notes";
 import { useNook } from "../../store/nook";
@@ -316,7 +316,75 @@ function Alarm() {
   );
 }
 
+/** Ada üstten tutulup ekranın başka yerine taşınır, sonra "Ortala" ile döner */
+function Drag() {
+  const face = useFace();
+  const n = useTick(1400);
+  const spots = [
+    { x: 0, y: 0, top: true },
+    { x: -70, y: 52, top: false },
+    { x: 80, y: 86, top: false },
+    { x: 0, y: 0, top: true },
+  ];
+  const p = spots[n % spots.length];
+  return (
+    <Stage>
+      <motion.div
+        className="absolute left-1/2 top-0"
+        animate={{ x: p.x - 64, y: p.y }}
+        transition={{ type: "spring", stiffness: 140, damping: 18 }}
+      >
+        <motion.div
+          className="relative flex h-[34px] w-[128px] items-center justify-center bg-black"
+          animate={{ borderRadius: p.top ? "0px 0px 14px 14px" : "14px 14px 14px 14px" }}
+          style={{ boxShadow: p.top ? "none" : "0 6px 16px -6px rgba(0,0,0,0.8)" }}
+        >
+          <NookFigure look={face.look} color={face.color} size={20} />
+          <Move size={9} className="absolute right-2 top-1/2 -translate-y-1/2 text-label-3" />
+        </motion.div>
+        <MousePointer2 size={14} className="absolute right-0 top-4 text-white drop-shadow" fill="white" />
+      </motion.div>
+      <div
+        className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[10px] font-medium"
+        style={{ background: tintBg(ACCENT.blue, 18), color: tintText(ACCENT.blue) }}
+      >
+        {n % spots.length === 3 ? "Ortala" : "Sürükle · bırak"}
+      </div>
+    </Stage>
+  );
+}
+
+/** Ana sayfadaki Görünüm çipi, dokununca Nook kostüm değiştirir */
+function LookChip() {
+  const n = useTick(1300);
+  const cur = HALLOWEEN[n % HALLOWEEN.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex items-center justify-center gap-4">
+        <motion.div
+          className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3"
+          style={{ background: tintBg(ACCENT.pink, 12), borderColor: tintBg(ACCENT.pink, 34) }}
+          animate={{ scale: [1, 0.94, 1] }}
+          transition={{ duration: 0.35, repeat: Infinity, repeatDelay: 0.95 }}
+        >
+          <span className="h-6 w-6 rounded-full" style={{ background: ACCENT.pink }} />
+          <span className="text-[12px] font-medium" style={{ color: tintText(ACCENT.pink) }}>
+            Görünüm
+          </span>
+        </motion.div>
+        <AnimatePresence mode="popLayout">
+          <motion.div key={n} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }}>
+            <NookFigure look={cur.look} color={cur.color} size={52} />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
+  drag: Drag,
+  lookchip: LookChip,
   halloween: Halloween,
   notes: NotesStack,
   move: LoopMove,

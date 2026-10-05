@@ -36,12 +36,25 @@ pub fn width_of(label: &str) -> f64 {
 /// Ada kaybolma animasyonu (ekran geçiş efektleri) bitene kadar pencere yerinde bekler.
 const RELOCATE_OUT: Duration = Duration::from_millis(470);
 
-/// Pencereyi verilen monitörün üst-orta noktasına yapıştırır.
+/// Pencereyi verilen monitöre yerleştirir: kullanıcının sürükleyip bıraktığı yere (oranla), yoksa üst ortaya.
+/// Pencere ekrandan taşmaz — alttayken açılan ada aşağı sarkmasın diye yukarı itilir.
 pub fn place_on(win: &WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
-    let width = (width_of(win.label()) * monitor.scale_factor()).round() as i32;
+    let scale = monitor.scale_factor();
+    let width = (width_of(win.label()) * scale).round() as i32;
+    let height = win.outer_size().map(|s| s.height as i32).unwrap_or((WIN_H * scale).round() as i32);
     let origin = monitor.position();
-    let x = origin.x + (monitor.size().width as i32 - width) / 2;
-    win.set_position(PhysicalPosition::new(x, origin.y))?;
+    let (mw, mh) = (monitor.size().width as i32, monitor.size().height as i32);
+    let pos = win.app_handle().state::<Arc<Shared>>().settings().island_pos;
+    let (x, y) = match pos {
+        Some(p) => {
+            let cx = origin.x + (p.fx * mw as f64).round() as i32;
+            let x = (cx - width / 2).clamp(origin.x, (origin.x + mw - width).max(origin.x));
+            let y = origin.y + ((p.fy * mh as f64).round() as i32).clamp(0, (mh - height).max(0));
+            (x, y)
+        }
+        None => (origin.x + (mw - width) / 2, origin.y),
+    };
+    win.set_position(PhysicalPosition::new(x, y))?;
     // Ekran değişince (ölçek, HDR) WebView2 beyaz zemine dönebiliyor
     clear_background(win);
     Ok(())
@@ -256,4 +269,33 @@ pub fn clear_background(win: &WebviewWindow) {
     });
     #[cfg(not(windows))]
     let _ = win;
+}
+
+/// Ada üst kenara bu kadar (mantıksal px) yakın bırakılırsa üste yapışır
+const SNAP_TOP: f64 = 28.0;
+
+#[derive(Serialize, Clone)]
+pub struct DroppedPos {
+    pub fx: f64,
+    pub fy: f64,
+}
+
+/// Sürükleme bitti: pencerenin yeni yerini, bulunduğu ekrana oranla frontend'e bildir (ayar olarak saklanır).
+pub fn finish_drag(app: &AppHandle, label: &str) {
+    let Some(win) = app.get_webview_window(label) else { return };
+    let (Ok(pos), Ok(size)) = (win.outer_position(), win.outer_size()) else { return };
+    let cx = pos.x as f64 + size.width as f64 / 2.0;
+    let monitors = app.available_monitors().unwrap_or_default();
+    let Some(m) = monitor_at(&monitors, cx, pos.y as f64 + 1.0).or_else(|| primary_monitor(app)) else { return };
+    let (o, ms, scale) = (m.position(), m.size(), m.scale_factor());
+    let top = (pos.y - o.y).max(0) as f64;
+    let fx = ((cx - o.x as f64) / ms.width as f64).clamp(0.0, 1.0);
+    let fy = if top < SNAP_TOP * scale { 0.0 } else { (top / ms.height as f64).clamp(0.0, 1.0) };
+    // Ortaya çok yakın ve üste yapışıksa: tam orta (eski yerine) dönsün
+    let centered = fy == 0.0 && (fx - 0.5).abs() * ms.width as f64 / scale < 24.0;
+    if centered {
+        let _ = app.emit("nook://island-pos", Option::<DroppedPos>::None);
+    } else {
+        let _ = app.emit("nook://island-pos", Some(DroppedPos { fx, fy }));
+    }
 }

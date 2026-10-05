@@ -21,7 +21,9 @@ export type DemoId =
   | "fullscreen"
   | "alarm"
   | "glasses"
-  | "look";
+  | "look"
+  | "drag"
+  | "lookchip";
 
 export interface NoteItem {
   title: string;
@@ -38,6 +40,19 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.31",
+    date: "5 Ekim 2026",
+    headline: "Adayı istediğin yere taşı",
+    items: [
+      {
+        title: "Sürükle, bırak",
+        text: "Açık adanın üstündeki ✥ tutamacını basılı tutup sürükle: ada ekranda istediğin yere gider, üst kenara yaklaştırınca oraya yapışır. Geri almak için sağ tık › Ortala ya da Ayarlar › Adanın yeri › Ortala.",
+        demo: "drag",
+      },
+      { title: "Görünüm çipi", text: "Nook'unu giydirmek için artık ana sayfadaki Görünüm çipine dokunman yeter.", demo: "lookchip" },
+    ],
+  },
   {
     version: "0.2.30",
     date: "5 Ekim 2026",

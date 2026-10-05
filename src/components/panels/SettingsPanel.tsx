@@ -121,6 +121,14 @@ export function SettingsPanel() {
             />
           </Row>
         )}
+        <Row label="Adanın yeri">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-label-3">{s.islandPos ? "Taşındı" : "Üst orta"} · üstteki ✥ ile sürükle</span>
+            <TextButton disabled={!s.islandPos} onClick={() => update({ islandPos: null })}>
+              Ortala
+            </TextButton>
+          </div>
+        </Row>
       </Section>
 
       <Section title="Bildirimler">

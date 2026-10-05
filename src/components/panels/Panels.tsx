@@ -49,6 +49,7 @@ const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "stats", label: "Sistem", color: ACCENT.red },
   { id: "play", label: "Oyun", color: ACCENT.pink },
   { id: "report", label: "Karne", color: ACCENT.teal },
+  { id: "look", label: "Görünüm", color: ACCENT.pink },
   { id: "notes", label: "Yama notları", color: ACCENT.orange },
 ];
 
@@ -239,6 +240,7 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
     notify: { text: notifs ? `${notifs} bildirim` : "Sessiz" },
     play: { text: best ? `Rekor ${best}` : "Yakala · Hafıza" },
     notes: { text: `${latestNote().version} · ${latestNote().headline}` },
+    look: { text: "Kostüm, renk, şapka" },
     report: { text: active ? `Bugün ${active >= 60 ? `${Math.floor(active / 60)} sa ${active % 60} dk` : `${active} dk`}` : "Bu hafta" },
     argus: {
       text: !argusSnap

@@ -255,6 +255,7 @@ export const DEFAULT_SETTINGS: Settings = {
   nookName: "",
   look: { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none" },
   hideInFullscreen: true,
+  islandPos: null,
   weather: true,
   weatherCity: "",
   alarmSound: 1,

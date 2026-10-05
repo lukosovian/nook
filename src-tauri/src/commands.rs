@@ -47,6 +47,15 @@ pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_
     shortcut::register(&app, &settings.shortcut, &settings.ask_shortcut, &settings.voice_shortcut)
 }
 
+/// Adayı sürüklemeye başla (üst çubuktaki tutamaçtan). Windows'un kendi taşıma döngüsü çalışır;
+/// tuş bırakılınca tracker yeni yeri kaydettirir (bkz. window::finish_drag).
+#[tauri::command]
+pub fn island_drag(window: WebviewWindow, shared: State<'_, Arc<Shared>>) -> Result<(), String> {
+    shared.dragging.store(true, std::sync::atomic::Ordering::Relaxed);
+    *shared.drag_label.lock().unwrap() = window.label().to_owned();
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
 /// Tanıtım ekranı için pencereyi büyütür; bitince varsayılan boyuta döner.
 #[tauri::command]
 pub fn set_window_size(window: WebviewWindow, width: Option<f64>, height: Option<f64>) -> Result<(), String> {

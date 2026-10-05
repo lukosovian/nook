@@ -43,6 +43,7 @@ export const EVENTS = {
   askScreen: "nook://ask-screen",
   online: "nook://online",
   game: "nook://game",
+  islandPos: "nook://island-pos",
   gameStart: "nook://game-start",
   gameBreak: "nook://game-break",
 } as const;
@@ -219,6 +220,14 @@ export interface NativeSettings {
   gameIntro: boolean;
   /** Bu kadar dakikada bir oyun molası hatırlat (0 = kapalı) */
   breakReminderMin: number;
+  /** Sürüklenip bırakılan yer (ekrana oranla); yoksa üst orta */
+  islandPos: IslandPos | null;
+}
+
+/** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */
+export interface IslandPos {
+  fx: number;
+  fy: number;
 }
 
 export interface MonitorInfo {
@@ -251,6 +260,8 @@ export const argusCard = (show: boolean, x: number, y: number) => invoke<void>("
 export const argusInstall = () => invoke<void>("argus_install");
 export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
 /** Tanıtım ekranı için pencereyi büyüt; argümansız çağrı varsayılan boyuta döndürür. */
+/** Adayı sürüklemeye başla (sol tuş basılıyken çağrılmalı) */
+export const islandDrag = () => (inTauri ? invoke<void>("island_drag") : Promise.resolve());
 export const setWindowSize = (width?: number, height?: number) => (inTauri ? invoke<void>("set_window_size", { width, height }) : noop());
 export const releaseFocus = () => (inTauri ? invoke<void>("release_focus") : noop());
 export const openPath = (path: string) =>

@@ -32,6 +32,7 @@ import {
   useRelocateFeed,
   useScreenshotFeed,
   useSearchFeed,
+  useIslandPosFeed,
   useSettingsSync,
   useShelfRevalidation,
   useStatsFeed,
@@ -57,6 +58,7 @@ export default function App() {
   useOsdFeed();
   useRelocateFeed();
   useSearchFeed();
+  useIslandPosFeed();
   useFocusRelease();
   useFeeding();
   useAntics();

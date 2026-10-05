@@ -13,6 +13,7 @@ import {
   syncAutostart,
   type DevicesPayload,
   type DownloadItem,
+  type IslandPos,
   type PrivacyPayload,
   type MediaPayload,
   type StatsPayload,
@@ -289,6 +290,14 @@ export function useRelocateFeed() {
   }, []);
 }
 
+/** Ada sürüklenip bırakıldı: yeni yer ayar olarak saklanır (Rust pencereleri buna göre yerleştirir) */
+export function useIslandPosFeed() {
+  useEffect(() => {
+    if (!isPrimary) return;
+    return subscribe<IslandPos | null>(EVENTS.islandPos, (pos) => useNook.getState().updateSettings({ islandPos: pos ?? null }));
+  }, []);
+}
+
 /** Genel kısayol → hızlı arama. */
 export function useSearchFeed() {
   useEffect(() => subscribe(EVENTS.search, () => useNook.getState().setSearching(true)), []);
@@ -334,6 +343,7 @@ const native = (s: Settings) => ({
   hideInFullscreen: s.hideInFullscreen,
   gameIntro: s.gameIntro,
   breakReminderMin: s.breakReminderMin,
+  islandPos: s.islandPos ?? null,
 });
 
 /** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). Gizliyken kare çizilmez. */

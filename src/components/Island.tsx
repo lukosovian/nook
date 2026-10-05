@@ -103,6 +103,8 @@ export function Island() {
   const media = useNook((s) => s.media);
   const settings = useNook((s) => s.settings);
   const fullscreen = useNook((s) => s.fullscreen);
+  // Üst kenardan ayrı bir yere taşındıysa ada çentik değil, dört köşesi yuvarlak bir hap
+  const detached = useNook((s) => (s.settings.islandPos?.fy ?? 0) > 0);
   const downloading = useNook((s) => s.downloads.length > 0);
   const focusing = useNook((s) => !!s.focus);
   const listening = useNook((s) => s.listening);
@@ -184,7 +186,7 @@ export function Island() {
         initial={{ scale: 0.4, opacity: 0 }}
         animate={fullscreen ? jelly(mood, true) : move ? moveTarget(move) : jelly(mood, false)}
       >
-        {/* Ekrana yapışık çentik: saf siyah, üst köşeler düz, yalnızca alt köşeler yuvarlak */}
+        {/* Ekrana yapışık çentik: saf siyah, üst köşeler düz, yalnızca alt köşeler yuvarlak (taşınınca hepsi) */}
         <motion.div
           ref={ref}
           data-island
@@ -193,8 +195,8 @@ export function Island() {
           animate={{
             width,
             height: shape.height,
-            borderTopLeftRadius: 0,
-            borderTopRightRadius: 0,
+            borderTopLeftRadius: detached ? shape.radius : 0,
+            borderTopRightRadius: detached ? shape.radius : 0,
             borderBottomLeftRadius: shape.radius,
             borderBottomRightRadius: shape.radius,
             boxShadow: SHADOW,

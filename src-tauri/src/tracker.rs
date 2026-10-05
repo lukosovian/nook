@@ -67,6 +67,12 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut candidate: Option<(Monitor, Instant)> = None;
 
             loop {
+                // Ada sürüklenip bırakıldı: yeni yeri kaydettir
+                if shared.dragging.load(std::sync::atomic::Ordering::Relaxed) && !left_button_down() {
+                    shared.dragging.store(false, std::sync::atomic::Ordering::Relaxed);
+                    let label = shared.drag_label.lock().unwrap().clone();
+                    crate::window::finish_drag(&app, &label);
+                }
                 if let Some((px, py)) = cursor_position(&app) {
                     let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                     let forced = shared.forced.lock().unwrap().clone();

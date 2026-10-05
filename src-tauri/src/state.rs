@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicIsize};
 use std::sync::Mutex;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::{PhysicalPosition, WebviewWindow};
 
 /// Pencere-yerel, mantıksal (CSS px) dikdörtgen. Frontend her boyut değişiminde günceller.
@@ -89,6 +89,16 @@ pub struct Settings {
     pub game_intro: bool,
     /// Bu kadar dakikada bir mola hatırlatır (0 = kapalı)
     pub break_reminder_min: u64,
+    /// Kullanıcının sürükleyip bıraktığı yer; yoksa ekranın üst ortası
+    pub island_pos: Option<IslandPos>,
+}
+
+/// Adanın ekrandaki yeri, ekran boyuna oranla: fx üst-orta noktanın yatay yeri, fy üst kenarın
+/// dikey yeri (0 = üste yapışık). Oran olduğu için çözünürlük ya da ekran değişince de yerinde kalır.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct IslandPos {
+    pub fx: f64,
+    pub fy: f64,
 }
 
 impl Default for Settings {
@@ -104,6 +114,7 @@ impl Default for Settings {
             hide_in_fullscreen: true,
             game_intro: true,
             break_reminder_min: 120,
+            island_pos: None,
         }
     }
 }
@@ -113,6 +124,10 @@ pub struct Shared {
     pub windows: Mutex<HashMap<String, WinState>>,
     /// İmleç dışarıda olsa bile etkileşimli kalması gereken pencereler (arama açıkken).
     pub forced: Mutex<HashSet<String>>,
+    /// Ada sürükleniyor (bırakılınca yeni yeri kaydedilir)
+    pub dragging: std::sync::atomic::AtomicBool,
+    /// Sürüklenen adanın etiketi
+    pub drag_label: Mutex<String>,
     pub settings: Mutex<Settings>,
     /// Nook odağı almadan önce öndeki pencere — odağı geri vermek için.
     pub prev_foreground: AtomicIsize,

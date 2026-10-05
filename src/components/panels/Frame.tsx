@@ -23,6 +23,7 @@ import {
   Heart,
   Maximize2,
   Minimize2,
+  Move,
   Sparkles,
   Sun,
   Target,
@@ -35,6 +36,7 @@ import { formatSize } from "../../lib/format";
 import type { View } from "../../lib/layout";
 import { useExpanded } from "../../hooks/useExpanded";
 import { toggleBig } from "../../lib/big";
+import { islandDrag } from "../../lib/bridge";
 import { easeOut } from "../../lib/motion";
 import { SKY_LABEL, type Sky } from "../../lib/weather";
 import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
@@ -203,8 +205,28 @@ function StatusBar() {
         </span>
       )}
       <span className="text-label-2">{now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
+      <MoveHandle />
       <BigToggle />
     </div>
+  );
+}
+
+/** Basılı tutup sürükle: ada ekranda istediğin yere taşınır (Ayarlar'dan ya da sağ tıkla ortalanır) */
+function MoveHandle() {
+  const big = useNook((s) => !!s.big);
+  if (big) return null;
+  return (
+    <button
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        void islandDrag();
+      }}
+      title="Sürükleyerek taşı"
+      className="-my-1 flex h-[22px] w-[22px] cursor-grab items-center justify-center rounded-full text-label-3 transition-colors hover:bg-white/[0.08] hover:text-label active:cursor-grabbing"
+    >
+      <Move size={11} strokeWidth={2.4} />
+    </button>
   );
 }
 

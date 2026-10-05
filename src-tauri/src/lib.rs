@@ -73,6 +73,7 @@ pub fn run() {
             commands::apply_settings,
             commands::list_monitors,
             commands::set_window_size,
+            commands::island_drag,
             argus::argus_snapshot,
             argus::argus_mark,
             argus::argus_card,
