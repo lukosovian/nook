@@ -186,6 +186,25 @@ export function applyPreview(mode: string) {
       localStorage.setItem("nook-today-line", JSON.stringify({ day: dayKey(), text: "Günaydın Luko! Bugün İstanbul parçalı bulutlu, akşam Lanterns'in yeni bölümü var; önce suyunu içmeyi unutma, sonra keyfine bak." }));
     useNook.setState({ media: null, brief: true, settings: { ...useNook.getState().settings, weather: false, userName: "Luko" } });
     window.setTimeout(() => useNook.setState({ weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() } }), 300);
+  } else if (mode === "archive") {
+    useNook.setState({
+      media: null,
+      hovered: true,
+      pinned: true,
+      tab: "archive",
+      archive: {
+        path: "C:\Users\Luko\Downloads\Ödev teslim.zip",
+        kind: "zip",
+        entries: [
+          { path: "Görseller", size: 0, dir: true, encrypted: false },
+          { path: "Görseller/çizim.png", size: 482_113, dir: false, encrypted: false },
+          { path: "Görseller/kapak.jpg", size: 1_204_331, dir: false, encrypted: false },
+          { path: "rapor.pdf", size: 2_301_442, dir: false, encrypted: false },
+          { path: "notlar.txt", size: 3_120, dir: false, encrypted: false },
+          { path: "gizli.docx", size: 88_000, dir: false, encrypted: true },
+        ],
+      },
+    });
   } else if (mode === "notes") {
     // ?v=0.2.26 → o sürümün notu
     useNook.setState({ media: null });

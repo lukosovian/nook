@@ -25,7 +25,11 @@ export type DemoId =
   | "drag"
   | "lookchip"
   | "games"
-  | "mixer";
+  | "mixer"
+  | "archive"
+  | "shield"
+  | "sensitive"
+  | "chips";
 
 export interface NoteItem {
   title: string;
@@ -42,6 +46,29 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.33",
+    date: "6 Ekim 2026",
+    headline: "Gizlilik kalkanı ve arşivin içi",
+    items: [
+      {
+        title: "Arşivi açmadan içine bak",
+        text: "Bir .zip ya da .rar dosyasını adanın üstüne bırak: içindekiler listelenir, klasörlerde gezebilirsin. İstediğin dosyayı tutup masaüstüne, klasöre ya da Discord'a sürükle; çift tıklayınca açılır.",
+        demo: "archive",
+      },
+      {
+        title: "Gizlilik kalkanı",
+        text: "Odaya biri girdi mi? Ctrl+Alt+H'ye bas: bütün ekranları uyuyan Nook'lar kaplar. Tekrar bas, Esc ya da çift tıkla, geri gelsin. Kısayolu Ayarlar'dan değiştirebilirsin.",
+        demo: "shield",
+      },
+      {
+        title: "Hassas veri koruyucu",
+        text: "Panoya kart numarası, IBAN, API anahtarı ya da şifre kopyalanınca Nook kilitle uyarır, Pano geçmişine eklemez ve 60 saniye sonra panodan siler. Hepsi bu bilgisayarda olur, hiçbir yere gönderilmez.",
+        demo: "sensitive",
+      },
+      { title: "Çiplerde giyinik Nook'lar", text: "Ana sayfadaki her çipin Nook'u artık işine göre giyinik: Medya'da kulaklık, Pomodoro'da filizli domates, Karne'de monokl…", demo: "chips" },
+    ],
+  },
   {
     version: "0.2.32",
     date: "6 Ekim 2026",

@@ -44,7 +44,7 @@ pub fn release_focus(shared: State<'_, Arc<Shared>>) {
 pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_, Arc<Shared>>) -> Result<(), String> {
     *shared.settings.lock().unwrap() = settings.clone();
     window::apply_monitor_mode(&app, &settings);
-    shortcut::register(&app, &settings.shortcut, &settings.ask_shortcut, &settings.voice_shortcut)
+    shortcut::register(&app, &settings.shortcut, &settings.ask_shortcut, &settings.voice_shortcut, &settings.shield_shortcut)
 }
 
 /// Adayı sürüklemeye başla (üst çubuktaki tutamaçtan). Windows'un kendi taşıma döngüsü çalışır;

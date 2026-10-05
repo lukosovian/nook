@@ -1,3 +1,7 @@
+import { useEffect } from "react";
+import { CHIP_NOOKS } from "./lib/look";
+import { prefetchBodies } from "./lib/nook3d";
+import { figureRes } from "./components/mascot/Figure";
 import { Island } from "./components/Island";
 import { useUpdateCheck } from "./lib/update";
 import { useArgusDetect, useArgusFeed } from "./lib/argus";
@@ -73,9 +77,18 @@ export default function App() {
   useGameFeed();
   usePlayOffers();
   useDailySummaryOpen();
+  useChipPrefetch();
   useUpdateCheck();
   useArgusFeed();
   useArgusDetect();
 
   return <Island />;
+}
+
+/** Ana sayfa çiplerinin Nook'ları açılıştan biraz sonra arka planda çizilir — ada açılınca hazır olsunlar */
+function useChipPrefetch() {
+  useEffect(() => {
+    const t = window.setTimeout(() => prefetchBodies(Object.values(CHIP_NOOKS).map((c) => ({ look: c.look, color: c.color, size: figureRes(22) }))), 4000);
+    return () => window.clearTimeout(t);
+  }, []);
 }

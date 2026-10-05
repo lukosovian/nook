@@ -96,6 +96,7 @@ export interface StatsPayload {
 }
 
 export type SysEventKind =
+  | "sensitive"
   | "charging"
   | "unplugged"
   | "battery-low"
@@ -226,6 +227,8 @@ export interface NativeSettings {
   askShortcut: string;
   /** Sesli komut (basılı tut) */
   voiceShortcut: string;
+  /** Gizlilik kalkanı (aç/kapat) */
+  shieldShortcut: string;
   autoScreenshots: boolean;
   hideInFullscreen: boolean;
   /** Oyun açılınca ada gizlenmeden önce kısa özet */
@@ -273,6 +276,20 @@ export const argusInstall = () => invoke<void>("argus_install");
 export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
 /** Tanıtım ekranı için pencereyi büyüt; argümansız çağrı varsayılan boyuta döndürür. */
 /** Adayı sürüklemeye başla (sol tuş basılıyken çağrılmalı) */
+/** Hassas veri: pano hâlâ bu metni tutuyorsa temizle */
+export const clipboardClearIf = (text: string) => (inTauri ? invoke<boolean>("clipboard_clear_if", { text }) : Promise.resolve(false));
+/** Gizlilik kalkanını kapat (kalkanın kendisinden: Esc, çift tık) */
+export const shieldOff = () => (inTauri ? invoke<void>("shield_off") : Promise.resolve());
+/** Arşivin içi (zip, rar) — açmadan */
+export interface ArchiveEntry {
+  path: string;
+  size: number;
+  dir: boolean;
+  encrypted: boolean;
+}
+export const archiveList = (path: string) => invoke<{ kind: string; entries: ArchiveEntry[] }>("archive_list", { path });
+/** Dosyayı/klasörü geçici klasöre çıkarır, yolunu döner */
+export const archiveExtract = (path: string, entry: string) => invoke<string>("archive_extract", { path, entry });
 export const islandDrag = () => (inTauri ? invoke<void>("island_drag") : Promise.resolve());
 export const setWindowSize = (width?: number, height?: number) => (inTauri ? invoke<void>("set_window_size", { width, height }) : noop());
 export const releaseFocus = () => (inTauri ? invoke<void>("release_focus") : noop());

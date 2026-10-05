@@ -48,3 +48,11 @@ fn sequence() -> Option<u32> {
 fn sequence() -> Option<u32> {
     None
 }
+
+/// Hassas veri koruyucusu: pano hâlâ bu metni tutuyorsa temizler (arada başka bir şey
+/// kopyalandıysa ona dokunmaz). Silindiyse true.
+#[tauri::command]
+pub fn clipboard_clear_if(app: AppHandle, text: String) -> bool {
+    let same = app.clipboard().read_text().map(|t| t.trim() == text.trim()).unwrap_or(false);
+    same && app.clipboard().clear().is_ok()
+}

@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.32"
+version = "0.2.33"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -31,6 +31,8 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 ureq = { version = "2", default-features = false, features = ["json"] }
 tauri-plugin-dialog = "2"
+zip = { version = "2", default-features = false, features = ["deflate", "deflate64", "time"] }
+unrar = "0.5"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

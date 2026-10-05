@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import {
+  LockKeyhole,
   Bell,
   Bluetooth,
   Coffee,
@@ -31,6 +32,7 @@ import { useNook } from "../../store/nook";
 import { ACCENT, MiniNook, tintText } from "../ui/primitives";
 
 const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
+  sensitive: { icon: LockKeyhole, color: ACCENT.yellow },
   charging: { icon: BatteryCharging, color: ACCENT.green },
   unplugged: { icon: PlugZap, color: ACCENT.orange },
   "battery-low": { icon: BatteryLow, color: ACCENT.red },

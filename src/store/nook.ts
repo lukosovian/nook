@@ -110,6 +110,7 @@ export type Tab =
   | "argus"
   | "look"
   | "notes"
+  | "archive"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -203,6 +204,8 @@ export interface Settings extends NativeSettings {
   memories: string[];
   /** Kopyalanan yabancı metni Türkçeye çevir */
   translate: boolean;
+  /** Panoya kart, IBAN, anahtar, şifre kopyalanınca uyar ve bir dakika sonra sil */
+  sensitiveGuard: boolean;
   /** Windows bildirimlerini adada göster */
   notifications: boolean;
   /** Odaklanırken bildirim kartlarını sustur (listede yine birikir) */
@@ -256,6 +259,8 @@ export const DEFAULT_SETTINGS: Settings = {
   look: { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none" },
   hideInFullscreen: true,
   islandPos: null,
+  sensitiveGuard: true,
+  shieldShortcut: "Ctrl+Alt+H",
   weather: true,
   weatherCity: "",
   alarmSound: 1,
@@ -387,6 +392,8 @@ interface NookState {
   brief: boolean;
   /** Yama notları büyük adada açık */
   notes: boolean;
+  /** Adaya bırakılan arşiv (açmadan içine bakılır) */
+  archive: { path: string; kind: string; entries: import("../lib/bridge").ArchiveEntry[] } | null;
   /** Kendiliğinden gösterilen son yama notunun sürümü (bir kez görülen bir daha açılmaz) */
   notesSeen: string;
   /** Son oyun teklifinin zamanı */
@@ -461,6 +468,7 @@ interface NookState {
   setPendingTab: (tab: Tab | null) => void;
   setBrief: (brief: boolean) => void;
   setNotes: (notes: boolean) => void;
+  setArchive: (archive: NookState["archive"]) => void;
   setNotesSeen: (version: string) => void;
   setSummaryDay: (day: string) => void;
   setLastOffer: (at: number) => void;
@@ -525,6 +533,7 @@ export const useNook = create<NookState>()(
       summaryDay: "",
       brief: false,
       notes: false,
+      archive: null,
       notesSeen: "",
       lastOffer: 0,
 
@@ -678,6 +687,7 @@ export const useNook = create<NookState>()(
       setSummaryDay: (summaryDay) => set({ summaryDay }),
       setBrief: (brief) => set({ brief }),
       setNotes: (notes) => set({ notes }),
+      setArchive: (archive) => set({ archive }),
       setNotesSeen: (notesSeen) => set({ notesSeen }),
       setLastOffer: (lastOffer) => set({ lastOffer }),
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
@@ -718,6 +728,8 @@ export const useNook = create<NookState>()(
         if (!settings.aiModel.startsWith("gemini")) settings.aiModel = "";
         // İlk sürümün varsayılanı birçok bilgisayarda başka programlarca tutuluyordu
         if (settings.askShortcut === "Ctrl+Shift+X" || settings.askShortcut === "Ctrl+Shift+E") settings.askShortcut = DEFAULT_SETTINGS.askShortcut;
+        // Kalkanın ilk varsayılanı (Ctrl+Shift+X) de sık tutuluyordu
+        if (settings.shieldShortcut === "Ctrl+Shift+X") settings.shieldShortcut = DEFAULT_SETTINGS.shieldShortcut;
         return { ...current, ...p, settings };
       },
     },

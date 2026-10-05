@@ -107,6 +107,12 @@ export function SettingsPanel() {
         <Row label="Sesli komut (basılı tut)">
           <ShortcutInput value={s.voiceShortcut} onChange={(v) => update({ voiceShortcut: v })} />
         </Row>
+        <Row label="Gizlilik kalkanı">
+          <ShortcutInput value={s.shieldShortcut} onChange={(v) => update({ shieldShortcut: v })} />
+        </Row>
+        <Row label="Hassas veri koruyucu (kart, IBAN, anahtar, şifre)">
+          <Toggle on={s.sensitiveGuard} onChange={(v) => update({ sensitiveGuard: v })} />
+        </Row>
         <Row label="Ekran">
           <Segmented id="monitor" options={MONITOR_MODES} value={s.monitorMode} onChange={(v) => update({ monitorMode: v })} color={ACCENT.blue} />
         </Row>

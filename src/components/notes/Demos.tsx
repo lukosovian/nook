@@ -4,8 +4,8 @@
  */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, Check, Maximize2, MousePointer2, Move, RotateCw, ScrollText, Sparkles } from "lucide-react";
-import { DEFAULT_LOOK, HALLOWEEN, normalizeColor, normalizeLook, SHOWCASE, type Look } from "../../lib/look";
+import { Bell, Check, FileArchive, FileText, Folder, LockKeyhole, Maximize2, MousePointer2, Move, RotateCw, ScrollText, Sparkles } from "lucide-react";
+import { CHIP_NOOKS, DEFAULT_LOOK, HALLOWEEN, normalizeColor, normalizeLook, SHOWCASE, type Look } from "../../lib/look";
 import type { DemoId } from "../../lib/notes";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
@@ -433,7 +433,102 @@ function Mixer() {
   );
 }
 
+/** Arşivden bir dosya tutulup dışarı sürüklenir */
+function ArchiveDemo() {
+  const n = useTick(1800);
+  const out = n % 2 === 0;
+  return (
+    <Stage>
+      <div className="absolute left-4 top-3 w-[150px] rounded-[10px] border border-white/10 bg-black/60 p-1.5">
+        <div className="mb-1 flex items-center gap-1 text-[10px] text-label">
+          <FileArchive size={11} style={{ color: tintText(ACCENT.orange) }} /> ödev.zip
+        </div>
+        {["Görseller", "rapor.pdf", "not.txt"].map((f, i) => (
+          <div key={f} className="flex items-center gap-1 rounded px-1 py-0.5 text-[9.5px] text-label-2" style={i === 1 ? { background: "rgb(255 255 255 / 0.07)" } : undefined}>
+            {i === 0 ? <Folder size={10} style={{ color: tintText(ACCENT.yellow) }} /> : <FileText size={10} />} {f}
+          </div>
+        ))}
+      </div>
+      <motion.div
+        className="absolute flex items-center gap-1 rounded-[8px] bg-white/10 px-1.5 py-0.5 text-[9.5px] text-label"
+        animate={out ? { left: "64%", top: "58%", opacity: 1 } : { left: "16%", top: "38%", opacity: 0 }}
+        transition={{ duration: 0.9, ease: "easeInOut" }}
+      >
+        <FileText size={10} /> rapor.pdf
+        <MousePointer2 size={12} className="ml-1 text-white" fill="white" />
+      </motion.div>
+      <div className="absolute bottom-3 right-4 flex h-10 w-14 items-center justify-center rounded-[8px] border border-dashed border-white/20 text-[9px] text-label-3">Masaüstü</div>
+    </Stage>
+  );
+}
+
+/** Ekranı kaplayan gece ve uyuyan Nook'lar */
+function ShieldDemo() {
+  const face = useFace();
+  const n = useTick(2200);
+  const on = n % 2 === 0;
+  return (
+    <Stage bg="#1b1d27">
+      <div className="absolute inset-3 rounded-[8px] bg-[#2a3142] p-2 text-[9px] text-label-3">
+        <div className="mb-1 h-1.5 w-1/2 rounded bg-white/20" />
+        <div className="mb-1 h-1.5 w-3/4 rounded bg-white/10" />
+        <div className="h-1.5 w-2/3 rounded bg-white/10" />
+      </div>
+      <motion.div
+        className="absolute inset-3 flex flex-col items-center justify-center rounded-[8px]"
+        style={{ background: "radial-gradient(120% 90% at 50% 40%, #1a1830 0%, #0c0b18 60%, #050509 100%)" }}
+        animate={{ opacity: on ? 1 : 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <NookFigure look={face.look} color={face.color} size={46} expression="sleepy" />
+        <span className="mt-1 text-[9.5px] text-white/60">Şşş… · Ctrl+Alt+H</span>
+      </motion.div>
+    </Stage>
+  );
+}
+
+/** Kopyalanan kart numarası kilitlenir, sayaç sıfıra iner */
+function SensitiveDemo() {
+  const n = useTick(1000);
+  const left = 60 - ((n * 10) % 60);
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-0 -translate-x-1/2">
+        <div className="flex h-[40px] w-[230px] items-center gap-2 bg-black px-3" style={{ borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
+          <LockKeyhole size={14} style={{ color: tintText(ACCENT.yellow) }} />
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block text-[10.5px] font-medium text-label">Hassas veri · Kart numarası</span>
+            <span className="block text-[9px] text-label-3">{left} sn sonra panodan silinecek</span>
+          </span>
+        </div>
+      </div>
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-[8px] bg-white/[0.06] px-2 py-1 font-mono text-[10px] tracking-wider text-label-2">4111 •••• •••• 1111</div>
+    </Stage>
+  );
+}
+
+/** Çiplerin giyinik Nook'ları sırayla zıplar */
+function Chips() {
+  const n = useTick(700);
+  const list = Object.values(CHIP_NOOKS).slice(0, 6);
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex items-center justify-center gap-3">
+        {list.map((c, i) => (
+          <motion.div key={i} animate={{ y: n % list.length === i ? -10 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 14 }}>
+            <NookFigure look={c.look} color={c.color} size={34} />
+          </motion.div>
+        ))}
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
+  archive: ArchiveDemo,
+  shield: ShieldDemo,
+  sensitive: SensitiveDemo,
+  chips: Chips,
   games: Games,
   mixer: Mixer,
   drag: Drag,

@@ -261,6 +261,30 @@ export const HALLOWEEN: { name: string; color: string; look: Look }[] = [
   { name: "Kabak Cadı", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", texture: "plush", head: "witch" } },
 ];
 
+/**
+ * Ana sayfadaki çiplerin Nook'ları: her biri bölümün işine göre giyinmiş (Medya'da kulaklık,
+ * Pomodoro'da filizli domates, Karne'de monokllü öğretmen…). Renkler çipin rengine yakın.
+ */
+export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
+  today: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
+  media: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
+  argus: { color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "bead", glasses: "round" } },
+  focus: { color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "smooth", eyes: "calm", head: "sprout" } },
+  shelf: { color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush" } },
+  clip: { color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", glasses: "bold" } },
+  note: { color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "triangle", head: "beret" } },
+  alarm: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "diamond", head: "antenna" } },
+  apps: { color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "cap" } },
+  notify: { color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "ears" } },
+  control: { color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "sphere", head: "bowler", neck: "bowtie" } },
+  devices: { color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "triangle", head: "headphones" } },
+  stats: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "blob", glasses: "shades" } },
+  play: { color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "cloud", eyes: "sparkle", head: "star" } },
+  report: { color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", glasses: "monocle" } },
+  notes: { color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", head: "witch" } },
+  look: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "bow" } },
+};
+
 /** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */
 export const TOUR_CHIPS: { label: string; body: string; look: Look }[] = [
   { label: "Müzik", body: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },

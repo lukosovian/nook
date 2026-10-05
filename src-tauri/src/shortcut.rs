@@ -24,6 +24,7 @@ enum Role {
     Search,
     Ask,
     Voice,
+    Shield,
 }
 
 #[derive(Clone, Serialize)]
@@ -34,9 +35,9 @@ enum VoiceEvent {
     Error { message: String },
 }
 
-pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str) -> Result<(), String> {
+pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str, shield: &str) -> Result<(), String> {
     let mut registered = REGISTERED.lock().unwrap();
-    let wanted: Vec<String> = [search, ask, voice_key].iter().map(|s| s.to_string()).collect();
+    let wanted: Vec<String> = [search, ask, voice_key, shield].iter().map(|s| s.to_string()).collect();
     if *registered == wanted {
         return Ok(());
     }
@@ -45,7 +46,7 @@ pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str) -> Re
     registered.clear();
 
     let mut errors = Vec::new();
-    for (accel, role) in [(search, Role::Search), (ask, Role::Ask), (voice_key, Role::Voice)] {
+    for (accel, role) in [(search, Role::Search), (ask, Role::Ask), (voice_key, Role::Voice), (shield, Role::Shield)] {
         if accel.trim().is_empty() {
             continue;
         }
@@ -62,6 +63,7 @@ pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str) -> Re
                 }
             }
             (Role::Voice, ShortcutState::Released) => finish_voice(app),
+            (Role::Shield, ShortcutState::Pressed) => crate::shield::toggle(app),
             _ => {}
         });
         if let Err(e) = res {

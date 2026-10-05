@@ -1,4 +1,5 @@
 mod alarm;
+mod archive;
 mod argus;
 mod audio;
 mod brightness;
@@ -17,6 +18,7 @@ mod notify;
 mod privacy;
 mod quick;
 mod shell;
+mod shield;
 mod shortcut;
 mod state;
 mod system;
@@ -75,6 +77,10 @@ pub fn run() {
             commands::list_monitors,
             commands::set_window_size,
             commands::island_drag,
+            clipboard::clipboard_clear_if,
+            shield::shield_off,
+            archive::archive_list,
+            archive::archive_extract,
             argus::argus_snapshot,
             argus::argus_mark,
             argus::argus_card,

@@ -83,6 +83,8 @@ pub struct Settings {
     pub ask_shortcut: String,
     /// Sesli komut (basılı tut)
     pub voice_shortcut: String,
+    /// Gizlilik kalkanı (aç/kapat)
+    pub shield_shortcut: String,
     pub auto_screenshots: bool,
     pub hide_in_fullscreen: bool,
     /// Oyun açılınca ada gizlenmeden önce birkaç saniye özet gösterir
@@ -110,6 +112,7 @@ impl Default for Settings {
             shortcut: "Ctrl+Shift+Space".into(),
             ask_shortcut: "Ctrl+Shift+A".into(),
             voice_shortcut: "Ctrl+Shift+D".into(),
+            shield_shortcut: "Ctrl+Alt+H".into(),
             auto_screenshots: true,
             hide_in_fullscreen: true,
             game_intro: true,

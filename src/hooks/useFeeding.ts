@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { inspectPaths, inTauri } from "../lib/bridge";
+import { archiveList, inspectPaths, inTauri } from "../lib/bridge";
 import { useNook } from "../store/nook";
 
 /** Çiğneme animasyonu süresi — Island'daki squash keyframe'leri ile aynı. */
@@ -36,6 +36,20 @@ export function useFeeding() {
     const drop = async (paths: string[]) => {
       if (!paths.length) return setMood("idle");
       setMood("chewing");
+      // Tek bir arşiv: rafa değil, içine bakılır (açmadan)
+      if (inTauri && paths.length === 1 && /\.(zip|rar)$/i.test(paths[0])) {
+        try {
+          const [list] = await Promise.all([archiveList(paths[0]), new Promise((r) => later(CHEW_MS, () => r(null)))]);
+          useNook.getState().setArchive({ path: paths[0], ...list });
+          setTab("archive");
+          setMood("happy");
+          later(HAPPY_MS, () => mood() === "happy" && setMood("idle"));
+          return;
+        } catch (e) {
+          console.warn("[nook] arşiv", e);
+          // Okunamadıysa (bozuk, şifreli başlık) rafa düşer
+        }
+      }
       try {
         const [files] = await Promise.all([
           inspectPaths(paths),

@@ -8,6 +8,7 @@ import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
 import { ArgusPanel } from "./ArgusPanel";
+import { ArchivePanel } from "./ArchivePanel";
 import { ARGUS_BLUE } from "../ArgusPromo";
 import { epLabel, todayEpisodes, useArgus, watching } from "../../lib/argus";
 import { AppsPanel } from "./AppsPanel";
@@ -17,7 +18,8 @@ import { PlayPanel } from "./PlayPanel";
 import { ReportPanel } from "./ReportPanel";
 import { openBrief } from "../../lib/brief";
 import { latestNote, openNotes } from "../../lib/notes";
-import { ek, useNookName } from "../../lib/look";
+import { CHIP_NOOKS, ek, useNookName } from "../../lib/look";
+import { NookFigure } from "../mascot/Figure";
 import { summaryDue } from "../../hooks/useFeatures";
 import { ChatPanel } from "./ChatPanel";
 import { ClipboardPanel } from "./ClipboardPanel";
@@ -71,6 +73,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   report: ReportPanel,
   today: TodayRedirect,
   notes: NotesRedirect,
+  archive: ArchivePanel,
   devices: DevicesPanel,
   control: ControlPanel,
   stats: StatsPanel,
@@ -85,6 +88,7 @@ const TITLE = {
   look: "Görünüm",
   today: "Günün özeti",
   notes: "Yama notları",
+  archive: "Arşivin içi",
   report: "Haftalık karne",
   argus: "Argus",
 } as Record<Module, string>;
@@ -195,7 +199,7 @@ function ModuleGrid() {
           className="flex min-w-0 items-center gap-2 rounded-full border py-1 pl-1 pr-2.5 text-left"
           style={{ background: tintBg(m.color, 12), borderColor: tintBg(m.color, 34) }}
         >
-          <MiniNook color={m.color} size={24} eyes={sub[m.id]?.alert ? "closed" : "open"} />
+          <ChipNook id={m.id} color={m.color} alert={!!sub[m.id]?.alert} />
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-[12px] font-medium" style={{ color: tintText(m.color) }}>
               {m.label}
@@ -205,6 +209,17 @@ function ModuleGrid() {
         </motion.button>
       ))}
     </div>
+  );
+}
+
+/** Çipin Nook'u: bölümüne göre giyinmiş küçük 3B Nook (WebGL yoksa eski renkli küre) */
+function ChipNook({ id, color, alert }: { id: string; color: string; alert: boolean }) {
+  const c = CHIP_NOOKS[id];
+  if (!c) return <MiniNook color={color} size={24} eyes={alert ? "closed" : "open"} />;
+  return (
+    <span className="relative flex h-[26px] w-[26px] shrink-0 items-center justify-center">
+      <NookFigure look={c.look} color={c.color} size={22} expression={alert ? "sleepy" : "idle"} />
+    </span>
   );
 }
 

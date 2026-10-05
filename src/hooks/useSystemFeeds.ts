@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { pauseFrames, setFrameRate } from "../lib/frameCap";
 import {
   applySettings,
+  clipboardClearIf,
   consumeSelfWrite,
   EVENTS,
   inspectPaths,
@@ -22,6 +23,7 @@ import {
 } from "../lib/bridge";
 import { looksForeign, translateToTurkish } from "../lib/assist";
 import { note } from "../lib/log";
+import { detectSensitive, SENSITIVE_CLEAR_MS, SENSITIVE_LABEL } from "../lib/sensitive";
 import { fetchWeather } from "../lib/weather";
 import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
@@ -131,6 +133,8 @@ export function useIdleFeed() {
   }, []);
 }
 
+let secretTimer = 0;
+
 /** Rust pano izleyicisinden gelen metinleri havuza ekler (yalnızca ana ada). */
 export function useClipboardFeed() {
   useEffect(() => {
@@ -138,6 +142,20 @@ export function useClipboardFeed() {
     return subscribe<string>(EVENTS.clipboard, (text) => {
       if (consumeSelfWrite(text)) return;
       const s = useNook.getState();
+      // Hassas veri: geçmişe girmez, çevrilmez, uyarılır ve bir dakika sonra panodan silinir
+      const secret = s.settings.sensitiveGuard ? detectSensitive(text) : null;
+      if (secret) {
+        note(`pano: hassas veri (${secret})`);
+        s.pushToast({ kind: "sensitive", title: `Hassas veri · ${SENSITIVE_LABEL[secret]}`, detail: "Pano geçmişine eklenmedi · 60 sn sonra panodan silinecek", ms: 6500 });
+        playAntic("surprised");
+        window.clearTimeout(secretTimer);
+        secretTimer = window.setTimeout(() => {
+          void clipboardClearIf(text).then((cleared) => {
+            if (cleared) useNook.getState().pushToast({ kind: "sensitive", title: "Panodan silindi", detail: `${SENSITIVE_LABEL[secret]} artık panoda değil`, ms: 4000 });
+          });
+        }, SENSITIVE_CLEAR_MS);
+        return;
+      }
       s.pushClip(text);
       // Yabancı dilde metin → Türkçesi kartta ve Pano'da
       const foreign = looksForeign(text);
@@ -339,6 +357,7 @@ const native = (s: Settings) => ({
   shortcut: s.shortcut,
   askShortcut: s.askShortcut,
   voiceShortcut: s.voiceShortcut,
+  shieldShortcut: s.shieldShortcut,
   autoScreenshots: s.autoScreenshots,
   hideInFullscreen: s.hideInFullscreen,
   gameIntro: s.gameIntro,
