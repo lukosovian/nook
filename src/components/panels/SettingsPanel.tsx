@@ -10,6 +10,7 @@ import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle, Dropdown } from "../ui/primitives";
 import { INTRO_KINDS } from "../overlays/Intro";
 import { MOVE_KINDS } from "../../lib/moveFx";
+import { IntroPreview, MovePreview } from "./EffectPreview";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: "Ana" },
@@ -53,6 +54,9 @@ export function SettingsPanel() {
   const update = useNook((st) => st.updateSettings);
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   useEffect(() => void listMonitors().then(setMonitors), []);
+  // Önizleme sahneleri: ilk oynatışta açılır, her basışta baştan oynar
+  const [preview, setPreview] = useState({ move: 0, intro: 0 });
+  const replay = (k: "move" | "intro") => setPreview((p) => ({ ...p, [k]: p[k] + 1 }));
 
   return (
     <div ref={scroller} className="h-full space-y-3 overflow-y-auto pr-1.5">
@@ -139,21 +143,35 @@ export function SettingsPanel() {
           <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
         </Row>
         <Row label="Ekranlar arası geçiş">
-          <Dropdown
-            value={s.moveStyle}
-            onChange={(v) => update({ moveStyle: v })}
-            color={ACCENT.blue}
-            options={[{ id: "random" as const, label: "Her seferinde farklı" }, ...MOVE_KINDS]}
-          />
+          <div className="flex items-center gap-1.5">
+            <Dropdown
+              value={s.moveStyle}
+              onChange={(v) => {
+                update({ moveStyle: v });
+                replay("move");
+              }}
+              color={ACCENT.blue}
+              options={[{ id: "random" as const, label: "Her seferinde farklı" }, ...MOVE_KINDS]}
+            />
+            <PreviewButton color={ACCENT.blue} onClick={() => replay("move")} />
+          </div>
         </Row>
+        {preview.move > 0 && <MovePreview style={s.moveStyle} run={preview.move} />}
         <Row label="Açılış animasyonu">
-          <Dropdown
-            value={s.introStyle}
-            onChange={(v) => update({ introStyle: v })}
-            color={ACCENT.yellow}
-            options={[{ id: "random" as const, label: "Her seferinde farklı" }, ...INTRO_KINDS]}
-          />
+          <div className="flex items-center gap-1.5">
+            <Dropdown
+              value={s.introStyle}
+              onChange={(v) => {
+                update({ introStyle: v });
+                replay("intro");
+              }}
+              color={ACCENT.yellow}
+              options={[{ id: "random" as const, label: "Her seferinde farklı" }, ...INTRO_KINDS]}
+            />
+            <PreviewButton color={ACCENT.yellow} onClick={() => replay("intro")} />
+          </div>
         </Row>
+        {preview.intro > 0 && <IntroPreview style={s.introStyle} run={preview.intro} />}
         <Row label="Uzun süre yokken dönünce karşıla">
           <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
         </Row>
@@ -278,6 +296,20 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h3 className="mb-1 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">{title}</h3>
       <div className="divide-y divide-white/[0.05]">{children}</div>
     </section>
+  );
+}
+
+/** Önizlemeyi oynatan küçük yuvarlak düğme */
+function PreviewButton({ color, onClick }: { color: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Önizle"
+      className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-well transition-colors hover:bg-well-hi"
+      style={{ color }}
+    >
+      <Play size={11} strokeWidth={2.6} fill="currentColor" />
+    </button>
   );
 }
 

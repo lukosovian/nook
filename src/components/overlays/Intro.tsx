@@ -81,12 +81,37 @@ const COLORS = [ACCENT.teal, ACCENT.pink, ACCENT.yellow, ACCENT.blue, ACCENT.pur
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
 export function Intro() {
-  const Effect = EFFECTS[introKind()];
   return (
     <motion.div className="pointer-events-none absolute inset-0 z-20" exit={{ opacity: 0, transition: { duration: 0.2 } }}>
-      <Effect />
+      <IntroEffect kind={introKind()} />
     </motion.div>
   );
+}
+
+/** Tek bir açılış efekti (ayarlardaki önizleme de bunu oynatır) */
+export function IntroEffect({ kind }: { kind: IntroKind }) {
+  const Effect = EFFECTS[kind];
+  return <Effect />;
+}
+
+/** Efektin süresi (ms) */
+export const introDuration = (kind: IntroKind) => (kind === "trek" ? TREK_MS : INTRO_MS);
+
+/** Rastgele bir açılış efekti (önizleme için; oturumun seçimini değiştirmez) */
+export const randomIntro = (except?: IntroKind): IntroKind => {
+  const pool = KINDS.filter((k) => k !== except);
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+/** Nook'un doğuşu: çoğu efektte ortada "pop"; Star Trek'te ışınlanır gibi titreşerek belirir */
+export function birthMotion(kind: IntroKind) {
+  if (kind !== "trek")
+    return { initial: { scale: 0 }, animate: { scale: 1 }, transition: { type: "spring" as const, stiffness: 380, damping: 14, delay: (INTRO_MS / 1000) * 0.55 } };
+  return {
+    initial: { opacity: 0, scale: 1 },
+    animate: { opacity: [0, 0.25, 0.1, 0.5, 0.3, 0.8, 0.65, 1], filter: ["brightness(2.2)", "brightness(2.2)", "brightness(1)"] },
+    transition: { delay: TREK_BEAM.at, duration: TREK_BEAM.dur, ease: "linear" as const, filter: { delay: TREK_BEAM.at, duration: TREK_BEAM.dur + 0.3, times: [0, 0.6, 1] } },
+  };
 }
 
 /** Ortalanmış parça */

@@ -40,6 +40,32 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(Shared::default()))
+        // Sağ tık › Yenile: sayfa baştan yüklenir ama Rust'taki durum eskisi gibi kalıyordu (zorla tıklanabilir,
+        // açık adanın tıklama alanı, büyütülmüş pencere). Pencere tıklamaları ve odağı tutup donmuş gibi
+        // görünüyordu. Yükleme başlarken o adanın durumunu sıfırla; yeni sayfa kendi durumunu bildirir.
+        .on_page_load(|webview, payload| {
+            if payload.event() != tauri::webview::PageLoadEvent::Started {
+                return;
+            }
+            let label = webview.label();
+            if !label.starts_with(window::ISLAND) {
+                return;
+            }
+            let app = webview.app_handle();
+            let shared = app.state::<Arc<Shared>>().inner().clone();
+            let was_forced = shared.forced.lock().unwrap().remove(label);
+            shared.set_hit(label, state::Rect::default(), None);
+            if let Some(win) = app.get_webview_window(label) {
+                let _ = win.set_ignore_cursor_events(true);
+                if label == window::ISLAND && window::width_of(label) != window::WIN_W {
+                    let _ = window::resize_island(&win, window::WIN_W, window::WIN_H);
+                }
+                window::clear_background(&win);
+            }
+            if was_forced {
+                focus::release(&shared);
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::set_hit_rect,
             commands::set_interactive,

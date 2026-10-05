@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.27"
+version = "0.2.28"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
