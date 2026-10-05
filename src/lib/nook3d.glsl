@@ -1,4 +1,8 @@
+// Başlık (sürüm, FRAG, ZERO) lib/nook3d.ts'de eklenir.
+// ZERO: döngüler sabitten başlamasın — Windows'ta (ANGLE → D3D) derleyici sabit döngüleri açıp
+// map()'i onlarca kez kopyalıyordu; derleme dakikalar sürüp sayfayı donduruyordu.
 precision highp float;
+uniform int uZero;
 uniform vec2 uRes;
 uniform float uSpan;
 uniform int uShape, uHat, uGlasses, uNeck;
@@ -109,10 +113,10 @@ float acc(vec3 p){
   if(uGlasses==1){ d=min(d,sdTorus(p-eL,vec2(R,.038))); d=min(d,sdTorus(p-eR,vec2(R,.038))); }
   if(uGlasses==2){ d=min(d,sdCylZ(p-eL,R+.02,.05,.04)); d=min(d,sdCylZ(p-eR,R+.02,.05,.04)); }
   if(uGlasses==4){
-     for(int s=0;s<2;s++){ vec3 c=s==0?eL:eR; vec3 q=p-c; float f=abs(sdBox2(q.xy,vec2(R,R-.04),.09))-.042; d=min(d,max(f,abs(q.z)-.05)); } }
+     for(int s=ZERO;s<2;s++){ vec3 c=s==0?eL:eR; vec3 q=p-c; float f=abs(sdBox2(q.xy,vec2(R,R-.04),.09))-.042; d=min(d,max(f,abs(q.z)-.05)); } }
   if(uGlasses==3){ d=min(d,sdTorus(p-eR,vec2(.3,.045)));
      vec3 c=eR+vec3(.2,-.24,0.);
-     for(int i=0;i<6;i++){ float t=float(i)/6.; vec3 a=c+vec3(.12*t+.1*sin(t*5.),-.5*t,-.25*t); vec3 b=c+vec3(.12*(t+.17)+.1*sin((t+.17)*5.),-.5*(t+.17),-.25*(t+.17)); d=min(d,sdCaps(p,a,b,.022)); } }
+     for(int i=ZERO;i<6;i++){ float t=float(i)/6.; vec3 a=c+vec3(.12*t+.1*sin(t*5.),-.5*t,-.25*t); vec3 b=c+vec3(.12*(t+.17)+.1*sin((t+.17)*5.),-.5*(t+.17),-.25*(t+.17)); d=min(d,sdCaps(p,a,b,.022)); } }
   // başlıklar
   if(uHat==1){ vec3 q=p-vec3(.1,.86,-.02); q.xy=rot(.26)*q.xy;
      float b=sdEll(q,vec3(.98,.3,.88)); b=smin(b,sdEll(q-vec3(0.,.1,0.),vec3(.66,.34,.62)),.2);
@@ -132,7 +136,7 @@ float acc(vec3 p){
   if(uHat==12){ // cadı şapkası: geniş siper, ucu geriye kıvrılan koni
      vec3 q=p-vec3(.04,.76,-.04); q.xy=rot(.16)*q.xy;
      float h=sdCylY(q,.98,.03,.03);
-     for(int i=0;i<7;i++){ float t0=float(i)/7., t1=float(i+1)/7.;
+     for(int i=ZERO;i<7;i++){ float t0=float(i)/7., t1=float(i+1)/7.;
         vec3 a=vec3(-.34*t0*t0*t0,.0+.82*t0-.08*t0*t0*t0,-.1*t0*t0), b=vec3(-.34*t1*t1*t1,.0+.82*t1-.08*t1*t1*t1,-.1*t1*t1);
         float r0=mix(.46,.03,t0), r1=mix(.46,.03,t1);
         h=smin(h,sdCaps(q,a,b,mix(r0,r1,.5)),.03); }
@@ -185,7 +189,7 @@ vec2 accC(vec3 p){
   if(uHat==13){ // şeytan boynuzları (kırmızı): yana açılıp yukarı kıvrılır
      vec3 q=p; q.x=abs(q.x);
      float h=1e3;
-     for(int i=0;i<6;i++){ float t0=float(i)/6., t1=float(i+1)/6.;
+     for(int i=ZERO;i<6;i++){ float t0=float(i)/6., t1=float(i+1)/6.;
         vec3 a=vec3(.34+.24*t0,.74+.5*t0-.1*t0*t0,.12), b=vec3(.34+.24*t1,.74+.5*t1-.1*t1*t1,.12);
         h=smin(h,sdCaps(q,a,b,mix(.15,.02,(t0+t1)*.5)),.04); }
      if(h<r.x) r=vec2(h,7.); }
@@ -205,17 +209,16 @@ vec2 map(vec3 p){
   vec2 r=b<a?vec2(b,0.):vec2(a,1.);
   return c.x<r.x?c:r;
 }
-vec3 nrm(vec3 p){vec2 e=vec2(.002,0.);return normalize(vec3(map(p+e.xyy).x-map(p-e.xyy).x,map(p+e.yxy).x-map(p-e.yxy).x,map(p+e.yyx).x-map(p-e.yyx).x));}
-float ao(vec3 p,vec3 n){float o=0.,s=1.;for(int i=1;i<6;i++){float h=.05*float(i);o+=(h-map(p+n*h).x)*s;s*=.7;}return clamp(1.-2.2*o,0.,1.);}
-float shadow(vec3 p,vec3 l){float r=1.,t=.03;for(int i=0;i<28;i++){float h=map(p+l*t).x;r=min(r,10.*h/t);t+=clamp(h,.02,.2);if(r<.01||t>3.)break;}return clamp(r,0.,1.);}
+const vec3 LIGHT=vec3(-.4795,.6539,.6539); // normalize(-.55,.75,.75)
+// Dörtyüzlü normal örnekleri
+vec3 tet(int k){return k==0?vec3(1.,-1.,-1.):k==1?vec3(-1.,-1.,1.):k==2?vec3(-1.,1.,-1.):vec3(1.);}
 
-vec3 shade(vec3 p,vec3 n,float id){
+vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
   vec3 v=vec3(0.,0.,1.);
-  vec3 L=normalize(vec3(-.55,.75,.75));
+  vec3 L=LIGHT;
   float wrap=clamp((dot(n,L)+.5)/1.5,0.,1.);
   float rim=pow(1.-clamp(dot(n,v),0.,1.),2.2);
-  float o=ao(p,n);
-  float sh=mix(.55,1.,shadow(p+n*.01,L));
+  float sh=mix(.55,1.,shRaw);
   bool colored = id<.5 || id>1.5;
   if(colored){
     vec3 base = id<.5 ? uColor : id<2.5 ? uAcc : id<3.5 ? vec3(.97,.96,.94) : id<4.5 ? vec3(1.,.8,.12) : id<5.5 ? vec3(.42,.8,.2)
@@ -246,28 +249,42 @@ vec3 shade(vec3 p,vec3 n,float id){
   return col;
 }
 
+// Tek döngü: ışın ilerletme, normal, ortam gölgesi ve gölge sırayla aynı map() çağrısını kullanır.
+// map() böylece gölgelendiricide tek kez yer alır — Windows'ta derleme süresi bunun kopya sayısıyla büyüyor.
 void main(){
   vec2 uv=(gl_FragCoord.xy/uRes-.5)*uSpan;
   vec3 ro=vec3(uv,4.), rd=vec3(0.,0.,-1.);
-  float t=0.,minD=1e3; vec3 minP=ro; vec2 h; bool hit=false;
-  for(int i=0;i<140;i++){
-    vec3 p=ro+rd*t; h=map(p);
-    if(h.y<.5 && h.x<minD){minD=h.x;minP=p;}
-    if(h.x<.0008){hit=true;break;}
-    t+=h.x*.85; if(t>8.)break;
-  }
-  if(!hit){
-    // peluş: kenarda tüy saçakları
-    if(uFur>0. && minD<.07){
-      float s=noise(minP*80.)*.7+noise(minP*160.)*.3;
-      float a=smoothstep(.07,0.,minD)*smoothstep(.35,.75,s);
-      vec3 n=normalize(vec3(minP.xy,.2));
-      gl_FragColor=vec4(shade(minP,n,0.)*a,a);
-      return;
+  float t=0.,minD=1e3; vec3 minP=ro; bool hit=false;
+  int phase=0, k=0;            // 0 ilerle, 1 normal, 2 ortam gölgesi, 3 gölge
+  vec3 hp=ro, n=vec3(0.); float id=0., alpha=1.;
+  float occ=0., occW=1., sh=1., st=.03;
+  for(int it=ZERO;it<200;it++){
+    vec3 q = phase==0 ? ro+rd*t : phase==1 ? hp+.0012*tet(k) : phase==2 ? hp+n*(.05*float(k+1)) : hp+n*.01+LIGHT*st;
+    vec2 m=map(q);
+    if(phase==0){
+      if(m.y<.5 && m.x<minD){minD=m.x;minP=q;}
+      if(m.x<.0008){ hit=true; hp=q; id=m.y; phase=1; continue; }
+      t+=m.x*.85;
+      if(t>8. || it>=139){
+        // ıska: peluşsa kenarda tüy saçakları, değilse boş
+        if(!(uFur>0. && minD<.07)) break;
+        float s=noise(minP*80.)*.7+noise(minP*160.)*.3;
+        alpha=smoothstep(.07,0.,minD)*smoothstep(.35,.75,s);
+        if(alpha<=0.) break;
+        hp=minP; n=normalize(vec3(minP.xy,.2)); id=0.; phase=2; k=0;
+      }
+    } else if(phase==1){
+      n+=tet(k)*m.x; k++;
+      if(k==4){ n=normalize(n); phase=2; k=0; }
+    } else if(phase==2){
+      occ+=(.05*float(k+1)-m.x)*occW; occW*=.7; k++;
+      if(k==5){ phase=3; k=0; }
+    } else {
+      sh=min(sh,10.*m.x/st); st+=clamp(m.x,.02,.2); k++;
+      if(sh<.01 || st>3. || k>=28){ phase=4; break; }
     }
-    gl_FragColor=vec4(0.); return;
   }
-  vec3 p=ro+rd*t, n=nrm(p);
-  vec3 col=shade(p,n,h.y);
-  gl_FragColor=vec4(pow(col,vec3(.97)),1.);
+  if(phase<4){ FRAG=vec4(0.); return; }
+  vec3 col=shade(hp,n,id,clamp(1.-2.2*occ,0.,1.),clamp(sh,0.,1.));
+  FRAG = hit ? vec4(pow(col,vec3(.97)),1.) : vec4(col*alpha,alpha);
 }

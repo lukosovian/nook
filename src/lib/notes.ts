@@ -39,6 +39,28 @@ export interface PatchNote {
 
 export const NOTES: PatchNote[] = [
   {
+    version: "0.2.30",
+    date: "5 Ekim 2026",
+    headline: "Donmalar bitti",
+    items: [
+      {
+        title: "Nook artık donmuyor",
+        text: "3B Nook'u çizen gölgelendirici Windows'ta dakikalarca derleniyor, bu sırada her şey donuyordu. Artık bir saniyeden kısa sürüyor ve arka planda hazırlanıyor: Yenile, açılış ve önizlemeler akıcı.",
+        demo: "reload",
+      },
+      {
+        title: "Kostümler kaybolmuyor",
+        text: "Cadılar Bayramı kostümü seçince Nook'lar kaybolmuyor; Cadılar Bayramı parçaları da yalnızca kendi bölümünde, iki kez görünmüyor.",
+        demo: "halloween",
+      },
+      {
+        title: "Arkadaki ışık söndü",
+        text: "Açık adada Nook'un arkasındaki beyaz parıltı kaldırıldı; yalnızca bir durum varken renkli parlar.",
+        demo: "noglow",
+      },
+    ],
+  },
+  {
     version: "0.2.29",
     date: "5 Ekim 2026",
     headline: "Cadılar Bayramı geldi",

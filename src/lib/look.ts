@@ -248,6 +248,9 @@ export const SHOWCASE: { name: string; color: string; look: Look; x: number; y: 
   { name: "Kiraz", color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush" }, x: 572, y: 366, size: 100, mood: "wink" },
 ];
 
+/** Cadılar Bayramı parçaları Görünüm'de yalnızca kendi bölümünde (hazır kostümlerde) görünür */
+export const HALLOWEEN_PARTS = new Set<string>(["pumpkin", "ghost", "witch", "horns", "bat"]);
+
 /** Cadılar Bayramı: Görünüm'de tek dokunuşla giyilen hazır Nook'lar */
 export const HALLOWEEN: { name: string; color: string; look: Look }[] = [
   { name: "Bal Kabak", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", eyes: "diamond" } },

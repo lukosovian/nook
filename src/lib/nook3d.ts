@@ -34,93 +34,169 @@ export const eyeGap = (look: Look) => (look.glasses === "none" ? ANCHORS[look.sh
 /** Gözlük camının ardında gözler küçülür */
 export const EYE_SCALE_GLASSES = 0.6;
 
-const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+/**
+ * WebGL2'de döngüler uZero'dan başlar (derleyici açamaz, derleme saniyeler yerine anında biter);
+ * WebGL1'de döngü başı sabit olmak zorunda — orada eski, yavaş derlenen hâli kalır.
+ */
+const HEAD2 = "#version 300 es\nout highp vec4 fragOut;\n#define FRAG fragOut\n#define ZERO min(uZero,0)\n";
+const HEAD1 = "#define FRAG gl_FragColor\n#define ZERO 0\n";
+const VS2 = "#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+const VS1 = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
 
 interface Renderer {
   draw: (look: Look, color: string, size: number) => string;
 }
 
-let renderer: Renderer | null | undefined;
+/** undefined: hiç başlamadı · "pending": gölgelendirici GPU'da derleniyor · null: WebGL yok */
+let renderer: Renderer | null | "pending" | undefined;
+const readyListeners = new Set<() => void>();
 
-function create(): Renderer | null {
+/** Çizici hazır olunca (ya da WebGL'in olmadığı anlaşılınca) bir kez çağrılır */
+function whenReady(fn: () => void) {
+  if (renderer === "pending") readyListeners.add(fn);
+  else fn();
+}
+
+/**
+ * Çiziciyi kurar. Derleme, KHR_parallel_shader_compile varsa GPU sürecinde arka planda sürer —
+ * sayfa beklemez (eskiden derleme ana iş parçacığını dakikalarca dondurabiliyordu).
+ */
+function start() {
   try {
     const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl", { premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: true, antialias: false });
-    if (!gl) return null;
-    const compile = (type: number, src: string) => {
+    const opts = { premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: true, antialias: false };
+    const gl2 = canvas.getContext("webgl2", opts);
+    const gl = (gl2 ?? canvas.getContext("webgl", opts)) as WebGLRenderingContext | null;
+    if (!gl) {
+      renderer = null;
+      return;
+    }
+    const t0 = performance.now();
+    const sh = (type: number, src: string) => {
       const s = gl.createShader(type)!;
       gl.shaderSource(s, src);
       gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) ?? "shader");
       return s;
     };
+    const vs = sh(gl.VERTEX_SHADER, gl2 ? VS2 : VS1);
+    const fs = sh(gl.FRAGMENT_SHADER, (gl2 ? HEAD2 : HEAD1) + shader);
     const prog = gl.createProgram()!;
-    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, shader));
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? "link");
-    gl.useProgram(prog);
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "p");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const u = (n: string) => gl.getUniformLocation(prog, n);
-    const out = document.createElement("canvas");
-    const ctx = out.getContext("2d")!;
 
-    return {
-      draw(look, color, size) {
-        // 2× çizip küçült: kenarlar pürüzsüz olsun
-        const ss = size * 2;
-        canvas.width = canvas.height = ss;
-        gl.viewport(0, 0, ss, ss);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        const a = ANCHORS[look.shape];
-        gl.uniform2f(u("uRes"), ss, ss);
-        gl.uniform1f(u("uSpan"), SPAN);
-        gl.uniform1i(u("uShape"), SHAPE_ID[look.shape]);
-        gl.uniform1i(u("uHat"), HAT_ID[look.head]);
-        gl.uniform1i(u("uGlasses"), GLASSES_ID[look.glasses]);
-        gl.uniform1i(u("uNeck"), NECK_ID[look.neck]);
-        gl.uniform1f(u("uFur"), look.texture === "plush" ? 1 : 0);
-        const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-        gl.uniform3fv(u("uColor"), rgb(color));
-        gl.uniform3fv(u("uAcc"), rgb(capColor(color)));
-        gl.uniform4f(u("uEye"), a.y, eyeGap(look), a.z, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        out.width = out.height = size;
-        ctx.clearRect(0, 0, size, size);
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(canvas, 0, 0, size, size);
-        return out.toDataURL("image/png");
-      },
+    const finish = () => {
+      try {
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+          throw new Error(gl.getShaderInfoLog(fs) || gl.getShaderInfoLog(vs) || gl.getProgramInfoLog(prog) || "link");
+        renderer = makeRenderer(gl, prog, canvas);
+        const ms = Math.round(performance.now() - t0);
+        if (ms > 500) console.warn(`[nook] 3B çizici ${gl2 ? "WebGL2" : "WebGL1"} ${ms} ms'de hazırlandı`);
+      } catch (e) {
+        console.warn("[nook] 3B çizici", e);
+        renderer = null;
+      }
+      const fns = [...readyListeners];
+      readyListeners.clear();
+      fns.forEach((fn) => fn());
     };
+
+    const ext = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
+    if (!ext) {
+      finish();
+      return;
+    }
+    renderer = "pending";
+    const poll = () => (gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) ? finish() : window.setTimeout(poll, 40));
+    window.setTimeout(poll, 0);
   } catch (e) {
     console.warn("[nook] 3B çizici", e);
-    return null;
+    renderer = null;
   }
 }
 
+function makeRenderer(gl: WebGLRenderingContext, prog: WebGLProgram, canvas: HTMLCanvasElement): Renderer {
+  gl.useProgram(prog);
+  gl.uniform1i(gl.getUniformLocation(prog, "uZero"), 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "p");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const u = (n: string) => gl.getUniformLocation(prog, n);
+  const out = document.createElement("canvas");
+  const ctx = out.getContext("2d")!;
+
+  return {
+    draw(look, color, size) {
+      // 2× çizip küçült: kenarlar pürüzsüz olsun
+      const ss = size * 2;
+      canvas.width = canvas.height = ss;
+      gl.viewport(0, 0, ss, ss);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      const a = ANCHORS[look.shape];
+      gl.uniform2f(u("uRes"), ss, ss);
+      gl.uniform1f(u("uSpan"), SPAN);
+      gl.uniform1i(u("uShape"), SHAPE_ID[look.shape]);
+      gl.uniform1i(u("uHat"), HAT_ID[look.head]);
+      gl.uniform1i(u("uGlasses"), GLASSES_ID[look.glasses]);
+      gl.uniform1i(u("uNeck"), NECK_ID[look.neck]);
+      gl.uniform1f(u("uFur"), look.texture === "plush" ? 1 : 0);
+      const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      gl.uniform3fv(u("uColor"), rgb(color));
+      gl.uniform3fv(u("uAcc"), rgb(capColor(color)));
+      gl.uniform4f(u("uEye"), a.y, eyeGap(look), a.z, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      out.width = out.height = size;
+      ctx.clearRect(0, 0, size, size);
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(canvas, 0, 0, size, size);
+      return out.toDataURL("image/png");
+    },
+  };
+}
+
 const cache = new Map<string, string | null>();
-const MAX_CACHE = 80;
+/** Seçenekler, tanıtım, kostümler… bir oturumda yüzlerce görünüm olabilir; en az kullanılan silinir */
+const MAX_CACHE = 400;
 
 const keyOf = (look: Look, color: string, size: number) => `${look.shape}|${look.texture}|${look.glasses}|${look.head}|${look.neck}|${color}|${size}`;
 
-/** Görünümün resmi (data URL); WebGL yoksa null. Aynı görünüm bir kez çizilir. */
+/** Görünümün resmi (data URL); WebGL yoksa ya da çizici daha hazırlanıyorsa null. Aynı görünüm bir kez çizilir. */
 export function bodyImage(look: Look, color: string, size: number): string | null {
   const key = keyOf(look, color, size);
-  if (cache.has(key)) return cache.get(key)!;
-  if (renderer === undefined) renderer = create();
+  // En son kullanılan sona: silinecekler hep en eskiler olsun
+  if (cache.has(key)) return touch(key);
+  if (renderer === undefined) start();
+  if (renderer === "pending") return null;
   const url = renderer ? renderer.draw(look, color, size) : null;
   if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
   cache.set(key, url);
   return url;
 }
 
+/** Önbellekteki resmi al ve "son kullanılan" yap */
+function touch(key: string) {
+  const v = cache.get(key) ?? null;
+  cache.delete(key);
+  cache.set(key, v);
+  return v;
+}
+
+/** Çizici hazır olunca bileşeni yenile */
+function useRendererReady() {
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  const pending = renderer === "pending" || renderer === undefined;
+  useEffect(() => {
+    if (renderer === "pending") whenReady(bump);
+  }, [pending]);
+  return pending ? 0 : 1;
+}
+
 export function useBodyImage(look: Look, color: string, size: number) {
-  return useMemo(() => bodyImage(look, color, size), [look.shape, look.texture, look.glasses, look.head, look.neck, color, size]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ready = useRendererReady();
+  return useMemo(() => bodyImage(look, color, size), [look.shape, look.texture, look.glasses, look.head, look.neck, color, size, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 // ------------------------------------------------------------------ sıralı çizim
@@ -138,6 +214,13 @@ function pump() {
   const job = queue.shift();
   if (!job) {
     pumping = false;
+    return;
+  }
+  if (renderer === undefined) start();
+  if (renderer === "pending") {
+    // Çizici hazırlanırken sırayı beklet
+    queue.unshift(job);
+    whenReady(() => window.setTimeout(pump, 16));
     return;
   }
   if (!cache.has(job.key)) bodyImage(job.look, job.color, job.size);
@@ -169,10 +252,12 @@ export function useBodyImageQueued(look: Look, color: string, size: number): str
   const [, bump] = useReducer((n: number) => n + 1, 0);
   // Geliştirme önizlemesinin ekran görüntüsü beklemez: orada hemen çiz
   if (STILL && !cache.has(key)) bodyImage(look, color, size);
+  const has = cache.has(key);
+  // Önbellekten düşmüşse (çok görünüm gezildi) yeniden sıraya girer — boş kalmaz
   useEffect(() => {
     if (cache.has(key)) return;
     request(look, color, size, bump);
     return () => void waiting.get(key)?.delete(bump);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
-  return cache.get(key) ?? null;
+  }, [key, has]); // eslint-disable-line react-hooks/exhaustive-deps
+  return has ? touch(key) : null;
 }

@@ -7,6 +7,7 @@ import {
   EYE_STYLES,
   GLASSES,
   HALLOWEEN,
+  HALLOWEEN_PARTS,
   HEADS,
   NAME_MAX,
   NECKS,
@@ -66,7 +67,7 @@ export function LookPanel() {
       </Group>
 
       <Group title="Gövde">
-        {SHAPES.map((o) => (
+        {SHAPES.filter((o) => !HALLOWEEN_PARTS.has(o.id)).map((o) => (
           <Option key={o.id} label={o.label} on={look.shape === o.id} onClick={() => set({ shape: o.id })}>
             <Figure look={{ ...bare(look), shape: o.id }} color={color} />
           </Option>
@@ -102,7 +103,7 @@ export function LookPanel() {
       </Group>
 
       <Group title="Başlık">
-        {HEADS.map((o) => (
+        {HEADS.filter((o) => !HALLOWEEN_PARTS.has(o.id)).map((o) => (
           <Option key={o.id} label={o.label} on={look.head === o.id} onClick={() => set({ head: o.id })}>
             <Figure look={{ ...bare(look), head: o.id }} color={color} drop={4} />
           </Option>

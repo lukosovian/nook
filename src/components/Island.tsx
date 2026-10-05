@@ -8,7 +8,7 @@ import { boostFrames } from "../lib/frameCap";
 import { useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
 import { isPrimary } from "../lib/bridge";
-import { FACE, ISLAND, ISLAND_TOP, MEDIA_COLLAPSED_WIDTH, mascotPose, tourPose, type IslandMode } from "../lib/layout";
+import { FACE, ISLAND, ISLAND_TOP, MEDIA_COLLAPSED_WIDTH, mascotPose, tourPose } from "../lib/layout";
 import { spring } from "../lib/motion";
 import { startTour } from "../lib/tour";
 import { exitBig } from "../lib/big";
@@ -209,8 +209,8 @@ export function Island() {
             {mode === "notes" && <PatchNotes key="notes" />}
           </AnimatePresence>
 
-          {/* Nook'un arkasındaki parıltı: duruma göre renkli, yoksa çok hafif beyaz */}
-          <Halo mode={mode} pose={pose} color={status ? STATUS_COLOR[status] : null} transition={transition} />
+          {/* Nook'un arkasındaki parıltı: yalnızca durum varken, durumun renginde */}
+          <Halo pose={pose} color={status ? STATUS_COLOR[status] : null} transition={transition} />
 
           {/* z-10: panellerin katmanı yüzün tıklamalarını yutmasın */}
           <motion.div className="absolute z-10" initial={false} animate={pose} transition={transition}>
@@ -273,19 +273,18 @@ function useSelectHold() {
 }
 
 function Halo({
-  mode,
   pose,
   color,
   transition,
 }: {
-  mode: IslandMode;
   pose: { left: number; top: number; scale: number };
   color: string | null;
   transition: object;
 }) {
-  // Kapalı adada parıltı küçük ve yalnızca durum varken; açıkken her zaman (beyaz/renkli)
+  // Yalnızca bir durum varken (renkli). Varsayılan beyaz parıltı kaldırıldı: adanın arkasında
+  // beyaz bir ışık yanıyormuş gibi görünüyordu.
   const size = FACE * pose.scale * 2.8;
-  const visible = color ? 1 : mode === "expanded" || mode === "search" || mode === "feeding" || mode === "brief" || mode === "notes" ? 0.55 : 0;
+  const visible = color ? 1 : 0;
   return (
     <motion.div
       className="pointer-events-none absolute z-[5] rounded-full"
