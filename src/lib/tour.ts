@@ -3,6 +3,7 @@
  * Kapanırken tersi: ada küçülür, animasyon bitince pencere eski boyutuna döner.
  */
 import { setWindowSize } from "./bridge";
+import { latestNote } from "./notes";
 import { TOUR_WINDOW } from "./layout";
 import { useNook } from "../store/nook";
 import { normalizeColor, normalizeLook, SHOWCASE, TOUR_CHIPS } from "./look";
@@ -32,8 +33,10 @@ export async function startTour() {
 
 export function endTour() {
   useNook.getState().setTour(false);
+  // Yeni kullanıcı tanıtımda zaten her şeyi gördü: mevcut yama notu ona ayrıca açılmasın
+  if (!useNook.getState().notesSeen) useNook.getState().setNotesSeen(latestNote().version);
   window.clearTimeout(shrinkTimer);
   shrinkTimer = window.setTimeout(() => {
-    if (!useNook.getState().tour) void setWindowSize().catch(() => undefined);
+    if (!useNook.getState().tour && !useNook.getState().brief && !useNook.getState().notes) void setWindowSize().catch(() => undefined);
   }, SHRINK_AFTER_MS);
 }

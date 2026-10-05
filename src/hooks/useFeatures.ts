@@ -20,6 +20,7 @@ import { transcribe } from "../lib/assist";
 import { note } from "../lib/log";
 import { sendChat } from "../lib/chat";
 import { openBrief } from "../lib/brief";
+import { notesDue, openNotes } from "../lib/notes";
 import { nextPhase, remaining } from "../lib/focus";
 import { dayKey, isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
@@ -319,7 +320,13 @@ export function useDailySummaryOpen() {
     const tryOpen = () => {
       const s = useNook.getState();
       // İlk kurulumda tanıtım var; oyun/alarm sırasında araya girme — ilk üzerine gelişte açılır
-      if (done || !summaryDue() || s.intro || s.tour || !s.toured || s.fullscreen || s.ringing) return;
+      if (done || s.intro || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes) return;
+      // Güncellemeden sonra önce yama notları; kapanınca sıra özete gelir
+      if (notesDue()) {
+        void openNotes();
+        return;
+      }
+      if (!summaryDue()) return;
       done = true;
       try {
         localStorage.setItem(SHOWCASE_KEY, SHOWCASE);
@@ -332,6 +339,10 @@ export function useDailySummaryOpen() {
       if (prev.intro && !st.intro) {
         window.clearTimeout(wait);
         wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);
+      }
+      if (prev.notes && !st.notes) {
+        window.clearTimeout(wait);
+        wait = window.setTimeout(tryOpen, 1500);
       }
     });
     if (!useNook.getState().intro) wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);

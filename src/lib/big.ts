@@ -35,7 +35,7 @@ export function exitBig() {
   window.clearTimeout(shrinkTimer);
   shrinkTimer = window.setTimeout(() => {
     const st = useNook.getState();
-    if (!st.big && !st.tour && !st.brief) void setWindowSize().catch(() => undefined);
+    if (!st.big && !st.tour && !st.brief && !st.notes) void setWindowSize().catch(() => undefined);
   }, SHRINK_AFTER_MS);
 }
 

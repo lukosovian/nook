@@ -12,6 +12,7 @@ export function useIslandMode(): IslandMode {
     if (s.searching) return "search";
     // Günün özeti: üzerine gelinse de büyük kalır
     if (s.brief && isPrimary) return "brief";
+    if (s.notes && isPrimary) return "notes";
     // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
     if (s.reminder) return "reminder";
     if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";

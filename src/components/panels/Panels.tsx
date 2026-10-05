@@ -15,6 +15,7 @@ import { NotifyPanel } from "./NotifyPanel";
 import { PlayPanel } from "./PlayPanel";
 import { ReportPanel } from "./ReportPanel";
 import { openBrief } from "../../lib/brief";
+import { latestNote, openNotes } from "../../lib/notes";
 import { ek, useNookName } from "../../lib/look";
 import { summaryDue } from "../../hooks/useFeatures";
 import { ChatPanel } from "./ChatPanel";
@@ -48,6 +49,7 @@ const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "stats", label: "Sistem", color: ACCENT.red },
   { id: "play", label: "Oyun", color: ACCENT.pink },
   { id: "report", label: "Karne", color: ACCENT.teal },
+  { id: "notes", label: "Yama notları", color: ACCENT.orange },
 ];
 
 /** Lukonnect bu bilgisayarda hiç yoksa (ör. arkadaşının bilgisayarı) Cihazlar bölümü gizlenir. */
@@ -66,6 +68,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   play: PlayPanel,
   report: ReportPanel,
   today: TodayRedirect,
+  notes: NotesRedirect,
   devices: DevicesPanel,
   control: ControlPanel,
   stats: StatsPanel,
@@ -79,6 +82,7 @@ const TITLE = {
   settings: "Ayarlar",
   look: "Görünüm",
   today: "Günün özeti",
+  notes: "Yama notları",
   report: "Haftalık karne",
   argus: "Argus",
 } as Record<Module, string>;
@@ -147,6 +151,15 @@ function TodayRedirect() {
   useLayoutEffect(() => {
     useNook.getState().setTab("home");
     void openBrief();
+  }, []);
+  return <></>;
+}
+
+/** Yama notları da büyük adada açılır */
+function NotesRedirect() {
+  useLayoutEffect(() => {
+    useNook.getState().setTab("home");
+    void openNotes();
   }, []);
   return <></>;
 }
@@ -225,6 +238,7 @@ function useModuleStatus(): Partial<Record<Module, { text: string; alert?: boole
     apps: { text: apps ? `${apps} kısayol` : "Ekle" },
     notify: { text: notifs ? `${notifs} bildirim` : "Sessiz" },
     play: { text: best ? `Rekor ${best}` : "Yakala · Hafıza" },
+    notes: { text: `${latestNote().version} · ${latestNote().headline}` },
     report: { text: active ? `Bugün ${active >= 60 ? `${Math.floor(active / 60)} sa ${active % 60} dk` : `${active} dk`}` : "Bu hafta" },
     argus: {
       text: !argusSnap

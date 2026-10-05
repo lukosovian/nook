@@ -5,11 +5,11 @@
  */
 import { useNook } from "../store/nook";
 
-export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob";
+export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost";
 export type Texture = "smooth" | "plush";
 export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm";
 export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle";
-export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks";
+export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat";
 export type NeckId = "none" | "bowtie";
 
 export interface Look {
@@ -45,6 +45,8 @@ export const SHAPES: { id: ShapeId; label: string }[] = [
   { id: "flower", label: "Çiçek" },
   { id: "bean", label: "Fasulye" },
   { id: "blob", label: "Damla" },
+  { id: "pumpkin", label: "Balkabağı" },
+  { id: "ghost", label: "Hayalet" },
 ];
 
 export const TEXTURES: { id: Texture; label: string }[] = [
@@ -81,6 +83,9 @@ export const HEADS: { id: HeadId; label: string }[] = [
   { id: "flower", label: "Çiçek" },
   { id: "star", label: "Yıldız" },
   { id: "stalks", label: "Salyangoz" },
+  { id: "witch", label: "Cadı" },
+  { id: "horns", label: "Boynuz" },
+  { id: "bat", label: "Yarasa" },
 ];
 
 /** Kepin rengi: gövdeyle karışmasın diye mavi gövdede mercan, öbürlerinde koyu mavi (Dots'taki gibi) */
@@ -188,7 +193,7 @@ const COLOR_NAMES: Record<string, string> = {
   "#2FD4C0": "turkuaz",
   "#FF8A1F": "turuncu",
 };
-const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli", blob: "damla biçimli, tombul" };
+const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli", blob: "damla biçimli, tombul", pumpkin: "dilimli bir balkabağı", ghost: "etekleri dalgalı bir hayalet" };
 const EYE_WORDS: Record<EyeStyle, string> = { pill: "iki siyah hap göz", bead: "parlak boncuk gözler", diamond: "elmas biçimli gözler", sparkle: "iri, parıltılı gözler", calm: "sakin, yarı kapalı gözler" };
 const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
   round: "yuvarlak tel gözlük",
@@ -207,6 +212,9 @@ const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
   flower: "çiçek tokası",
   star: "yıldız tokası",
   stalks: "salyangoz gibi saplı gözler",
+  witch: "sivri cadı şapkası",
+  horns: "kırmızı şeytan boynuzları",
+  bat: "yarasa tokası",
 };
 
 /** Sistem isteminde: "elektrik mavisi, peluş, kabarık bir bulut gövde, parlak boncuk gözler; üstünde siyah Fransız beresi" */
@@ -238,6 +246,16 @@ export const SHOWCASE: { name: string; color: string; look: Look; x: number; y: 
   { name: "Profesör", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "triangle", texture: "plush", eyes: "calm", glasses: "round" }, x: 398, y: 362, size: 118 },
   { name: "Kalp", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", texture: "plush", glasses: "shades" }, x: 496, y: 364, size: 112 },
   { name: "Kiraz", color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush" }, x: 572, y: 366, size: 100, mood: "wink" },
+];
+
+/** Cadılar Bayramı: Görünüm'de tek dokunuşla giyilen hazır Nook'lar */
+export const HALLOWEEN: { name: string; color: string; look: Look }[] = [
+  { name: "Bal Kabak", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", eyes: "diamond" } },
+  { name: "Hayalet", color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "ghost", eyes: "bead" } },
+  { name: "Cadı", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "witch" } },
+  { name: "Şeytancık", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", head: "horns" } },
+  { name: "Yarasa", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "bat" } },
+  { name: "Kabak Cadı", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", texture: "plush", head: "witch" } },
 ];
 
 /** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */

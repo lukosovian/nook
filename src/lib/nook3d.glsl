@@ -72,6 +72,21 @@ float body0(vec3 q){
     float d=sdEll(q-vec3(0.,.02,0.),vec3(.9,.94,.9));
     d=smin(d,sdEll(q-vec3(0.,-.42,0.),vec3(1.1,.52,1.)),.3);
     return d;}
+  if(uShape==7){
+    // balkabağı: basık, dilimli; dilimler kutuplara doğru söner, tepede çukur
+    float a=atan(q.z,q.x); float lobe=sqrt(abs(cos(a*4.)));
+    float d=sdEll(q-vec3(0.,-.06,0.),vec3(1.06,.8,1.02));
+    d-=.07*lobe*smoothstep(.85,.2,abs(q.y+.06));
+    d+=.12*exp(-dot(q.xz,q.xz)*9.)*step(0.,q.y);
+    return d;}
+  if(uShape==8){
+    // hayalet: kubbe tepe, aşağı doğru hafif açılan etek, dalgalı etek ucu
+    float top=sdSph(q-vec3(0.,.2,0.),.8);
+    float skirt=length(q.xz)-(.8+.13*clamp(.2-q.y,0.,1.));
+    skirt=max(skirt,q.y-.2);
+    float d=min(top,skirt);
+    d=max(d,-(q.y+.86+.08*cos(q.x*9.+.6)*cos(q.z*2.5)));
+    return d;}
   if(uShape==5){
     return smin(sdSph(q-vec3(-.12,.3,0.),.66),sdSph(q-vec3(.1,-.3,0.),.68),.55)+.0;}
   return sdSph(q,1.);
@@ -114,12 +129,30 @@ float acc(vec3 p){
   if(uHat==4){ d=min(d,sdCaps(p,vec3(0.,.9,0.),vec3(.1,1.3,0.),.03)); d=min(d,sdSph(p-vec3(.11,1.38,0.),.11)); }
   if(uHat==5){ vec3 q=p-vec3(.52,.78,.25); q.xy=rot(-.5)*q.xy; vec3 r=q; r.x=abs(r.x);
      float w=sdEll(r-vec3(.2,0.,0.),vec3(.22,.15,.09)); w=smin(w,sdSph(q,.08),.04); d=min(d,w); }
+  if(uHat==12){ // cadı şapkası: geniş siper, ucu geriye kıvrılan koni
+     vec3 q=p-vec3(.04,.76,-.04); q.xy=rot(.16)*q.xy;
+     float h=sdCylY(q,.98,.03,.03);
+     for(int i=0;i<7;i++){ float t0=float(i)/7., t1=float(i+1)/7.;
+        vec3 a=vec3(-.34*t0*t0*t0,.0+.82*t0-.08*t0*t0*t0,-.1*t0*t0), b=vec3(-.34*t1*t1*t1,.0+.82*t1-.08*t1*t1*t1,-.1*t1*t1);
+        float r0=mix(.46,.03,t0), r1=mix(.46,.03,t1);
+        h=smin(h,sdCaps(q,a,b,mix(r0,r1,.5)),.03); }
+     d=min(d,h); }
+  if(uHat==14){ // yarasa tokası: küçük gövde, kulaklar, tırtıklı kanatlar
+     vec3 q=p-vec3(-.5,.66,.52); q.xz=rot(.5)*q.xz; q.xy=rot(.18)*q.xy;
+     float b=sdEll(q,vec3(.11,.13,.09));
+     vec3 e=q; e.x=abs(e.x); b=smin(b,sdCaps(e,vec3(.04,.08,0.),vec3(.07,.2,0.),.025),.02);
+     vec3 w=q; w.x=abs(w.x);
+     float wing=sdTri(w.xy,vec2(.06,.06),vec2(.46,.14),vec2(.36,-.14));
+     wing=max(wing,-(length(w.xy-vec2(.2,-.12))-.09));
+     wing=max(wing,-(length(w.xy-vec2(.38,-.15))-.07));
+     b=min(b,ext(wing,w.z,.022,.015));
+     d=min(d,b); }
   // boyun
   if(uNeck==1){ vec3 q=p-vec3(0.,-.92,.42); vec3 r=q; r.x=abs(r.x); r.xy=rot(-.08)*r.xy;
      float w=sdEll(r-vec3(.22,0.,0.),vec3(.25,.16+.06*clamp(r.x*2.,0.,1.),.1)); w=smin(w,sdSph(q,.085),.04); d=min(d,w); }
   return d;
 }
-/** Renkli aksesuarlar: x uzaklık, y malzeme (2 şapka rengi, 3 beyaz, 4 sarı, 5 yeşil) */
+/** Renkli aksesuarlar: x uzaklık, y malzeme (2 şapka rengi, 3 beyaz, 4 sarı, 5 yeşil, 6 kahve, 7 kırmızı, 8 mor) */
 vec2 accC(vec3 p){
   vec2 r=vec2(1e3,0.);
   if(uHat==7){ // şapka (kep): kubbe + öne siper
@@ -145,6 +178,21 @@ vec2 accC(vec3 p){
   if(uHat==11){ // salyangoz gözleri: beyaz göz küresi
      vec3 q=p; q.x=abs(q.x);
      r=vec2(sdSph(q-vec3(.47,1.28,.15),.19),3.); }
+  if(uShape==7){ // balkabağı sapı (kahverengi)
+     float st=sdCaps(p,vec3(0.,.5,0.),vec3(.1,.92,-.02),.085);
+     st=smin(st,sdCaps(p,vec3(.1,.92,-.02),vec3(.22,.98,-.02),.06),.04);
+     if(st<r.x) r=vec2(st,6.); }
+  if(uHat==13){ // şeytan boynuzları (kırmızı): yana açılıp yukarı kıvrılır
+     vec3 q=p; q.x=abs(q.x);
+     float h=1e3;
+     for(int i=0;i<6;i++){ float t0=float(i)/6., t1=float(i+1)/6.;
+        vec3 a=vec3(.34+.24*t0,.74+.5*t0-.1*t0*t0,.12), b=vec3(.34+.24*t1,.74+.5*t1-.1*t1*t1,.12);
+        h=smin(h,sdCaps(q,a,b,mix(.15,.02,(t0+t1)*.5)),.04); }
+     if(h<r.x) r=vec2(h,7.); }
+  if(uHat==12){ // cadı şapkasının mor bandı
+     vec3 q=p-vec3(.04,.76,-.04); q.xy=rot(.16)*q.xy;
+     float band=max(sdCylY(q-vec3(0.,.12,0.),.45,.06,.02),-sdCylY(q-vec3(0.,.12,0.),.36,.2,.0));
+     if(band<r.x) r=vec2(band,8.); }
   return r;
 }
 vec2 map(vec3 p){
@@ -170,7 +218,8 @@ vec3 shade(vec3 p,vec3 n,float id){
   float sh=mix(.55,1.,shadow(p+n*.01,L));
   bool colored = id<.5 || id>1.5;
   if(colored){
-    vec3 base = id<.5 ? uColor : id<2.5 ? uAcc : id<3.5 ? vec3(.97,.96,.94) : id<4.5 ? vec3(1.,.8,.12) : vec3(.42,.8,.2);
+    vec3 base = id<.5 ? uColor : id<2.5 ? uAcc : id<3.5 ? vec3(.97,.96,.94) : id<4.5 ? vec3(1.,.8,.12) : id<5.5 ? vec3(.42,.8,.2)
+              : id<6.5 ? vec3(.36,.22,.1) : id<7.5 ? vec3(.92,.12,.1) : vec3(.55,.22,.95);
     // aksesuarlar vinil gibi parlar; şapka gövde peluşsa o da peluş
     float fur = id<.5 || id<2.5 ? uFur : 0.;
     vec3 deep=base*base*vec3(.62,.58,.7);

@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -23,6 +23,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   tour: { width: 900, height: 520, radius: 40 },
   /** Günün özeti: ada büyür, solda kocaman Nook, sağda kartlar */
   brief: { width: 880, height: 440, radius: 38 },
+  /** Yama notları: günün özetiyle aynı büyük ada */
+  notes: { width: 880, height: 440, radius: 38 },
 };
 
 /** Günün özeti düzeni (adaya göre) */
@@ -145,6 +147,7 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
         : center(h.x + h.w / 2, h.y + (24 * s) / 2.6 + (FACE * s) / 2, s);
     }
     case "brief":
+    case "notes":
       return center(BRIEF.face.cx, BRIEF.face.cy, BRIEF.face.scale);
     case "intro":
       return center(width / 2, height / 2, 1.5);

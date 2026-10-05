@@ -19,7 +19,7 @@ let unsub: (() => void) | null = null;
 export async function openBrief() {
   if (!isPrimary) return;
   const s = useNook.getState();
-  if (s.brief || s.tour) return;
+  if (s.brief || s.tour || s.notes) return;
   window.clearTimeout(shrinkTimer);
   s.setSearching(false);
   s.setSummaryDay(dayKey());
@@ -54,6 +54,6 @@ export function closeBrief() {
   window.clearTimeout(shrinkTimer);
   shrinkTimer = window.setTimeout(() => {
     const st = useNook.getState();
-    if (!st.brief && !st.tour) void setWindowSize().catch(() => undefined);
+    if (!st.brief && !st.tour && !st.notes) void setWindowSize().catch(() => undefined);
   }, SHRINK_AFTER_MS);
 }

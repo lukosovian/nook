@@ -11,8 +11,8 @@ import { capColor, type Look } from "./look";
 /** Resmin kapsadığı alan, yüz çapının (2 birim) kaç katı: şapka, kulaklık, papyon sığsın */
 export const SPAN = 3.2;
 
-const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5, blob: 6 };
-const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11 };
+const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5, blob: 6, pumpkin: 7, ghost: 8 };
+const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11, witch: 12, horns: 13, bat: 14 };
 const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4 };
 const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1 };
 
@@ -25,6 +25,8 @@ export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number 
   flower: { y: -0.02, gap: 0.33, z: 0.66 },
   bean: { y: 0.02, gap: 0.31, z: 0.74 },
   blob: { y: -0.1, gap: 0.33, z: 0.72 },
+  pumpkin: { y: -0.06, gap: 0.36, z: 0.76 },
+  ghost: { y: 0.08, gap: 0.3, z: 0.74 },
 };
 
 /** Gözlük takılınca iki cam arasında köprüye yer kalsın diye gözler biraz açılır */

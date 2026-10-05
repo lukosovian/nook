@@ -6,6 +6,7 @@ import {
   BODY_COLORS,
   EYE_STYLES,
   GLASSES,
+  HALLOWEEN,
   HEADS,
   NAME_MAX,
   NECKS,
@@ -50,6 +51,19 @@ export function LookPanel() {
           Şaşırt beni
         </motion.button>
       </div>
+
+      <Group title="Cadılar Bayramı 🎃">
+        {HALLOWEEN.map((o) => (
+          <Option
+            key={o.name}
+            label={o.name}
+            on={color.toLowerCase() === o.color.toLowerCase() && JSON.stringify(look) === JSON.stringify(o.look)}
+            onClick={() => update({ look: o.look, faceColor: o.color })}
+          >
+            <Figure look={o.look} color={o.color} drop={3} />
+          </Option>
+        ))}
+      </Group>
 
       <Group title="Gövde">
         {SHAPES.map((o) => (
@@ -156,7 +170,7 @@ function Option({ label, on, onClick, children }: { label: string; on: boolean; 
       style={on ? { boxShadow: `inset 0 0 0 1px ${ACCENT.teal}` } : undefined}
     >
       <span className="relative flex h-[40px] w-[46px] items-center justify-center overflow-hidden">{children}</span>
-      <span className={`text-[10px] font-medium ${on ? "text-label" : "text-label-3"}`}>{label}</span>
+      <span className={`max-w-full truncate px-0.5 text-[10px] font-medium ${on ? "text-label" : "text-label-3"}`}>{label}</span>
     </motion.button>
   );
 }

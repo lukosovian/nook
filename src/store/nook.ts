@@ -109,6 +109,7 @@ export type Tab =
   | "today"
   | "argus"
   | "look"
+  | "notes"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -383,6 +384,10 @@ interface NookState {
   summaryDay: string;
   /** Günün özeti büyük adada açık */
   brief: boolean;
+  /** Yama notları büyük adada açık */
+  notes: boolean;
+  /** Kendiliğinden gösterilen son yama notunun sürümü (bir kez görülen bir daha açılmaz) */
+  notesSeen: string;
   /** Son oyun teklifinin zamanı */
   lastOffer: number;
 
@@ -454,6 +459,8 @@ interface NookState {
   setAttachment: (image: string | null) => void;
   setPendingTab: (tab: Tab | null) => void;
   setBrief: (brief: boolean) => void;
+  setNotes: (notes: boolean) => void;
+  setNotesSeen: (version: string) => void;
   setSummaryDay: (day: string) => void;
   setLastOffer: (at: number) => void;
   patchClip: (id: string, patch: Partial<ClipItem>) => void;
@@ -516,6 +523,8 @@ export const useNook = create<NookState>()(
       pendingTab: null,
       summaryDay: "",
       brief: false,
+      notes: false,
+      notesSeen: "",
       lastOffer: 0,
 
       setMood: (mood) => set({ mood }),
@@ -667,6 +676,8 @@ export const useNook = create<NookState>()(
       setPendingTab: (pendingTab) => set({ pendingTab }),
       setSummaryDay: (summaryDay) => set({ summaryDay }),
       setBrief: (brief) => set({ brief }),
+      setNotes: (notes) => set({ notes }),
+      setNotesSeen: (notesSeen) => set({ notesSeen }),
       setLastOffer: (lastOffer) => set({ lastOffer }),
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       setBusy: (key, on) =>
@@ -684,6 +695,7 @@ export const useNook = create<NookState>()(
         settings: s.settings,
         affection: s.affection,
         lastCare: s.lastCare,
+        notesSeen: s.notesSeen,
         alarms: s.alarms,
         // Ekran görüntüleri büyük — kaydedilmez
         chat: s.chat.map(({ image: _image, ...m }) => m),
