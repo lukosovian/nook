@@ -304,7 +304,9 @@ function Halo({
         opacity: visible,
         background: `radial-gradient(circle, ${color ?? "rgba(160,190,255,0.55)"} 0%, transparent 62%)`,
       }}
-      style={{ filter: "blur(6px)", mixBlendMode: "screen" }}
+      // mix-blend-mode yok: şeffaf pencerede screen karışımı adanın dışına mavi-beyaz ışık sızdırıyordu
+      // (ada zaten siyah, siyah üstünde screen ile normal çizim aynı görünür)
+      style={{ filter: "blur(6px)" }}
       transition={{ ...transition, opacity: { duration: 0.35 }, background: { duration: 0.35 } }}
     />
   );
