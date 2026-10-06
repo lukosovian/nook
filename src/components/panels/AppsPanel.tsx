@@ -6,6 +6,7 @@ import { fileIcon, listApps, openPath, type AppEntry } from "../../lib/bridge";
 import { spring } from "../../lib/motion";
 import { useNook, type PinnedApp } from "../../store/nook";
 import { ACCENT, EmptyState, MiniNook, TextButton } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Uygulama listesi oturum boyunca bir kez okunur. */
 let appsCache: Promise<AppEntry[]> | undefined;
@@ -21,14 +22,14 @@ export function AppsPanel() {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex shrink-0 items-center justify-between">
-        <p className="text-[10.5px] text-label-3">Tıkla, aç · raftaki klasörleri de ekleyebilirsin</p>
+        <p className="text-[10.5px] text-label-3">{tt("Tıkla, aç · raftaki klasörleri de ekleyebilirsin")}</p>
         {pinned.length > 0 && (
-          <TextButton onClick={() => setEditing((v) => !v)}>{editing ? "Bitti" : "Düzenle"}</TextButton>
+          <TextButton onClick={() => setEditing((v) => !v)}>{editing ? tt("Bitti") : tt("Düzenle")}</TextButton>
         )}
       </div>
       {!pinned.length ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-          <EmptyState title="Kısayol yok" hint="Sık açtığın uygulamaları buraya ekle" color={ACCENT.blue} />
+          <EmptyState title={tt("Kısayol yok")} hint={tt("Sık açtığın uygulamaları buraya ekle")} color={ACCENT.blue} />
           <AddButton onClick={() => setAdding(true)} />
         </div>
       ) : (
@@ -45,7 +46,7 @@ export function AppsPanel() {
               className="flex flex-col items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-white/[0.12] text-label-3 hover:border-white/25 hover:text-label-2"
             >
               <Plus size={18} strokeWidth={2.2} />
-              <span className="text-[10px] font-medium">Ekle</span>
+              <span className="text-[10px] font-medium">{tt("Ekle")}</span>
             </motion.button>
           )}
         </div>
@@ -61,9 +62,7 @@ function AddButton({ onClick }: { onClick: () => void }) {
       className="flex items-center gap-1 rounded-full border px-3 py-1 text-[11.5px] font-medium"
       style={{ background: `color-mix(in srgb, ${ACCENT.blue} 14%, transparent)`, borderColor: `color-mix(in srgb, ${ACCENT.blue} 38%, transparent)`, color: `color-mix(in srgb, ${ACCENT.blue} 70%, white)` }}
     >
-      <Plus size={12} strokeWidth={2.6} />
-      Uygulama ekle
-    </button>
+      <Plus size={12} strokeWidth={2.6} />{tt("Uygulama ekle")}</button>
   );
 }
 
@@ -96,7 +95,7 @@ function Tile({ app, editing }: { app: PinnedApp; editing: boolean }) {
         void openPath(app.path);
         playAntic("wink");
       }}
-      title={editing ? `${app.name} — kaldır` : app.name}
+      title={editing ? tt("{0} — kaldır", app.name) : app.name}
       className="relative flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-[14px] bg-well px-1 hover:bg-well-hi"
     >
       {icon ? <img src={icon} alt="" draggable={false} className="h-8 w-8 object-contain" /> : <MiniNook color={ACCENT.blue} size={30} />}
@@ -142,11 +141,11 @@ function Picker({ onClose }: { onClose: () => void }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && onClose()}
-          placeholder="Uygulama ara…"
+          placeholder={tt("Uygulama ara…")}
           spellCheck={false}
           className="min-w-0 flex-1 bg-transparent text-[12px] text-label outline-none placeholder:text-label-3"
         />
-        <button onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title="Kapat">
+        <button onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title={tt("Kapat")}>
           <X size={12} />
         </button>
       </div>
@@ -162,7 +161,7 @@ function Picker({ onClose }: { onClose: () => void }) {
             }}
           />
         ))}
-        {!list.length && <p className="pt-6 text-center text-[11px] text-label-3">{apps.length ? "Bulunamadı" : "Uygulamalar okunuyor…"}</p>}
+        {!list.length && <p className="pt-6 text-center text-[11px] text-label-3">{apps.length ? tt("Bulunamadı") : tt("Uygulamalar okunuyor…")}</p>}
       </div>
     </div>
   );

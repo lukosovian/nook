@@ -1,4 +1,5 @@
 import type { NowPlaying } from "../store/nook";
+import { tt } from "./i18n";
 
 /** Oynarken, son güncellemeden bu yana geçen süreyi ekleyerek anlık pozisyon. */
 export function livePosition(m: NowPlaying): number {
@@ -20,7 +21,7 @@ const KNOWN: [RegExp, string][] = [
   [/firefox/i, "Firefox"],
   [/opera/i, "Opera"],
   [/brave/i, "Brave"],
-  [/zune|music/i, "Medya Oynatıcı"],
+  [/zune|music/i, tt("Medya Oynatıcı")],
   [/vlc/i, "VLC"],
   [/apple/i, "Apple Music"],
 ];

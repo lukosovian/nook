@@ -5,6 +5,7 @@ import { canGoOut, endPerch, haul, haulText, perchReturned, startOuting, tryPerc
 import { isSleeping, isWorking, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 import { islandModeOf } from "./useIslandMode";
+import { tt } from "../lib/i18n";
 
 /** Tüneme için dakikada bir zar atılır (bekleme süresi dolduysa) */
 const PERCH_CHANCE = 0.3;
@@ -61,7 +62,7 @@ export function useOutings() {
         haul.trash = 0;
         window.setTimeout(() => {
           const c = useNook.getState().catches;
-          useNook.getState().pushToast({ kind: "fish", title: "Sen yokken balık tuttum!", detail: `${text} · toplam ${c.stars} yıldız`, ms: 6000 });
+          useNook.getState().pushToast({ kind: "fish", title: tt("Sen yokken balık tuttum!"), detail: tt("{0} · toplam {1} yıldız", text, c.stars), ms: 6000 });
           playAntic("giggle");
         }, 1800);
       }
@@ -116,7 +117,7 @@ function clearGuard(praise: boolean) {
   s.setGuard(null);
   void guardAlert(false);
   if (praise) {
-    s.pushToast({ kind: "guard", title: "Aferin, işine döndün", detail: "Saat işliyor, devam!", ms: 3500 });
+    s.pushToast({ kind: "guard", title: tt("Aferin, işine döndün"), detail: tt("Saat işliyor, devam!"), ms: 3500 });
     s.care(1);
     playAntic("love");
   }

@@ -5,6 +5,7 @@ import { convert } from "./convert";
 import { ek, nookName } from "./look";
 import { searchEmoji } from "./emoji";
 import { convertCurrency, parseCurrency, translate } from "./online";
+import { tt } from "./i18n";
 
 export type ResultKind = "calc" | "convert" | "currency" | "translate" | "emoji" | "app" | "web" | "note" | "ask" | "argus";
 
@@ -40,23 +41,23 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
   // "not: …" → uçucu nota ekle
   const note = /^not[:\s]\s*(.+)$/i.exec(q);
   if (note) {
-    out.push({ id: "note", kind: "note", title: note[1], subtitle: "Nota ekle", payload: note[1] });
+    out.push({ id: "note", kind: "note", title: note[1], subtitle: tt("Nota ekle"), payload: note[1] });
   }
 
   // "emoji kalp" / ":kalp" → emojiler
   const emojis = searchEmoji(q);
   if (emojis.length) {
-    emojis.forEach((e, i) => out.push({ id: `emoji:${i}`, kind: "emoji", title: e, subtitle: "Enter ile kopyala", payload: e }));
+    emojis.forEach((e, i) => out.push({ id: `emoji:${i}`, kind: "emoji", title: e, subtitle: tt("Enter ile kopyala"), payload: e }));
     return out;
   }
 
   const conv = convert(q);
-  if (conv) out.push({ id: "convert", kind: "convert", title: conv.text, subtitle: "Enter ile sonucu kopyala", payload: conv.value });
+  if (conv) out.push({ id: "convert", kind: "convert", title: conv.text, subtitle: tt("Enter ile sonucu kopyala"), payload: conv.value });
 
   const calc = conv || parseCurrency(q) ? null : evaluate(q.replace(/=\s*$/, ""));
   if (calc !== null) {
     const v = formatNumber(calc);
-    out.push({ id: "calc", kind: "calc", title: `= ${v}`, subtitle: "Enter ile sonucu kopyala", payload: v });
+    out.push({ id: "calc", kind: "calc", title: `= ${v}`, subtitle: tt("Enter ile sonucu kopyala"), payload: v });
   }
 
   const lower = q.toLocaleLowerCase("tr");
@@ -65,7 +66,7 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
     .filter((x) => x.s >= 0)
     .sort((x, y) => y.s - x.s)
     .slice(0, MAX_APPS)
-    .forEach(({ a }) => out.push({ id: `app:${a.path}`, kind: "app", title: a.name, subtitle: "Uygulamayı aç", payload: a.path }));
+    .forEach(({ a }) => out.push({ id: `app:${a.path}`, kind: "app", title: a.name, subtitle: tt("Uygulamayı aç"), payload: a.path }));
 
   // Argus arşivi (dizi/film)
   if (lower.length >= 2) {
@@ -86,17 +87,17 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
   }
 
   // Yerel yapay zekâya sor
-  out.push({ id: "ask", kind: "ask", title: q, subtitle: `${ek(nookName(), "a")} sor`, payload: q });
+  out.push({ id: "ask", kind: "ask", title: q, subtitle: tt("{0} sor", ek(nookName(), "a")), payload: q });
 
   const isUrl = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i.test(q) && !/\s/.test(q);
   out.push(
     isUrl
-      ? { id: "url", kind: "web", title: q, subtitle: "Tarayıcıda aç", payload: q.startsWith("http") ? q : `https://${q}` }
+      ? { id: "url", kind: "web", title: q, subtitle: tt("Tarayıcıda aç"), payload: q.startsWith("http") ? q : `https://${q}` }
       : {
           id: "web",
           kind: "web",
           title: q,
-          subtitle: "Google'da ara",
+          subtitle: tt("Google'da ara"),
           payload: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
         },
   );
@@ -109,7 +110,7 @@ export async function searchOnline(query: string): Promise<SearchResult[]> {
   if (!q) return [];
   const [cur, tr] = await Promise.all([convertCurrency(q).catch(() => null), translate(q).catch(() => null)]);
   const out: SearchResult[] = [];
-  if (cur) out.push({ id: "currency", kind: "currency", title: cur.text, subtitle: "Güncel kur · Enter ile kopyala", payload: cur.value });
-  if (tr) out.push({ id: "translate", kind: "translate", title: tr.text, subtitle: `${tr.pair} · Enter ile kopyala`, payload: tr.text });
+  if (cur) out.push({ id: "currency", kind: "currency", title: cur.text, subtitle: tt("Güncel kur · Enter ile kopyala"), payload: cur.value });
+  if (tr) out.push({ id: "translate", kind: "translate", title: tr.text, subtitle: tt("{0} · Enter ile kopyala", tr.pair), payload: tr.text });
   return out;
 }

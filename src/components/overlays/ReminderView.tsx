@@ -4,6 +4,7 @@ import { drankWater, snoozeWater } from "../../hooks/useFeatures";
 import { spring } from "../../lib/motion";
 import { dayKey, useNook } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 const COLOR = ACCENT.blue;
 
@@ -34,17 +35,17 @@ export function ReminderView() {
             <motion.span animate={drinking ? { y: [0, -2, 0] } : { y: [0, -2.5, 0] }} transition={{ duration: 1.2, repeat: Infinity }} className="flex">
               <Droplet size={14} strokeWidth={2.4} fill="currentColor" />
             </motion.span>
-            {drinking ? "Afiyet olsun!" : "Su içme vakti"}
+            {drinking ? tt("Afiyet olsun!") : tt("Su içme vakti")}
           </p>
           <p className="mt-0.5 truncate text-[11px] text-label-2">
-            {drinking ? `Bugün ${today}. bardak` : today ? `Bugün ${today} bardak içtin, bir tane daha?` : "Benimle bir bardak su içer misin?"}
+            {drinking ? tt("Bugün {0}. bardak", today) : today ? tt("Bugün {0} bardak içtin, bir tane daha?", today) : tt("Benimle bir bardak su içer misin?")}
           </p>
         </motion.div>
       </AnimatePresence>
       {!drinking && (
         <>
-          <Action icon={Clock} label="Sonra" title="15 dakika sonra hatırlat" color={ACCENT.gray} onClick={snoozeWater} />
-          <Action icon={Droplet} label="İçtim" title="İçtim / içiyorum" color={COLOR} onClick={drankWater} strong />
+          <Action icon={Clock} label={tt("Sonra")} title={tt("15 dakika sonra hatırlat")} color={ACCENT.gray} onClick={snoozeWater} />
+          <Action icon={Droplet} label={tt("İçtim")} title={tt("İçtim / içiyorum")} color={COLOR} onClick={drankWater} strong />
         </>
       )}
     </motion.div>

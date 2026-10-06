@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { motion } from "motion/react";
 import { useNook, type Antic } from "../../store/nook";
 import { ACCENT } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Açılış süresi (ms): bir efekt ortaya toplanır, Nook tam o anda doğar. */
 export const INTRO_MS = 1700;
@@ -24,14 +25,14 @@ export const TREK_BEAM = { at: 1.55, dur: 1.35 };
  */
 export type IntroKind = "dust" | "warp" | "ripple" | "orbit" | "confetti" | "sparkle" | "bubbles" | "trek";
 export const INTRO_KINDS: { id: IntroKind; label: string }[] = [
-  { id: "trek", label: "Star Trek ışınlanma" },
-  { id: "dust", label: "Uzay tozu" },
-  { id: "warp", label: "Işık hızı" },
-  { id: "ripple", label: "Halkalar" },
-  { id: "orbit", label: "Yörünge" },
-  { id: "confetti", label: "Konfeti" },
-  { id: "sparkle", label: "Yıldızlar" },
-  { id: "bubbles", label: "Kabarcıklar" },
+  { id: "trek", label: tt("Star Trek ışınlanma") },
+  { id: "dust", label: tt("Uzay tozu") },
+  { id: "warp", label: tt("Işık hızı") },
+  { id: "ripple", label: tt("Halkalar") },
+  { id: "orbit", label: tt("Yörünge") },
+  { id: "confetti", label: tt("Konfeti") },
+  { id: "sparkle", label: tt("Yıldızlar") },
+  { id: "bubbles", label: tt("Kabarcıklar") },
 ];
 const KINDS = INTRO_KINDS.map((k) => k.id);
 

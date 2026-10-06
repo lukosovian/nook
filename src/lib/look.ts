@@ -4,6 +4,8 @@
  * Gövde ve aksesuarlar lib/nook3d'de 3B çizilir; gözler ifadeleriyle birlikte DOM'da kalır.
  */
 import { useNook } from "../store/nook";
+import { isTurkish } from "./i18n";
+import { tt } from "./i18n";
 
 export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost" | "cube" | "egg" | "star" | "cat" | "bear";
 export type Texture = "smooth" | "plush" | "matte" | "jelly" | "metal" | "spots";
@@ -38,71 +40,71 @@ export const roundBody = (w: number, h = w): BodyShape => {
 };
 
 export const SHAPES: { id: ShapeId; label: string }[] = [
-  { id: "sphere", label: "Küre" },
-  { id: "cloud", label: "Bulut" },
-  { id: "heart", label: "Kalp" },
-  { id: "triangle", label: "Üçgen" },
-  { id: "flower", label: "Çiçek" },
-  { id: "bean", label: "Fasulye" },
-  { id: "blob", label: "Damla" },
-  { id: "cube", label: "Şeker" },
-  { id: "egg", label: "Yumurta" },
-  { id: "star", label: "Yıldız" },
-  { id: "cat", label: "Kedi" },
-  { id: "bear", label: "Ayıcık" },
-  { id: "pumpkin", label: "Balkabağı" },
-  { id: "ghost", label: "Hayalet" },
+  { id: "sphere", label: tt("Küre") },
+  { id: "cloud", label: tt("Bulut") },
+  { id: "heart", label: tt("Kalp") },
+  { id: "triangle", label: tt("Üçgen") },
+  { id: "flower", label: tt("Çiçek") },
+  { id: "bean", label: tt("Fasulye") },
+  { id: "blob", label: tt("Damla") },
+  { id: "cube", label: tt("Şeker") },
+  { id: "egg", label: tt("Yumurta") },
+  { id: "star", label: tt("Yıldız") },
+  { id: "cat", label: tt("Kedi") },
+  { id: "bear", label: tt("Ayıcık") },
+  { id: "pumpkin", label: tt("Balkabağı") },
+  { id: "ghost", label: tt("Hayalet") },
 ];
 
 export const TEXTURES: { id: Texture; label: string }[] = [
-  { id: "smooth", label: "Vinil" },
-  { id: "plush", label: "Peluş" },
-  { id: "matte", label: "Mat kil" },
-  { id: "jelly", label: "Jöle" },
-  { id: "metal", label: "Metalik" },
-  { id: "spots", label: "Benekli" },
+  { id: "smooth", label: tt("Vinil") },
+  { id: "plush", label: tt("Peluş") },
+  { id: "matte", label: tt("Mat kil") },
+  { id: "jelly", label: tt("Jöle") },
+  { id: "metal", label: tt("Metalik") },
+  { id: "spots", label: tt("Benekli") },
 ];
 
 export const EYE_STYLES: { id: EyeStyle; label: string }[] = [
-  { id: "pill", label: "Hap" },
-  { id: "bead", label: "Boncuk" },
-  { id: "diamond", label: "Elmas" },
-  { id: "sparkle", label: "Parlak" },
-  { id: "calm", label: "Sakin" },
+  { id: "pill", label: tt("Hap") },
+  { id: "bead", label: tt("Boncuk") },
+  { id: "diamond", label: tt("Elmas") },
+  { id: "sparkle", label: tt("Parlak") },
+  { id: "calm", label: tt("Sakin") },
 ];
 
 export const GLASSES: { id: GlassesId; label: string }[] = [
-  { id: "none", label: "Yok" },
-  { id: "round", label: "Yuvarlak" },
-  { id: "bold", label: "Kalın" },
-  { id: "shades", label: "Güneş" },
-  { id: "monocle", label: "Monokl" },
+  { id: "none", label: tt("Yok") },
+  { id: "round", label: tt("Yuvarlak") },
+  { id: "bold", label: tt("Kalın") },
+  { id: "shades", label: tt("Güneş") },
+  { id: "monocle", label: tt("Monokl") },
 ];
 
 export const HEADS: { id: HeadId; label: string }[] = [
-  { id: "none", label: "Yok" },
-  { id: "beret", label: "Bere" },
-  { id: "bowler", label: "Melon" },
-  { id: "headphones", label: "Kulaklık" },
-  { id: "antenna", label: "Anten" },
-  { id: "bow", label: "Fiyonk" },
-  { id: "cap", label: "Kep" },
-  { id: "ears", label: "Kulak" },
-  { id: "sprout", label: "Filiz" },
-  { id: "flower", label: "Çiçek" },
-  { id: "star", label: "Yıldız" },
-  { id: "stalks", label: "Salyangoz" },
-  { id: "witch", label: "Cadı" },
-  { id: "horns", label: "Boynuz" },
-  { id: "bat", label: "Yarasa" },
+  { id: "none", label: tt("Yok") },
+  { id: "beret", label: tt("Bere") },
+  { id: "bowler", label: tt("Melon") },
+  { id: "headphones", label: tt("Kulaklık") },
+  { id: "antenna", label: tt("Anten") },
+  { id: "bow", label: tt("Fiyonk") },
+  { id: "cap", label: tt("Kep") },
+  { id: "ears", label: tt("Kulak") },
+  { id: "sprout", label: tt("Filiz") },
+  { id: "flower", label: tt("Çiçek") },
+  { id: "star", label: tt("Yıldız") },
+  { id: "stalks", label: tt("Salyangoz") },
+  { id: "witch", label: tt("Cadı") },
+  { id: "horns", label: tt("Boynuz") },
+  { id: "bat", label: tt("Yarasa") },
 ];
 
 /** Kepin rengi: gövdeyle karışmasın diye mavi gövdede mercan, öbürlerinde koyu mavi (Dots'taki gibi) */
 export const capColor = (body: string) => (["#2B8CFF", "#9B7BFF", "#E23BD6"].includes(body.toUpperCase()) ? "#FF6A3D" : "#2F5BFF");
 
 export const NECKS: { id: NeckId; label: string }[] = [
-  { id: "none", label: "Yok" },
-  { id: "bowtie", label: "Papyon" },
+  { id: "none", label: tt("Yok") },
+  { id: "bowtie", label: tt("Papyon") },
 ];
 
 /** Gövde renkleri: Nook'un beyazı + Dots gibi canlı, doygun tonlar */
@@ -173,6 +175,8 @@ function backVowel(word: string) {
  *   ek("Fıstık", "la"), ek("Elma", "la") → "Elma'yla", ek("Elma", "a") → "Elma'ya"
  */
 export function ek(name: string, suffix: "la" | "a" | "un") {
+  // Ekler yalnızca Türkçede; öbür dillerde çeviri adı kendi cümlesine yerleştirir
+  if (!isTurkish) return name;
   const back = backVowel(name);
   const last = name[name.length - 1] ?? "";
   const vowelEnd = VOWELS.includes(last);
@@ -195,48 +199,48 @@ export function ek(name: string, suffix: "la" | "a" | "un") {
 const COLOR_NAMES: Record<string, string> = {
   "#F4F4F6": "beyaz",
   "#FFFFFF": "beyaz",
-  "#2B8CFF": "elektrik mavisi",
-  "#E23BD6": "fuşya",
-  "#FFD21F": "limon sarısı",
+  "#2B8CFF": tt("elektrik mavisi"),
+  "#E23BD6": tt("fuşya"),
+  "#FFD21F": tt("limon sarısı"),
   "#FF6A3D": "mercan",
-  "#8FE03A": "fıstık yeşili",
+  "#8FE03A": tt("fıstık yeşili"),
   "#9B7BFF": "lavanta",
   "#FF5C8A": "pembe",
   "#2FD4C0": "turkuaz",
   "#FF8A1F": "turuncu",
-  "#FF3B4A": "kiraz kırmızısı",
-  "#00B8FF": "gök mavisi",
-  "#16C47F": "zümrüt yeşili",
-  "#C9F23A": "fosforlu yeşil",
-  "#6B4BFF": "çivit mavisi",
-  "#FF9EC4": "şeker pembesi",
+  "#FF3B4A": tt("kiraz kırmızısı"),
+  "#00B8FF": tt("gök mavisi"),
+  "#16C47F": tt("zümrüt yeşili"),
+  "#C9F23A": tt("fosforlu yeşil"),
+  "#6B4BFF": tt("çivit mavisi"),
+  "#FF9EC4": tt("şeker pembesi"),
   "#B5651D": "karamel",
   "#FFE3A8": "krem",
-  "#8A8F99": "gümüş grisi",
+  "#8A8F99": tt("gümüş grisi"),
   "#1E3A8A": "lacivert",
 };
-const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli", blob: "damla biçimli, tombul", pumpkin: "dilimli bir balkabağı", ghost: "etekleri dalgalı bir hayalet", cube: "yumuşak köşeli şeker küp", egg: "yumurta biçimli", star: "tombul bir yıldız", cat: "kedi kulaklı yuvarlak", bear: "ayıcık kulaklı yuvarlak" };
-const EYE_WORDS: Record<EyeStyle, string> = { pill: "iki siyah hap göz", bead: "parlak boncuk gözler", diamond: "elmas biçimli gözler", sparkle: "iri, parıltılı gözler", calm: "sakin, yarı kapalı gözler" };
+const SHAPE_WORDS: Record<ShapeId, string> = { sphere: tt("yuvarlak bir küre"), cloud: tt("kabarık bir bulut"), heart: tt("tombul bir kalp"), triangle: tt("yumuşak bir üçgen"), flower: tt("tırtıklı bir çiçek"), bean: tt("fasulye biçimli"), blob: tt("damla biçimli, tombul"), pumpkin: tt("dilimli bir balkabağı"), ghost: tt("etekleri dalgalı bir hayalet"), cube: tt("yumuşak köşeli şeker küp"), egg: tt("yumurta biçimli"), star: tt("tombul bir yıldız"), cat: tt("kedi kulaklı yuvarlak"), bear: tt("ayıcık kulaklı yuvarlak") };
+const EYE_WORDS: Record<EyeStyle, string> = { pill: tt("iki siyah hap göz"), bead: tt("parlak boncuk gözler"), diamond: tt("elmas biçimli gözler"), sparkle: tt("iri, parıltılı gözler"), calm: tt("sakin, yarı kapalı gözler") };
 const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
-  round: "yuvarlak tel gözlük",
-  bold: "kalın çerçeveli gözlük",
-  shades: "güneş gözlüğü",
+  round: tt("yuvarlak tel gözlük"),
+  bold: tt("kalın çerçeveli gözlük"),
+  shades: tt("güneş gözlüğü"),
   monocle: "monokl",
-  beret: "Fransız beresi",
-  bowler: "melon şapka",
-  headphones: "kulaklık",
+  beret: tt("Fransız beresi"),
+  bowler: tt("melon şapka"),
+  headphones: tt("kulaklık"),
   antenna: "anten",
   bow: "fiyonk",
   bowtie: "papyon",
   cap: "kep",
-  ears: "tavşan kulakları",
-  sprout: "başında filiz",
-  flower: "çiçek tokası",
-  star: "yıldız tokası",
-  stalks: "salyangoz gibi saplı gözler",
-  witch: "sivri cadı şapkası",
-  horns: "kırmızı şeytan boynuzları",
-  bat: "yarasa tokası",
+  ears: tt("tavşan kulakları"),
+  sprout: tt("başında filiz"),
+  flower: tt("çiçek tokası"),
+  star: tt("yıldız tokası"),
+  stalks: tt("salyangoz gibi saplı gözler"),
+  witch: tt("sivri cadı şapkası"),
+  horns: tt("kırmızı şeytan boynuzları"),
+  bat: tt("yarasa tokası"),
 };
 
 /** Sistem isteminde: "elektrik mavisi, peluş, kabarık bir bulut gövde, parlak boncuk gözler; üstünde siyah Fransız beresi" */
@@ -244,8 +248,8 @@ export function describeLook(raw: Look, color = useNook.getState().settings.face
   const look = normalizeLook(raw);
   const tone = COLOR_NAMES[color.toUpperCase()] ?? "renkli";
   const wear = [look.glasses, look.head, look.neck].map((k) => WEAR_WORDS[k]).filter(Boolean);
-  const tex = { smooth: "", plush: ", peluş", matte: ", mat kil", jelly: ", jöle gibi parlak", metal: ", metalik", spots: ", benekli" }[look.texture];
-  return `${tone}${tex}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde ${wear.join(", ")}` : ""}`;
+  const tex = { smooth: "", plush: tt(", peluş"), matte: tt(", mat kil"), jelly: tt(", jöle gibi parlak"), metal: ", metalik", spots: ", benekli" }[look.texture];
+  return tt("{0}{1}, {2} gövde, {3}{4}", tone, tex, SHAPE_WORDS[look.shape], EYE_WORDS[look.eyes], wear.length ? tt("; üstünde {0}", wear.join(", ")) : "");
 }
 
 // ------------------------------------------------------------------ vitrin (tanıtım)
@@ -256,19 +260,19 @@ export function describeLook(raw: Look, color = useNook.getState().settings.face
  */
 export const SHOWCASE: { name: string; color: string; look: Look; x: number; y: number; size: number; mood?: "happy" | "wink" | "love" }[] = [
   // arka sıra
-  { name: "Pamuk", color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush" }, x: 64, y: 250, size: 100 },
-  { name: "Mandalina", color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "flower" }, x: 166, y: 218, size: 104, mood: "happy" },
-  { name: "Lila", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "stalks" }, x: 272, y: 242, size: 92, mood: "happy" },
-  { name: "Kaptan", color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "cap" }, x: 374, y: 228, size: 98 },
-  { name: "Pembiş", color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "ears" }, x: 474, y: 234, size: 94 },
-  { name: "Filiz", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", head: "sprout" }, x: 556, y: 270, size: 88 },
+  { name: tt("Pamuk"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush" }, x: 64, y: 250, size: 100 },
+  { name: tt("Mandalina"), color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "flower" }, x: 166, y: 218, size: 104, mood: "happy" },
+  { name: tt("Lila"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "stalks" }, x: 272, y: 242, size: 92, mood: "happy" },
+  { name: tt("Kaptan"), color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "cap" }, x: 374, y: 228, size: 98 },
+  { name: tt("Pembiş"), color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "ears" }, x: 474, y: 234, size: 94 },
+  { name: tt("Filiz"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", head: "sprout" }, x: 556, y: 270, size: 88 },
   // ön sıra
-  { name: "Yıldız", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", head: "star" }, x: 44, y: 356, size: 112 },
-  { name: "Bulut", color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "beret" }, x: 172, y: 362, size: 134 },
-  { name: "Fıstık", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", eyes: "bead", head: "stalks" }, x: 296, y: 370, size: 104 },
-  { name: "Profesör", color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "triangle", texture: "plush", eyes: "calm", glasses: "round" }, x: 398, y: 362, size: 118 },
-  { name: "Kalp", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", texture: "plush", glasses: "shades" }, x: 496, y: 364, size: 112 },
-  { name: "Kiraz", color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush" }, x: 572, y: 366, size: 100, mood: "wink" },
+  { name: tt("Yıldız"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", head: "star" }, x: 44, y: 356, size: 112 },
+  { name: tt("Bulut"), color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "beret" }, x: 172, y: 362, size: 134 },
+  { name: tt("Fıstık"), color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush", eyes: "bead", head: "stalks" }, x: 296, y: 370, size: 104 },
+  { name: tt("Profesör"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "triangle", texture: "plush", eyes: "calm", glasses: "round" }, x: 398, y: 362, size: 118 },
+  { name: tt("Kalp"), color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", texture: "plush", glasses: "shades" }, x: 496, y: 364, size: 112 },
+  { name: tt("Kiraz"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush" }, x: 572, y: 366, size: 100, mood: "wink" },
 ];
 
 /** Cadılar Bayramı parçaları Görünüm'de yalnızca kendi bölümünde (hazır kostümlerde) görünür */
@@ -276,12 +280,12 @@ export const HALLOWEEN_PARTS = new Set<string>(["pumpkin", "ghost", "witch", "ho
 
 /** Cadılar Bayramı: Görünüm'de tek dokunuşla giyilen hazır Nook'lar */
 export const HALLOWEEN: { name: string; color: string; look: Look }[] = [
-  { name: "Bal Kabak", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", eyes: "diamond" } },
-  { name: "Hayalet", color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "ghost", eyes: "bead" } },
-  { name: "Cadı", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "witch" } },
-  { name: "Şeytancık", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", head: "horns" } },
-  { name: "Yarasa", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "bat" } },
-  { name: "Kabak Cadı", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", texture: "plush", head: "witch" } },
+  { name: tt("Bal Kabak"), color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", eyes: "diamond" } },
+  { name: tt("Hayalet"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "ghost", eyes: "bead" } },
+  { name: tt("Cadı"), color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "witch" } },
+  { name: tt("Şeytancık"), color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", head: "horns" } },
+  { name: tt("Yarasa"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "bat" } },
+  { name: tt("Kabak Cadı"), color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", texture: "plush", head: "witch" } },
 ];
 
 /**
@@ -310,9 +314,9 @@ export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
 
 /** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */
 export const TOUR_CHIPS: { label: string; body: string; look: Look }[] = [
-  { label: "Müzik", body: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
-  { label: "Dosya rafı", body: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead" } },
-  { label: "Yapay zekâ", body: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "triangle", glasses: "round" } },
-  { label: "Alarm", body: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
-  { label: "Odak", body: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "bean", head: "bowler" } },
+  { label: tt("Müzik"), body: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
+  { label: tt("Dosya rafı"), body: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "bead" } },
+  { label: tt("Yapay zekâ"), body: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "triangle", glasses: "round" } },
+  { label: tt("Alarm"), body: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
+  { label: tt("Odak"), body: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "bean", head: "bowler" } },
 ];

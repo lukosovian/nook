@@ -5,6 +5,7 @@ import { mmss, nextPhase, pauseFocus, PHASE_LABEL, remaining, resumeFocus, start
 import { spring } from "../../lib/motion";
 import { dayKey, useNook } from "../../store/nook";
 import { ACCENT, Segmented, tintBg, tintText, Toggle } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 const WORK = [
   { id: 15, label: "15" },
@@ -12,10 +13,10 @@ const WORK = [
   { id: 50, label: "50" },
 ];
 const WATER = [
-  { id: 0, label: "Yok" },
-  { id: 45, label: "45 dk" },
-  { id: 60, label: "1 sa" },
-  { id: 90, label: "90 dk" },
+  { id: 0, label: tt("Yok") },
+  { id: 45, label: tt("45 dk") },
+  { id: 60, label: tt("1 sa") },
+  { id: 90, label: tt("90 dk") },
 ];
 
 /** Odak: solda büyük halka ve kalan süre, sağda kontroller ve mola hatırlatıcıları. */
@@ -43,11 +44,11 @@ export function FocusPanel() {
         <Ring p={p} color={color}>
           <span className="text-[24px] font-medium leading-none tabular-nums tracking-tight text-label">{mmss(left)}</span>
           <span className="mt-1 text-[10.5px] font-medium" style={{ color: tintText(color) }}>
-            {focus ? (paused ? "Duraklatıldı" : PHASE_LABEL[focus.phase]) : "Hazır"}
+            {focus ? (paused ? tt("Duraklatıldı") : PHASE_LABEL[focus.phase]) : tt("Hazır")}
           </span>
         </Ring>
         {/* Tur noktaları: 4'te bir uzun mola */}
-        <div className="flex gap-1.5" title={`${round} tur tamamlandı`}>
+        <div className="flex gap-1.5" title={tt("{0} tur tamamlandı", round)}>
           {[0, 1, 2, 3].map((i) => (
             <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: i < round % 4 || (round > 0 && round % 4 === 0 && !work) ? ACCENT.red : "rgb(255 255 255 / 0.12)" }} />
           ))}
@@ -57,33 +58,31 @@ export function FocusPanel() {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex gap-1.5">
           {!focus ? (
-            <Big color={ACCENT.red} icon={Play} label="Başlat" onClick={() => startFocus("work", 0)} />
+            <Big color={ACCENT.red} icon={Play} label={tt("Başlat")} onClick={() => startFocus("work", 0)} />
           ) : paused ? (
-            <Big color={color} icon={Play} label="Devam" onClick={resumeFocus} />
+            <Big color={color} icon={Play} label={tt("Devam")} onClick={resumeFocus} />
           ) : (
-            <Big color={color} icon={Pause} label="Duraklat" onClick={pauseFocus} />
+            <Big color={color} icon={Pause} label={tt("Duraklat")} onClick={pauseFocus} />
           )}
-          {focus && <Small icon={SkipForward} label={work ? "Molaya geç" : "Molayı atla"} onClick={() => nextPhase(false)} />}
-          {focus && <Small icon={Square} label="Bitir" onClick={stopFocus} />}
+          {focus && <Small icon={SkipForward} label={work ? tt("Molaya geç") : tt("Molayı atla")} onClick={() => nextPhase(false)} />}
+          {focus && <Small icon={Square} label={tt("Bitir")} onClick={stopFocus} />}
         </div>
-        <p className="px-1 text-[10.5px] text-label-3">
-          Bugün {today?.pomodoros ?? 0} tur · {today?.focus ?? 0} dk odak
-        </p>
+        <p className="px-1 text-[10.5px] text-label-3">{tt("Bugün {0} tur · {1} dk odak", today?.pomodoros ?? 0, today?.focus ?? 0)}</p>
 
         <div className="mt-auto divide-y divide-white/[0.05]">
-          <Row label="Süre (dk)">
+          <Row label={tt("Süre (dk)")}>
             <Segmented id="work" options={WORK} value={s.focusWork} onChange={(v) => update({ focusWork: v, focusBreak: v >= 50 ? 10 : 5, focusLong: v >= 50 ? 20 : 15 })} color={ACCENT.red} />
           </Row>
-          <Row label="Odak bekçisi (YouTube, X…)">
+          <Row label={tt("Odak bekçisi (YouTube, X…)")}>
             <Toggle on={s.focusGuard} onChange={(v) => update({ focusGuard: v })} color={ACCENT.red} />
           </Row>
-          <Row label="Odakta bildirim yok">
+          <Row label={tt("Odakta bildirim yok")}>
             <Toggle on={s.focusMute} onChange={(v) => update({ focusMute: v })} color={ACCENT.red} />
           </Row>
-          <Row label="Göz molası (20-20-20)">
+          <Row label={tt("Göz molası (20-20-20)")}>
             <Toggle on={s.eyeBreak} onChange={(v) => update({ eyeBreak: v })} />
           </Row>
-          <Row label="Su">
+          <Row label={tt("Su")}>
             <Segmented id="water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
           </Row>
         </div>

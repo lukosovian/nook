@@ -22,6 +22,7 @@ import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 import { ACCENT } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /**
  * Nook'un görünümü: isim, gövde, renk, gözler, gözlük, başlık, boyun.
@@ -48,12 +49,10 @@ export function LookPanel() {
           }}
           className="flex shrink-0 items-center gap-1 rounded-full bg-well px-2.5 py-1 text-[11px] font-medium text-label-2 transition-colors hover:bg-well-hi hover:text-label"
         >
-          <Shuffle size={11} strokeWidth={2.4} />
-          Şaşırt beni
-        </motion.button>
+          <Shuffle size={11} strokeWidth={2.4} />{tt("Şaşırt beni")}</motion.button>
       </div>
 
-      <Group title="Cadılar Bayramı 🎃">
+      <Group title={tt("Cadılar Bayramı 🎃")}>
         {HALLOWEEN.map((o) => (
           <Option
             key={o.name}
@@ -66,7 +65,7 @@ export function LookPanel() {
         ))}
       </Group>
 
-      <Group title="Gövde">
+      <Group title={tt("Gövde")}>
         {SHAPES.filter((o) => !HALLOWEEN_PARTS.has(o.id)).map((o) => (
           <Option key={o.id} label={o.label} on={look.shape === o.id} onClick={() => set({ shape: o.id })}>
             <Figure look={{ ...bare(look), shape: o.id }} color={color} />
@@ -74,7 +73,7 @@ export function LookPanel() {
         ))}
       </Group>
 
-      <Group title="Doku">
+      <Group title={tt("Doku")}>
         {TEXTURES.map((o) => (
           <Option key={o.id} label={o.label} on={look.texture === o.id} onClick={() => set({ texture: o.id })}>
             <Figure look={{ ...bare(look), texture: o.id }} color={color} />
@@ -82,11 +81,11 @@ export function LookPanel() {
         ))}
       </Group>
 
-      <Group title="Renk">
+      <Group title={tt("Renk")}>
         <Swatches value={color} onChange={(c) => update({ faceColor: c })} />
       </Group>
 
-      <Group title="Gözler">
+      <Group title={tt("Gözler")}>
         {EYE_STYLES.map((o) => (
           <Option key={o.id} label={o.label} on={look.eyes === o.id} onClick={() => set({ eyes: o.id })}>
             <Figure look={{ ...bare(look), eyes: o.id }} color={color} zoom />
@@ -94,7 +93,7 @@ export function LookPanel() {
         ))}
       </Group>
 
-      <Group title="Gözlük">
+      <Group title={tt("Gözlük")}>
         {GLASSES.map((o) => (
           <Option key={o.id} label={o.label} on={look.glasses === o.id} onClick={() => set({ glasses: o.id })}>
             <Figure look={{ ...bare(look), glasses: o.id }} color={color} zoom />
@@ -102,7 +101,7 @@ export function LookPanel() {
         ))}
       </Group>
 
-      <Group title="Başlık">
+      <Group title={tt("Başlık")}>
         {HEADS.filter((o) => !HALLOWEEN_PARTS.has(o.id)).map((o) => (
           <Option key={o.id} label={o.label} on={look.head === o.id} onClick={() => set({ head: o.id })}>
             <Figure look={{ ...bare(look), head: o.id }} color={color} drop={4} />
@@ -110,7 +109,7 @@ export function LookPanel() {
         ))}
       </Group>
 
-      <Group title="Boyun">
+      <Group title={tt("Boyun")}>
         {NECKS.map((o) => (
           <Option key={o.id} label={o.label} on={look.neck === o.id} onClick={() => set({ neck: o.id })}>
             <Figure look={{ ...bare(look), neck: o.id }} color={color} />
@@ -135,7 +134,7 @@ function NameInput() {
   };
   return (
     <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-well px-3 py-1 focus-within:bg-well-hi">
-      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">Adı</span>
+      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">{tt("Adı")}</span>
       <input
         value={draft}
         maxLength={NAME_MAX}

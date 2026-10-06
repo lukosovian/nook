@@ -20,6 +20,7 @@ import { dragOut, thumbnailSrc } from "../../lib/shelf";
 import { useNook, type ShelfItem } from "../../store/nook";
 import { ek, useNookName } from "../../lib/look";
 import { ACCENT, EmptyState, TextButton } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Bu kadar px hareket etmeden sürükleme başlamaz (tıklama ile karışmasın). */
 const DRAG_THRESHOLD = 5;
@@ -30,16 +31,14 @@ export function ShelfPanel() {
   const name = useNookName();
 
   if (!shelf.length) {
-    return <EmptyState title="Raf boş" hint={`Bir dosyayı ${ek(name, "a")} sürükle — kutuya dönüşüp yutar`} color={ACCENT.teal} />;
+    return <EmptyState title={tt("Raf boş")} hint={tt("Bir dosyayı {0} sürükle — kutuya dönüşüp yutar", ek(name, "a"))} color={ACCENT.teal} />;
   }
 
   return (
     <div className="flex h-full flex-col">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] text-label-3">{shelf.length} öğe · sürükle, çift tıkla, sağ tıkla</span>
-        <TextButton tone="danger" onClick={clearShelf}>
-          Temizle
-        </TextButton>
+        <span className="text-[11px] text-label-3">{tt("{0} öğe · sürükle, çift tıkla, sağ tıkla", shelf.length)}</span>
+        <TextButton tone="danger" onClick={clearShelf}>{tt("Temizle")}</TextButton>
       </div>
       <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden pb-1" onWheel={(e) => (e.currentTarget.scrollLeft += e.deltaY)}>
         <AnimatePresence initial={false}>
@@ -90,14 +89,14 @@ function ShelfCard({ item }: { item: ShelfItem }) {
       <Thumb item={item} />
       <div className="min-w-0 px-0.5 leading-tight">
         <p className="truncate text-[11px] font-medium text-label">{item.name}</p>
-        <p className="mt-0.5 text-[10px] tabular-nums text-label-3">{item.isDir ? "Klasör" : formatSize(item.size)}</p>
+        <p className="mt-0.5 text-[10px] tabular-nums text-label-3">{item.isDir ? tt("Klasör") : formatSize(item.size)}</p>
       </div>
 
       <div className="absolute inset-x-2.5 top-2.5 flex justify-between opacity-0 transition-opacity group-hover:opacity-100">
-        <CardAction label="Klasörde göster" onClick={() => void revealPath(item.path)}>
+        <CardAction label={tt("Klasörde göster")} onClick={() => void revealPath(item.path)}>
           <FolderOpen size={10} strokeWidth={2.4} />
         </CardAction>
-        <CardAction label="Raftan kaldır" onClick={() => removeShelf(item.id)}>
+        <CardAction label={tt("Raftan kaldır")} onClick={() => removeShelf(item.id)}>
           <X size={10} strokeWidth={2.6} />
         </CardAction>
       </div>

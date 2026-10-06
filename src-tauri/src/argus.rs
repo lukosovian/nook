@@ -921,7 +921,8 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
     }
     let pos = window.outer_position().map_err(|e| e.to_string())?;
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let at = tauri::PhysicalPosition::new(pos.x + (x * scale).round() as i32, pos.y + (y * scale).round() as i32);
+    let k = scale * crate::window::zoom();
+    let at = tauri::PhysicalPosition::new(pos.x + (x * k).round() as i32, pos.y + (y * k).round() as i32);
     let card = match app.get_webview_window(CARD) {
         Some(c) => c,
         None => {
@@ -929,7 +930,7 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
             let c = tauri::WebviewWindowBuilder::new(app, CARD, tauri::WebviewUrl::App("index.html".into()))
                 .position(at.x as f64 / scale, at.y as f64 / scale)
                 .title("Nook")
-                .inner_size(CARD_W, CARD_H)
+                .inner_size(CARD_W * crate::window::zoom(), CARD_H * crate::window::zoom())
                 .resizable(false)
                 .maximizable(false)
                 .minimizable(false)
@@ -944,6 +945,7 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
                 .map_err(|e| e.to_string())?;
             c.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
             crate::window::clear_background(&c);
+            crate::window::apply_zoom(&c);
             c
         }
     };

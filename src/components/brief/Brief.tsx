@@ -19,6 +19,7 @@ import { SKY_LABEL } from "../../lib/weather";
 import { modelsFor } from "../../hooks/useGemini";
 import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, Card, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { tt, locale } from "../../lib/i18n";
 
 const LINE_KEY = "nook-today-line";
 
@@ -43,7 +44,7 @@ function useTodayLine() {
       const text = await generateOnce(
         key,
         model,
-        [{ text: "Güne başlarken bana tek cümlelik, sıcak ve kısa bir günaydın mesajı ver. Hava, alarmlar ya da notum ilginçse birine değin. En fazla 18 kelime." }],
+        [{ text: tt("Güne başlarken bana tek cümlelik, sıcak ve kısa bir günaydın mesajı ver. Hava, alarmlar ya da notum ilginçse birine değin. En fazla 18 kelime.") }],
         systemPrompt(),
       );
       if (!alive || !text) return;
@@ -70,7 +71,7 @@ const enter = (i: number) => ({
   transition: { duration: 0.32, ease: easeOut, delay: 0.12 + i * 0.045 },
 });
 
-const mins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} sa${m % 60 ? ` ${m % 60} dk` : ""}` : `${m} dk`);
+const mins = (m: number) => (m >= 60 ? tt("{0} sa", Math.floor(m / 60)) + (m % 60 ? tt(" {0} dk", m % 60) : "") : tt("{0} dk", m));
 
 export function Brief() {
   const s = useNook();
@@ -81,7 +82,7 @@ export function Brief() {
 
   const now = new Date();
   const h = now.getHours();
-  const greet = h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
+  const greet = h < 12 ? tt("Günaydın") : h < 18 ? tt("İyi günler") : tt("İyi akşamlar");
   const w = s.weather;
 
   // Diziler: bugün çıkanlar önce, sonra önümüzdeki hafta
@@ -108,9 +109,7 @@ export function Brief() {
       {/* Üst çubuk */}
       <div className="absolute inset-x-5 top-0 z-20 flex items-center justify-between" style={{ height: BRIEF.header }}>
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-label-2">
-          <Sparkles size={13} strokeWidth={2.2} style={{ color: tintText(ACCENT.yellow) }} />
-          Günün özeti
-          <span className="text-label-3">· {now.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" })}</span>
+          <Sparkles size={13} strokeWidth={2.2} style={{ color: tintText(ACCENT.yellow) }} />{tt("Günün özeti")}<span className="text-label-3">· {now.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" })}</span>
         </span>
         <div className="flex items-center gap-1.5">
           {update && (
@@ -120,15 +119,13 @@ export function Brief() {
               style={{ background: tintBg(ACCENT.blue, 16), borderColor: tintBg(ACCENT.blue, 40), color: tintText(ACCENT.blue) }}
             >
               <Download size={12} strokeWidth={2.4} />
-              {progress === null ? `Yeni sürüm ${update} · Güncelle` : `Güncelleniyor %${progress}`}
+              {progress === null ? tt("Yeni sürüm {0} · Güncelle", update) : tt("Güncelleniyor %{0}", progress)}
             </button>
           )}
           <button
             onClick={closeBrief}
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-label-3 transition-colors hover:bg-well-hi hover:text-label"
-          >
-            Kapat
-            <X size={12} strokeWidth={2.4} />
+          >{tt("Kapat")}<X size={12} strokeWidth={2.4} />
           </button>
         </div>
       </div>
@@ -150,10 +147,10 @@ export function Brief() {
                 className="rounded-[14px] px-3 py-2 text-center text-[11.5px] leading-snug"
                 style={{ background: tintBg(ACCENT.yellow, 10), color: tintText(ACCENT.yellow) }}
               >
-                {line ?? "Bugünü düşünüyorum…"}
+                {line ?? tt("Bugünü düşünüyorum…")}
               </p>
             ) : (
-              <p className="text-center text-[11.5px] leading-snug text-label-3">Bugün senin için neler var, bir bakalım</p>
+              <p className="text-center text-[11.5px] leading-snug text-label-3">{tt("Bugün senin için neler var, bir bakalım")}</p>
             )}
           </div>
 
@@ -170,7 +167,7 @@ export function Brief() {
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[10.5px] tabular-nums">
                   <Chip color={ACCENT.orange}>↑ {w.high}°</Chip>
                   <Chip color={ACCENT.teal}>↓ {w.low}°</Chip>
-                  <Chip color={ACCENT.blue}>{w.rainChance >= 50 ? `Şemsiye al · %${w.rainChance}` : `Yağış %${w.rainChance}`}</Chip>
+                  <Chip color={ACCENT.blue}>{w.rainChance >= 50 ? tt("Şemsiye al · %{0}", w.rainChance) : tt("Yağış %{0}", w.rainChance)}</Chip>
                 </div>
               </div>
             ) : (
@@ -182,9 +179,7 @@ export function Brief() {
                   }}
                   className="w-full rounded-full border py-2 text-[12px] font-medium"
                   style={{ background: tintBg(ACCENT.red, 14), borderColor: tintBg(ACCENT.red, 38), color: tintText(ACCENT.red) }}
-                >
-                  Güne bir odak turuyla başla
-                </button>
+                >{tt("Güne bir odak turuyla başla")}</button>
               )
             )}
           </div>
@@ -199,11 +194,10 @@ export function Brief() {
               <div className="mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2 text-[12.5px] font-medium text-label">
                   <MiniNook color={ACCENT.orange} size={22} eyes={shows.length ? "happy" : "closed"} />
-                  {freshCount ? `Bugün ${freshCount} yeni bölüm` : shows.length ? "Bu hafta çıkacaklar" : "Bu hafta yeni bölüm yok"}
+                  {freshCount ? tt("Bugün {0} yeni bölüm", freshCount) : shows.length ? tt("Bu hafta çıkacaklar") : tt("Bu hafta yeni bölüm yok")}
                 </span>
                 {week && (week.episodes > 0 || week.movies > 0) && (
-                  <span className="text-[10.5px] text-label-3">
-                    Son 7 günde {[week.episodes && `${week.episodes} bölüm`, week.movies && `${week.movies} film`].filter(Boolean).join(", ")}
+                  <span className="text-[10.5px] text-label-3">{tt("Son 7 günde")}{" "}{[week.episodes && tt("{0} bölüm", week.episodes), week.movies && tt("{0} film", week.movies)].filter(Boolean).join(", ")}
                   </span>
                 )}
               </div>
@@ -212,7 +206,7 @@ export function Brief() {
                   <Poster key={`${e.item.id}-${e.ep.season}-${e.ep.episode}`} e={e} i={i} />
                 ))}
                 {!shows.length && (
-                  <p className="col-span-4 py-6 text-center text-[11.5px] text-label-3">Takip ettiğin dizilerde önümüzdeki hafta yeni bölüm görünmüyor</p>
+                  <p className="col-span-4 py-6 text-center text-[11.5px] text-label-3">{tt("Takip ettiğin dizilerde önümüzdeki hafta yeni bölüm görünmüyor")}</p>
                 )}
               </div>
             </Card>
@@ -247,11 +241,11 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const nextWeek = new Date();
   nextWeek.setDate(nextWeek.getDate() + 7);
-  const weekday = d.toLocaleDateString("tr-TR", { weekday: "long" });
-  const badge = today ? "Bugün" : e.date === dayKey(tomorrow) ? "Yarın" : e.date === dayKey(nextWeek) ? `Haftaya ${weekday}` : weekday;
+  const weekday = d.toLocaleDateString(locale(), { weekday: "long" });
+  const badge = today ? tt("Bugün") : e.date === dayKey(tomorrow) ? tt("Yarın") : e.date === dayKey(nextWeek) ? `Haftaya ${weekday}` : weekday;
   const hue = [ACCENT.orange, ACCENT.purple, ACCENT.blue, ACCENT.pink][i % 4];
   return (
-    <div className="min-w-0 cursor-pointer transition-transform hover:-translate-y-0.5" role="button" title="Argus'ta aç" onClick={() => openTab("argus")}>
+    <div className="min-w-0 cursor-pointer transition-transform hover:-translate-y-0.5" role="button" title={tt("Argus'ta aç")} onClick={() => openTab("argus")}>
       <div className="relative h-[88px] overflow-hidden rounded-[12px]" style={{ background: `linear-gradient(160deg, ${tintBg(hue, 34)} 0%, ${tintBg(hue, 8)} 100%)` }}>
         {src ? (
           <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
@@ -269,7 +263,7 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
         <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/60 px-1.5 py-px text-[9.5px] font-medium tabular-nums text-label">{epLabel(e.ep)}</span>
       </div>
       <p className="mt-1.5 text-[11.5px] font-medium leading-snug text-label">{e.item.title}</p>
-      <p className="text-[10px] leading-snug text-label-3">{e.ep.name || `${e.ep.season}. sezon ${e.ep.episode}. bölüm`}</p>
+      <p className="text-[10px] leading-snug text-label-3">{e.ep.name || tt("{0}. sezon {1}. bölüm", e.ep.season, e.ep.episode)}</p>
     </div>
   );
 }
@@ -315,7 +309,7 @@ function Tile({ label, value, color, eyes = "open", action, open }: TileData) {
             e.stopPropagation();
             action();
           }}
-          title="Ekle"
+          title={tt("Ekle")}
           className="flex size-6 shrink-0 items-center justify-center rounded-full border"
           style={{ background: tintBg(color, 18), borderColor: tintBg(color, 40), color: tintText(color) }}
         >
@@ -339,37 +333,37 @@ function useTiles(): TileData[] {
   const water = s.days[dayKey()]?.water ?? 0;
   const night = s.notifications.filter((n) => n.at > Date.now() - 12 * 3600_000).length;
   const wd = now.getDay();
-  const devs = [s.devices?.headset && { name: "Kulaklık", pct: s.devices.headset.percent }, s.devices?.mouse && { name: "Mouse", pct: s.devices.mouse.percent }].filter(
+  const devs = [s.devices?.headset && { name: tt("Kulaklık"), pct: s.devices.headset.percent }, s.devices?.mouse && { name: tt("Mouse"), pct: s.devices.mouse.percent }].filter(
     (d): d is { name: string; pct: number } => !!d,
   );
   const lowest = Math.min(s.devices?.headset?.percent ?? 100, s.devices?.mouse?.percent ?? 100);
 
   const tiles: TileData[] = [
     {
-      label: "Alarm",
-      value: alarms.length ? alarms.map((a) => `${clock(a)}${alarms.length === 1 && a.label ? ` ${a.label}` : ""}`).join(", ") : "Bugün yok",
+      label: tt("Alarm"),
+      value: alarms.length ? alarms.map((a) => `${clock(a)}${alarms.length === 1 && a.label ? ` ${a.label}` : ""}`).join(", ") : tt("Bugün yok"),
       color: ACCENT.orange,
       eyes: alarms.length ? "open" : "closed",
       open: "alarm",
     },
-    { label: "Su", value: water ? `${water} bardak içtin` : "Henüz içmedin", color: ACCENT.blue, eyes: water ? "happy" : "side", action: drankWater },
+    { label: tt("Su"), value: water ? tt("{0} bardak içtin", water) : tt("Henüz içmedin"), color: ACCENT.blue, eyes: water ? "happy" : "side", action: drankWater },
     {
-      label: "Dün",
-      value: [yesterday?.focus && `${mins(yesterday.focus)} odak`, yesterday?.game && `${mins(yesterday.game)} oyun`].filter(Boolean).join(" · ") || "Dinlenme günüydü",
+      label: tt("Dün"),
+      value: [yesterday?.focus && `${mins(yesterday.focus)} odak`, yesterday?.game && `${mins(yesterday.game)} oyun`].filter(Boolean).join(" · ") || tt("Dinlenme günüydü"),
       color: ACCENT.red,
       open: "report",
     },
-    { label: "Gece", value: night ? `${night} bildirim geldi` : "Sessizdi", color: ACCENT.purple, eyes: night ? "open" : "closed", open: "notify" },
+    { label: tt("Gece"), value: night ? tt("{0} bildirim geldi", night) : tt("Sessizdi"), color: ACCENT.purple, eyes: night ? "open" : "closed", open: "notify" },
   ];
   if (devs.length) tiles.push({ label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => `%${d.pct}`).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open", open: "devices" });
   tiles.push({
-    label: "Hafta sonu",
-    value: wd === 0 || wd === 6 ? "Keyfini çıkar" : wd === 5 ? "Yarın başlıyor" : `${6 - wd} gün kaldı`,
+    label: tt("Hafta sonu"),
+    value: wd === 0 || wd === 6 ? tt("Keyfini çıkar") : wd === 5 ? tt("Yarın başlıyor") : tt("{0} gün kaldı", 6 - wd),
     color: ACCENT.yellow,
     eyes: wd === 0 || wd === 5 || wd === 6 ? "happy" : "open",
   });
-  if (yesterday?.active) tiles.push({ label: "Dün ekranda", value: mins(yesterday.active), color: ACCENT.green, open: "report" });
-  if (!s.focus) tiles.push({ label: "Pomodoro", value: "Bir tur başlat", color: ACCENT.pink, action: () => (startFocus("work", 0), closeBrief()) });
-  if (yesterday?.music) tiles.push({ label: "Dün müzik", value: mins(yesterday.music), color: ACCENT.pink, eyes: "happy", open: "media" });
+  if (yesterday?.active) tiles.push({ label: tt("Dün ekranda"), value: mins(yesterday.active), color: ACCENT.green, open: "report" });
+  if (!s.focus) tiles.push({ label: "Pomodoro", value: tt("Bir tur başlat"), color: ACCENT.pink, action: () => (startFocus("work", 0), closeBrief()) });
+  if (yesterday?.music) tiles.push({ label: tt("Dün müzik"), value: mins(yesterday.music), color: ACCENT.pink, eyes: "happy", open: "media" });
   return tiles;
 }

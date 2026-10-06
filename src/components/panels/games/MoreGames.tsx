@@ -11,6 +11,7 @@ import { useNook } from "../../../store/nook";
 import { NookFigure } from "../../mascot/Figure";
 import { ACCENT, MiniNook, tintBg, tintText } from "../../ui/primitives";
 import { Header, Over, StartButton } from "./kit";
+import { tt } from "../../../lib/i18n";
 
 /** Oyun bitti: rekor, keyif, Nook'un tepkisi */
 function finish(game: string, score: number, good: number) {
@@ -97,11 +98,11 @@ export function Whack({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col gap-2">
       <Header
         onBack={onBack}
-        title="Köstebek"
+        title={tt("Köstebek")}
         right={
           <>
             <span style={{ color: tintText(ACCENT.orange) }}>{score}</span>
-            <span className="text-label-3">{(left / 1000).toFixed(1)} sn</span>
+            <span className="text-label-3">{(left / 1000).toFixed(1)}{" "}{tt("sn")}</span>
           </>
         }
       />
@@ -136,7 +137,7 @@ export function Whack({ onBack }: { onBack: () => void }) {
         {phase === "ready" && (
           <>
             <StartButton onClick={start} color={ACCENT.orange} best={best} />
-            <p className="absolute inset-x-0 bottom-1 text-center text-[10px] text-label-3">Turuncular +1 · kırmızı kızgın Nook −2</p>
+            <p className="absolute inset-x-0 bottom-1 text-center text-[10px] text-label-3">{tt("Turuncular +1 · kırmızı kızgın Nook −2")}</p>
           </>
         )}
         {phase === "over" && <Over score={score} best={best} onAgain={start} color={ACCENT.orange} />}
@@ -205,11 +206,11 @@ export function Pairs({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col gap-2">
       <Header
         onBack={onBack}
-        title="Eşleştir"
+        title={tt("Eşleştir")}
         right={
           <>
             <span style={{ color: tintText(ACCENT.purple) }}>{done.size / 2} / {PAIR_LOOKS.length}</span>
-            <span className="text-label-3">{moves} hamle</span>
+            <span className="text-label-3">{moves}{" "}{tt("hamle")}</span>
           </>
         }
       />
@@ -336,11 +337,11 @@ export function Jump({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col gap-2">
       <Header
         onBack={onBack}
-        title="Zıpla"
+        title={tt("Zıpla")}
         right={
           <>
             <span style={{ color: tintText(ACCENT.green) }}>{score}</span>
-            <span className="text-label-3">Boşluk ya da tıkla</span>
+            <span className="text-label-3">{tt("Boşluk ya da tıkla")}</span>
           </>
         }
       />

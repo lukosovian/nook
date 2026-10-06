@@ -17,6 +17,8 @@ import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnap
 import type { IslandMode } from "./layout";
 import { ISLAND, ISLAND_TOP } from "./layout";
 import { dayKey, useNook } from "../store/nook";
+import { locale } from "./i18n";
+import { tt } from "./i18n";
 
 export interface ArgusEp {
   season: number;
@@ -149,9 +151,9 @@ export function dayLabel(date: string) {
   const d = new Date(`${date}T12:00:00`);
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  if (date === today) return "Bugün";
-  if (date === dayKey(tomorrow)) return "Yarın";
-  return d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
+  if (date === today) return tt("Bugün");
+  if (date === dayKey(tomorrow)) return tt("Yarın");
+  return d.toLocaleDateString(locale(), { weekday: "short", day: "numeric", month: "short" });
 }
 
 /** Çıkmış mı — Argus'un "ne izlesem" kuralı: vizyon tarihi gelecekteyse önerme, tarihi boşsa öner */
@@ -273,15 +275,15 @@ export async function markWatched(item: ArgusItem, ep?: { season: number; episod
     const what = `${ep ? `${item.title} ${epLabel(ep)}` : item.title}${status ? ` · ${status}` : ""}`;
     s.pushToast({
       kind: "argus",
-      title: ep ? "Bölüm işaretlendi" : status ? "Argus'a yazıldı" : "Film izlendi",
-      detail: r.completed && ep ? `${item.title}: bütün bölümler bitti!` : what,
+      title: ep ? tt("Bölüm işaretlendi") : status ? tt("Argus'a yazıldı") : tt("Film izlendi"),
+      detail: r.completed && ep ? tt("{0}: bütün bölümler bitti!", item.title) : what,
       ms: 4500,
     });
     playAntic(r.completed ? "love" : "nod");
     const sug = useArgus.getState().suggestion;
     if (sug?.itemId === item.id) answerSuggestion(sug);
   } catch (e) {
-    s.pushToast({ kind: "argus", title: "Argus'a yazılamadı", detail: String(e), ms: 6000 });
+    s.pushToast({ kind: "argus", title: tt("Argus'a yazılamadı"), detail: String(e), ms: 6000 });
     playAntic("suspicious");
   } finally {
     useArgus.setState({ busy: null });
@@ -293,18 +295,18 @@ export async function markWatched(item: ArgusItem, ep?: { season: number; episod
 /** Argus başka bir yerdeyse klasörünü elle seç */
 export async function chooseArgusDir() {
   const s = useNook.getState();
-  const picked = await pickFolder({ directory: true, title: "Argus klasörünü seç" }).catch(() => null);
+  const picked = await pickFolder({ directory: true, title: tt("Argus klasörünü seç") }).catch(() => null);
   if (typeof picked !== "string") return;
   const dir = await argusCheckDir(picked).catch(() => null);
   if (!dir) {
-    s.pushToast({ kind: "argus", title: "Burada Argus yok", detail: "İçinde app ve data klasörleri olan Argus klasörünü seç", ms: 6000 });
+    s.pushToast({ kind: "argus", title: tt("Burada Argus yok"), detail: tt("İçinde app ve data klasörleri olan Argus klasörünü seç"), ms: 6000 });
     playAntic("suspicious");
     return;
   }
   s.updateSettings({ argusDir: dir });
   await refreshArgus();
   if (useArgus.getState().snap) {
-    s.pushToast({ kind: "argus", title: "Argus'u buldum!", detail: dir, ms: 4500 });
+    s.pushToast({ kind: "argus", title: tt("Argus'u buldum!"), detail: dir, ms: 4500 });
     playAntic("love");
   }
 }
@@ -314,16 +316,16 @@ export async function installArgus() {
   const s = useNook.getState();
   try {
     await argusInstall();
-    s.pushToast({ kind: "argus", title: "Argus kuruluyor", detail: "Açılan penceredeki adımları izle", ms: 6000 });
+    s.pushToast({ kind: "argus", title: tt("Argus kuruluyor"), detail: tt("Açılan penceredeki adımları izle"), ms: 6000 });
     playAntic("hop");
   } catch (e) {
-    s.pushToast({ kind: "argus", title: "Argus kurulamadı", detail: String(e), ms: 6000 });
+    s.pushToast({ kind: "argus", title: tt("Argus kurulamadı"), detail: String(e), ms: 6000 });
   }
 }
 
 export async function openArgus() {
   const opened = await argusOpen().catch(() => false);
-  if (!opened) useNook.getState().pushToast({ kind: "argus", title: "Argus zaten açık", detail: "Görev çubuğundan geçebilirsin", ms: 3500 });
+  if (!opened) useNook.getState().pushToast({ kind: "argus", title: tt("Argus zaten açık"), detail: tt("Görev çubuğundan geçebilirsin"), ms: 3500 });
 }
 
 // ------------------------------------------------------------------ beslemeler
@@ -371,8 +373,8 @@ function announceNews() {
   const first = eps[0];
   s.pushToast({
     kind: "argus",
-    title: `Bugün yeni bölüm: ${first.item.title}`,
-    detail: `${epLabel(first.ep)}${first.ep.name ? ` · ${first.ep.name}` : ""}${eps.length > 1 ? ` · +${eps.length - 1} dizi daha` : ""}`,
+    title: tt("Bugün yeni bölüm: {0}", first.item.title),
+    detail: `${epLabel(first.ep)}${first.ep.name ? ` · ${first.ep.name}` : ""}${eps.length > 1 ? tt(" · +{0} dizi daha", eps.length - 1) : ""}`,
     ms: 8000,
   });
   playAntic("surprised");
@@ -471,8 +473,8 @@ export function useArgusDetect() {
       const s = useNook.getState();
       s.pushToast({
         kind: "argus",
-        title: `${item.title}${c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""} bitti mi?`,
-        detail: `${Math.round(played(c.key) / 60_000)} dk izledin · Üstüme gel, Argus'a işaretleyeyim`,
+        title: tt("{0}{1} bitti mi?", item.title, c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""),
+        detail: tt("{0} dk izledin · Üstüme gel, Argus'a işaretleyeyim", Math.round(played(c.key) / 60_000)),
         ms: 9000,
       });
       s.setPendingTab("argus");

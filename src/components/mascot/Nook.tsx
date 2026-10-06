@@ -22,15 +22,10 @@ import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
 import { Mouth } from "./Mouth";
 import { Props, type SleepStyle } from "./Props";
+import { statusColor } from "../../lib/palette";
 
-/** Durum renkleri (rozet, alt ton, ada parıltısı) */
-export const STATUS_COLOR: Record<Status, string> = {
-  working: "#2f8cff",
-  error: "#ff453a",
-  success: "#34c759",
-  annoyed: "#ff9f0a",
-  alarm: "#ffd23f",
-};
+/** Durum renkleri (rozet, alt ton, ada parıltısı) — renk körlüğü paletine göre */
+export const STATUS_COLOR = new Proxy({} as Record<Status, string>, { get: (_, k) => statusColor(k as Status) });
 
 const sec = (ms: number) => ms / 1000;
 /** Dosya gelince yüz kutuya dönüşür (seçilen gövde ne olursa olsun). */

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Copy, Crosshair, Palette, RotateCw, type LucideIcon } from "lucide-react";
 import { copyText } from "../../lib/bridge";
 import { useNook } from "../../store/nook";
+import { tt } from "../../lib/i18n";
 
 const W = 132;
 const ROW = 28;
@@ -30,10 +31,10 @@ export function ContextMenu({ bounds }: { bounds: RefObject<HTMLElement | null> 
       if (!box) return;
       const selected = window.getSelection()?.toString() ?? "";
       const items: Item[] = [
-        ...(selected.trim() ? [{ label: "Kopyala", icon: Copy, run: () => void copyText(selected) }] : []),
-        { label: "Görünüm", icon: Palette, run: () => useNook.getState().setTab("look") },
-        ...(useNook.getState().settings.islandPos ? [{ label: "Ortala", icon: Crosshair, run: () => useNook.getState().updateSettings({ islandPos: null }) }] : []),
-        { label: "Yenile", icon: RotateCw, run: () => location.reload() },
+        ...(selected.trim() ? [{ label: tt("Kopyala"), icon: Copy, run: () => void copyText(selected) }] : []),
+        { label: tt("Görünüm"), icon: Palette, run: () => useNook.getState().setTab("look") },
+        ...(useNook.getState().settings.islandPos ? [{ label: tt("Ortala"), icon: Crosshair, run: () => useNook.getState().updateSettings({ islandPos: null }) }] : []),
+        { label: tt("Yenile"), icon: RotateCw, run: () => location.reload() },
       ];
       const h = items.length * ROW + 8;
       setMenu({

@@ -21,20 +21,22 @@ import {
   type SysEvent,
   type VolumePayload,
 } from "../lib/bridge";
-import { looksForeign, translateToTurkish } from "../lib/assist";
+import { looksForeign, translateToUser } from "../lib/assist";
+import { localizeEvent } from "../lib/sysText";
 import { note } from "../lib/log";
 import { detectSensitive, SENSITIVE_CLEAR_MS, SENSITIVE_LABEL } from "../lib/sensitive";
 import { fetchWeather } from "../lib/weather";
 import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
 import { playAntic } from "./useAntics";
+import { tt } from "../lib/i18n";
 
 /** "12 dakikadır", "1 saat 20 dakikadır", "3 saattir" — ve ek almadan: "12 dakika", "3 saat" */
 function awayText(mins: number) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  const since = !h ? `${m} dakikadır` : !m ? `${h} saattir` : `${h} saat ${m} dakikadır`;
-  const plain = !h ? `${m} dakika` : !m ? `${h} saat` : `${h} saat ${m} dakika`;
+  const since = !h ? tt("{0} dakikadır", m) : !m ? tt("{0} saattir", h) : tt("{0} saat {1} dakikadır", h, m);
+  const plain = !h ? tt("{0} dakika", m) : !m ? tt("{0} saat", h) : tt("{0} saat {1} dakika", h, m);
   return { since, plain };
 }
 
@@ -45,52 +47,52 @@ const WELCOME: { upTo: number; antic: Antic; titles: Line[]; details: string[] }
     upTo: 20,
     antic: "surprised",
     titles: [
-      (t) => `${t} yoktun, sıkılmaya başlamıştım`,
-      (t) => `Hop, geldin! ${t} bekliyordum`,
-      (t) => `${t} neredeydin? Ben burada saydım`,
-      (t) => `Çay mı demledin? ${t} yoktun`,
-      (t) => `Geldin mi? ${t} tavana bakıyordum`,
-      (t) => `${t} ortalıkta yoktun, ne yaptın?`,
+      (t) => tt("{0} yoktun, sıkılmaya başlamıştım", t),
+      (t) => tt("Hop, geldin! {0} bekliyordum", t),
+      (t) => tt("{0} neredeydin? Ben burada saydım", t),
+      (t) => tt("Çay mı demledin? {0} yoktun", t),
+      (t) => tt("Geldin mi? {0} tavana bakıyordum", t),
+      (t) => tt("{0} ortalıkta yoktun, ne yaptın?", t),
     ],
-    details: ["Neyse ki döndün", "Bana da getirseydin bari", "Kaldığın yerden devam", "Ben hiç kıpırdamadım, söz"],
+    details: [tt("Neyse ki döndün"), tt("Bana da getirseydin bari"), tt("Kaldığın yerden devam"), tt("Ben hiç kıpırdamadım, söz")],
   },
   {
     upTo: 60,
     antic: "shy",
     titles: [
-      (t) => `${t} neredeydin sen? Korktum!`,
-      (t) => `Beni unuttun sandım, ${t} yoktun`,
-      (t) => `Oh be, geldin! ${t} merak ettim`,
-      (t) => `${t} kayıptın, haber verseydin ya`,
-      (_, d) => `Sensiz ${d} geçti, çok sessizdi`,
-      (t) => `${t} ekrana tek başıma baktım`,
+      (t) => tt("{0} neredeydin sen? Korktum!", t),
+      (t) => tt("Beni unuttun sandım, {0} yoktun", t),
+      (t) => tt("Oh be, geldin! {0} merak ettim", t),
+      (t) => tt("{0} kayıptın, haber verseydin ya", t),
+      (_, d) => tt("Sensiz {0} geçti, çok sessizdi", d),
+      (t) => tt("{0} ekrana tek başıma baktım", t),
     ],
-    details: ["Bir dahakine söyle, meraktan öldüm", "Neyse, döndün ya, gerisi önemsiz", "Seni görünce içim rahatladı", "Gel bakalım, neler kaçırdın"],
+    details: [tt("Bir dahakine söyle, meraktan öldüm"), tt("Neyse, döndün ya, gerisi önemsiz"), tt("Seni görünce içim rahatladı"), tt("Gel bakalım, neler kaçırdın")],
   },
   {
     upTo: 180,
     antic: "love",
     titles: [
-      (t) => `${t} yoktun, seni çok özledim!`,
-      (_, d) => `Neredeydin ${d} boyunca? Arıyordum seni`,
-      (t) => `Sonunda! ${t} bekliyorum, korkmuştum`,
-      (_, d) => `${d} sonra geri dönüş, hoş geldin!`,
-      (t) => `Az daha kayıp ilanı veriyordum, ${t} yoktun`,
-      (t) => `${t} pencereden bakıp durdum`,
+      (t) => tt("{0} yoktun, seni çok özledim!", t),
+      (_, d) => tt("Neredeydin {0} boyunca? Arıyordum seni", d),
+      (t) => tt("Sonunda! {0} bekliyorum, korkmuştum", t),
+      (_, d) => tt("{0} sonra geri dönüş, hoş geldin!", d),
+      (t) => tt("Az daha kayıp ilanı veriyordum, {0} yoktun", t),
+      (t) => tt("{0} pencereden bakıp durdum", t),
     ],
-    details: ["Bir daha bu kadar uzun gitme, tamam mı?", "Sarılmak serbest", "Su içmeyi unutma, uzun ara verdin", "Geldin ya, günüm şenlendi"],
+    details: [tt("Bir daha bu kadar uzun gitme, tamam mı?"), tt("Sarılmak serbest"), tt("Su içmeyi unutma, uzun ara verdin"), tt("Geldin ya, günüm şenlendi")],
   },
   {
     upTo: Infinity,
     antic: "love",
     titles: [
-      (t) => `${t} neredeydin sen?! Çok korktum`,
-      (_, d) => `Bütün gün seni bekledim, tam ${d}`,
-      (t) => `Hoş geldin! ${t} yalnızdım`,
-      (_, d) => `${d} oldu ya! Beni bırakıp gittin sandım`,
-      (t) => `${t} uyuyamadım bile, nihayet geldin`,
+      (t) => tt("{0} neredeydin sen?! Çok korktum", t),
+      (_, d) => tt("Bütün gün seni bekledim, tam {0}", d),
+      (t) => tt("Hoş geldin! {0} yalnızdım", t),
+      (_, d) => tt("{0} oldu ya! Beni bırakıp gittin sandım", d),
+      (t) => tt("{0} uyuyamadım bile, nihayet geldin", t),
     ],
-    details: ["Bir dahakine beni de götür", "Seni görünce kalbim yerine geldi", "Neler yaptın, anlat bakalım", "Hadi, bugün neler var bakalım"],
+    details: [tt("Bir dahakine beni de götür"), tt("Seni görünce kalbim yerine geldi"), tt("Neler yaptın, anlat bakalım"), tt("Hadi, bugün neler var bakalım")],
   },
 ];
 
@@ -146,12 +148,12 @@ export function useClipboardFeed() {
       const secret = s.settings.sensitiveGuard ? detectSensitive(text) : null;
       if (secret) {
         note(`pano: hassas veri (${secret})`);
-        s.pushToast({ kind: "sensitive", title: `Hassas veri · ${SENSITIVE_LABEL[secret]}`, detail: "Pano geçmişine eklenmedi · 60 sn sonra panodan silinecek", ms: 6500 });
+        s.pushToast({ kind: "sensitive", title: tt("Hassas veri · {0}", SENSITIVE_LABEL[secret]), detail: tt("Pano geçmişine eklenmedi · 60 sn sonra panodan silinecek"), ms: 6500 });
         playAntic("surprised");
         window.clearTimeout(secretTimer);
         secretTimer = window.setTimeout(() => {
           void clipboardClearIf(text).then((cleared) => {
-            if (cleared) useNook.getState().pushToast({ kind: "sensitive", title: "Panodan silindi", detail: `${SENSITIVE_LABEL[secret]} artık panoda değil`, ms: 4000 });
+            if (cleared) useNook.getState().pushToast({ kind: "sensitive", title: tt("Panodan silindi"), detail: tt("{0} artık panoda değil", SENSITIVE_LABEL[secret]), ms: 4000 });
           });
         }, SENSITIVE_CLEAR_MS);
         return;
@@ -161,14 +163,14 @@ export function useClipboardFeed() {
       const foreign = looksForeign(text);
       note(`pano: ${text.length} karakter, yabancı=${foreign}, çeviri ayarı=${s.settings.translate}`);
       if (!s.settings.translate || !foreign) return;
-      void translateToTurkish(text)
+      void translateToUser(text)
         .then((out) => {
           note(`çeviri: ${out ? `${out.length} karakter` : "yok"}`);
           if (!out) return;
           const st = useNook.getState();
           const clip = st.clips.find((c) => c.text === text);
           if (clip) st.patchClip(clip.id, { translation: out });
-          if (!st.hovered) st.pushToast({ kind: "translate", title: "Çeviri", detail: out, ms: Math.min(9000, 3500 + out.length * 40) });
+          if (!st.hovered) st.pushToast({ kind: "translate", title: tt("Çeviri"), detail: out, ms: Math.min(9000, 3500 + out.length * 40) });
         })
         .catch((e) => console.warn("[nook] çeviri", e));
     });
@@ -221,7 +223,7 @@ export function useEventFeed() {
       subscribe<SysEvent>(EVENTS.event, (e) => {
         const { settings, pushToast } = useNook.getState();
         if (!settings.events) return;
-        pushToast(e);
+        pushToast(localizeEvent(e));
         const reaction = REACTION[e.kind];
         if (reaction) playAntic(reaction);
       }),
@@ -248,7 +250,7 @@ export function useScreenshotFeed() {
       addFiles(files);
       setMood("happy");
       window.setTimeout(() => useNook.getState().mood === "happy" && setMood("idle"), 900);
-      if (settings.events) pushToast({ kind: "screenshot", title: "Ekran görüntüsü rafta", detail: files[0].name });
+      if (settings.events) pushToast({ kind: "screenshot", title: tt("Ekran görüntüsü rafta"), detail: files[0].name });
     });
   }, []);
 }
@@ -363,6 +365,8 @@ const native = (s: Settings) => ({
   gameIntro: s.gameIntro,
   breakReminderMin: s.breakReminderMin,
   islandPos: s.islandPos ?? null,
+  uiScale: s.uiScale ?? 1,
+  quitLabel: tt("Nook'tan çık"),
 });
 
 /** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). Gizliyken kare çizilmez. */
@@ -398,8 +402,8 @@ export function usePrivacyFeed() {
       if (!settings.events) return;
       const newMic = p.mic.filter((a) => !prev.mic.includes(a));
       const newCam = p.camera.filter((a) => !prev.camera.includes(a));
-      if (newCam.length) pushToast({ kind: "camera", title: "Kamera kullanılıyor", detail: newCam.join(", ") });
-      else if (newMic.length) pushToast({ kind: "mic", title: "Mikrofon açık", detail: newMic.join(", ") });
+      if (newCam.length) pushToast({ kind: "camera", title: tt("Kamera kullanılıyor"), detail: newCam.join(", ") });
+      else if (newMic.length) pushToast({ kind: "mic", title: tt("Mikrofon açık"), detail: newMic.join(", ") });
     });
   }, []);
 }
@@ -417,7 +421,7 @@ export function useDownloadsFeed() {
           care(1);
           setMood("happy");
           window.setTimeout(() => useNook.getState().mood === "happy" && setMood("idle"), 900);
-          if (settings.events) pushToast({ kind: "download", title: "İndirme tamamlandı", detail: `${files[0].name} rafta` });
+          if (settings.events) pushToast({ kind: "download", title: tt("İndirme tamamlandı"), detail: `${files[0].name} rafta` });
         })
       : () => {};
     return () => {
@@ -492,7 +496,7 @@ export function useSettingsSync() {
       console.warn("[nook] ayarlar", e);
       // Kısayolu başka bir program tutuyorsa sessizce çalışmamak yerine söyle
       const m = /Kısayol kaydedilemedi \(([^:]+):/.exec(String(e));
-      if (m) useNook.getState().pushToast({ kind: "chat", title: `${m[1]} kullanılamıyor`, detail: "Başka bir program tutuyor — Ayarlar'dan değiştir", ms: 7000 });
+      if (m) useNook.getState().pushToast({ kind: "chat", title: tt("{0} kullanılamıyor", m[1]), detail: tt("Başka bir program tutuyor — Ayarlar'dan değiştir"), ms: 7000 });
     });
   }, [key]);
   useEffect(() => {

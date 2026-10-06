@@ -5,16 +5,17 @@
  */
 import type { TargetAndTransition } from "motion/react";
 import type { Antic } from "../store/nook";
+import { tt } from "./i18n";
 
 export type MoveKind = "beam" | "warp" | "portal" | "jump" | "slide" | "glitch";
 
 export const MOVE_KINDS: { id: MoveKind; label: string }[] = [
-  { id: "beam", label: "Star Trek ışınlanma" },
-  { id: "warp", label: "Işık hızı" },
-  { id: "portal", label: "Portal" },
-  { id: "jump", label: "Zıplayarak" },
-  { id: "slide", label: "Kayarak" },
-  { id: "glitch", label: "Dijital bozulma" },
+  { id: "beam", label: tt("Star Trek ışınlanma") },
+  { id: "warp", label: tt("Işık hızı") },
+  { id: "portal", label: tt("Portal") },
+  { id: "jump", label: tt("Zıplayarak") },
+  { id: "slide", label: tt("Kayarak") },
+  { id: "glitch", label: tt("Dijital bozulma") },
 ];
 
 export interface Move {

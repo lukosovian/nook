@@ -87,7 +87,9 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     for (label, ws) in windows {
                         let p = prev.entry(label.clone()).or_default();
                         let g = ws.geom;
-                        let (x, y) = ((px - g.x) / g.scale, (py - g.y) / g.scale);
+                        // Sayfanın gördüğü (CSS) px: ekran ölçeği × arayüz ölçeği
+                        let k = g.scale * window::zoom();
+                        let (x, y) = ((px - g.x) / k, (py - g.y) / k);
                         // Ada içinde basılıp (metin seçerken, kaydırıcı çekerken) imleç dışarı kayarsa
                         // tuş bırakılana kadar ada kapanmaz.
                         let over = !in_game && (ws.hit.contains(x, y) || ws.extra.contains(x, y));

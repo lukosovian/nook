@@ -6,6 +6,7 @@ import { formatSize } from "../../lib/format";
 import { dragPath } from "../../lib/shelf";
 import { useNook } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 const COLOR = ACCENT.orange;
 /** Bu kadar (px) oynayınca sürükleme başlar; daha azı tıklama */
@@ -43,7 +44,7 @@ export function ArchivePanel() {
   }, [archive, dir]);
 
   if (!archive) {
-    return <p className="py-6 text-center text-[11.5px] text-label-3">Bir .zip ya da .rar dosyasını adanın üstüne bırak, açmadan içine bakalım</p>;
+    return <p className="py-6 text-center text-[11.5px] text-label-3">{tt("Bir .zip ya da .rar dosyasını adanın üstüne bırak, açmadan içine bakalım")}</p>;
   }
 
   const name = archive.path.split(/[\\/]/).pop() ?? archive.path;
@@ -66,14 +67,14 @@ export function ArchivePanel() {
   };
 
   const startDrag = async (e: ArchiveEntry) => {
-    if (e.encrypted) return setError("Şifreli dosya — Nook şifreli arşivleri açamıyor");
+    if (e.encrypted) return setError(tt("Şifreli dosya — Nook şifreli arşivleri açamıyor"));
     const p = await extract(e);
     if (p) await dragPath(p).catch((err) => setError(String(err)));
   };
 
   const open = async (e: ArchiveEntry) => {
     if (e.dir) return setDir(e.path);
-    if (e.encrypted) return setError("Şifreli dosya — Nook şifreli arşivleri açamıyor");
+    if (e.encrypted) return setError(tt("Şifreli dosya — Nook şifreli arşivleri açamıyor"));
     const p = await extract(e);
     if (p) void openPath(p);
   };
@@ -91,16 +92,13 @@ export function ArchivePanel() {
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate text-[12px] font-medium text-label">{name}</span>
           <span className="block text-[10px] text-label-3">
-            {archive.kind.toUpperCase()} · {files.length} dosya · {formatSize(total)} · tut, sürükle
-          </span>
+            {archive.kind.toUpperCase()} · {tt("{0} dosya · {1} · tut, sürükle", files.length, formatSize(total))}</span>
         </span>
         <button
           onClick={() => void addToShelf()}
           className="shrink-0 rounded-full border px-2.5 py-0.5 text-[10.5px] font-medium"
           style={{ background: tintBg(COLOR, 14), borderColor: tintBg(COLOR, 36), color: tintText(COLOR) }}
-        >
-          Rafa ekle
-        </button>
+        >{tt("Rafa ekle")}</button>
       </div>
 
       {/* Neredeyiz */}
@@ -146,7 +144,7 @@ export function ArchivePanel() {
                 if (p && !p.started && e.dir) setDir(e.path);
               }}
               onDoubleClick={() => void open(e)}
-              title={e.encrypted ? "Şifreli" : e.dir ? "Tıkla: içine gir · sürükle: klasörü çıkar" : "Sürükle: dışarı al · çift tıkla: aç"}
+              title={e.encrypted ? tt("Şifreli") : e.dir ? tt("Tıkla: içine gir · sürükle: klasörü çıkar") : tt("Sürükle: dışarı al · çift tıkla: aç")}
               className="flex cursor-grab select-none items-center gap-2 rounded-[10px] px-2 py-1 hover:bg-well active:cursor-grabbing"
             >
               <Icon size={14} className="shrink-0" style={{ color: e.dir ? tintText(ACCENT.yellow) : "var(--color-label-2)" }} />

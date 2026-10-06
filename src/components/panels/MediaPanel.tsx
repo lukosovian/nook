@@ -7,10 +7,11 @@ import { useNook, type NowPlaying } from "../../store/nook";
 import { Equalizer } from "../media/Equalizer";
 import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph } from "../ui/glyphs";
 import { ACCENT, EmptyState, MiniNook, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 export function MediaPanel() {
   const media = useNook((s) => s.media);
-  if (!media) return <EmptyState title="Sessizlik" hint="Spotify, YouTube ya da başka bir oynatıcı başlat" color={ACCENT.pink} />;
+  if (!media) return <EmptyState title={tt("Sessizlik")} hint={tt("Spotify, YouTube ya da başka bir oynatıcı başlat")} color={ACCENT.pink} />;
 
   return (
     <div className="relative flex h-full items-center gap-3.5">
@@ -131,10 +132,10 @@ function Controls({ playing }: { playing: boolean }) {
 
   return (
     <div className="mt-1 flex items-center gap-4">
-      <ControlButton label="Önceki" onClick={() => send("prev")}>
+      <ControlButton label={tt("Önceki")} onClick={() => send("prev")}>
         <PrevGlyph size={18} />
       </ControlButton>
-      <ControlButton label={playing ? "Duraklat" : "Oynat"} onClick={() => send("toggle")} big>
+      <ControlButton label={playing ? tt("Duraklat") : tt("Oynat")} onClick={() => send("toggle")} big>
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span
             key={playing ? "pause" : "play"}
@@ -148,7 +149,7 @@ function Controls({ playing }: { playing: boolean }) {
           </motion.span>
         </AnimatePresence>
       </ControlButton>
-      <ControlButton label="Sonraki" onClick={() => send("next")}>
+      <ControlButton label={tt("Sonraki")} onClick={() => send("next")}>
         <NextGlyph size={18} />
       </ControlButton>
     </div>

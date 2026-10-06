@@ -1,3 +1,4 @@
+import { tt } from "./i18n";
 /**
  * Hava durumu — Open-Meteo (ücretsiz, anahtar gerektirmez).
  * Konum: ayarlardaki şehir (Open-Meteo geocoding) ya da boşsa IP'den yaklaşık konum (ipwho.is).
@@ -30,14 +31,14 @@ function sky(code: number): Sky {
 }
 
 export const SKY_LABEL: Record<Sky, string> = {
-  clear: "Açık",
-  partly: "Parçalı bulutlu",
-  cloudy: "Bulutlu",
-  fog: "Sisli",
-  drizzle: "Çiseleyen yağmur",
-  rain: "Yağmurlu",
-  snow: "Karlı",
-  storm: "Fırtınalı",
+  clear: tt("Açık"),
+  partly: tt("Parçalı bulutlu"),
+  cloudy: tt("Bulutlu"),
+  fog: tt("Sisli"),
+  drizzle: tt("Çiseleyen yağmur"),
+  rain: tt("Yağmurlu"),
+  snow: tt("Karlı"),
+  storm: tt("Fırtınalı"),
 };
 
 async function json<T>(url: string): Promise<T> {
@@ -52,11 +53,11 @@ async function locate(city: string): Promise<{ lat: number; lon: number; name: s
       `https://geocoding-api.open-meteo.com/v1/search?count=1&language=tr&name=${encodeURIComponent(city.trim())}`,
     );
     const hit = g.results?.[0];
-    if (!hit) throw new Error("şehir bulunamadı");
+    if (!hit) throw new Error(tt("şehir bulunamadı"));
     return { lat: hit.latitude, lon: hit.longitude, name: hit.name };
   }
   const ip = await json<{ success: boolean; latitude: number; longitude: number; city: string }>("https://ipwho.is/");
-  if (!ip.success) throw new Error("konum bulunamadı");
+  if (!ip.success) throw new Error(tt("konum bulunamadı"));
   return { lat: ip.latitude, lon: ip.longitude, name: ip.city };
 }
 

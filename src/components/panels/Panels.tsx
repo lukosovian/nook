@@ -34,27 +34,28 @@ import { SettingsPanel } from "./SettingsPanel";
 import { LookPanel } from "./LookPanel";
 import { ShelfPanel } from "./ShelfPanel";
 import { StatsPanel } from "./StatsPanel";
+import { tt, locale } from "../../lib/i18n";
 
 type Module = Exclude<Tab, "home">;
 
 const MODULES: { id: Module; label: string; color: string }[] = [
-  { id: "today", label: "Bugün", color: ACCENT.yellow },
-  { id: "media", label: "Medya", color: ACCENT.pink },
+  { id: "today", label: tt("Bugün"), color: ACCENT.yellow },
+  { id: "media", label: tt("Medya"), color: ACCENT.pink },
   { id: "argus", label: "Argus", color: ARGUS_BLUE },
   { id: "focus", label: "Pomodoro", color: ACCENT.red },
-  { id: "shelf", label: "Raf", color: ACCENT.teal },
-  { id: "clip", label: "Pano", color: ACCENT.purple },
-  { id: "note", label: "Not", color: ACCENT.orange },
-  { id: "alarm", label: "Alarm", color: ACCENT.yellow },
-  { id: "apps", label: "Kısayollar", color: ACCENT.blue },
-  { id: "notify", label: "Bildirimler", color: ACCENT.purple },
-  { id: "control", label: "Kontrol", color: ACCENT.green },
+  { id: "shelf", label: tt("Raf"), color: ACCENT.teal },
+  { id: "clip", label: tt("Pano"), color: ACCENT.purple },
+  { id: "note", label: tt("Not"), color: ACCENT.orange },
+  { id: "alarm", label: tt("Alarm"), color: ACCENT.yellow },
+  { id: "apps", label: tt("Kısayollar"), color: ACCENT.blue },
+  { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple },
+  { id: "control", label: tt("Kontrol"), color: ACCENT.green },
   { id: "devices", label: "Lukonnect", color: ACCENT.blue },
-  { id: "stats", label: "Sistem", color: ACCENT.red },
-  { id: "play", label: "Oyun", color: ACCENT.pink },
-  { id: "report", label: "Karne", color: ACCENT.teal },
-  { id: "look", label: "Görünüm", color: ACCENT.pink },
-  { id: "notes", label: "Yama notları", color: ACCENT.orange },
+  { id: "stats", label: tt("Sistem"), color: ACCENT.red },
+  { id: "play", label: tt("Oyun"), color: ACCENT.pink },
+  { id: "report", label: tt("Karne"), color: ACCENT.teal },
+  { id: "look", label: tt("Görünüm"), color: ACCENT.pink },
+  { id: "notes", label: tt("Yama notları"), color: ACCENT.orange },
 ];
 
 /** Lukonnect bu bilgisayarda hiç yoksa (ör. arkadaşının bilgisayarı) Cihazlar bölümü gizlenir. */
@@ -85,12 +86,12 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
 
 const TITLE = {
   ...Object.fromEntries(MODULES.map((m) => [m.id, m.label])),
-  settings: "Ayarlar",
-  look: "Görünüm",
-  today: "Günün özeti",
-  notes: "Yama notları",
-  archive: "Arşivin içi",
-  report: "Haftalık karne",
+  settings: tt("Ayarlar"),
+  look: tt("Görünüm"),
+  today: tt("Günün özeti"),
+  notes: tt("Yama notları"),
+  archive: tt("Arşivin içi"),
+  report: tt("Haftalık karne"),
   argus: "Argus",
 } as Record<Module, string>;
 
@@ -134,7 +135,7 @@ export function Panels() {
   const Active = home ? ModuleGrid : (PANEL[tab as Module] ?? ModuleGrid);
 
   return (
-    <Frame view={home ? "home" : "module"} title={home ? undefined : tab === "chat" ? `${ek(name, "la")} sohbet` : TITLE[tab as Module]}>
+    <Frame view={home ? "home" : "module"} title={home ? undefined : tab === "chat" ? tt("{0} sohbet", ek(name, "la")) : TITLE[tab as Module]}>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={tab}
@@ -221,7 +222,9 @@ function ModuleGrid() {
   const local = (clientX: number, clientY: number) => {
     const el = scroller.current!;
     const r = el.getBoundingClientRect();
-    return { x: clientX - r.left + el.scrollLeft, y: clientY - r.top + el.scrollTop };
+    // Tam ekranda içerik yakınlaştırılır (zoom): ekran px'ini içeriğin kendi px'ine çevir
+    const k = el.offsetWidth ? r.width / el.offsetWidth : 1;
+    return { x: (clientX - r.left) / k + el.scrollLeft, y: (clientY - r.top) / k + el.scrollTop };
   };
 
   // Kopyanın merkezine en yakın hücreye taşı (yalnızca sıra değişince yeniden çizilir)
@@ -375,7 +378,7 @@ function ModuleGrid() {
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => toggleHidden(m.id)}
-                    title={off ? "Ana sayfada göster" : "Ana sayfada gizle"}
+                    title={off ? tt("Ana sayfada göster") : tt("Ana sayfada gizle")}
                     className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white/[0.08] text-label-2 hover:bg-white/[0.16] hover:text-label"
                   >
                     {off ? <EyeOff size={11} strokeWidth={2.4} /> : <Eye size={11} strokeWidth={2.4} />}
@@ -396,9 +399,9 @@ function ModuleGrid() {
         }`}
       >
         {editing ? <Check size={12} strokeWidth={2.6} /> : <SlidersHorizontal size={11} strokeWidth={2.4} />}
-        {editing ? "Bitti" : "Düzenle"}
+        {editing ? tt("Bitti") : tt("Düzenle")}
       </motion.button>
-      {editing && <p className="col-span-2 -mt-0.5 px-2 text-center text-[10px] text-label-3">Sürükleyip sırala · göz simgesiyle gizle</p>}
+      {editing && <p className="col-span-2 -mt-0.5 px-2 text-center text-[10px] text-label-3">{tt("Sürükleyip sırala · göz simgesiyle gizle")}</p>}
 
       {/* Elde tutulan çip */}
       {ghost && (
@@ -533,35 +536,35 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
   const running = !!focus && focus.endsAt !== null;
 
   return {
-    media: { text: media ? (media.playing ? media.title : "Duraklatıldı") : "Sessiz", state: media?.playing ? "active" : media ? "idle" : "empty" },
-    shelf: { text: shelf ? `${shelf} öğe` : "Boş", state: shelf ? "idle" : "empty" },
-    clip: { text: clips ? `${clips} kayıt` : "Boş", state: clips ? "idle" : "empty" },
-    note: { text: note ? note.split("\n")[0] : "Boş", state: note ? "idle" : "empty" },
+    media: { text: media ? (media.playing ? media.title : tt("Duraklatıldı")) : tt("Sessiz"), state: media?.playing ? "active" : media ? "idle" : "empty" },
+    shelf: { text: shelf ? tt("{0} öğe", shelf) : tt("Boş"), state: shelf ? "idle" : "empty" },
+    clip: { text: clips ? tt("{0} kayıt", clips) : tt("Boş"), state: clips ? "idle" : "empty" },
+    note: { text: note ? note.split("\n")[0] : tt("Boş"), state: note ? "idle" : "empty" },
     alarm: {
-      text: next ? `${clock(next)}${next.label ? ` · ${next.label}` : ""}` : "Kurulu değil",
+      text: next ? `${clock(next)}${next.label ? ` · ${next.label}` : ""}` : tt("Kurulu değil"),
       state: ringing ? "alert" : alarmSoon ? "active" : next ? "idle" : "empty",
       soon: alarmSoon || ringing,
     },
-    devices: { text: lowest !== null ? `En düşük %${lowest}` : "Bilgi yok", state: lowest !== null && lowest <= 15 ? "alert" : lowest === null ? "empty" : "idle" },
-    control: { text: "Wi-Fi, ses, mikrofon" },
-    stats: { text: cpu != null ? `İşlemci %${Math.round(cpu)}` : "Ölçülüyor", state: cpu != null && levelColor(cpu, true) === ACCENT.red ? "alert" : "idle" },
-    focus: { text: focus ? `${PHASE_LABEL[focus.phase]} · ${mmss(remaining(focus, now))}` : "Başlat", state: running ? "active" : "idle" },
-    apps: { text: apps ? `${apps} kısayol` : "Ekle", state: apps ? "idle" : "empty" },
-    notify: { text: notifs ? `${notifs} bildirim` : "Sessiz", state: notifs ? "idle" : "empty" },
-    play: { text: "5 mini oyun" },
+    devices: { text: lowest !== null ? tt("En düşük %{0}", lowest) : tt("Bilgi yok"), state: lowest !== null && lowest <= 15 ? "alert" : lowest === null ? "empty" : "idle" },
+    control: { text: tt("Wi-Fi, ses, mikrofon") },
+    stats: { text: cpu != null ? tt("İşlemci %{0}", Math.round(cpu)) : tt("Ölçülüyor"), state: cpu != null && levelColor(cpu, true) === ACCENT.red ? "alert" : "idle" },
+    focus: { text: focus ? `${PHASE_LABEL[focus.phase]} · ${mmss(remaining(focus, now))}` : tt("Başlat"), state: running ? "active" : "idle" },
+    apps: { text: apps ? tt("{0} kısayol", apps) : tt("Ekle"), state: apps ? "idle" : "empty" },
+    notify: { text: notifs ? tt("{0} bildirim", notifs) : tt("Sessiz"), state: notifs ? "idle" : "empty" },
+    play: { text: tt("5 mini oyun") },
     notes: { text: `${latestNote().version} · ${latestNote().headline}` },
-    look: { text: "Kostüm, renk, şapka" },
-    report: { text: active ? `Bugün ${active >= 60 ? `${Math.floor(active / 60)} sa ${active % 60} dk` : `${active} dk`}` : "Bu hafta" },
+    look: { text: tt("Kostüm, renk, şapka") },
+    report: { text: active ? tt("Bugün {0}", active >= 60 ? tt("{0} sa {1} dk", Math.floor(active / 60), active % 60) : tt("{0} dk", active)) : tt("Bu hafta") },
     argus: {
       text: !argusSnap
-        ? "Keşfet"
+        ? tt("Keşfet")
         : newToday.length
-          ? `Bugün ${newToday[0].item.title} ${epLabel(newToday[0].ep)}`
+          ? tt("Bugün {0} {1}", newToday[0].item.title, epLabel(newToday[0].ep))
           : watchingList.length
-            ? `${watchingList.length} dizi izliyorsun`
-            : "Ne izlesem?",
+            ? tt("{0} dizi izliyorsun", watchingList.length)
+            : tt("Ne izlesem?"),
       state: newToday.length ? "active" : "idle",
     },
-    today: { text: new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "short" }) },
+    today: { text: new Date().toLocaleDateString(locale(), { day: "numeric", month: "long", weekday: "short" }) },
   };
 }

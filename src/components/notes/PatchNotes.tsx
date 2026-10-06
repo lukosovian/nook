@@ -10,6 +10,7 @@ import { easeOut } from "../../lib/motion";
 import { closeNotes, DAYS, dayOf, takePendingVersion } from "../../lib/notes";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { DEMOS } from "./Demos";
+import { tt } from "../../lib/i18n";
 
 const enter = (i: number) => ({
   initial: { opacity: 0, y: 10, filter: "blur(3px)" },
@@ -39,16 +40,12 @@ export function PatchNotes() {
       {/* Üst çubuk */}
       <div className="absolute inset-x-5 top-0 z-20 flex items-center justify-between" style={{ height: BRIEF.header }}>
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-label-2">
-          <ScrollText size={13} strokeWidth={2.2} style={{ color: tintText(ACCENT.yellow) }} />
-          Yama notları
-          <span className="text-label-3">· {DAYS.length} gün</span>
+          <ScrollText size={13} strokeWidth={2.2} style={{ color: tintText(ACCENT.yellow) }} />{tt("Yama notları")}<span className="text-label-3">· {DAYS.length}{" "}{tt("gün")}</span>
         </span>
         <button
           onClick={closeNotes}
           className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-label-3 transition-colors hover:bg-well-hi hover:text-label"
-        >
-          Kapat
-          <X size={12} strokeWidth={2.4} />
+        >{tt("Kapat")}<X size={12} strokeWidth={2.4} />
         </button>
       </div>
 
@@ -60,7 +57,7 @@ export function PatchNotes() {
             style={{ background: `radial-gradient(70% 90% at 50% 0%, ${tintBg(ACCENT.orange, 22)} 0%, transparent 70%)` }}
           />
           <h2 className="relative text-center font-display text-[19px] font-semibold leading-tight tracking-[-0.02em] text-label">
-            {latest ? "Neler yeni?" : note.date}
+            {latest ? tt("Neler yeni?") : note.date}
           </h2>
           <p className="relative mt-0.5 text-center text-[10px] font-medium tabular-nums text-label-3">{latest ? `${note.date} · ${range(note)}` : range(note)}</p>
           <div ref={scroller} className="relative -mr-1 mt-2.5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
@@ -83,8 +80,8 @@ export function PatchNotes() {
                     <span className={`block truncate text-[11.5px] font-medium ${on ? "text-label" : "text-label-2"}`}>{n.headline}</span>
                     <span className="block truncate text-[9.5px] text-label-3">
                       {n.date}
-                      {n.versions.length > 1 ? ` · ${n.versions.length} sürüm` : ""}
-                      {i === 0 ? " · yeni" : ""}
+                      {n.versions.length > 1 ? tt(" · {0} sürüm", n.versions.length) : ""}
+                      {i === 0 ? tt(" · yeni") : ""}
                     </span>
                   </span>
                 </button>

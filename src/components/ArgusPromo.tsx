@@ -6,14 +6,15 @@ import { chooseArgusDir, installArgus } from "../lib/argus";
 import { spring } from "../lib/motion";
 import { useNook } from "../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText } from "./ui/primitives";
+import { tt } from "../lib/i18n";
 
 /** Argus'un kendi mavisi (logodaki geçiş) */
 export const ARGUS_BLUE = "#1a8cff";
 
 const FEATURES: { icon: LucideIcon; text: string }[] = [
-  { icon: CalendarDays, text: "İzlediğin dizi ve filmleri, bölüm bölüm takip et" },
-  { icon: BellRing, text: "Yeni bölüm çıkınca Nook sana haber versin" },
-  { icon: Shuffle, text: "\"Ne izlesem?\" diye sorduğunda listenden seçsin" },
+  { icon: CalendarDays, text: tt("İzlediğin dizi ve filmleri, bölüm bölüm takip et") },
+  { icon: BellRing, text: tt("Yeni bölüm çıkınca Nook sana haber versin") },
+  { icon: Shuffle, text: tt("\"Ne izlesem?\" diye sorduğunda listenden seçsin") },
 ];
 
 /**
@@ -36,7 +37,7 @@ export function ArgusPromo({ big = false }: { big?: boolean }) {
       />
       <div className="min-w-0 flex-1">
         <img src={wordmark} alt="Argus" draggable={false} style={{ height: big ? 34 : 18 }} />
-        <p className={`mt-1 text-label-2 ${big ? "text-[13px]" : "text-[11px]"}`}>Nook'un kardeşi: izlediklerinin arşivi</p>
+        <p className={`mt-1 text-label-2 ${big ? "text-[13px]" : "text-[11px]"}`}>{tt("Nook'un kardeşi: izlediklerinin arşivi")}</p>
         <div className={`${big ? "mt-4 space-y-2" : "mt-1.5 space-y-0.5"}`}>
           {FEATURES.map(({ icon: Icon, text }) => (
             <p key={text} className={`flex items-center gap-2 text-label-2 ${big ? "text-[12.5px]" : "text-[10.5px]"}`}>
@@ -53,21 +54,13 @@ export function ArgusPromo({ big = false }: { big?: boolean }) {
             className={`flex items-center gap-1.5 rounded-full border font-medium ${big ? "h-9 px-4 text-[13px]" : "h-6 px-2.5 text-[11px]"}`}
             style={{ background: tintBg(ARGUS_BLUE, 22), borderColor: tintBg(ARGUS_BLUE, 50), color: tintText(ARGUS_BLUE), boxShadow: `0 0 16px -6px ${ARGUS_BLUE}` }}
           >
-            <Download size={big ? 14 : 11} strokeWidth={2.4} />
-            Argus'u kur
-          </motion.button>
-          <button onClick={() => void chooseArgusDir()} className={`rounded-full px-2 py-0.5 text-label-3 hover:bg-well-hi hover:text-label-2 ${big ? "text-[12px]" : "text-[10.5px]"}`}>
-            Zaten kurulu
-          </button>
+            <Download size={big ? 14 : 11} strokeWidth={2.4} />{tt("Argus'u kur")}</motion.button>
+          <button onClick={() => void chooseArgusDir()} className={`rounded-full px-2 py-0.5 text-label-3 hover:bg-well-hi hover:text-label-2 ${big ? "text-[12px]" : "text-[10.5px]"}`}>{tt("Zaten kurulu")}</button>
           {!big && (
-            <button onClick={hide} className="rounded-full px-2 py-0.5 text-[10.5px] text-label-3 hover:bg-well-hi hover:text-label-2">
-              Gösterme
-            </button>
+            <button onClick={hide} className="rounded-full px-2 py-0.5 text-[10.5px] text-label-3 hover:bg-well-hi hover:text-label-2">{tt("Gösterme")}</button>
           )}
         </div>
-        <p className={`text-label-3 ${big ? "mt-2 text-[11px]" : "mt-1 text-[9.5px]"}`}>
-          Ücretsiz. Gerekenleri kurulum kendisi kurar; bittiğinde Nook Argus'u kendiliğinden bulur.
-        </p>
+        <p className={`text-label-3 ${big ? "mt-2 text-[11px]" : "mt-1 text-[9.5px]"}`}>{tt("Ücretsiz. Gerekenleri kurulum kendisi kurar; bittiğinde Nook Argus'u kendiliğinden bulur.")}</p>
       </div>
     </div>
   );
@@ -82,9 +75,7 @@ export function ArgusLinked({ watching }: { watching: { id: string; title: strin
         <div>
           <img src={wordmark} alt="Argus" draggable={false} style={{ height: 24 }} />
           <p className="mt-1 flex items-center gap-1.5 text-[12px]" style={{ color: tintText(ACCENT.green) }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT.green }} />
-            Bu bilgisayarda Argus'u buldum, bağlandım
-          </p>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT.green }} />{tt("Bu bilgisayarda Argus'u buldum, bağlandım")}</p>
         </div>
       </div>
       <div className="space-y-1.5">
@@ -107,9 +98,9 @@ export function ArgusLinked({ watching }: { watching: { id: string; title: strin
             </div>
           </motion.div>
         ))}
-        {!watching.length && <p className="text-[12px] text-label-3">Argus'ta İzleniyor olan diziler burada görünecek.</p>}
+        {!watching.length && <p className="text-[12px] text-label-3">{tt("Argus'ta İzleniyor olan diziler burada görünecek.")}</p>}
       </div>
-      <p className="mt-auto text-[11px] text-label-3">Ana sayfadaki "Argus" çipinden açılır · Ayarlar › Argus</p>
+      <p className="mt-auto text-[11px] text-label-3">{tt("Ana sayfadaki \"Argus\" çipinden açılır · Ayarlar › Argus")}</p>
     </div>
   );
 }

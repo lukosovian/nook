@@ -24,6 +24,7 @@ import { notesDue, openNotes } from "../lib/notes";
 import { nextPhase, remaining } from "../lib/focus";
 import { dayKey, isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
+import { tt } from "../lib/i18n";
 
 /** Odak sayacı: faz bitince sıradakine geçer. */
 export function useFocusTimer() {
@@ -99,7 +100,7 @@ export function useDayTracker() {
       if (s.settings.eyeBreak && eye >= 20) {
         eye = 0;
         if (!quiet) {
-          s.pushToast({ kind: "eye", title: "Göz molası", detail: "20 saniye boyunca uzağa bak", ms: 7000 });
+          s.pushToast({ kind: "eye", title: tt("Göz molası"), detail: tt("20 saniye boyunca uzağa bak"), ms: 7000 });
           playAntic("suspicious");
         }
       }
@@ -139,13 +140,13 @@ export async function handleVoiceAudio(audio: string | null) {
   try {
     const text = await transcribe(audio);
     if (!text) {
-      s.pushToast({ kind: "chat", title: "Anlayamadım", detail: "Bir daha söyler misin?" });
+      s.pushToast({ kind: "chat", title: tt("Anlayamadım"), detail: tt("Bir daha söyler misin?") });
       playAntic("suspicious");
       return;
     }
     void sendChat(text, { voice: true });
   } catch (e) {
-    s.pushToast({ kind: "chat", title: "Sesli komut", detail: (e as Error).message, ms: 5000 });
+    s.pushToast({ kind: "chat", title: tt("Sesli komut"), detail: (e as Error).message, ms: 5000 });
   } finally {
     useNook.getState().setBusy("voice", false);
   }
@@ -174,7 +175,7 @@ export function useVoiceFeed() {
         void handleVoiceAudio(v.audio);
       } else {
         s.setListening(false);
-        s.pushToast({ kind: "chat", title: "Mikrofon", detail: v.message, ms: 5000 });
+        s.pushToast({ kind: "chat", title: tt("Mikrofon"), detail: v.message, ms: 5000 });
       }
     });
     return off;
@@ -186,10 +187,10 @@ export function useAskScreenFeed() {
   useEffect(
     () =>
       subscribe<string | null>(EVENTS.askScreen, (image) => {
-        note(`ekrana sor olayı: ${image ? image.length : "görüntü yok"}`);
+        note(`ekrana sor olayı: ${image ? image.length : tt("görüntü yok")}`);
         const s = useNook.getState();
         if (!image) {
-          s.pushToast({ kind: "chat", title: "Ekrana sor", detail: "Ekran görüntüsü alınamadı" });
+          s.pushToast({ kind: "chat", title: tt("Ekrana sor"), detail: tt("Ekran görüntüsü alınamadı") });
           return;
         }
         s.setAttachment(image);
@@ -216,14 +217,14 @@ export function useOnlineFeed() {
 const duration = (secs: number) => {
   const h = Math.floor(secs / 3600);
   const m = Math.round((secs % 3600) / 60);
-  return h ? `${h} sa ${m} dk` : `${m} dk`;
+  return h ? tt("{0} sa {1} dk", h, m) : tt("{0} dk", m);
 };
 
 /** 120 → "2 saattir", 150 → "2 saat 30 dakikadır" */
 const since = (mins: number) => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return !h ? `${m} dakikadır` : !m ? `${h} saattir` : `${h} saat ${m} dakikadır`;
+  return !h ? tt("{0} dakikadır", m) : !m ? `${h} saattir` : tt("{0} saat {1} dakikadır", h, m);
 };
 
 /** Oyundan çıkınca: süre ve en yüksek yük. */
@@ -237,7 +238,7 @@ export function useGameFeed() {
       s.pushToast({
         kind: "game",
         title: `${g.app} · ${duration(g.secs)}`,
-        detail: `En yüksek işlemci %${Math.round(g.peakCpu)} · bellek %${g.peakMem}`,
+        detail: tt("En yüksek işlemci %{0} · bellek %{1}", Math.round(g.peakCpu), g.peakMem),
         ms: 7000,
       });
       playAntic("hop");
@@ -250,12 +251,12 @@ export function useGameFeed() {
     return subscribe<GamePeekPayload>(EVENTS.gameStart, (g) => {
       const { stats, devices, pushToast } = useNook.getState();
       const parts = [
-        stats && `İşlemci %${Math.round(stats.cpu)}`,
+        stats && tt("İşlemci %{0}", Math.round(stats.cpu)),
         stats && stats.memTotal > 0 && `Bellek %${Math.round((stats.memUsed / stats.memTotal) * 100)}`,
-        devices?.headset && `Kulaklık %${devices.headset.percent}`,
+        devices?.headset && tt("Kulaklık %{0}", devices.headset.percent),
         devices?.mouse && `Mouse %${devices.mouse.percent}`,
       ].filter(Boolean);
-      pushToast({ kind: "game", title: `${g.app} başlıyor · iyi oyunlar!`, detail: parts.join(" · ") || "Ben burada bekliyorum", ms: 4800 });
+      pushToast({ kind: "game", title: tt("{0} başlıyor · iyi oyunlar!", g.app), detail: parts.join(" · ") || tt("Ben burada bekliyorum"), ms: 4800 });
       playAntic("wink");
     });
   }, []);
@@ -267,7 +268,7 @@ export function useGameFeed() {
       useNook.getState().pushToast({
         kind: "break",
         title: `${since(g.mins)} ${g.app} oynuyorsun`,
-        detail: "Biraz su iç, gözlerini dinlendir, bir esne",
+        detail: tt("Biraz su iç, gözlerini dinlendir, bir esne"),
         ms: 7500,
       });
       playAntic("yawn");
@@ -287,7 +288,7 @@ export function usePlayOffers() {
       if (Date.now() - st.lastOffer < OFFER_EVERY_MS) return;
       st.setLastOffer(Date.now());
       st.setPendingTab("play");
-      st.pushToast({ kind: "play", title: "Sıkıldım…", detail: "Benimle oyun oynar mısın? Üstüme gel", ms: 6000 });
+      st.pushToast({ kind: "play", title: tt("Sıkıldım…"), detail: tt("Benimle oyun oynar mısın? Üstüme gel"), ms: 6000 });
     });
   }, []);
 }

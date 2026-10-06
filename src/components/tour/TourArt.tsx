@@ -36,6 +36,7 @@ import { endTour } from "../../lib/tour";
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Shuffle } from "lucide-react";
+import { tt } from "../../lib/i18n";
 
 const LOOP = { repeat: Infinity, ease: "easeInOut" } as const;
 
@@ -122,14 +123,11 @@ export function HoverArt() {
         </motion.div>
       </Screen>
       <div className="flex gap-2">
-        <Tip icon={MousePointer2} color={ACCENT.blue}>
-          Üst ortaya gel: <b className="font-medium text-label">açılırım</b>
+        <Tip icon={MousePointer2} color={ACCENT.blue}>{tt("Üst ortaya gel:")}{" "}<b className="font-medium text-label">{tt("açılırım")}</b>
         </Tip>
-        <Tip icon={LogOut} color={ACCENT.teal}>
-          Uzaklaş: <b className="font-medium text-label">kapanırım</b>
+        <Tip icon={LogOut} color={ACCENT.teal}>{tt("Uzaklaş:")}{" "}<b className="font-medium text-label">{tt("kapanırım")}</b>
         </Tip>
-        <Tip icon={Moon} color={ACCENT.purple}>
-          Bilgisayar boştaysa <b className="font-medium text-label">uyurum</b>
+        <Tip icon={Moon} color={ACCENT.purple}>{tt("Bilgisayar boştaysa")}{" "}<b className="font-medium text-label">{tt("uyurum")}</b>
         </Tip>
       </div>
     </div>
@@ -139,26 +137,26 @@ export function HoverArt() {
 // ---------------------------------------------------------------- Bölümler
 
 const MODULES: { label: string; desc: string; color: string }[] = [
-  { label: "Bugün", desc: "Hava, alarm, günün özeti", color: ACCENT.yellow },
-  { label: "Medya", desc: "Çalan müziği ve videoyu yönet", color: ACCENT.pink },
-  { label: "Pomodoro", desc: "Odaklanma sayacı", color: ACCENT.red },
-  { label: "Raf", desc: "Bana bıraktığın dosyalar", color: ACCENT.teal },
-  { label: "Pano", desc: "Kopyaladıkların, çevirisi", color: ACCENT.purple },
-  { label: "Not", desc: "Hızlı karalama", color: ACCENT.orange },
-  { label: "Alarm", desc: "Alarm ve hatırlatıcı", color: ACCENT.yellow },
-  { label: "Kısayollar", desc: "Sık açtığın uygulamalar", color: ACCENT.blue },
-  { label: "Bildirimler", desc: "Windows bildirimleri", color: ACCENT.purple },
-  { label: "Kontrol", desc: "Wi-Fi, ses, mikrofon", color: ACCENT.green },
-  { label: "Sistem", desc: "İşlemci, bellek, ağ", color: ACCENT.red },
-  { label: "Oyun", desc: "Benimle mini oyunlar", color: ACCENT.pink },
-  { label: "Karne", desc: "Haftalık istatistik", color: ACCENT.teal },
+  { label: tt("Bugün"), desc: tt("Hava, alarm, günün özeti"), color: ACCENT.yellow },
+  { label: tt("Medya"), desc: tt("Çalan müziği ve videoyu yönet"), color: ACCENT.pink },
+  { label: "Pomodoro", desc: tt("Odaklanma sayacı"), color: ACCENT.red },
+  { label: tt("Raf"), desc: tt("Bana bıraktığın dosyalar"), color: ACCENT.teal },
+  { label: tt("Pano"), desc: tt("Kopyaladıkların, çevirisi"), color: ACCENT.purple },
+  { label: tt("Not"), desc: tt("Hızlı karalama"), color: ACCENT.orange },
+  { label: tt("Alarm"), desc: tt("Alarm ve hatırlatıcı"), color: ACCENT.yellow },
+  { label: tt("Kısayollar"), desc: tt("Sık açtığın uygulamalar"), color: ACCENT.blue },
+  { label: tt("Bildirimler"), desc: tt("Windows bildirimleri"), color: ACCENT.purple },
+  { label: tt("Kontrol"), desc: tt("Wi-Fi, ses, mikrofon"), color: ACCENT.green },
+  { label: tt("Sistem"), desc: tt("İşlemci, bellek, ağ"), color: ACCENT.red },
+  { label: tt("Oyun"), desc: tt("Benimle mini oyunlar"), color: ACCENT.pink },
+  { label: tt("Karne"), desc: tt("Haftalık istatistik"), color: ACCENT.teal },
 ];
 
 const NAV: { icon: LucideIcon; label: string }[] = [
-  { icon: House, label: "Ana sayfa" },
-  { icon: MessageCircle, label: "Sohbet" },
-  { icon: Search, label: "Ara" },
-  { icon: Settings, label: "Ayarlar" },
+  { icon: House, label: tt("Ana sayfa") },
+  { icon: MessageCircle, label: tt("Sohbet") },
+  { icon: Search, label: tt("Ara") },
+  { icon: Settings, label: tt("Ayarlar") },
 ];
 
 export function ModulesArt() {
@@ -171,7 +169,7 @@ export function ModulesArt() {
             {label}
           </span>
         ))}
-        <span className="ml-auto text-[10.5px] text-label-3">sol üstteki ikonlar</span>
+        <span className="ml-auto text-[10.5px] text-label-3">{tt("sol üstteki ikonlar")}</span>
       </div>
       <div className="grid flex-1 grid-cols-3 content-start gap-1.5">
         {MODULES.map((m, i) => (
@@ -232,21 +230,19 @@ export function FeedArt() {
           <span className="flex h-11 w-9 items-center justify-center rounded-[6px] border border-white/15 bg-white/10 backdrop-blur">
             <FileText size={18} className="text-white/85" strokeWidth={1.8} />
           </span>
-          <span className="rounded bg-black/50 px-1 text-[9.5px] text-white/80">rapor.pdf</span>
+          <span className="rounded bg-black/50 px-1 text-[9.5px] text-white/80">{tt("rapor.pdf")}</span>
           <MousePointer2 size={16} className="-mt-3 ml-6 text-white drop-shadow" fill="white" strokeWidth={1.4} />
         </motion.div>
       </Screen>
       {/* Raf */}
       <div className="flex items-center gap-2 rounded-[14px] bg-well px-2.5 py-2">
         <MiniNook color={ACCENT.teal} size={24} />
-        <span className="text-[11.5px] font-medium" style={{ color: tintText(ACCENT.teal) }}>
-          Raf
-        </span>
+        <span className="text-[11.5px] font-medium" style={{ color: tintText(ACCENT.teal) }}>{tt("Raf")}</span>
         <div className="ml-1 flex gap-1.5">
           {[
-            { icon: FileText, name: "rapor.pdf" },
-            { icon: ImageIcon, name: "ekran.png" },
-            { icon: FileText, name: "sunum.docx" },
+            { icon: FileText, name: tt("rapor.pdf") },
+            { icon: ImageIcon, name: tt("ekran.png") },
+            { icon: FileText, name: tt("sunum.docx") },
           ].map(({ icon: Icon, name }, i) => (
             <motion.span
               key={name}
@@ -261,11 +257,8 @@ export function FeedArt() {
         </div>
       </div>
       <div className="flex gap-2">
-        <Tip icon={Camera} color={ACCENT.teal}>
-          Ekran görüntüleri rafa <b className="font-medium text-label">kendiliğinden</b> düşer
-        </Tip>
-        <Tip icon={Hand} color={ACCENT.pink}>
-          Raftan sürükle, <b className="font-medium text-label">istediğin yere bırak</b>
+        <Tip icon={Camera} color={ACCENT.teal}>{tt("Ekran görüntüleri rafa")}{" "}<b className="font-medium text-label">{tt("kendiliğinden")}</b>{" "}{tt("düşer")}</Tip>
+        <Tip icon={Hand} color={ACCENT.pink}>{tt("Raftan sürükle,")}{" "}<b className="font-medium text-label">{tt("istediğin yere bırak")}</b>
         </Tip>
       </div>
     </div>
@@ -275,7 +268,7 @@ export function FeedArt() {
 // ---------------------------------------------------------------- Kısayollar
 
 function Keys({ combo, color }: { combo: string; color: string }) {
-  const parts = combo.replace("Space", "Boşluk").split("+");
+  const parts = combo.replace("Space", tt("Boşluk")).split("+");
   return (
     <span className="flex shrink-0 items-center gap-1">
       {parts.map((k, i) => (
@@ -301,9 +294,9 @@ function Keys({ combo, color }: { combo: string; color: string }) {
 export function KeysArt() {
   const s = useNook((st) => st.settings);
   const rows = [
-    { combo: s.shortcut, color: ACCENT.blue, title: "Hızlı arama", text: "Uygulama aç, hesap yap (12*7), çevir (5 km kaç mil, 100 usd), emoji bul, web'de ara." },
-    { combo: s.askShortcut, color: ACCENT.purple, title: "Ekrana sor", text: "Ekranın görüntüsünü alır, bana sorarsın: \"bu hata ne demek?\"" },
-    { combo: s.voiceShortcut, color: ACCENT.orange, title: "Sesli komut", text: "Basılı tut, konuş, bırak: \"yarın sekize alarm kur\"." },
+    { combo: s.shortcut, color: ACCENT.blue, title: tt("Hızlı arama"), text: tt("Uygulama aç, hesap yap (12*7), çevir (5 km kaç mil, 100 usd), emoji bul, web'de ara.") },
+    { combo: s.askShortcut, color: ACCENT.purple, title: tt("Ekrana sor"), text: tt("Ekranın görüntüsünü alır, bana sorarsın: \"bu hata ne demek?\"") },
+    { combo: s.voiceShortcut, color: ACCENT.orange, title: tt("Sesli komut"), text: tt("Basılı tut, konuş, bırak: \"yarın sekize alarm kur\".") },
   ];
   return (
     <div className="flex h-full flex-col justify-center gap-2.5">
@@ -327,7 +320,7 @@ export function KeysArt() {
           </div>
         </motion.div>
       ))}
-      <p className="px-1 text-[10.5px] text-label-3">Ekrana sor ve sesli komut için bir sonraki adımdaki Gemini anahtarı gerekir.</p>
+      <p className="px-1 text-[10.5px] text-label-3">{tt("Ekrana sor ve sesli komut için bir sonraki adımdaki Gemini anahtarı gerekir.")}</p>
     </div>
   );
 }
@@ -349,14 +342,10 @@ export function AiArt() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-        >
-          Yarın sabah 8'e alarm kurar mısın?
-        </motion.p>
+        >{tt("Yarın sabah 8'e alarm kurar mısın?")}</motion.p>
         <motion.div className="flex items-end gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
           <MyNook size={20} expression="happy" />
-          <p className="max-w-[160px] rounded-[14px] rounded-bl-[4px] bg-white/[0.08] px-3 py-1.5 text-[11.5px] text-label">
-            Kurdum! Yarın 08:00'de seni uyandırırım.
-          </p>
+          <p className="max-w-[160px] rounded-[14px] rounded-bl-[4px] bg-white/[0.08] px-3 py-1.5 text-[11.5px] text-label">{tt("Kurdum! Yarın 08:00'de seni uyandırırım.")}</p>
         </motion.div>
         <motion.span
           className="ml-[26px] flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px]"
@@ -364,18 +353,16 @@ export function AiArt() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.3, type: "spring", stiffness: 500, damping: 20 }}
-        >
-          Alarm · 08:00
-        </motion.span>
+        >{tt("Alarm · 08:00")}</motion.span>
         <motion.div className="mt-1 flex items-end gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.9 }}>
           <MyNook size={20} />
-          <p className="max-w-[160px] rounded-[14px] rounded-bl-[4px] bg-white/[0.08] px-3 py-1.5 text-[11.5px] text-label">"Şunu hatırla…" dersen aklımda tutarım.</p>
+          <p className="max-w-[160px] rounded-[14px] rounded-bl-[4px] bg-white/[0.08] px-3 py-1.5 text-[11.5px] text-label">{tt("\"Şunu hatırla…\" dersen aklımda tutarım.")}</p>
         </motion.div>
       </div>
 
       {/* Kurulum */}
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
-        <SetupRow n={1} title="Ücretsiz anahtarını al">
+        <SetupRow n={1} title={tt("Ücretsiz anahtarını al")}>
           <button
             onClick={() => void openPath("https://aistudio.google.com/apikey")}
             className="mt-1.5 flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-medium"
@@ -384,28 +371,28 @@ export function AiArt() {
             aistudio.google.com
             <ExternalLink size={11} strokeWidth={2.4} />
           </button>
-          <p className="mt-1 text-[10.5px] text-label-3">Google hesabınla gir → "Create API key"</p>
+          <p className="mt-1 text-[10.5px] text-label-3">{tt("Google hesabınla gir → \"Create API key\"")}</p>
         </SetupRow>
-        <SetupRow n={2} title="Anahtarı buraya yapıştır">
+        <SetupRow n={2} title={tt("Anahtarı buraya yapıştır")}>
           <div className="mt-1.5">
             <KeyInput value={s.geminiKey} onChange={(v) => update({ geminiKey: v })} />
           </div>
           <p className="mt-1 text-[10.5px]" style={{ color: gemini.status === "ok" ? ACCENT.green : gemini.status === "error" ? ACCENT.red : "var(--color-label-3)" }}>
             {gemini.status === "ok"
-              ? "Bağlandı! Artık konuşabiliriz."
+              ? tt("Bağlandı! Artık konuşabiliriz.")
               : gemini.status === "error"
                 ? gemini.error
                 : gemini.status === "checking"
-                  ? "Kontrol ediliyor…"
-                  : "Yalnızca bu bilgisayarda saklanır."}
+                  ? tt("Kontrol ediliyor…")
+                  : tt("Yalnızca bu bilgisayarda saklanır.")}
           </p>
         </SetupRow>
-        <SetupRow n={3} title="Sana nasıl seslenelim?">
+        <SetupRow n={3} title={tt("Sana nasıl seslenelim?")}>
           <div className="mt-1.5">
-            <TextInput value={s.userName} placeholder="Adın" onChange={(v) => update({ userName: v })} />
+            <TextInput value={s.userName} placeholder={tt("Adın")} onChange={(v) => update({ userName: v })} />
           </div>
         </SetupRow>
-        <p className="text-[10.5px] text-label-3">Şimdi atlarsan sonra Ayarlar › Yapay zekâ'dan girebilirsin.</p>
+        <p className="text-[10.5px] text-label-3">{tt("Şimdi atlarsan sonra Ayarlar › Yapay zekâ'dan girebilirsin.")}</p>
       </div>
     </div>
   );
@@ -431,10 +418,10 @@ function SetupRow({ n, title, children }: { n: number; title: string; children: 
 // ---------------------------------------------------------------- Sağlık
 
 const WATER = [
-  { id: 0, label: "Yok" },
-  { id: 45, label: "45 dk" },
-  { id: 60, label: "1 sa" },
-  { id: 90, label: "90 dk" },
+  { id: 0, label: tt("Yok") },
+  { id: 45, label: tt("45 dk") },
+  { id: 60, label: tt("1 sa") },
+  { id: 90, label: tt("90 dk") },
 ];
 
 /** Adadaki olay kartının küçük kopyası */
@@ -466,22 +453,22 @@ export function CareArt() {
       <Screen height={176}>
         <div className="absolute left-1/2 top-0 -translate-x-1/2">
           <div className="absolute left-0 top-0">
-            <MiniToast icon={Eye} color={ACCENT.teal} title="Göz molası" detail="20 saniye boyunca uzağa bak" delay={0.04} />
+            <MiniToast icon={Eye} color={ACCENT.teal} title={tt("Göz molası")} detail={tt("20 saniye boyunca uzağa bak")} delay={0.04} />
           </div>
           <div className="relative">
-            <MiniToast icon={Droplet} color={ACCENT.blue} title="Su içme vakti" detail="Bir bardak su iyi gelir" delay={0.52} />
+            <MiniToast icon={Droplet} color={ACCENT.blue} title={tt("Su içme vakti")} detail={tt("Bir bardak su iyi gelir")} delay={0.52} />
           </div>
         </div>
       </Screen>
       <div className="divide-y divide-white/[0.05] rounded-[16px] bg-well px-3.5 py-1">
-        <CareRow icon={Eye} color={ACCENT.teal} title="Göz molası (20-20-20)" sub="20 dk kesintisiz kullanımda 20 sn uzağa bak">
+        <CareRow icon={Eye} color={ACCENT.teal} title={tt("Göz molası (20-20-20)")} sub={tt("20 dk kesintisiz kullanımda 20 sn uzağa bak")}>
           <Toggle on={s.eyeBreak} onChange={(v) => update({ eyeBreak: v })} />
         </CareRow>
-        <CareRow icon={Droplet} color={ACCENT.blue} title="Su hatırlatıcısı" sub="Seçtiğin aralıkla">
+        <CareRow icon={Droplet} color={ACCENT.blue} title={tt("Su hatırlatıcısı")} sub={tt("Seçtiğin aralıkla")}>
           <Segmented id="tour-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
         </CareRow>
-        <CareRow icon={Target} color={ACCENT.red} title="Odak (Pomodoro)" sub="25 dk çalış, 5 dk mola; 4 turda bir uzun mola">
-          <span className="text-[10.5px] text-label-3">Odak bölümünde</span>
+        <CareRow icon={Target} color={ACCENT.red} title={tt("Odak (Pomodoro)")} sub={tt("25 dk çalış, 5 dk mola; 4 turda bir uzun mola")}>
+          <span className="text-[10.5px] text-label-3">{tt("Odak bölümünde")}</span>
         </CareRow>
       </div>
     </div>
@@ -504,10 +491,10 @@ function CareRow({ icon, color, title, sub, children }: { icon: LucideIcon; colo
 // ---------------------------------------------------------------- Keyif
 
 const MOODS: { icon: LucideIcon; color: string; expression: Expression; act: string; result: string }[] = [
-  { icon: MousePointerClick, color: ACCENT.orange, expression: "slap", act: "Bir kez tıkla", result: "Şaplak! (3 kez üst üste: kızarım)" },
-  { icon: Hand, color: ACCENT.purple, expression: "suspicious", act: "Tut ve fırlat", result: "Sert fırlatırsan başım döner" },
-  { icon: FileText, color: ACCENT.pink, expression: "happy", act: "Dosya yedir", result: "En sevdiğim şey" },
-  { icon: Moon, color: ACCENT.blue, expression: "sleepy", act: "Gece yarısından sonra", result: "Uykum gelir, esnerim" },
+  { icon: MousePointerClick, color: ACCENT.orange, expression: "slap", act: tt("Bir kez tıkla"), result: tt("Şaplak! (3 kez üst üste: kızarım)") },
+  { icon: Hand, color: ACCENT.purple, expression: "suspicious", act: tt("Tut ve fırlat"), result: tt("Sert fırlatırsan başım döner") },
+  { icon: FileText, color: ACCENT.pink, expression: "happy", act: tt("Dosya yedir"), result: tt("En sevdiğim şey") },
+  { icon: Moon, color: ACCENT.blue, expression: "sleepy", act: tt("Gece yarısından sonra"), result: tt("Uykum gelir, esnerim") },
 ];
 
 export function MoodArt() {
@@ -520,13 +507,13 @@ export function MoodArt() {
         <MyNook size={30} expression={sulky ? "sulk" : affection >= 80 ? "happy" : "idle"} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between text-[12.5px]">
-            <span className="font-medium text-label">Keyfim</span>
+            <span className="font-medium text-label">{tt("Keyfim")}</span>
             <span className="font-medium tabular-nums" style={{ color }}>
               %{Math.round(affection)}
             </span>
           </div>
           <Bar pct={affection} color={color} className="mt-1.5" />
-          <p className="mt-1.5 text-[10.5px] text-label-3">Ayarlar'ın en üstünde de görürsün.</p>
+          <p className="mt-1.5 text-[10.5px] text-label-3">{tt("Ayarlar'ın en üstünde de görürsün.")}</p>
         </div>
         <Heart size={18} className="shrink-0" style={{ color }} fill="currentColor" />
       </div>
@@ -639,9 +626,7 @@ export function LookArt() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-10" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }} />
 
       <div className="absolute inset-x-0 top-[142px] z-[4] flex flex-col items-center gap-2.5">
-        <motion.p className="text-[12px] text-label-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-          Hepsi ben. Gövde, doku, renk, göz, şapka, toka… sen seç.
-        </motion.p>
+        <motion.p className="text-[12px] text-label-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>{tt("Hepsi ben. Gövde, doku, renk, göz, şapka, toka… sen seç.")}</motion.p>
       </div>
 
       <motion.button
@@ -657,9 +642,7 @@ export function LookArt() {
         className="absolute right-3.5 top-3.5 z-[40] flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium"
         style={{ background: tintBg(ACCENT.pink, 18), borderColor: tintBg(ACCENT.pink, 45), color: tintText(ACCENT.pink) }}
       >
-        <Shuffle size={12} strokeWidth={2.4} />
-        Şimdi giydir
-      </motion.button>
+        <Shuffle size={12} strokeWidth={2.4} />{tt("Şimdi giydir")}</motion.button>
     </div>
   );
 }
@@ -692,7 +675,7 @@ export function ArgusArt() {
       id: i.id,
       title: i.title,
       poster: posterSrc(i),
-      sub: i.series?.next ? `Sıradaki ${epLabel(i.series.next)}${i.series.next.name ? ` · ${i.series.next.name}` : ""}` : "Güncelsin",
+      sub: i.series?.next ? tt("Sıradaki {0}{1}", epLabel(i.series.next), i.series.next.name ? ` · ${i.series.next.name}` : "") : tt("Güncelsin"),
     }));
   return <ArgusLinked watching={list} />;
 }
@@ -724,10 +707,10 @@ export function HelloChips() {
 
 export function DoneTips() {
   const tips = [
-    { color: ACCENT.blue, icon: MousePointer2, text: "Üst ortaya gel → açılırım" },
-    { color: ACCENT.purple, icon: Settings, text: "Ayarlar › Nook nedir? → bu tanıtım" },
-    { color: ACCENT.pink, icon: Shuffle, text: "Sağ tık › Görünüm → beni giydir" },
-    { color: ACCENT.gray, icon: ExternalLink, text: "Sağ alttaki tepsi simgesi → çıkış" },
+    { color: ACCENT.blue, icon: MousePointer2, text: tt("Üst ortaya gel → açılırım") },
+    { color: ACCENT.purple, icon: Settings, text: tt("Ayarlar › Nook nedir? → bu tanıtım") },
+    { color: ACCENT.pink, icon: Shuffle, text: tt("Sağ tık › Görünüm → beni giydir") },
+    { color: ACCENT.gray, icon: ExternalLink, text: tt("Sağ alttaki tepsi simgesi → çıkış") },
   ];
   return (
     <div className="flex justify-center gap-2">

@@ -9,6 +9,7 @@ import { search, searchOnline, type ResultKind, type SearchResult } from "../../
 import { useNook } from "../../store/nook";
 import { Frame } from "../panels/Frame";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 const KIND: Record<ResultKind, { icon: LucideIcon; color: string }> = {
   calc: { icon: Calculator, color: ACCENT.orange },
@@ -114,7 +115,7 @@ export function SearchPanel() {
   };
 
   return (
-    <Frame view="module" title="Hızlı arama">
+    <Frame view="module" title={tt("Hızlı arama")}>
       <div className="flex h-full flex-col gap-2">
         <div className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-well px-3 focus-within:bg-well-hi">
           <Search size={14} strokeWidth={2.4} className="shrink-0 text-label-3" />
@@ -124,7 +125,7 @@ export function SearchPanel() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             spellCheck={false}
-            placeholder="Ara, hesapla, çevir…"
+            placeholder={tt("Ara, hesapla, çevir…")}
             className="w-full bg-transparent text-[13px] text-label outline-none placeholder:text-label-3"
           />
         </div>
@@ -143,7 +144,7 @@ export function SearchPanel() {
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-label-3">↑↓ seç · Enter çalıştır · Esc kapat</p>
+              <p className="text-[10px] text-label-3">{tt("↑↓ seç · Enter çalıştır · Esc kapat")}</p>
             </div>
           )}
           <AnimatePresence initial={false}>

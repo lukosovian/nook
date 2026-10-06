@@ -1,3 +1,4 @@
+import { tt } from "./i18n";
 /**
  * Nook'un yapay zekâsı: Google Gemini API. Anahtar yalnızca bu bilgisayarda saklanır
  * ve doğrudan Google'a gönderilir (arada başka sunucu yok).
@@ -53,10 +54,10 @@ async function apiError(r: Response): Promise<GeminiError> {
   } catch {
     // gövde JSON değil
   }
-  if (r.status === 400 && /API key/i.test(message)) return new GeminiError("API anahtarı geçersiz");
-  if (r.status === 503 || status === "UNAVAILABLE") return new GeminiError("Gemini şu an çok yoğun", true);
-  if (r.status === 429 || status === "RESOURCE_EXHAUSTED") return new GeminiError("Gemini kotası doldu", true);
-  if (r.status >= 500) return new GeminiError(`Gemini geçici bir hata verdi (${r.status})`, true);
+  if (r.status === 400 && /API key/i.test(message)) return new GeminiError(tt("API anahtarı geçersiz"));
+  if (r.status === 503 || status === "UNAVAILABLE") return new GeminiError(tt("Gemini şu an çok yoğun"), true);
+  if (r.status === 429 || status === "RESOURCE_EXHAUSTED") return new GeminiError(tt("Gemini kotası doldu"), true);
+  if (r.status >= 500) return new GeminiError(tt("Gemini geçici bir hata verdi ({0})", r.status), true);
   return new GeminiError(`${status}: ${message || r.statusText}`);
 }
 
@@ -144,7 +145,7 @@ export async function* streamChat(
       };
       if (chunk.error) {
         const busy = /overload|unavailable|high demand|exhausted/i.test(chunk.error.message ?? "");
-        throw new GeminiError(busy ? "Gemini şu an çok yoğun" : (chunk.error.message ?? "Gemini hatası"), busy);
+        throw new GeminiError(busy ? tt("Gemini şu an çok yoğun") : (chunk.error.message ?? tt("Gemini hatası")), busy);
       }
       for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
         yield { type: "part", part };

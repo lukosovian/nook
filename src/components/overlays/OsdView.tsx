@@ -3,6 +3,7 @@ import { motion, useAnimationControls } from "motion/react";
 import { useNook } from "../../store/nook";
 import { SunGlyph } from "../ui/glyphs";
 import { ACCENT } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Hap kalınlığı — Nook'un yüzüyle aynı */
 const H = 22;
@@ -92,7 +93,7 @@ export function OsdView() {
         style={{ fontFamily: "var(--font-round)", fontWeight: 850, letterSpacing: "-0.01em", color: "var(--color-label)" }}
       >
         <motion.span key={osd.muted ? "m" : pct} initial={{ y: -5, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.16 }} className="inline-block">
-          {osd.muted ? "Kapalı" : pct}
+          {osd.muted ? tt("Kapalı") : pct}
         </motion.span>
       </span>
     </motion.div>

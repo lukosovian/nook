@@ -93,6 +93,10 @@ pub struct Settings {
     pub break_reminder_min: u64,
     /// Kullanıcının sürükleyip bıraktığı yer; yoksa ekranın üst ortası
     pub island_pos: Option<IslandPos>,
+    /// Arayüz ölçeği (0,8–1,5; 1 = %100)
+    pub ui_scale: f64,
+    /// Tepsi menüsündeki "çık" yazısı (seçili dilde)
+    pub quit_label: String,
 }
 
 /// Adanın ekrandaki yeri, ekran boyuna oranla: fx üst-orta noktanın yatay yeri, fy üst kenarın
@@ -118,6 +122,8 @@ impl Default for Settings {
             game_intro: true,
             break_reminder_min: 120,
             island_pos: None,
+            ui_scale: 1.0,
+            quit_label: String::new(),
         }
     }
 }

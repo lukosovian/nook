@@ -22,14 +22,15 @@ import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, EmptyState, Segmented, tintBg, tintText } from "../ui/primitives";
 import { ArgusPromo } from "../ArgusPromo";
+import { tt } from "../../lib/i18n";
 
 const COLOR = ACCENT.orange;
 
 type View = "watching" | "calendar" | "pick";
 const VIEWS: { id: View; label: string }[] = [
-  { id: "watching", label: "İzliyorum" },
-  { id: "calendar", label: "Takvim" },
-  { id: "pick", label: "Ne izlesem?" },
+  { id: "watching", label: tt("İzliyorum") },
+  { id: "calendar", label: tt("Takvim") },
+  { id: "pick", label: tt("Ne izlesem?") },
 ];
 
 /** Argus: izlediğin diziler, yayın takvimi, izleneceklerden öneri. */
@@ -48,15 +49,13 @@ export function ArgusPanel() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2">
         <div className="h-[110px]">
-          <EmptyState title="Argus'u buldum" hint="Argus'ta profilini ve arşivini oluşturunca dizilerin burada görünür" color={COLOR} />
+          <EmptyState title={tt("Argus'u buldum")} hint={tt("Argus'ta profilini ve arşivini oluşturunca dizilerin burada görünür")} color={COLOR} />
         </div>
         <button
           onClick={() => void openArgus()}
           className="flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium"
           style={{ background: tintBg(COLOR), color: tintText(COLOR) }}
-        >
-          Argus'u aç
-          <ExternalLink size={10} />
+        >{tt("Argus'u aç")}<ExternalLink size={10} />
         </button>
       </div>
     );
@@ -67,7 +66,7 @@ export function ArgusPanel() {
         <Segmented id="argus-view" options={VIEWS} value={view} onChange={(v) => { setView(v); useArgus.setState({ focusId: null }); }} color={COLOR} />
         <button
           onClick={() => void openArgus()}
-          title={snap.running ? "Argus açık" : "Argus'u aç"}
+          title={snap.running ? tt("Argus açık") : tt("Argus'u aç")}
           className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] text-label-3 hover:bg-well-hi hover:text-label-2"
         >
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: snap.running ? ACCENT.green : "rgb(255 255 255 / 0.25)" }} />
@@ -98,7 +97,7 @@ function Poster({ item, w, h }: { item: ArgusItem; w: number; h: number }) {
   );
 }
 
-function WatchedButton({ item, ep, label = "İzledim" }: { item: ArgusItem; ep?: { season: number; episode: number } | null; label?: string }) {
+function WatchedButton({ item, ep, label = tt("İzledim") }: { item: ArgusItem; ep?: { season: number; episode: number } | null; label?: string }) {
   const busy = useArgus((s) => s.busy === item.id);
   return (
     <motion.button
@@ -129,11 +128,9 @@ function StatusChoice({ item, ep }: { item: ArgusItem; ep: { season: number; epi
           onClick={() => void markWatched(item, ep)}
           className={chip}
           style={{ background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }}
-          title="Yalnızca bölümü işaretle"
+          title={tt("Yalnızca bölümü işaretle")}
         >
-          <Check size={10} strokeWidth={2.8} />
-          Bölüm
-        </motion.button>
+          <Check size={10} strokeWidth={2.8} />{tt("Bölüm")}</motion.button>
       )}
       {statuses.map((st) => (
         <motion.button
@@ -147,7 +144,7 @@ function StatusChoice({ item, ep }: { item: ArgusItem; ep: { season: number; epi
               ? { background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }
               : { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-2)" }
           }
-          title={ep ? `Bölümü işaretle, durumu ${st} yap` : `${st} olarak yaz (bugünün tarihiyle)`}
+          title={ep ? tt("Bölümü işaretle, durumu {0} yap", st) : tt("{0} olarak yaz (bugünün tarihiyle)", st)}
         >
           {st}
         </motion.button>
@@ -175,11 +172,10 @@ function SuggestionBanner() {
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[11.5px] font-medium" style={{ color: tintText(COLOR) }}>
             {item.title}
-            {ep ? ` ${epLabel(ep)}` : ""} bitti mi?
-          </p>
-          <p className="text-[10px] text-label-3">Argus'a hangi durumla yazayım?</p>
+            {ep ? ` ${epLabel(ep)}` : ""}{" "}{tt("bitti mi?")}</p>
+          <p className="text-[10px] text-label-3">{tt("Argus'a hangi durumla yazayım?")}</p>
         </div>
-        <button onClick={() => answerSuggestion(sug)} title="Hayır" className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+        <button onClick={() => answerSuggestion(sug)} title={tt("Hayır")} className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
           <X size={12} />
         </button>
       </div>
@@ -191,7 +187,7 @@ function SuggestionBanner() {
 function Watching() {
   const snap = useArgus((s) => s.snap);
   const list = useMemo(() => watching(snap), [snap]);
-  if (!list.length) return <EmptyState title="İzlediğin dizi yok" hint="Argus'ta durumu İzleniyor olan diziler burada" color={COLOR} />;
+  if (!list.length) return <EmptyState title={tt("İzlediğin dizi yok")} hint={tt("Argus'ta durumu İzleniyor olan diziler burada")} color={COLOR} />;
   return (
     <div className="space-y-1">
       {list.map((it) => {
@@ -205,7 +201,7 @@ function Watching() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-medium text-label">{it.title}</p>
               <p className="truncate text-[10.5px] text-label-3">
-                {s.next ? `Sıradaki ${epLabel(s.next)}${s.next.name ? ` · ${s.next.name}` : ""}` : soon?.date ? `Güncelsin · yeni bölüm ${dayLabel(soon.date)}` : "Güncelsin"}
+                {s.next ? tt("Sıradaki {0}{1}", epLabel(s.next), s.next.name ? ` · ${s.next.name}` : "") : soon?.date ? tt("Güncelsin · yeni bölüm {0}", dayLabel(soon.date)) : tt("Güncelsin")}
               </p>
               <Bar pct={s.aired ? (s.position / s.aired) * 100 : 0} color={COLOR} className="mt-1" />
             </div>
@@ -220,13 +216,13 @@ function Watching() {
 function Calendar() {
   const snap = useArgus((s) => s.snap);
   const entries = useMemo(() => calendar(snap), [snap]);
-  if (!entries.length) return <EmptyState title="Yakında bölüm yok" hint="Takip ettiğin dizilerin önümüzdeki iki haftası" color={COLOR} />;
+  if (!entries.length) return <EmptyState title={tt("Yakında bölüm yok")} hint={tt("Takip ettiğin dizilerin önümüzdeki iki haftası")} color={COLOR} />;
   const days = [...new Set(entries.map((e) => e.date))];
   return (
     <div className="space-y-1.5">
       {days.map((d) => (
         <div key={d} className="flex gap-2">
-          <span className="w-[62px] shrink-0 pt-1 text-[10.5px] font-medium" style={{ color: dayLabel(d) === "Bugün" ? tintText(COLOR) : "var(--color-label-3)" }}>
+          <span className="w-[62px] shrink-0 pt-1 text-[10.5px] font-medium" style={{ color: dayLabel(d) === tt("Bugün") ? tintText(COLOR) : "var(--color-label-3)" }}>
             {dayLabel(d)}
           </span>
           <div className="flex min-w-0 flex-1 flex-wrap gap-1">
@@ -254,13 +250,13 @@ function Calendar() {
 }
 
 const KINDS: { id: NonNullable<PickFilter["kind"]>; label: string }[] = [
-  { id: "all", label: "Hepsi" },
-  { id: "film", label: "Film" },
-  { id: "dizi", label: "Dizi" },
+  { id: "all", label: tt("Hepsi") },
+  { id: "film", label: tt("Film") },
+  { id: "dizi", label: tt("Dizi") },
 ];
 const LENGTH: { id: number; label: string }[] = [
-  { id: 0, label: "Farketmez" },
-  { id: 100, label: "Kısa" },
+  { id: 0, label: tt("Farketmez") },
+  { id: 100, label: tt("Kısa") },
 ];
 
 function Pick() {
@@ -276,28 +272,26 @@ function Pick() {
       <div className="flex items-center gap-1.5">
         <Segmented id="argus-kind" options={KINDS} value={kind} onChange={setKind} color={COLOR} />
         <Segmented id="argus-len" options={LENGTH} value={len} onChange={setLen} color={COLOR} />
-        <span className="ml-auto text-[10px] text-label-3">{pool.length} seçenek</span>
+        <span className="ml-auto text-[10px] text-label-3">{pool.length}{" "}{tt("seçenek")}</span>
       </div>
       {item ? (
         <Detail item={item} actions={
           <>
             <button onClick={() => setSeed(Math.random())} className="flex h-6 items-center gap-1 rounded-full bg-well px-2 text-[10.5px] font-medium text-label-2 hover:bg-well-hi hover:text-label">
-              <Shuffle size={11} /> Başka
-            </button>
+              <Shuffle size={11} />{" "}{tt("Başka")}</button>
             <button
               onClick={() => {
                 const st = useNook.getState();
                 st.setTab("chat");
-                void sendChat("Argus'taki izleneceklerimden bu akşam için bana bir şey önerir misin?");
+                void sendChat(tt("Argus'taki izleneceklerimden bu akşam için bana bir şey önerir misin?"));
               }}
               className="flex h-6 items-center gap-1 rounded-full bg-well px-2 text-[10.5px] font-medium text-label-2 hover:bg-well-hi hover:text-label"
             >
-              <MessageCircle size={11} /> Nook seçsin
-            </button>
+              <MessageCircle size={11} />{" "}{tt("Nook seçsin")}</button>
           </>
         } />
       ) : (
-        <EmptyState title="Uygun bir şey yok" hint="İzleneceklerde çıkmış bir yapım bulamadım" color={COLOR} />
+        <EmptyState title={tt("Uygun bir şey yok")} hint={tt("İzleneceklerde çıkmış bir yapım bulamadım")} color={COLOR} />
       )}
     </div>
   );
@@ -307,7 +301,7 @@ function Pick() {
 function Detail({ item, actions }: { item: ArgusItem; actions?: React.ReactNode }) {
   const s = item.series;
   const year = item.release?.slice(0, 4);
-  const meta = [year, item.genres.slice(0, 2).join(", "), item.runtime ? `${item.runtime} dk` : null, s ? `${s.aired} bölüm` : null].filter(Boolean).join(" · ");
+  const meta = [year, item.genres.slice(0, 2).join(", "), item.runtime ? tt("{0} dk", item.runtime) : null, s ? tt("{0} bölüm", s.aired) : null].filter(Boolean).join(" · ");
   const focus = useArgus((st) => st.focusId === item.id);
   return (
     <div className="flex gap-3">
@@ -334,8 +328,8 @@ function Detail({ item, actions }: { item: ArgusItem; actions?: React.ReactNode 
           {item.score != null && <span className="text-[10px] text-label-2">★ {item.score.toFixed(1)}</span>}
         </div>
         <p className="truncate text-[10.5px] text-label-3">{meta}</p>
-        {s?.next && <p className="truncate text-[10.5px] text-label-2">Sıradaki: {epLabel(s.next)}{s.next.name ? ` · ${s.next.name}` : ""}</p>}
-        {s && !s.next && s.upcoming[0]?.date && <p className="text-[10.5px] text-label-2">Yeni bölüm {dayLabel(s.upcoming[0].date)} ({epLabel(s.upcoming[0])})</p>}
+        {s?.next && <p className="truncate text-[10.5px] text-label-2">{tt("Sıradaki:")}{" "}{epLabel(s.next)}{s.next.name ? ` · ${s.next.name}` : ""}</p>}
+        {s && !s.next && s.upcoming[0]?.date && <p className="text-[10.5px] text-label-2">{tt("Yeni bölüm")}{" "}{dayLabel(s.upcoming[0].date)} ({epLabel(s.upcoming[0])})</p>}
         <div className="mt-auto flex flex-wrap gap-1.5 pt-0.5">
           {s ? s.next && <WatchedButton item={item} ep={s.next} label={`${epLabel(s.next)} izledim`} /> : <WatchedButton item={item} />}
           {actions}

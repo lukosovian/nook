@@ -5,6 +5,7 @@ import { clock } from "../../lib/alarm";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Çalan alarm: solda titreyen Nook, ortada saat ve isim, sağda Ertele / Kapat. */
 export function AlarmView() {
@@ -25,10 +26,10 @@ export function AlarmView() {
           </motion.span>
           {clock(ringing)}
         </p>
-        <p className="mt-1 truncate text-[11px] text-label-2">{ringing.label || "Alarm"}</p>
+        <p className="mt-1 truncate text-[11px] text-label-2">{ringing.label || tt("Alarm")}</p>
       </div>
-      <Action icon={Timer} label="5 dk" color={ACCENT.blue} onClick={() => stopAlarm(5)} />
-      <Action icon={BellOff} label="Kapat" color={ACCENT.yellow} onClick={() => stopAlarm()} strong />
+      <Action icon={Timer} label={tt("5 dk")} color={ACCENT.blue} onClick={() => stopAlarm(5)} />
+      <Action icon={BellOff} label={tt("Kapat")} color={ACCENT.yellow} onClick={() => stopAlarm()} strong />
     </motion.div>
   );
 }
@@ -51,7 +52,7 @@ function Action({
       whileTap={{ scale: 0.92 }}
       transition={spring.pop}
       onClick={onClick}
-      title={label === "5 dk" ? "5 dakika ertele" : "Alarmı kapat"}
+      title={label === "5 dk" ? tt("5 dakika ertele") : tt("Alarmı kapat")}
       className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium"
       style={{
         background: tintBg(color, strong ? 26 : 14),

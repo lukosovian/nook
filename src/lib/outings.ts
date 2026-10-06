@@ -9,6 +9,7 @@ import { emit } from "@tauri-apps/api/event";
 import { playAntic } from "../hooks/useAntics";
 import { EVENTS, inTauri, perchStart, perchStop } from "./bridge";
 import { isWorking, useNook, type Outing } from "../store/nook";
+import { tt } from "./i18n";
 
 /** Son dışarı çıkış (her biri için) — sık sık olmasın */
 const last: Record<Outing, number> = { perch: Date.now(), hang: 0, fish: 0 };
@@ -80,6 +81,6 @@ export function perchReturned() {
 export const haul = { stars: 0, trash: 0 };
 
 export function haulText() {
-  const parts = [haul.stars && `${haul.stars} parlak yıldız`, haul.trash && `${haul.trash} eski dosya`].filter(Boolean);
+  const parts = [haul.stars && tt("{0} parlak yıldız", haul.stars), haul.trash && tt("{0} eski dosya", haul.trash)].filter(Boolean);
   return parts.join(", ");
 }

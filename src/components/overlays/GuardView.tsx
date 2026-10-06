@@ -6,6 +6,7 @@ import { mmss, remaining } from "../../lib/focus";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 const COLOR = ACCENT.red;
 /** Nook'un vuruşlarıyla (Props/Knock) aynı ritim */
@@ -45,28 +46,24 @@ export function GuardView() {
       />
       <div className="absolute inset-y-0 left-[94px] right-3 flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[14.5px] font-semibold leading-tight" style={{ color: tintText(COLOR) }}>
-            Çalışmıyor muyduk?
-            <motion.span
+          <p className="flex items-center gap-1.5 text-[14.5px] font-semibold leading-tight" style={{ color: tintText(COLOR) }}>{tt("Çalışmıyor muyduk?")}<motion.span
               className="text-[10px] font-medium text-label-3"
               animate={{ opacity: [0, 0, 1, 0.4, 0.4, 1, 0, 0], y: [2, 2, 0, 0, 0, 0, -2, -2] }}
               transition={{ ...KNOCK, repeat: Infinity }}
-            >
-              tık tık
-            </motion.span>
+            >{tt("tık tık")}</motion.span>
           </p>
           <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-label-2">
-            <span className="truncate">{guard.site} açık</span>
+            <span className="truncate">{guard.site}{" "}{tt("açık")}</span>
             <span className="text-label-3">·</span>
             <Clock size={10} strokeWidth={2.6} style={{ color: tintText(COLOR) }} />
             <span className="font-medium tabular-nums" style={{ color: tintText(COLOR) }}>
               {mmss(left)}
             </span>
-            <span>kaldı</span>
+            <span>{tt("kaldı")}</span>
           </p>
         </div>
-        <Action icon={Clock} label="5 dk izin" title="5 dakika uyarma" onClick={snoozeGuard} />
-        <Action icon={BellOff} label="Bu tur sus" title="Bu çalışma turunda bir daha uyarma" onClick={muteGuardForPhase} />
+        <Action icon={Clock} label={tt("5 dk izin")} title={tt("5 dakika uyarma")} onClick={snoozeGuard} />
+        <Action icon={BellOff} label={tt("Bu tur sus")} title={tt("Bu çalışma turunda bir daha uyarma")} onClick={muteGuardForPhase} />
       </div>
     </motion.div>
   );

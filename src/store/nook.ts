@@ -16,6 +16,7 @@ import type { ToolNote } from "../lib/aiTools";
 import type { Weather } from "../lib/weather";
 import type { Look } from "../lib/look";
 import { detectColor } from "../lib/format";
+import { lang as initialLang } from "../lib/i18n";
 
 /** Olay güdümlü ruh hali (dosya yutma). */
 export type Mood = "idle" | "hungry" | "chewing" | "happy";
@@ -242,6 +243,10 @@ export interface Settings extends NativeSettings {
   argusProfile: string;
   /** Argus klasörü elle seçildiyse (boş = otomatik bul) */
   argusDir: string;
+  /** Arayüz dili */
+  lang: import("../lib/i18n").Lang;
+  /** Renk körlüğü paleti */
+  colorVision: import("../lib/palette").ColorVision;
   /** Nook ara sıra dışarı çıksın: pencere üstüne tüner, iple sarkar, boştayken balık tutar */
   outings: boolean;
   /** Odak bekçisi: çalışırken dikkat dağıtan siteye girince uyarır */
@@ -308,6 +313,10 @@ export const DEFAULT_SETTINGS: Settings = {
   argusNews: true,
   argusDetect: true,
   outings: true,
+  uiScale: 1,
+  colorVision: "normal",
+  // Eski kurulumlarda Türkçe, yeni kurulumda sistemin dili (bkz. lib/i18n)
+  lang: initialLang,
   homeOrder: [],
   homeHidden: [],
   focusGuard: true,

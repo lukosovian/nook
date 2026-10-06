@@ -11,6 +11,7 @@ import type { FunctionDecl } from "./ai";
 import { calendar, dayLabel, epLabel, findItem, markWatched, matchTitle, parseEpisode, pickPool, useArgus, watching, weekStats, type ArgusItem } from "./argus";
 import { useNook } from "../store/nook";
 import { describeLook, nookName } from "./look";
+import { lang, LANG_NAME_TR, locale, tt } from "./i18n";
 
 const fn = (name: string, description: string, properties: object, required: string[] = []): FunctionDecl => ({
   name,
@@ -148,7 +149,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
           d.setHours(hour, minute, 0, 0);
           if (d.getTime() > Date.now()) {
             at = d.getTime();
-            when = num(args.day_offset) === 1 ? "yarın " : num(args.day_offset) >= 2 ? d.toLocaleDateString("tr-TR", { weekday: "long" }) + " " : "bugün ";
+            when = num(args.day_offset) === 1 ? tt("yarın ") : num(args.day_offset) >= 2 ? d.toLocaleDateString(locale(), { weekday: "long" }) + " " : tt("bugün ");
           }
         }
         const silent = args.silent === true || args.silent === "true";
@@ -157,7 +158,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         const name = str(args.label) ? ` (${str(args.label)})` : "";
         return {
           result: `Alarm ${when}${t} için kuruldu${name}, tekrar: ${REPEAT_LABEL[repeat]}.`,
-          note: { icon: "alarm", text: `${when ? when[0].toUpperCase() + when.slice(1) : ""}${t}${name} · ${REPEAT_LABEL[repeat]}${silent ? " · sessiz" : ""}` },
+          note: { icon: "alarm", text: `${when ? when[0].toUpperCase() + when.slice(1) : ""}${t}${name} · ${REPEAT_LABEL[repeat]}${silent ? tt(" · sessiz") : ""}` },
         };
       }
       case "set_timer": {
@@ -165,7 +166,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         const at = Date.now() + minutes * 60_000;
         const d = new Date(at);
         s.addAlarm({ hour: d.getHours(), minute: d.getMinutes(), label: str(args.label) || `${minutes} dk zamanlayıcı`, repeat: "once", oneShot: true, at });
-        return { result: `${minutes} dakikalık zamanlayıcı kuruldu, ${clock({ hour: d.getHours(), minute: d.getMinutes() })}'de çalacak.`, note: { icon: "alarm", text: `${minutes} dk sonra çalacak` } };
+        return { result: `${minutes} dakikalık zamanlayıcı kuruldu, ${clock({ hour: d.getHours(), minute: d.getMinutes() })}'de çalacak.`, note: { icon: "alarm", text: tt("{0} dk sonra çalacak", minutes) } };
       }
       case "quick_set": {
         const key = str(args.key) as QuickKey;
@@ -178,21 +179,21 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
       case "focus": {
         if (str(args.action) === "stop") {
           stopFocus();
-          return { result: "Odak sayacı durduruldu.", note: { icon: "focus", text: "Odak bitti" } };
+          return { result: "Odak sayacı durduruldu.", note: { icon: "focus", text: tt("Odak bitti") } };
         }
         const mins = args.minutes != null ? Math.min(180, Math.max(1, Math.round(num(args.minutes)))) : s.settings.focusWork;
         startFocus("work", 0, mins);
-        return { result: `${mins} dakikalık odak başladı.`, note: { icon: "focus", text: `${mins} dk odak başladı` } };
+        return { result: `${mins} dakikalık odak başladı.`, note: { icon: "focus", text: tt("{0} dk odak başladı", mins) } };
       }
       case "add_note": {
         const text = str(args.text).trim();
         s.setNote(s.note ? `${s.note}\n${text}` : text);
         playAntic("note");
-        return { result: `Nota eklendi: ${text}`, note: { icon: "note", text: `Nota eklendi: ${text}` } };
+        return { result: `Nota eklendi: ${text}`, note: { icon: "note", text: tt("Nota eklendi: {0}", text) } };
       }
       case "media": {
         const action = str(args.action) as "toggle" | "next" | "prev";
-        if (!s.media) return { result: "Şu an çalan bir şey yok.", note: { icon: "music", text: "Çalan bir şey yok" } };
+        if (!s.media) return { result: "Şu an çalan bir şey yok.", note: { icon: "music", text: tt("Çalan bir şey yok") } };
         await mediaControl(action);
         const text = action === "next" ? "Sonraki parça" : action === "prev" ? "Önceki parça" : s.media.playing ? "Duraklatıldı" : "Oynatılıyor";
         return { result: `${text}.`, note: { icon: "music", text } };
@@ -204,53 +205,53 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
           apps.find((a) => a.name.toLocaleLowerCase("tr") === q) ??
           apps.find((a) => a.name.toLocaleLowerCase("tr").startsWith(q)) ??
           apps.find((a) => a.name.toLocaleLowerCase("tr").includes(q));
-        if (!hit) return { result: `"${args.name}" adında bir uygulama bulamadım.`, note: { icon: "error", text: `${args.name} bulunamadı` } };
+        if (!hit) return { result: `"${args.name}" adında bir uygulama bulamadım.`, note: { icon: "error", text: tt("{0} bulunamadı", args.name) } };
         await openPath(hit.path);
-        return { result: `${hit.name} açıldı.`, note: { icon: "app", text: `${hit.name} açıldı` } };
+        return { result: `${hit.name} açıldı.`, note: { icon: "app", text: tt("{0} açıldı", hit.name) } };
       }
       case "web_search": {
         const query = str(args.query);
         await openPath(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
         playAntic("magnify");
-        return { result: `Tarayıcıda "${query}" araması açıldı.`, note: { icon: "web", text: `"${query}" aranıyor` } };
+        return { result: `Tarayıcıda "${query}" araması açıldı.`, note: { icon: "web", text: tt("\"{0}\" aranıyor", query) } };
       }
       case "set_user_name": {
         const name = str(args.name).trim();
         s.updateSettings({ userName: name });
         playAntic("love");
-        return { result: `Kullanıcının adı kaydedildi: ${name}`, note: { icon: "memory", text: `Adın: ${name}` } };
+        return { result: `Kullanıcının adı kaydedildi: ${name}`, note: { icon: "memory", text: tt("Adın: {0}", name) } };
       }
       case "remember": {
         const fact = str(args.fact).trim();
         s.updateSettings({ memories: [...s.settings.memories.filter((m) => m !== fact), fact].slice(-30) });
         playAntic("love");
-        return { result: `Kaydedildi: ${fact}`, note: { icon: "memory", text: `Hatırlayacağım: ${fact}` } };
+        return { result: `Kaydedildi: ${fact}`, note: { icon: "memory", text: tt("Hatırlayacağım: {0}", fact) } };
       }
       case "argus_overview": {
         const snap = useArgus.getState().snap;
-        if (!snap) return { result: "Argus bu bilgisayarda yok.", note: { icon: "error", text: "Argus yok" } };
+        if (!snap) return { result: "Argus bu bilgisayarda yok.", note: { icon: "error", text: tt("Argus yok") } };
         const w = watching(snap).map((i) => `${i.title}: ${i.series!.next ? `sıradaki ${epLabel(i.series!.next)} ${i.series!.next.name}` : "güncel"} (${i.series!.seen}/${i.series!.aired})`);
         const cal = calendar(snap).slice(0, 8).map((c) => `${dayLabel(c.date)}: ${c.item.title} ${epLabel(c.ep)}`);
         const st = weekStats(snap)!;
         return {
           result: [`İzlediği diziler: ${w.join("; ") || "yok"}`, `Takvim: ${cal.join("; ") || "yakında bölüm yok"}`, `Son 7 gün: ${st.episodes} bölüm, ${st.movies} film`].join("\n"),
-          note: { icon: "argus", text: "Argus'a baktım" },
+          note: { icon: "argus", text: tt("Argus'a baktım") },
         };
       }
       case "argus_suggest": {
         const snap = useArgus.getState().snap;
         const kind = (["film", "dizi", "all"].includes(str(args.kind)) ? str(args.kind) : "all") as "film" | "dizi" | "all";
         const pool = pickPool(snap, { kind, maxMinutes: args.max_minutes != null ? num(args.max_minutes) : null, genre: str(args.genre) || null });
-        if (!pool.length) return { result: "Bu ölçülere uyan, izlenecekler listesinde çıkmış bir yapım yok.", note: { icon: "argus", text: "Uygun yapım yok" } };
+        if (!pool.length) return { result: "Bu ölçülere uyan, izlenecekler listesinde çıkmış bir yapım yok.", note: { icon: "argus", text: tt("Uygun yapım yok") } };
         const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 8);
         return {
           result: `Adaylar (${pool.length} içinden):\n${picks.map(describe).join("\n")}`,
-          note: { icon: "argus", text: `${pool.length} izlenecek arasından seçtim` },
+          note: { icon: "argus", text: tt("{0} izlenecek arasından seçtim", pool.length) },
         };
       }
       case "argus_find": {
         const it = matchTitle(useArgus.getState().snap, str(args.title));
-        if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: `${args.title} bulunamadı` } };
+        if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: tt("{0} bulunamadı", args.title) } };
         const sr = it.series;
         return {
           result: `${describe(it)}${it.score != null ? `, puanı ${it.score.toFixed(1)}` : ""}${sr ? `, ${sr.seen}/${sr.aired} bölüm izlendi${sr.next ? `, sıradaki ${epLabel(sr.next)}` : ""}` : ""}`,
@@ -260,24 +261,24 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
       case "argus_mark_watched": {
         const snap = useArgus.getState().snap;
         const it = matchTitle(snap, str(args.title));
-        if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: `${args.title} bulunamadı` } };
+        if (!it) return { result: `Argus'ta "${args.title}" bulunamadı.`, note: { icon: "error", text: tt("{0} bulunamadı", args.title) } };
         let ep: { season: number; episode: number } | null = null;
         if (it.series) {
           ep = args.episode != null ? { season: args.season != null ? num(args.season) : (it.series.next?.season ?? 1), episode: num(args.episode) } : (parseEpisode(str(args.title), it.series.next?.season ?? 1) ?? it.series.next);
-          if (!ep) return { result: `${it.title} dizisinin çıkmış bütün bölümleri zaten izlenmiş.`, note: { icon: "argus", text: `${it.title} güncel` } };
+          if (!ep) return { result: `${it.title} dizisinin çıkmış bütün bölümleri zaten izlenmiş.`, note: { icon: "argus", text: tt("{0} güncel", it.title) } };
         }
         await markWatched(it, ep);
         const fresh = findItem(it.id);
         return {
           result: `${it.title}${ep ? ` ${epLabel(ep)}` : ""} izlendi olarak işaretlendi.${fresh?.series?.next ? ` Sıradaki: ${epLabel(fresh.series.next)}.` : ""}`,
-          note: { icon: "argus", text: `${it.title}${ep ? ` ${epLabel(ep)}` : ""} izlendi` },
+          note: { icon: "argus", text: tt("{0}{1} izlendi", it.title, ep ? ` ${epLabel(ep)}` : "") },
         };
       }
       default:
-        return { result: `Bilinmeyen araç: ${name}`, note: { icon: "error", text: `Bilinmeyen araç: ${name}` } };
+        return { result: `Bilinmeyen araç: ${name}`, note: { icon: "error", text: tt("Bilinmeyen araç: {0}", name) } };
     }
   } catch (e) {
-    return { result: `Hata: ${String(e)}`, note: { icon: "error", text: `Yapılamadı: ${String(e)}` } };
+    return { result: `Hata: ${String(e)}`, note: { icon: "error", text: tt("Yapılamadı: {0}", String(e)) } };
   }
 }
 
@@ -289,7 +290,7 @@ export function systemPrompt(): string {
   const lines = [
     `Senin adın ${name}. Kullanıcının Windows bilgisayarında, ekranın üst kenarındaki çentikte yaşayan sevimli bir maskotsun.`,
     `Görünüşün: ${describeLook(s.settings.look)}, bazen beliren küçük yüzen eller.`,
-    "Kişiliğin: neşeli, meraklı, biraz şakacı ve kullanıcına bağlı. Her zaman Türkçe konuş.",
+    `Kişiliğin: neşeli, meraklı, biraz şakacı ve kullanıcına bağlı. Her zaman ${LANG_NAME_TR[lang]} konuş; kullanıcı başka dilde yazarsa onun dilinde cevap ver.`,
     `Kullanıcıyla konuşuyorsun: ona asla '${name}' diye hitap etme, ${name} sensin. Adını biliyorsan adıyla, bilmiyorsan hitapsız konuş.`,
     "Kısa konuş: çoğunlukla 1-2 cümle. Emojiyi çok az kullan. Yapay zekâ olduğunu vurgulama.",
     "Bir iş istenirse (alarm, zamanlayıcı, odak, Wi-Fi, mikrofon, not, müzik, uygulama, arama) uygun aracı kullan.",
@@ -297,7 +298,7 @@ export function systemPrompt(): string {
     "Aracı kullandıktan sonra ne yaptığını onaylayan tek, doğal bir cümle kur. Örnek: 'Tamam, yarın 08:00'e toplantı alarmını kurdum!'",
     "Araçları yalnızca kullanıcı açıkça isterse kullan. Saat ya da gün belirsizse önce sor.",
     "",
-    `Şu an: ${now.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}, saat ${now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}.`,
+    `Şu an: ${now.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}, saat ${now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}.`,
   ];
   if (s.settings.userName) lines.push(`Kullanıcının adı: ${s.settings.userName}.`);
   if (s.media) lines.push(`${s.media.playing ? "Çalıyor" : "Duraklatılmış"}: "${s.media.title}"${s.media.artist ? ` — ${s.media.artist}` : ""}.`);

@@ -7,6 +7,7 @@ import { copyText, setInteractive } from "../../lib/bridge";
 import { spring } from "../../lib/motion";
 import { useNook, type ClipItem } from "../../store/nook";
 import { ACCENT, EmptyState, TextButton, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 export function ClipboardPanel() {
   const scroller = useRef<HTMLDivElement>(null);
@@ -33,14 +34,12 @@ export function ClipboardPanel() {
       <div className="flex shrink-0 items-center justify-between">
         <PickColor />
         {texts.length > 0 && (
-          <TextButton tone="danger" onClick={clearClips}>
-            Temizle
-          </TextButton>
+          <TextButton tone="danger" onClick={clearClips}>{tt("Temizle")}</TextButton>
         )}
       </div>
 
       {!clips.length ? (
-        <EmptyState title="Pano boş" hint="Kopyaladığın metinler ve renkler burada birikir" color={ACCENT.purple} />
+        <EmptyState title={tt("Pano boş")} hint={tt("Kopyaladığın metinler ve renkler burada birikir")} color={ACCENT.purple} />
       ) : (
         <div ref={scroller} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {colors.length > 0 && (
@@ -80,7 +79,7 @@ export function ClipboardPanel() {
                     {/* Sil: üzerine gelince belirir */}
                     <button
                       onClick={() => removeClip(c.id)}
-                      title="Rengi sil"
+                      title={tt("Rengi sil")}
                       className="mr-1 flex h-4 w-4 items-center justify-center rounded-full text-label-3 opacity-40 transition hover:bg-white/10 hover:text-label group-hover:opacity-100"
                     >
                       <X size={10} strokeWidth={3} />
@@ -117,7 +116,7 @@ export function ClipboardPanel() {
                   {c.translation && (
                     <button
                       onClick={() => copy(c, true)}
-                      title={`${c.translation} — çeviriyi kopyala`}
+                      title={tt("{0} — çeviriyi kopyala", c.translation)}
                       className="group flex h-7 w-full items-center gap-2 border-t border-white/[0.05] px-2.5 text-left transition-colors hover:bg-well-hi"
                     >
                       <Languages size={11} strokeWidth={2.4} className="shrink-0" style={{ color: ACCENT.purple }} />
@@ -170,12 +169,10 @@ function PickColor() {
       whileTap={{ scale: 0.92 }}
       transition={spring.pop}
       onClick={() => void pick()}
-      title="Ekrandan renk seç"
+      title={tt("Ekrandan renk seç")}
       className="flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium"
       style={{ background: tintBg(ACCENT.purple, 14), borderColor: tintBg(ACCENT.purple, 38), color: tintText(ACCENT.purple) }}
     >
-      <Pipette size={11} strokeWidth={2.6} />
-      Ekrandan renk seç
-    </motion.button>
+      <Pipette size={11} strokeWidth={2.6} />{tt("Ekrandan renk seç")}</motion.button>
   );
 }

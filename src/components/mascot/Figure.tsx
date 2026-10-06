@@ -19,6 +19,7 @@ export function NookFigure({
   className = "",
   style,
   smile = false,
+  res,
 }: {
   look: Look;
   color: string;
@@ -29,8 +30,10 @@ export function NookFigure({
   style?: CSSProperties;
   /** Gözlerin altında küçük bir gülümseme (tanıtımdaki kalabalık için) */
   smile?: boolean;
+  /** Çizim çözünürlüğü (varsayılan boya göre 160/256; logo gibi büyük çizimler için daha yüksek) */
+  res?: number;
 }) {
-  const img = useBodyImageQueued(look, color, figureRes(size));
+  const img = useBodyImageQueued(look, color, res ?? figureRes(size));
   const [eye, , shine] = eyesFor(expression, look.eyes);
   const span = (size * SPAN) / 2;
   const unit = size / 2; // 1 birim (yüz yarıçapı) kaç px

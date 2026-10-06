@@ -28,6 +28,8 @@ $Bundle = "$Root\src-tauri\target\release\bundle\nsis"
 $Out = "$Root\release\$Tag"
 New-Item -ItemType Directory -Force $Out | Out-Null
 Copy-Item "$Bundle\$Setup" $Out -Force
+# Sabit adlı kopya: .../releases/latest/download/Nook-setup.exe her zaman en yeni sürümü indirir
+Copy-Item "$Bundle\$Setup" "$Out\Nook-setup.exe" -Force
 
 $Manifest = [ordered]@{
   version   = $Version
@@ -56,7 +58,7 @@ if ($Token) {
   $H = @{ Authorization = "Bearer $Token"; Accept = "application/vnd.github+json" }
   $Body = [Text.Encoding]::UTF8.GetBytes((@{ tag_name = $Tag; target_commitish = "main"; name = "Nook $Version"; body = $Notes } | ConvertTo-Json))
   $Rel = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$Repo/releases" -Headers $H -Body $Body -ContentType "application/json; charset=utf-8"
-  foreach ($f in @($Setup, "latest.json")) {
+  foreach ($f in @($Setup, "Nook-setup.exe", "latest.json")) {
     Invoke-RestMethod -Method Post -Uri "https://uploads.github.com/repos/$Repo/releases/$($Rel.id)/assets?name=$f" -Headers $H -InFile "$Out\$f" -ContentType "application/octet-stream" | Out-Null
   }
   Write-Host "Yayinlandi: $($Rel.html_url)" -ForegroundColor Green

@@ -4,6 +4,7 @@ import { AppWindow, Bluetooth, ChevronLeft, Headphones, Lock, Mic, MicOff, Moon,
 import { brightnessGet, brightnessSet, fileIcon, mixerList, mixerSet, quickAction, quickOutput, quickSet, quickState, quickVolume, type AppVolume, type QuickKey, type QuickState } from "../../lib/bridge";
 import { spring } from "../../lib/motion";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /**
  * Kontrol: solda telefonlardaki gibi kalın ses ve parlaklık kaydırıcıları (parmağınla/fareyle
@@ -46,7 +47,7 @@ export function ControlPanel() {
         if (got != null && Math.abs(got - want) <= 6) return;
         markBrightnessBroken();
         setLight(null);
-        setError("Bu ekran parlaklığın uygulamadan ayarlanmasına izin vermiyor — kaydırıcı kaldırıldı");
+        setError(tt("Bu ekran parlaklığın uygulamadan ayarlanmasına izin vermiyor — kaydırıcı kaldırıldı"));
       });
     }, 1500);
   };
@@ -84,7 +85,7 @@ export function ControlPanel() {
           value={s?.muted ? 0 : vol}
           color={ACCENT.pink}
           icon={s?.muted || vol === 0 ? VolumeX : vol < 0.5 ? Volume1 : Volume2}
-          label="Ses"
+          label={tt("Ses")}
           onChange={(v) => {
             setState((p) => (p ? { ...p, volume: v, muted: v === 0 ? p.muted : false } : p));
             void quickVolume(v);
@@ -97,7 +98,7 @@ export function ControlPanel() {
           value={light / 100}
           color={ACCENT.yellow}
           icon={light < 40 ? SunDim : Sun}
-          label="Parlaklık"
+          label={tt("Parlaklık")}
           onChange={(v) => {
             setLight(Math.round(v * 100));
             void brightnessSet(v * 100);
@@ -121,18 +122,18 @@ export function ControlPanel() {
               on
               color={ACCENT.pink}
               busy={outputBusy}
-              tip={`${current.name}\nTıkla: ${nextOutput.name}`}
+              tip={tt("{0}\nTıkla: {1}", current.name, nextOutput.name)}
               onClick={() => void switchOutput()}
             />
           )}
-          <Toggle label={s?.dark ? "Karanlık" : "Aydınlık"} icon={s?.dark ? Moon : Sun} on={!!s?.dark} color={ACCENT.purple} busy={busy === "dark"} onClick={() => toggle("dark", !s?.dark)} />
-          <Toggle label={s?.micMuted ? "Mik. kapalı" : "Mikrofon"} icon={s?.micMuted ? MicOff : Mic} on={!!s?.micMuted} color={ACCENT.orange} disabled={s?.micMuted == null} busy={busy === "mic"} onClick={() => toggle("mic", !s?.micMuted)} />
+          <Toggle label={s?.dark ? tt("Karanlık") : tt("Aydınlık")} icon={s?.dark ? Moon : Sun} on={!!s?.dark} color={ACCENT.purple} busy={busy === "dark"} onClick={() => toggle("dark", !s?.dark)} />
+          <Toggle label={s?.micMuted ? tt("Mik. kapalı") : tt("Mikrofon")} icon={s?.micMuted ? MicOff : Mic} on={!!s?.micMuted} color={ACCENT.orange} disabled={s?.micMuted == null} busy={busy === "mic"} onClick={() => toggle("mic", !s?.micMuted)} />
           {vol == null && (
-            <Toggle label={s?.muted ? "Ses kapalı" : "Ses açık"} icon={s?.muted ? VolumeX : Volume2} on={!!s?.muted} color={ACCENT.red} disabled={s?.muted == null} busy={busy === "mute"} onClick={() => toggle("mute", !s?.muted)} />
+            <Toggle label={s?.muted ? tt("Ses kapalı") : tt("Ses açık")} icon={s?.muted ? VolumeX : Volume2} on={!!s?.muted} color={ACCENT.red} disabled={s?.muted == null} busy={busy === "mute"} onClick={() => toggle("mute", !s?.muted)} />
           )}
-          <Toggle label="Kilitle" icon={Lock} color={ACCENT.teal} action onClick={() => void quickAction("lock")} />
-          <Toggle label="Ekranı kapat" icon={MonitorOff} color={ACCENT.teal} action onClick={() => void quickAction("screen-off")} />
-          <Toggle label="Uygulama sesi" icon={SlidersHorizontal} color={ACCENT.pink} action onClick={() => setMixer(true)} />
+          <Toggle label={tt("Kilitle")} icon={Lock} color={ACCENT.teal} action onClick={() => void quickAction("lock")} />
+          <Toggle label={tt("Ekranı kapat")} icon={MonitorOff} color={ACCENT.teal} action onClick={() => void quickAction("screen-off")} />
+          <Toggle label={tt("Uygulama sesi")} icon={SlidersHorizontal} color={ACCENT.pink} action onClick={() => setMixer(true)} />
         </div>
         {error && <p className="truncate text-[10px] text-red/90" title={error}>{error}</p>}
       </div>
@@ -179,14 +180,14 @@ function AppMixer({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="mb-1 flex items-center gap-1">
-        <button onClick={onBack} className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title="Geri">
+        <button onClick={onBack} className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title={tt("Geri")}>
           <ChevronLeft size={13} strokeWidth={2.4} />
         </button>
-        <span className="text-[11.5px] font-medium text-label-2">Uygulama sesi</span>
+        <span className="text-[11.5px] font-medium text-label-2">{tt("Uygulama sesi")}</span>
       </div>
       <div className="-mr-1.5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1.5">
-        {apps === null && <p className="py-4 text-center text-[11px] text-label-3">Yükleniyor…</p>}
-        {apps?.length === 0 && <p className="py-4 text-center text-[11px] text-label-3">Şu an ses çıkaran bir uygulama yok</p>}
+        {apps === null && <p className="py-4 text-center text-[11px] text-label-3">{tt("Yükleniyor…")}</p>}
+        {apps?.length === 0 && <p className="py-4 text-center text-[11px] text-label-3">{tt("Şu an ses çıkaran bir uygulama yok")}</p>}
         {apps?.map((a) => {
           const pct = Math.round((a.muted ? 0 : a.volume) * 100);
           return (
@@ -216,7 +217,7 @@ function AppMixer({ onBack }: { onBack: () => void }) {
                   patchApp(a.key, { muted: !a.muted });
                   void mixerSet(a.key, undefined, !a.muted);
                 }}
-                title={a.muted ? "Sesi aç" : "Sessize al"}
+                title={a.muted ? tt("Sesi aç") : tt("Sessize al")}
                 className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full hover:bg-well-hi"
                 style={{ color: a.muted ? tintText(ACCENT.red) : "var(--color-label-2)" }}
               >

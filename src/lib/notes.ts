@@ -7,9 +7,13 @@ import { playAntic } from "../hooks/useAntics";
 import { isPrimary, setWindowSize } from "./bridge";
 import { TOUR_WINDOW } from "./layout";
 import { useNook } from "../store/nook";
+import { tt } from "./i18n";
 
 /** Notun görseli (components/notes/Demos'ta çizilir) */
 export type DemoId =
+  | "lang"
+  | "scale"
+  | "cvd"
   | "glow"
   | "nowcards"
   | "bodies"
@@ -56,229 +60,251 @@ export interface PatchNote {
 
 export const NOTES: PatchNote[] = [
   {
-    version: "0.2.36",
-    date: "6 Ekim 2026",
-    headline: "Yeni gövdeler, dokular, renkler",
+    version: "0.2.37",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Nook artık 9 dil konuşuyor"),
     items: [
       {
-        title: "Beş yeni gövde",
-        text: "Şeker küp, Yumurta, Yıldız, Kedi ve Ayıcık. Görünüm › Gövde'den seç; her biri bütün dokular ve aksesuarlarla giyilebilir.",
+        title: tt("9 dil"),
+        text: tt("Türkçe, English, Español, Português, Deutsch, Français, Русский, 简体中文 ve 日本語. İlk açılışta tanıtımın ilk sayfasından ya da Ayarlar › Dil'den seç; Nook'la sohbet de senin dilinde olur."),
+        demo: "lang",
+      },
+      {
+        title: tt("Arayüz boyutu"),
+        text: tt("Ayarlar › Erişilebilirlik: adayı %80 ile %150 arasında büyüt ya da küçült. 4K ekranda da küçük dizüstünde de rahat okunur."),
+        demo: "scale",
+      },
+      {
+        title: tt("Renk körü paletleri"),
+        text: tt("Protanopi, döteranopi ve tritanopi için vurgu renkleri birbirinden kolay ayrılan tonlara geçer; hata, tamam, uyarı ve alarm renkleri karışmaz."),
+        demo: "cvd",
+      },
+    ],
+  },
+  {
+    version: "0.2.36",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Yeni gövdeler, dokular, renkler"),
+    items: [
+      {
+        title: tt("Beş yeni gövde"),
+        text: tt("Şeker küp, Yumurta, Yıldız, Kedi ve Ayıcık. Görünüm › Gövde'den seç; her biri bütün dokular ve aksesuarlarla giyilebilir."),
         demo: "bodies",
       },
       {
-        title: "Dört yeni doku",
-        text: "Vinil ve Peluş'un yanına Mat kil, ıslak parlak Jöle, ortamı yansıtan Metalik ve uğur böceği gibi Benekli geldi.",
+        title: tt("Dört yeni doku"),
+        text: tt("Vinil ve Peluş'un yanına Mat kil, ıslak parlak Jöle, ortamı yansıtan Metalik ve uğur böceği gibi Benekli geldi."),
         demo: "textures",
       },
-      { title: "20 renk", text: "Kiraz, gök mavisi, zümrüt, fosforlu yeşil, çivit, şeker pembesi, karamel, krem, gümüş ve lacivert eklendi.", demo: "colors" },
+      { title: tt("20 renk"), text: tt("Kiraz, gök mavisi, zümrüt, fosforlu yeşil, çivit, şeker pembesi, karamel, krem, gümüş ve lacivert eklendi."), demo: "colors" },
       {
-        title: "Şu an kartları",
-        text: "Nook'un yanındaki bilgiler düzenli küçük kartlara dönüştü: renkli ikon, alt satırda ayrıntı (sanatçı, kaç dakika sonra, hava), sağda saat ya da yüzde, şarkıda ve Pomodoro'da ilerleme çubuğu.",
+        title: tt("Şu an kartları"),
+        text: tt("Nook'un yanındaki bilgiler düzenli küçük kartlara dönüştü: renkli ikon, alt satırda ayrıntı (sanatçı, kaç dakika sonra, hava), sağda saat ya da yüzde, şarkıda ve Pomodoro'da ilerleme çubuğu."),
         demo: "nowcards",
       },
     ],
   },
   {
     version: "0.2.35",
-    date: "6 Ekim 2026",
-    headline: "Daha canlı ana sayfa",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Daha canlı ana sayfa"),
     items: [
       {
-        title: "Meşgul bölümler parlar",
-        text: "Müzik çalarken Medya, Pomodoro sürerken Pomodoro çipi kendi renginde yavaşça nefes alır; boş olanlar (Raf, Not…) soluk kalır. Çiplerdeki Nook'lar da kıpırdar: ara sıra göz kırpar, alarm yaklaşınca zıplar.",
+        title: tt("Meşgul bölümler parlar"),
+        text: tt("Müzik çalarken Medya, Pomodoro sürerken Pomodoro çipi kendi renginde yavaşça nefes alır; boş olanlar (Raf, Not…) soluk kalır. Çiplerdeki Nook'lar da kıpırdar: ara sıra göz kırpar, alarm yaklaşınca zıplar."),
         demo: "glow",
       },
       {
-        title: "Ana sayfayı düzenle",
-        text: "Çiplerin sonundaki Düzenle'ye bas: çipi tutup istediğin yere sürükle, kullanmadıklarını göz simgesiyle gizle. Ayarlar'da üstte bölüm sekmeleri var, Temizle gibi düğmeler çerçeveli.",
+        title: tt("Ana sayfayı düzenle"),
+        text: tt("Çiplerin sonundaki Düzenle'ye bas: çipi tutup istediğin yere sürükle, kullanmadıklarını göz simgesiyle gizle. Ayarlar'da üstte bölüm sekmeleri var, Temizle gibi düğmeler çerçeveli."),
         demo: "chips",
       },
     ],
   },
   {
     version: "0.2.34",
-    date: "6 Ekim 2026",
-    headline: "Nook dışarı çıkıyor",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Nook dışarı çıkıyor"),
     items: [
       {
-        title: "Pencere üstüne tüneme",
-        text: "Nook ara sıra adadan atlayıp önündeki pencerenin başlık çubuğuna oturur. Pencereyi taşıdıkça dengesini kaybetmemek için sendeler, başka pencereye geçince ona zıplar. Adanın üstüne gelince hemen geri döner.",
+        title: tt("Pencere üstüne tüneme"),
+        text: tt("Nook ara sıra adadan atlayıp önündeki pencerenin başlık çubuğuna oturur. Pencereyi taşıdıkça dengesini kaybetmemek için sendeler, başka pencereye geçince ona zıplar. Adanın üstüne gelince hemen geri döner."),
         demo: "perch",
       },
       {
-        title: "Adadan iple sarkma",
-        text: "Uzun süre ekranın alt kısmında çalışırken Nook adanın altından minik bir iple sarkıp seni izler. Fareyi ona yaklaştırırsan ipi hızla sarıp adaya kaçar.",
+        title: tt("Adadan iple sarkma"),
+        text: tt("Uzun süre ekranın alt kısmında çalışırken Nook adanın altından minik bir iple sarkıp seni izler. Fareyi ona yaklaştırırsan ipi hızla sarıp adaya kaçar."),
         demo: "dangle",
       },
       {
-        title: "Masaüstü balıkçılığı",
-        text: "Bilgisayar boştayken Nook adanın kenarına oturup masaüstüne olta sallar. Bazen eski bir çöp dosyası çıkar, bazen parlak bir yıldız; döndüğünde neler tuttuğunu anlatır.",
+        title: tt("Masaüstü balıkçılığı"),
+        text: tt("Bilgisayar boştayken Nook adanın kenarına oturup masaüstüne olta sallar. Bazen eski bir çöp dosyası çıkar, bazen parlak bir yıldız; döndüğünde neler tuttuğunu anlatır."),
         demo: "fishing",
       },
       {
-        title: "Odak bekçisi",
-        text: "Pomodoro başlayınca Nook masasına geçer. Çalışırken YouTube, X gibi bir siteye girersen cama vurup saati gösterir: \"Çalışmıyor muyduk?\" Siteleri Ayarlar › Odak bekçisi'nden değiştirebilirsin.",
+        title: tt("Odak bekçisi"),
+        text: tt("Pomodoro başlayınca Nook masasına geçer. Çalışırken YouTube, X gibi bir siteye girersen cama vurup saati gösterir: \"Çalışmıyor muyduk?\" Siteleri Ayarlar › Odak bekçisi'nden değiştirebilirsin."),
         demo: "guard",
       },
     ],
   },
   {
     version: "0.2.33",
-    date: "6 Ekim 2026",
-    headline: "Gizlilik kalkanı ve arşivin içi",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Gizlilik kalkanı ve arşivin içi"),
     items: [
       {
-        title: "Arşivi açmadan içine bak",
-        text: "Bir .zip ya da .rar dosyasını adanın üstüne bırak: içindekiler listelenir, klasörlerde gezebilirsin. İstediğin dosyayı tutup masaüstüne, klasöre ya da Discord'a sürükle; çift tıklayınca açılır.",
+        title: tt("Arşivi açmadan içine bak"),
+        text: tt("Bir .zip ya da .rar dosyasını adanın üstüne bırak: içindekiler listelenir, klasörlerde gezebilirsin. İstediğin dosyayı tutup masaüstüne, klasöre ya da Discord'a sürükle; çift tıklayınca açılır."),
         demo: "archive",
       },
       {
-        title: "Gizlilik kalkanı",
-        text: "Odaya biri girdi mi? Ctrl+Alt+H'ye bas: bütün ekranları uyuyan Nook'lar kaplar. Tekrar bas, Esc ya da çift tıkla, geri gelsin. Kısayolu Ayarlar'dan değiştirebilirsin.",
+        title: tt("Gizlilik kalkanı"),
+        text: tt("Odaya biri girdi mi? Ctrl+Alt+H'ye bas: bütün ekranları uyuyan Nook'lar kaplar. Tekrar bas, Esc ya da çift tıkla, geri gelsin. Kısayolu Ayarlar'dan değiştirebilirsin."),
         demo: "shield",
       },
       {
-        title: "Hassas veri koruyucu",
-        text: "Panoya kart numarası, IBAN, API anahtarı ya da şifre kopyalanınca Nook kilitle uyarır, Pano geçmişine eklemez ve 60 saniye sonra panodan siler. Hepsi bu bilgisayarda olur, hiçbir yere gönderilmez.",
+        title: tt("Hassas veri koruyucu"),
+        text: tt("Panoya kart numarası, IBAN, API anahtarı ya da şifre kopyalanınca Nook kilitle uyarır, Pano geçmişine eklemez ve 60 saniye sonra panodan siler. Hepsi bu bilgisayarda olur, hiçbir yere gönderilmez."),
         demo: "sensitive",
       },
-      { title: "Çiplerde giyinik Nook'lar", text: "Ana sayfadaki her çipin Nook'u artık işine göre giyinik: Medya'da kulaklık, Pomodoro'da filizli domates, Karne'de monokl…", demo: "chips" },
+      { title: tt("Çiplerde giyinik Nook'lar"), text: tt("Ana sayfadaki her çipin Nook'u artık işine göre giyinik: Medya'da kulaklık, Pomodoro'da filizli domates, Karne'de monokl…"), demo: "chips" },
     ],
   },
   {
     version: "0.2.32",
-    date: "6 Ekim 2026",
-    headline: "Yeni oyunlar, uygulama sesi",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Yeni oyunlar, uygulama sesi"),
     items: [
-      { title: "Üç yeni oyun", text: "Köstebek, Eşleştir ve Zıpla. Oyun bölümünde artık beş oyun var, her birinin rekoru ayrı.", demo: "games" },
+      { title: tt("Üç yeni oyun"), text: tt("Köstebek, Eşleştir ve Zıpla. Oyun bölümünde artık beş oyun var, her birinin rekoru ayrı."), demo: "games" },
       {
-        title: "Uygulama bazlı ses",
-        text: "Kontrol › Uygulama sesi: her uygulamanın sesini ayrı ayrı aç, kıs ya da sustur. Parlaklığı değiştirmeye izin vermeyen ekranlarda parlaklık kaydırıcısı artık görünmüyor.",
+        title: tt("Uygulama bazlı ses"),
+        text: tt("Kontrol › Uygulama sesi: her uygulamanın sesini ayrı ayrı aç, kıs ya da sustur. Parlaklığı değiştirmeye izin vermeyen ekranlarda parlaklık kaydırıcısı artık görünmüyor."),
         demo: "mixer",
       },
       {
-        title: "Bugün'e dokun",
-        text: "Günün özetindeki kartlara dokununca ilgili bölüm açılır: alarm, karne, bildirimler, diziler. Karne'de notun nasıl hesaplandığı da artık görünüyor.",
+        title: tt("Bugün'e dokun"),
+        text: tt("Günün özetindeki kartlara dokununca ilgili bölüm açılır: alarm, karne, bildirimler, diziler. Karne'de notun nasıl hesaplandığı da artık görünüyor."),
         demo: "notes",
       },
       {
-        title: "Yeni adlar",
-        text: "Müzik → Medya, İzliyorum → Argus, Odak → Pomodoro, Cihazlar → Lukonnect. Tam ekranda önizlemeler de düzgün oynuyor.",
+        title: tt("Yeni adlar"),
+        text: tt("Müzik → Medya, İzliyorum → Argus, Odak → Pomodoro, Cihazlar → Lukonnect. Tam ekranda önizlemeler de düzgün oynuyor."),
         demo: "lookchip",
       },
     ],
   },
   {
     version: "0.2.31",
-    date: "5 Ekim 2026",
-    headline: "Adayı istediğin yere taşı",
+    date: tt("5 Ekim 2026"),
+    headline: tt("Adayı istediğin yere taşı"),
     items: [
       {
-        title: "Sürükle, bırak",
-        text: "Açık adanın üstündeki ✥ tutamacını basılı tutup sürükle: ada ekranda istediğin yere gider, üst kenara yaklaştırınca oraya yapışır. Geri almak için sağ tık › Ortala ya da Ayarlar › Adanın yeri › Ortala.",
+        title: tt("Sürükle, bırak"),
+        text: tt("Açık adanın üstündeki ✥ tutamacını basılı tutup sürükle: ada ekranda istediğin yere gider, üst kenara yaklaştırınca oraya yapışır. Geri almak için sağ tık › Ortala ya da Ayarlar › Adanın yeri › Ortala."),
         demo: "drag",
       },
-      { title: "Görünüm çipi", text: "Nook'unu giydirmek için artık ana sayfadaki Görünüm çipine dokunman yeter.", demo: "lookchip" },
+      { title: tt("Görünüm çipi"), text: tt("Nook'unu giydirmek için artık ana sayfadaki Görünüm çipine dokunman yeter."), demo: "lookchip" },
     ],
   },
   {
     version: "0.2.30",
-    date: "5 Ekim 2026",
-    headline: "Donmalar bitti",
+    date: tt("5 Ekim 2026"),
+    headline: tt("Donmalar bitti"),
     items: [
       {
-        title: "Nook artık donmuyor",
-        text: "3B Nook'u çizen gölgelendirici Windows'ta dakikalarca derleniyor, bu sırada her şey donuyordu. Artık bir saniyeden kısa sürüyor ve arka planda hazırlanıyor: Yenile, açılış ve önizlemeler akıcı.",
+        title: tt("Nook artık donmuyor"),
+        text: tt("3B Nook'u çizen gölgelendirici Windows'ta dakikalarca derleniyor, bu sırada her şey donuyordu. Artık bir saniyeden kısa sürüyor ve arka planda hazırlanıyor: Yenile, açılış ve önizlemeler akıcı."),
         demo: "reload",
       },
       {
-        title: "Kostümler kaybolmuyor",
-        text: "Cadılar Bayramı kostümü seçince Nook'lar kaybolmuyor; Cadılar Bayramı parçaları da yalnızca kendi bölümünde, iki kez görünmüyor.",
+        title: tt("Kostümler kaybolmuyor"),
+        text: tt("Cadılar Bayramı kostümü seçince Nook'lar kaybolmuyor; Cadılar Bayramı parçaları da yalnızca kendi bölümünde, iki kez görünmüyor."),
         demo: "halloween",
       },
       {
-        title: "Arkadaki ışık söndü",
-        text: "Açık adada Nook'un arkasındaki beyaz parıltı kaldırıldı; yalnızca bir durum varken renkli parlar.",
+        title: tt("Arkadaki ışık söndü"),
+        text: tt("Açık adada Nook'un arkasındaki beyaz parıltı kaldırıldı; yalnızca bir durum varken renkli parlar."),
         demo: "noglow",
       },
     ],
   },
   {
     version: "0.2.29",
-    date: "5 Ekim 2026",
-    headline: "Cadılar Bayramı geldi",
+    date: tt("5 Ekim 2026"),
+    headline: tt("Cadılar Bayramı geldi"),
     items: [
       {
-        title: "Cadılar Bayramı Nook'ları",
-        text: "Balkabağı ve hayalet gövdeler; cadı şapkası, şeytan boynuzu ve yarasa tokası. Görünüm'de tek dokunuşla giyilen hazır kostümler.",
+        title: tt("Cadılar Bayramı Nook'ları"),
+        text: tt("Balkabağı ve hayalet gövdeler; cadı şapkası, şeytan boynuzu ve yarasa tokası. Görünüm'de tek dokunuşla giyilen hazır kostümler."),
         demo: "halloween",
       },
       {
-        title: "Yama notları",
-        text: "Güncellemeden sonra Nook neler geldiğini bir kez gösterir. Eskilerine ana sayfadaki Yama notları çipinden bakabilirsin.",
+        title: tt("Yama notları"),
+        text: tt("Güncellemeden sonra Nook neler geldiğini bir kez gösterir. Eskilerine ana sayfadaki Yama notları çipinden bakabilirsin."),
         demo: "notes",
       },
     ],
   },
   {
     version: "0.2.28",
-    date: "5 Ekim 2026",
-    headline: "Animasyonlara önizleme",
+    date: tt("5 Ekim 2026"),
+    headline: tt("Animasyonlara önizleme"),
     items: [
-      { title: "Geçiş önizlemesi", text: "Ayarlar'da ekranlar arası geçişin yanındaki ▶ ile efekti iki mini ekranda izle; seçim değişince de oynar.", demo: "move" },
-      { title: "Açılış önizlemesi", text: "Açılış animasyonu mini adada, senin Nook'unla oynar. \"Her seferinde farklı\" seçiliyse her basışta başkası.", demo: "intro" },
-      { title: "Yenile donmaz", text: "Sağ tık › Yenile'den sonra ada tıklamaları ve odağı tutmaz; yeniden yüklenirken her şey sıfırlanır.", demo: "reload" },
+      { title: tt("Geçiş önizlemesi"), text: tt("Ayarlar'da ekranlar arası geçişin yanındaki ▶ ile efekti iki mini ekranda izle; seçim değişince de oynar."), demo: "move" },
+      { title: tt("Açılış önizlemesi"), text: tt("Açılış animasyonu mini adada, senin Nook'unla oynar. \"Her seferinde farklı\" seçiliyse her basışta başkası."), demo: "intro" },
+      { title: tt("Yenile donmaz"), text: tt("Sağ tık › Yenile'den sonra ada tıklamaları ve odağı tutmaz; yeniden yüklenirken her şey sıfırlanır."), demo: "reload" },
     ],
   },
   {
     version: "0.2.27",
-    date: "5 Ekim 2026",
-    headline: "Adanın arkası artık parlamıyor",
+    date: tt("5 Ekim 2026"),
+    headline: tt("Adanın arkası artık parlamıyor"),
     items: [
-      { title: "Arkadaki ışık gitti", text: "Nook'un arkasındaki parıltı şeffaf pencereden dışarı sızıp adanın altında mavi-beyaz bir ışık yakıyordu. Düzeldi.", demo: "noglow" },
+      { title: tt("Arkadaki ışık gitti"), text: tt("Nook'un arkasındaki parıltı şeffaf pencereden dışarı sızıp adanın altında mavi-beyaz bir ışık yakıyordu. Düzeldi."), demo: "noglow" },
     ],
   },
   {
     version: "0.2.26",
-    date: "4 Ekim 2026",
-    headline: "Nook kalabalığı ve tam ekran",
+    date: tt("4 Ekim 2026"),
+    headline: tt("Nook kalabalığı ve tam ekran"),
     items: [
-      { title: "Tanıtımda Nook kalabalığı", text: "Parlayan \"nook\" yazısı ve iç içe dizilmiş peluş Nook'lar; üzerine gelince adını söyler.", demo: "crowd" },
-      { title: "Yeni gövde ve başlıklar", text: "Damla gövde; kep, tavşan kulağı, filiz, çiçek ve yıldız tokası, salyangoz gözleri.", demo: "shapes" },
-      { title: "Tam ekran", text: "Açık ada sağ üstteki düğmeyle ekrana yayılır, Esc ile döner.", demo: "fullscreen" },
+      { title: tt("Tanıtımda Nook kalabalığı"), text: tt("Parlayan \"nook\" yazısı ve iç içe dizilmiş peluş Nook'lar; üzerine gelince adını söyler."), demo: "crowd" },
+      { title: tt("Yeni gövde ve başlıklar"), text: tt("Damla gövde; kep, tavşan kulağı, filiz, çiçek ve yıldız tokası, salyangoz gözleri."), demo: "shapes" },
+      { title: tt("Tam ekran"), text: tt("Açık ada sağ üstteki düğmeyle ekrana yayılır, Esc ile döner."), demo: "fullscreen" },
     ],
   },
   {
     version: "0.2.24",
-    date: "4 Ekim 2026",
-    headline: "Oyunda alarm hemen görünür",
-    items: [{ title: "Alarm oyunda da çalar", text: "Vakti gelince Nook tam ekran oyunun üstünde bile hemen haber verir.", demo: "alarm" }],
+    date: tt("4 Ekim 2026"),
+    headline: tt("Oyunda alarm hemen görünür"),
+    items: [{ title: tt("Alarm oyunda da çalar"), text: tt("Vakti gelince Nook tam ekran oyunun üstünde bile hemen haber verir."), demo: "alarm" }],
   },
   {
     version: "0.2.23",
-    date: "4 Ekim 2026",
-    headline: "Gözlükler yerine oturdu",
-    items: [{ title: "Gözler camın içinde", text: "Gözlük takınca gözler camların ardında kalır, köprü düzeldi.", demo: "glasses" }],
+    date: tt("4 Ekim 2026"),
+    headline: tt("Gözlükler yerine oturdu"),
+    items: [{ title: tt("Gözler camın içinde"), text: tt("Gözlük takınca gözler camların ardında kalır, köprü düzeldi."), demo: "glasses" }],
   },
   {
     version: "0.2.22",
-    date: "4 Ekim 2026",
-    headline: "Nook 3B oldu",
+    date: tt("4 Ekim 2026"),
+    headline: tt("Nook 3B oldu"),
     items: [
-      { title: "Dots tarzı 3B Nook", text: "Vinil ya da peluş gövde, canlı renkler, siyah parlak aksesuarlar: gözlük, bere, melon, kulaklık, anten, fiyonk, papyon.", demo: "look" },
+      { title: tt("Dots tarzı 3B Nook"), text: tt("Vinil ya da peluş gövde, canlı renkler, siyah parlak aksesuarlar: gözlük, bere, melon, kulaklık, anten, fiyonk, papyon."), demo: "look" },
     ],
   },
   {
     version: "0.2.20",
-    date: "3 Ekim 2026",
-    headline: "Ekranlar arası geçiş efektleri",
-    items: [{ title: "Işınlan, zıpla, kay", text: "İmleci takip ederken ada ekrandan ekrana ışınlanma, ışık hızı, portal, zıplama, kayma ya da dijital bozulmayla geçer.", demo: "move" }],
+    date: tt("3 Ekim 2026"),
+    headline: tt("Ekranlar arası geçiş efektleri"),
+    items: [{ title: tt("Işınlan, zıpla, kay"), text: tt("İmleci takip ederken ada ekrandan ekrana ışınlanma, ışık hızı, portal, zıplama, kayma ya da dijital bozulmayla geçer."), demo: "move" }],
   },
   {
     version: "0.2.17",
-    date: "3 Ekim 2026",
-    headline: "Star Trek açılışı",
-    items: [{ title: "Açılış animasyonları", text: "Yıldız gemisi geçer, Nook altın ışıltıyla ışınlanır. Toz, halkalar, konfeti, kabarcıklar ve daha fazlası.", demo: "intro" }],
+    date: tt("3 Ekim 2026"),
+    headline: tt("Star Trek açılışı"),
+    items: [{ title: tt("Açılış animasyonları"), text: tt("Yıldız gemisi geçer, Nook altın ışıltıyla ışınlanır. Toz, halkalar, konfeti, kabarcıklar ve daha fazlası."), demo: "intro" }],
   },
 ];
 

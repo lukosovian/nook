@@ -3,10 +3,11 @@ import { motion } from "motion/react";
 import { useArgus, weekStats } from "../../lib/argus";
 import { dayKey, EMPTY_DAY, useNook, type DayStats } from "../../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { tt, locale } from "../../lib/i18n";
 
-const hm = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} sa${min % 60 ? ` ${min % 60} dk` : ""}` : `${min} dk`);
+const hm = (min: number) => (min >= 60 ? tt("{0} sa", Math.floor(min / 60)) + (min % 60 ? tt(" {0} dk", min % 60) : "") : tt("{0} dk", min));
 /** Dar kutucuklar için: "6,2 sa" */
-const short = (min: number) => (min >= 60 ? `${(min / 60).toFixed(1).replace(".", ",").replace(",0", "")} sa` : `${min} dk`);
+const short = (min: number) => (min >= 60 ? tt("{0} sa", (min / 60).toFixed(1).replace(".", ",").replace(",0", "")) : tt("{0} dk", min));
 
 /** Son 7 gün (bugün dahil, eskiden yeniye) */
 function lastWeek(days: Record<string, DayStats>) {
@@ -27,11 +28,11 @@ interface Part {
 
 /** Harf sınırları (100 üzerinden) */
 const SCALE: { letter: string; min: number; meaning: string }[] = [
-  { letter: "A", min: 80, meaning: "Çok iyi" },
-  { letter: "B", min: 65, meaning: "İyi" },
-  { letter: "C", min: 50, meaning: "Orta" },
-  { letter: "D", min: 35, meaning: "Zayıf" },
-  { letter: "E", min: 0, meaning: "Dağınık" },
+  { letter: "A", min: 80, meaning: tt("Çok iyi") },
+  { letter: "B", min: 65, meaning: tt("İyi") },
+  { letter: "C", min: 50, meaning: tt("Orta") },
+  { letter: "D", min: 35, meaning: tt("Zayıf") },
+  { letter: "E", min: 0, meaning: tt("Dağınık") },
 ];
 
 /**
@@ -44,22 +45,22 @@ function grade(week: { stats: DayStats }[]) {
   const focusAvg = sum("focus") / activeDays;
   const mood = sum("moodN") ? sum("moodSum") / sum("moodN") : 60;
   const parts: Part[] = [
-    { label: "Odak", detail: `günde ort. ${Math.round(focusAvg)} dk (60 dk = tam)`, pts: Math.min(35, focusAvg * 0.6), max: 35 },
-    { label: "Pomodoro", detail: `${sum("pomodoros")} tur (14 tur = tam)`, pts: Math.min(20, sum("pomodoros") * 1.5), max: 20 },
-    { label: "Nook'la ilgilenme", detail: `${sum("care")} kez (40 = tam)`, pts: Math.min(20, sum("care") * 0.5), max: 20 },
-    { label: "Keyif", detail: `Nook'un ruh hâli ort. %${Math.round(mood)}`, pts: mood * 0.25, max: 25 },
+    { label: tt("Odak"), detail: tt("günde ort. {0} dk (60 dk = tam)", Math.round(focusAvg)), pts: Math.min(35, focusAvg * 0.6), max: 35 },
+    { label: "Pomodoro", detail: tt("{0} tur (14 tur = tam)", sum("pomodoros")), pts: Math.min(20, sum("pomodoros") * 1.5), max: 20 },
+    { label: tt("Nook'la ilgilenme"), detail: `${sum("care")} kez (40 = tam)`, pts: Math.min(20, sum("care") * 0.5), max: 20 },
+    { label: tt("Keyif"), detail: tt("Nook'un ruh hâli ort. %{0}", Math.round(mood)), pts: mood * 0.25, max: 25 },
   ];
   const penalty = sum("game") > sum("focus") * 2 && sum("game") > 300 ? 10 : 0;
   const pts = Math.max(0, parts.reduce((a, p) => a + p.pts, 0) - penalty);
   const letter = SCALE.find((x) => pts >= x.min)!.letter;
   const line =
     letter === "A"
-      ? "Harika bir hafta, seninle gurur duyuyorum!"
+      ? tt("Harika bir hafta, seninle gurur duyuyorum!")
       : letter === "B"
-        ? "Gayet iyi gidiyorsun, biraz daha odak ve A senin."
+        ? tt("Gayet iyi gidiyorsun, biraz daha odak ve A senin.")
         : letter === "C"
-          ? "Fena değil. Birkaç Pomodoro turu her şeyi değiştirir."
-          : "Bu hafta biraz dağınıktık. Pomodoro'dan bir tur başlatalım mı?";
+          ? tt("Fena değil. Birkaç Pomodoro turu her şeyi değiştirir.")
+          : tt("Bu hafta biraz dağınıktık. Pomodoro'dan bir tur başlatalım mı?");
   // En çok puan kaçan parça: oradan başlamak en çok işe yarar
   const weakest = [...parts].sort((x, y) => x.pts / x.max - y.pts / y.max)[0];
   return { letter, line, mood, pts: Math.round(pts), parts, penalty, weakest };
@@ -85,10 +86,10 @@ export function ReportPanel() {
       ) : (
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-baseline justify-between">
-          <span className="text-[11px] text-label-2">Bilgisayar başında</span>
+          <span className="text-[11px] text-label-2">{tt("Bilgisayar başında")}</span>
           {/* Seçili günün değeri (üzerine gelince o gün) */}
           <span className="text-[11px] tabular-nums text-label">
-            {week[shown].date.toLocaleDateString("tr-TR", { weekday: "short" })} · {hm(week[shown].stats.active)}
+            {week[shown].date.toLocaleDateString(locale(), { weekday: "short" })} · {hm(week[shown].stats.active)}
           </span>
         </div>
         <div className="relative mt-2 flex min-h-0 flex-1 items-end gap-[6px] border-b border-white/[0.08] pb-px" onPointerLeave={() => setHover(null)}>
@@ -110,22 +111,22 @@ export function ReportPanel() {
         <div className="mt-1 flex gap-[6px]">
           {week.map((d, i) => (
             <span key={i} className={`flex-1 text-center text-[9.5px] ${i === shown ? "text-label-2" : "text-label-3"}`}>
-              {d.date.toLocaleDateString("tr-TR", { weekday: "narrow" })}
+              {d.date.toLocaleDateString(locale(), { weekday: "narrow" })}
             </span>
           ))}
         </div>
         <div className="mt-2 grid grid-cols-4 gap-1.5">
-          <Tile label="Odak" value={short(total("focus"))} />
-          <Tile label="Müzik" value={short(total("music"))} />
-          <Tile label="Oyun" value={short(total("game"))} />
-          <Tile label="Pomodoro" value={`${total("pomodoros")} tur`} />
+          <Tile label={tt("Odak")} value={short(total("focus"))} />
+          <Tile label={tt("Müzik")} value={short(total("music"))} />
+          <Tile label={tt("Oyun")} value={short(total("game"))} />
+          <Tile label="Pomodoro" value={tt("{0} tur", total("pomodoros"))} />
         </div>
       </div>
       )}
 
       <button
         onClick={() => setExplain((e) => !e)}
-        title="Not nasıl hesaplandı?"
+        title={tt("Not nasıl hesaplandı?")}
         className="flex w-[104px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[14px] bg-well px-2 text-center transition-colors hover:bg-well-hi"
       >
         <span className="text-[34px] font-semibold leading-none" style={{ color: tintText(color) }}>
@@ -134,14 +135,13 @@ export function ReportPanel() {
         <span className="text-[9.5px] tabular-nums text-label-3">{g.pts} / 100</span>
         <MiniNook color={color} size={22} eyes={g.letter <= "B" ? "happy" : "open"} />
         <p className="text-[10px] leading-snug text-label-2">{g.line}</p>
-        <p className="text-[9.5px] text-label-3">Keyif ort. %{Math.round(g.mood)}</p>
+        <p className="text-[9.5px] text-label-3">{tt("Keyif ort. %{0}", Math.round(g.mood))}</p>
         {watch && (watch.episodes > 0 || watch.movies > 0) && (
           <p className="text-[9.5px]" style={{ color: tintText(ACCENT.orange) }}>
-            {[watch.episodes && `${watch.episodes} bölüm`, watch.movies && `${watch.movies} film`].filter(Boolean).join(", ")} izledin
-          </p>
+            {tt("{0} izledin", [watch.episodes && tt("{0} bölüm", watch.episodes), watch.movies && tt("{0} film", watch.movies)].filter(Boolean).join(", "))}</p>
         )}
         <span className="text-[9.5px] font-medium" style={{ color: tintText(color) }}>
-          {explain ? "‹ Grafiğe dön" : "Not ne demek? ›"}
+          {explain ? tt("‹ Grafiğe dön") : tt("Not ne demek? ›")}
         </span>
       </button>
     </div>
@@ -153,10 +153,8 @@ function Breakdown({ g, onBack }: { g: ReturnType<typeof grade>; onBack: () => v
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
       <div className="flex items-baseline justify-between">
-        <span className="text-[11px] text-label-2">Bu haftanın notu nasıl çıktı</span>
-        <button onClick={onBack} className="text-[10px] text-label-3 hover:text-label">
-          Kapat
-        </button>
+        <span className="text-[11px] text-label-2">{tt("Bu haftanın notu nasıl çıktı")}</span>
+        <button onClick={onBack} className="text-[10px] text-label-3 hover:text-label">{tt("Kapat")}</button>
       </div>
       {g.parts.map((p) => (
         <div key={p.label}>
@@ -173,7 +171,7 @@ function Breakdown({ g, onBack }: { g: ReturnType<typeof grade>; onBack: () => v
           </div>
         </div>
       ))}
-      {g.penalty > 0 && <p className="text-[10px]" style={{ color: tintText(ACCENT.red) }}>−{g.penalty}: oyun süresi odak süresinin iki katını geçti</p>}
+      {g.penalty > 0 && <p className="text-[10px]" style={{ color: tintText(ACCENT.red) }}>{tt("−{0}: oyun süresi odak süresinin iki katını geçti", g.penalty)}</p>}
       <div className="mt-0.5 flex gap-1">
         {SCALE.map((x) => (
           <span
@@ -186,8 +184,7 @@ function Breakdown({ g, onBack }: { g: ReturnType<typeof grade>; onBack: () => v
           </span>
         ))}
       </div>
-      <p className="text-[10px] leading-snug text-label-3">
-        En kolay puan: <span className="text-label-2">{g.weakest.label}</span> ({Math.round(g.weakest.pts)}/{g.weakest.max}).
+      <p className="text-[10px] leading-snug text-label-3">{tt("En kolay puan:")}{" "}<span className="text-label-2">{g.weakest.label}</span> ({Math.round(g.weakest.pts)}/{g.weakest.max}).
       </p>
     </div>
   );

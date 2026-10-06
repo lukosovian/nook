@@ -1,12 +1,13 @@
 /**
  * Gemini'nin hızlı modeliyle küçük işler:
  *  - Sesli komut kaydını yazıya dökme
- *  - Kopyalanan yabancı metni Türkçeye çevirme (anahtar yoksa MyMemory)
+ *  - Kopyalanan yabancı metni kullanıcının diline çevirme (anahtar yoksa MyMemory)
  */
 import { GeminiError, generateOnce, pickQuickModel, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
 import { note } from "./log";
 import { useNook } from "../store/nook";
+import { lang, LANG_NAME_TR, type Lang } from "./i18n";
 
 /** Kotası dolan model bir süre denenmesin (her kopyalamada boşa istek gitmesin). */
 const resting = new Map<string, number>();
@@ -50,13 +51,26 @@ export async function transcribe(wavBase64: string): Promise<string> {
   return text.replace(/^["“]|["”]$/g, "").trim();
 }
 
+/** Dillerin sık geçen küçük kelimeleri: metnin hangi dilde olduğunu kabaca anlamak için */
+const STOP: Partial<Record<Lang, RegExp>> = {
+  tr: /\b(ve|bir|bu|şu|için|ile|ama|çok|daha|gibi|olan|değil|var|yok|ben|sen|biz|ne|nasıl|neden|merhaba|tamam)\b/i,
+  en: /\b(the|and|is|are|you|your|of|to|with|that|this|for|not|have|what|it|was)\b/i,
+  es: /\b(el|los|las|que|por|para|una|con|del|está|pero|como|muy)\b/i,
+  pt: /\b(não|para|com|uma|você|está|mas|como|muito|isso|são)\b/i,
+  de: /\b(der|die|das|und|ist|nicht|ein|eine|mit|für|ich|auch|sie)\b/i,
+  fr: /\b(le|les|et|est|une|des|pour|pas|avec|je|vous|dans|sur)\b/i,
+};
+const SCRIPT: Record<"latin" | "cyrillic" | "han" | "kana" | "other", RegExp> = {
+  latin: /[A-Za-zÀ-ɏ]/,
+  cyrillic: /[Ѐ-ӿ]/,
+  han: /[一-鿿]/,
+  kana: /[぀-ヿ]/,
+  other: /[؀-ۿ֐-׿가-힯฀-๿Ͱ-Ͽ]/,
+};
 const TURKISH_CHARS = /[çğıöşüÇĞİÖŞÜ]/;
-const TURKISH_WORDS = /\b(ve|bir|bu|şu|için|ile|ama|çok|daha|gibi|olan|değil|var|yok|ben|sen|biz|ne|nasıl|neden|merhaba|tamam)\b/i;
-const FOREIGN_WORDS = /\b(the|and|is|are|you|your|of|to|with|that|this|for|not|have|what|der|die|das|und|ist|nicht|le|la|les|et|est|une|el|los|las|que|por|para|il|di|che)\b/i;
-const NON_LATIN = /[Ѐ-ӿ؀-ۿ֐-׿぀-ヿ一-鿿가-힯฀-๿Ͱ-Ͽ]/;
 
 /**
- * Çevrilmeye değer yabancı bir metin mi? Kod, bağlantı, dosya yolu, sayı ve Türkçe elenir.
+ * Çevrilmeye değer, seçili dilden başka bir dilde metin mi? Kod, bağlantı, dosya yolu, sayı elenir.
  * (Her kopyalamada istek atılmasın diye önce yerel bir kaba eleme.)
  */
 export function looksForeign(raw: string): boolean {
@@ -67,18 +81,27 @@ export function looksForeign(raw: string): boolean {
   if (/[{};]\s*$|=>|::|\bfunction\b|\bconst\b|\bimport\b|<\/?[a-z]+>/m.test(t)) return false;
   const letters = (t.match(/\p{L}/gu) ?? []).length;
   if (letters < 4 || letters / t.length < 0.55) return false;
-  if (NON_LATIN.test(t)) return true;
-  if (TURKISH_CHARS.test(t) || TURKISH_WORDS.test(t)) return false;
-  // Tek kelimeyse (ör. "Download") en az bir yabancı ipucu ya da büyük harfle başlayan anlamlı kelime
-  return FOREIGN_WORDS.test(t) || /[äöüßéèêàâñœæøåčřšž]/i.test(t) || /^[A-Za-z][a-z]{3,}(\s+[A-Za-z][a-z]+){0,3}$/.test(t);
+  // Kendi alfabemizden başka bir alfabe → yabancı
+  const mine = lang === "ru" ? "cyrillic" : lang === "zh" ? "han" : lang === "ja" ? "kana" : "latin";
+  const own = SCRIPT[mine].test(t) || (lang === "ja" && SCRIPT.han.test(t));
+  const otherScript = (Object.keys(SCRIPT) as (keyof typeof SCRIPT)[]).some((k) => k !== mine && !(lang === "ja" && k === "han") && SCRIPT[k].test(t));
+  if (otherScript && !own) return true;
+  if (mine !== "latin") return otherScript && /[A-Za-z]{3,}/.test(t);
+  // Latin alfabeli dillerde: kendi dilimizin ipucu varsa değil, başka dilin ipucu varsa yabancı
+  if (STOP[lang]?.test(t) || (lang === "tr" && TURKISH_CHARS.test(t))) return false;
+  if (otherScript) return true;
+  if (lang !== "tr" && TURKISH_CHARS.test(t)) return true;
+  if (Object.entries(STOP).some(([l, re]) => l !== lang && re!.test(t))) return true;
+  // Tek kelime (ör. "Download"): yalnızca Türkçede, büyük harfle başlayan anlamlı yabancı kelime
+  return lang === "tr" && (/[äöüßéèêàâñœæøåčřšž]/i.test(t) || /^[A-Za-z][a-z]{3,}(\s+[A-Za-z][a-z]+){0,3}$/.test(t));
 }
 
-/** Türkçe çevirisi; zaten Türkçeyse ya da çevrilemezse null. */
-export async function translateToTurkish(text: string): Promise<string | null> {
+/** Seçili dildeki çevirisi; zaten o dildeyse ya da çevrilemezse null. */
+export async function translateToUser(text: string): Promise<string | null> {
   // Gemini (anahtar varsa); kota/ağ sorununda ücretsiz servise düş
   const out = await ask(
     [{ text }],
-    "Kullanıcının kopyaladığı metni Türkçeye çevir. Yalnızca çeviriyi yaz; açıklama, tırnak ya da dil adı ekleme. Metin zaten Türkçeyse ya da çevrilecek bir şey değilse (kod, isim, sayı) yalnızca - yaz.",
+    `Kullanıcının kopyaladığı metni ${LANG_NAME_TR[lang]} diline çevir. Yalnızca çeviriyi yaz; açıklama, tırnak ya da dil adı ekleme. Metin zaten bu dildeyse ya da çevrilecek bir şey değilse (kod, isim, sayı) yalnızca - yaz.`,
     // Çeviri hızlı olmalı: Flash yoksa yavaş modeli bekleme, ücretsiz servise geç
     false,
   ).catch(() => undefined);
@@ -86,7 +109,7 @@ export async function translateToTurkish(text: string): Promise<string | null> {
     return out && out !== "-" && out.toLocaleLowerCase("tr") !== text.toLocaleLowerCase("tr") ? out : null;
   }
   // Ücretsiz MyMemory (kaynak dili otomatik algılar)
-  const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=autodetect|tr`);
+  const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=autodetect|${lang === "zh" ? "zh-CN" : lang}`);
   const j = (await r.json()) as { responseData?: { translatedText?: string } };
   const mm = j.responseData?.translatedText?.trim();
   return mm && mm.toLocaleLowerCase("tr") !== text.toLocaleLowerCase("tr") && !/MYMEMORY WARNING|INVALID/i.test(mm) ? mm : null;

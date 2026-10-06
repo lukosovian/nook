@@ -3,6 +3,7 @@ import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { useNook, type NotifItem } from "../../store/nook";
 import { ACCENT, EmptyState, MiniNook, TextButton, Toggle } from "../ui/primitives";
+import { tt, locale } from "../../lib/i18n";
 
 /** Son Windows bildirimleri (Discord, WhatsApp, Mail…). Odaktayken susturulanlar da burada birikir. */
 export function NotifyPanel() {
@@ -17,19 +18,15 @@ export function NotifyPanel() {
     <div className="flex h-full flex-col gap-2">
       <div className="flex shrink-0 items-center justify-between gap-2">
         <label className="flex items-center gap-2 text-[11px] text-label-2">
-          <Toggle on={on} onChange={(v) => update({ notifications: v })} color={ACCENT.purple} />
-          Adada göster
-        </label>
+          <Toggle on={on} onChange={(v) => update({ notifications: v })} color={ACCENT.purple} />{tt("Adada göster")}</label>
         {items.length > 0 && (
-          <TextButton tone="danger" onClick={clear}>
-            Temizle
-          </TextButton>
+          <TextButton tone="danger" onClick={clear}>{tt("Temizle")}</TextButton>
         )}
       </div>
       {!items.length ? (
         <EmptyState
-          title={on ? "Bildirim yok" : "Bildirimler kapalı"}
-          hint={on ? "Discord, WhatsApp, Mail… bildirimleri burada birikir" : "Açınca Windows bildirimleri adada da görünür"}
+          title={on ? tt("Bildirim yok") : tt("Bildirimler kapalı")}
+          hint={on ? tt("Discord, WhatsApp, Mail… bildirimleri burada birikir") : tt("Açınca Windows bildirimleri adada da görünür")}
           color={ACCENT.purple}
         />
       ) : (
@@ -47,10 +44,10 @@ export function NotifyPanel() {
 
 const ago = (at: number) => {
   const m = Math.floor((Date.now() - at) / 60_000);
-  if (m < 1) return "şimdi";
-  if (m < 60) return `${m} dk`;
+  if (m < 1) return tt("şimdi");
+  if (m < 60) return tt("{0} dk", m);
   const h = Math.floor(m / 60);
-  return h < 24 ? `${h} sa` : new Date(at).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+  return h < 24 ? tt("{0} sa", h) : new Date(at).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 };
 
 function Row({ n }: { n: NotifItem }) {

@@ -5,8 +5,9 @@
 import { playAntic } from "../hooks/useAntics";
 import { alarmRing } from "./bridge";
 import { useNook, type FocusPhase } from "../store/nook";
+import { tt } from "./i18n";
 
-export const PHASE_LABEL: Record<FocusPhase, string> = { work: "Odak", break: "Kısa mola", long: "Uzun mola" };
+export const PHASE_LABEL: Record<FocusPhase, string> = { work: tt("Odak"), break: tt("Kısa mola"), long: tt("Uzun mola") };
 const LONG_EVERY = 4;
 
 const minutes = (phase: FocusPhase) => {
@@ -51,10 +52,10 @@ export function nextPhase(announce = true) {
     if (announce) s.track({ pomodoros: 1 });
     const next: FocusPhase = round % LONG_EVERY === 0 ? "long" : "break";
     startFocus(next, round);
-    if (announce) notify("break", round % LONG_EVERY === 0 ? "Uzun mola zamanı" : "Mola zamanı", `${round}. tur bitti · ${minutes(next)} dk dinlen`, "stretch");
+    if (announce) notify("break", round % LONG_EVERY === 0 ? tt("Uzun mola zamanı") : tt("Mola zamanı"), tt("{0}. tur bitti · {1} dk dinlen", round, minutes(next)), "stretch");
   } else {
     startFocus("work", f.round);
-    if (announce) notify("focus", "Odak zamanı", `${minutes("work")} dk · ${f.round + 1}. tur`, "hop");
+    if (announce) notify("focus", tt("Odak zamanı"), tt("{0} dk · {1}. tur", minutes("work"), f.round + 1), "hop");
   }
 }
 

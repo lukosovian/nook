@@ -8,6 +8,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import * as autostart from "@tauri-apps/plugin-autostart";
+import { tt } from "./i18n";
 
 export const inTauri = isTauri();
 
@@ -82,7 +83,7 @@ export interface GamePayload {
 }
 
 export const fileIcon = (path: string, size = 48) => (inTauri ? invoke<string | null>("file_icon", { path, size }) : Promise.resolve(null));
-export const captureScreen = () => (inTauri ? invoke<string>("capture_screen") : Promise.reject(new Error("yalnızca uygulamada")));
+export const captureScreen = () => (inTauri ? invoke<string>("capture_screen") : Promise.reject(new Error(tt("yalnızca uygulamada"))));
 export const voiceStart = () => (inTauri ? invoke<boolean>("voice_start") : Promise.resolve(false));
 export const voiceStop = () => (inTauri ? invoke<string | null>("voice_stop") : Promise.resolve(null));
 export const onlineState = () => (inTauri ? invoke<boolean>("online_state") : Promise.resolve(navigator.onLine));
@@ -171,8 +172,8 @@ export const quickState = () =>
     ? invoke<QuickState>("quick_state")
     : // Tarayıcı önizlemesi: Wi-Fi/Bluetooth'suz masaüstü
       Promise.resolve<QuickState>({ wifi: null, bluetooth: null, dark: true, muted: false, micMuted: false, volume: 0.45, outputs: [
-        { id: "a", name: "Hoparlör (Realtek Audio)", default: true, headphone: false },
-        { id: "b", name: "Kulaklık (HyperX Cloud)", default: false, headphone: true },
+        { id: "a", name: tt("Hoparlör (Realtek Audio)"), default: true, headphone: false },
+        { id: "b", name: tt("Kulaklık (HyperX Cloud)"), default: false, headphone: true },
       ] });
 export const quickSet = (key: QuickKey, on: boolean) => (inTauri ? invoke<void>("quick_set", { key, on }) : Promise.resolve());
 /** Alarm sesi (Windows Alarm01–10). `preview`: tek sefer dinlet. */
@@ -244,6 +245,10 @@ export interface NativeSettings {
   breakReminderMin: number;
   /** Sürüklenip bırakılan yer (ekrana oranla); yoksa üst orta */
   islandPos: IslandPos | null;
+  /** Arayüz ölçeği (0,8–1,5) */
+  uiScale: number;
+  /** Tepsi menüsündeki "çık" yazısı (seçili dilde) */
+  quitLabel?: string;
 }
 
 /** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */

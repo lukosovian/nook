@@ -11,9 +11,10 @@ import { spring } from "../../lib/motion";
 import { useNook, type ChatItem } from "../../store/nook";
 import { ek, useNookName } from "../../lib/look";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
-const SUGGESTIONS = ["Bana bir şaka anlat", "Yarın 8'de alarm kur", "25 dakika odaklanalım", "Mikrofonumu kapat", "Şu an ne çalıyor?"];
-const SCREEN_SUGGESTIONS = ["Bu ne?", "Özetle", "Bu hatayı nasıl çözerim?", "Türkçeye çevir"];
+const SUGGESTIONS = [tt("Bana bir şaka anlat"), tt("Yarın 8'de alarm kur"), tt("25 dakika odaklanalım"), tt("Mikrofonumu kapat"), tt("Şu an ne çalıyor?")];
+const SCREEN_SUGGESTIONS = [tt("Bu ne?"), tt("Özetle"), tt("Bu hatayı nasıl çözerim?"), tt("Türkçeye çevir")];
 
 const NOTE_STYLE: Record<ToolNote["icon"], { icon: LucideIcon; color: string }> = {
   alarm: { icon: AlarmClock, color: ACCENT.yellow },
@@ -88,7 +89,7 @@ export function ChatPanel() {
           <NotReady state={gemini} />
         ) : !chat.length || attachment ? (
           <div className="flex h-full flex-col items-center justify-center gap-2">
-            <p className="text-[11px] text-label-3">{attachment ? "Ekranına baktım — ne sormak istersin?" : "Bana bir şey sor ya da bir iş ver"}</p>
+            <p className="text-[11px] text-label-3">{attachment ? tt("Ekranına baktım — ne sormak istersin?") : tt("Bana bir şey sor ya da bir iş ver")}</p>
             <div className="flex flex-wrap justify-center gap-1">
               {(attachment ? SCREEN_SUGGESTIONS : SUGGESTIONS).map((s) => (
                 <button key={s} onClick={() => send(s)} className="rounded-full bg-well px-2.5 py-0.5 text-[11px] text-label-2 transition-colors hover:bg-well-hi hover:text-label">
@@ -109,10 +110,10 @@ export function ChatPanel() {
       <div className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-well pl-1.5 pr-1 focus-within:bg-well-hi">
         {attachment ? (
           <span className="relative h-7 w-10 shrink-0 overflow-hidden rounded-[8px] ring-1 ring-white/15">
-            <img src={attachment} alt="Ekran görüntüsü" className="h-full w-full object-cover" />
+            <img src={attachment} alt={tt("Ekran görüntüsü")} className="h-full w-full object-cover" />
             <button
               onClick={() => useNook.getState().setAttachment(null)}
-              title="Görüntüyü kaldır"
+              title={tt("Görüntüyü kaldır")}
               className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100"
             >
               <X size={11} strokeWidth={3} />
@@ -134,7 +135,7 @@ export function ChatPanel() {
           }}
           disabled={!ready}
           spellCheck={false}
-          placeholder={!ready ? "Yapay zekâ hazır değil" : listening ? "Dinliyorum… bitince tekrar bas" : attachment ? "Ekran hakkında sor…" : `${ek(name, "a")} yaz…`}
+          placeholder={!ready ? tt("Yapay zekâ hazır değil") : listening ? tt("Dinliyorum… bitince tekrar bas") : attachment ? tt("Ekran hakkında sor…") : tt("{0} yaz…", ek(name, "a"))}
           className="min-w-0 flex-1 bg-transparent text-[12.5px] text-label outline-none placeholder:text-label-3"
         />
         <motion.button
@@ -142,7 +143,7 @@ export function ChatPanel() {
           transition={spring.pop}
           onClick={() => void toggleVoice()}
           disabled={!ready || busy}
-          title={listening ? "Bitir ve gönder" : "Sesle sor"}
+          title={listening ? tt("Bitir ve gönder") : tt("Sesle sor")}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-30"
           style={listening ? { background: tintBg(ACCENT.red, 30), color: tintText(ACCENT.red) } : { color: "var(--color-label-2)" }}
         >
@@ -153,7 +154,7 @@ export function ChatPanel() {
           transition={spring.pop}
           onClick={() => (busy ? stopChat() : send())}
           disabled={!ready || (!busy && !draft.trim() && !attachment)}
-          title={busy ? "Durdur" : "Gönder"}
+          title={busy ? tt("Durdur") : tt("Gönder")}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30"
           style={{ background: busy ? tintBg(ACCENT.red, 30) : ACCENT.purple, color: busy ? tintText(ACCENT.red) : "white" }}
         >
@@ -235,19 +236,17 @@ function NotReady({ state }: { state: ReturnType<typeof useGemini> }) {
     <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
       <p className="text-[12px] leading-relaxed text-label-2">
         {state.status === "checking"
-          ? "Gemini'ye bağlanıyorum…"
+          ? tt("Gemini'ye bağlanıyorum…")
           : state.status === "error"
-            ? `Gemini'ye bağlanamadım: ${state.error}`
-            : "Konuşabilmem için Ayarlar'a Gemini API anahtarını yapıştırman lazım."}
+            ? tt("Gemini'ye bağlanamadım: {0}", state.error)
+            : tt("Konuşabilmem için Ayarlar'a Gemini API anahtarını yapıştırman lazım.")}
       </p>
       {state.status !== "checking" && (
         <button
           onClick={go}
           className="rounded-full border px-3 py-1 text-[11.5px] font-medium"
           style={{ background: tintBg(ACCENT.purple, 16), borderColor: tintBg(ACCENT.purple, 40), color: tintText(ACCENT.purple) }}
-        >
-          Ayarlar'a git
-        </button>
+        >{tt("Ayarlar'a git")}</button>
       )}
     </div>
   );

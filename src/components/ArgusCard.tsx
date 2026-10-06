@@ -4,6 +4,7 @@ import { Film } from "lucide-react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { CARD_SIZE, type ArgusCardData } from "../lib/argus";
 import { ACCENT, Bar, tintBg, tintText } from "./ui/primitives";
+import { tt } from "../lib/i18n";
 
 const COLOR = ACCENT.orange;
 
@@ -72,8 +73,8 @@ export function ArgusCard({ initial = null }: { initial?: ArgusCardData | null }
               )}
               <div className="mt-auto">
                 <div className="flex items-baseline justify-between text-[11.5px] font-medium tabular-nums" style={{ color: tintText(COLOR) }}>
-                  <span>{min} dk izlendi</span>
-                  <span className="text-label-3">{done ? "✓ yazılabilir" : `/ ${need} dk`}</span>
+                  <span>{tt("{0} dk izlendi", min)}</span>
+                  <span className="text-label-3">{done ? tt("✓ yazılabilir") : tt("/ {0} dk", need)}</span>
                 </div>
                 <Bar pct={Math.min(100, (data.playedMs / Math.max(1, data.needMs)) * 100)} color={done ? ACCENT.green : COLOR} className="mt-1.5" />
               </div>

@@ -9,6 +9,8 @@ import { useNook, type Antic } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { useArgus } from "../../lib/argus";
 import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, LookArt, ModulesArt, MoodArt } from "./TourArt";
+import { tt } from "../../lib/i18n";
+import { LangChips } from "../ui/LangPicker";
 
 interface Step {
   title: string;
@@ -24,82 +26,82 @@ interface Step {
 
 export const STEPS: Step[] = [
   {
-    title: "Merhaba, ben Nook",
-    text: "Ekranının tepesindeki çentikte yaşayan küçük yardımcınım. Müziğini, dosyalarını, alarmlarını tutarım, sorularını cevaplarım. Bir dakikada kendimi tanıtayım mı?",
+    title: tt("Merhaba, ben Nook"),
+    text: tt("Ekranının tepesindeki çentikte yaşayan küçük yardımcınım. Müziğini, dosyalarını, alarmlarını tutarım, sorularını cevaplarım. Bir dakikada kendimi tanıtayım mı?"),
     color: ACCENT.teal,
     antic: "hop",
     centered: true,
   },
   {
-    title: "Üstüme gel, açılayım",
-    text: "Fareyi ekranın üst ortasındaki siyah çentiğe götür, ada açılır. Uzaklaşınca kendiliğinden kapanır; hiçbir pencerenin önünü kapatmam.",
+    title: tt("Üstüme gel, açılayım"),
+    text: tt("Fareyi ekranın üst ortasındaki siyah çentiğe götür, ada açılır. Uzaklaşınca kendiliğinden kapanır; hiçbir pencerenin önünü kapatmam."),
     color: ACCENT.blue,
     antic: "wink",
     Art: HoverArt,
   },
   {
-    title: "Her şey bir çip uzağında",
-    text: "Açılınca ana sayfada renkli çipler var. Her biri bir bölüm; tıkla, içine gir. Üstteki küçük ikonlarla ana sayfaya, sohbete, aramaya ve ayarlara geçersin.",
+    title: tt("Her şey bir çip uzağında"),
+    text: tt("Açılınca ana sayfada renkli çipler var. Her biri bir bölüm; tıkla, içine gir. Üstteki küçük ikonlarla ana sayfaya, sohbete, aramaya ve ayarlara geçersin."),
     color: ACCENT.purple,
     antic: "nod",
     Art: ModulesArt,
   },
   {
-    title: "Dosyaları bana yedir",
-    text: "Bir dosyayı sürükleyip üstüme bırak, yutar ve Raf'ta saklarım. Sonra raftan istediğin yere sürükleyip bırakırsın. Aldığın ekran görüntüleri de kendiliğinden rafa düşer.",
+    title: tt("Dosyaları bana yedir"),
+    text: tt("Bir dosyayı sürükleyip üstüme bırak, yutar ve Raf'ta saklarım. Sonra raftan istediğin yere sürükleyip bırakırsın. Aldığın ekran görüntüleri de kendiliğinden rafa düşer."),
     color: ACCENT.pink,
     antic: "giggle",
     Art: FeedArt,
   },
   {
-    title: "Klavyeden çağır",
-    text: "Fareye uzanmana gerek yok. Bu kısayollar her yerde çalışır; istersen Ayarlar'dan değiştirebilirsin.",
+    title: tt("Klavyeden çağır"),
+    text: tt("Fareye uzanmana gerek yok. Bu kısayollar her yerde çalışır; istersen Ayarlar'dan değiştirebilirsin."),
     color: ACCENT.yellow,
     antic: "suspicious",
     Art: KeysArt,
   },
   {
-    title: "Benimle konuş",
-    text: "Sohbet, ekrana sor ve sesli komut için Google'ın ücretsiz Gemini anahtarı lazım. Bir kere yapıştırman yeter; alarm kurar, not alır, müziği yönetir, aklımda tutarım.",
+    title: tt("Benimle konuş"),
+    text: tt("Sohbet, ekrana sor ve sesli komut için Google'ın ücretsiz Gemini anahtarı lazım. Bir kere yapıştırman yeter; alarm kurar, not alır, müziği yönetir, aklımda tutarım."),
     color: ACCENT.purple,
     antic: "love",
     Art: AiArt,
   },
   {
-    title: "Sağlığına göz kulak olurum",
-    text: "Uzun süre ekrana bakınca göz molası, aralıklarla su hatırlatırım. Bunlar her zaman çalışır, odak modu açık olmasa da. Oyundayken ve tam ekranda susarım.",
+    title: tt("Sağlığına göz kulak olurum"),
+    text: tt("Uzun süre ekrana bakınca göz molası, aralıklarla su hatırlatırım. Bunlar her zaman çalışır, odak modu açık olmasa da. Oyundayken ve tam ekranda susarım."),
     color: ACCENT.teal,
     antic: "stretch",
     Art: CareArt,
   },
   {
-    title: "Benim de bir keyfim var",
-    text: "İlgilendikçe mutlu olurum, uzun süre unutursan küserim. Beni tutup fırlatabilir, dürtebilirsin. Şimdi dene: soldaki beni tut ve fırlat!",
+    title: tt("Benim de bir keyfim var"),
+    text: tt("İlgilendikçe mutlu olurum, uzun süre unutursan küserim. Beni tutup fırlatabilir, dürtebilirsin. Şimdi dene: soldaki beni tut ve fırlat!"),
     color: ACCENT.orange,
     antic: "shy",
     Art: MoodArt,
   },
   {
-    title: "Beni kendine göre giydir",
-    text: "Bana bir isim ver; bulut, kalp, damla gibi bir gövde, vinil ya da peluş doku ve renk seç. Gözlük, kep, tavşan kulağı, filiz, çiçek tokası da takarım. Üzerimize gelip tanış; Sağ tık › Görünüm'den istediğin zaman değiştirirsin.",
+    title: tt("Beni kendine göre giydir"),
+    text: tt("Bana bir isim ver; bulut, kalp, damla gibi bir gövde, vinil ya da peluş doku ve renk seç. Gözlük, kep, tavşan kulağı, filiz, çiçek tokası da takarım. Üzerimize gelip tanış; Sağ tık › Görünüm'den istediğin zaman değiştirirsin."),
     color: ACCENT.pink,
     antic: "spin",
     Art: LookArt,
   },
   {
-    title: "Argus'la birlikte çalışırım",
-    text: "Argus, izlediğin dizi ve filmlerin arşivi; ikimiz aynı ailedeniz. Sıradaki bölümünü, yeni çıkanları ve \"ne izlesem?\" sorusunu ben hallederim, \"İzledim\" dediğinde Argus'a yazarım.",
+    title: tt("Argus'la birlikte çalışırım"),
+    text: tt("Argus, izlediğin dizi ve filmlerin arşivi; ikimiz aynı ailedeniz. Sıradaki bölümünü, yeni çıkanları ve \"ne izlesem?\" sorusunu ben hallederim, \"İzledim\" dediğinde Argus'a yazarım."),
     alt: {
-      title: "Argus'la tanış",
-      text: "Argus, izlediğin dizi ve filmleri takip ettiğin arşiv uygulaması; benim kardeşim. Kurarsan yeni bölümleri haber verir, ne izleyeceğini seçer, izlediklerini işaretlerim.",
+      title: tt("Argus'la tanış"),
+      text: tt("Argus, izlediğin dizi ve filmleri takip ettiğin arşiv uygulaması; benim kardeşim. Kurarsan yeni bölümleri haber verir, ne izleyeceğini seçer, izlediklerini işaretlerim."),
     },
     color: "#1a8cff",
     antic: "wink",
     Art: ArgusArt,
   },
   {
-    title: "Hazırız!",
-    text: "Artık seninleyim. Bu tanıtımı istediğin zaman Ayarlar'daki \"Nook nedir?\" ile yeniden açabilirsin.",
+    title: tt("Hazırız!"),
+    text: tt("Artık seninleyim. Bu tanıtımı istediğin zaman Ayarlar'daki \"Nook nedir?\" ile yeniden açabilirsin."),
     color: ACCENT.green,
     antic: "love",
     centered: true,
@@ -132,13 +134,9 @@ export function Tour() {
       {/* Üst çubuk */}
       <div className="absolute inset-x-5 top-0 z-10 flex items-center justify-between" style={{ height: TOUR.header }}>
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-label-2">
-          <Sparkles size={13} strokeWidth={2.2} style={{ color: tintText(cur.color) }} />
-          Nook nedir?
-        </span>
+          <Sparkles size={13} strokeWidth={2.2} style={{ color: tintText(cur.color) }} />{tt("Nook nedir?")}</span>
         {!last && (
-          <button onClick={endTour} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-label-3 transition-colors hover:bg-well-hi hover:text-label">
-            Geç
-            <X size={12} strokeWidth={2.4} />
+          <button onClick={endTour} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-label-3 transition-colors hover:bg-well-hi hover:text-label">{tt("Geç")}<X size={12} strokeWidth={2.4} />
           </button>
         )}
       </div>
@@ -156,6 +154,11 @@ export function Tour() {
           >
             <h1 className="font-display text-[32px] font-semibold tracking-[-0.03em] text-label">{cur.title}</h1>
             <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-label-2">{cur.text}</p>
+            {step === 0 && (
+              <div className="mt-4">
+                <LangChips />
+              </div>
+            )}
             <div className="mt-5">{last ? <DoneTips /> : <HelloChips />}</div>
           </motion.div>
         ) : (
@@ -208,9 +211,7 @@ export function Tour() {
         <div className="w-[120px]">
           {step > 0 && (
             <button onClick={back} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-label-2 transition-colors hover:bg-well-hi hover:text-label">
-              <ArrowLeft size={13} strokeWidth={2.4} />
-              Geri
-            </button>
+              <ArrowLeft size={13} strokeWidth={2.4} />{tt("Geri")}</button>
           )}
         </div>
         <div className="flex items-center gap-1.5">
@@ -218,7 +219,7 @@ export function Tour() {
             <motion.button
               key={i}
               onClick={() => setStep(i)}
-              aria-label={`${i + 1}. adım`}
+              aria-label={tt("{0}. adım", i + 1)}
               className="h-1.5 rounded-full"
               initial={false}
               animate={{ width: i === step ? 20 : 6, background: i === step ? cur.color : i < step ? "rgb(255 255 255 / 0.35)" : "rgb(255 255 255 / 0.12)" }}
@@ -235,7 +236,7 @@ export function Tour() {
             className="flex h-9 items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium"
             style={{ background: tintBg(cur.color, 22), borderColor: tintBg(cur.color, 50), color: tintText(cur.color), boxShadow: `0 0 18px -6px ${cur.color}` }}
           >
-            {step === 0 ? "Tanıyalım" : last ? "Başla" : "Devam"}
+            {step === 0 ? tt("Tanıyalım") : last ? tt("Başla") : tt("Devam")}
             {!last && <ArrowRight size={14} strokeWidth={2.4} />}
           </motion.button>
         </div>

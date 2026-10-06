@@ -8,15 +8,16 @@ import { ek, useNookName } from "../../lib/look";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { Header, Over } from "./games/kit";
 import { Jump, Pairs, Whack } from "./games/MoreGames";
+import { tt } from "../../lib/i18n";
 
 type Game = "catch" | "simon" | "whack" | "pairs" | "jump";
 
 const GAMES: { id: Game; title: string; hint: string; color: string }[] = [
-  { id: "catch", title: "Yakala", hint: "20 sn'de kaçan Nook'u yakala", color: ACCENT.pink },
-  { id: "simon", title: "Hafıza", hint: "Yanma sırasını aklında tut, tekrarla", color: ACCENT.blue },
-  { id: "whack", title: "Köstebek", hint: "Çıkanlara dokun, kırmızıdan kaç", color: ACCENT.orange },
-  { id: "pairs", title: "Eşleştir", hint: "Kartları çevir, aynı Nook'ları bul", color: ACCENT.purple },
-  { id: "jump", title: "Zıpla", hint: "Engellerin üstünden atla", color: ACCENT.green },
+  { id: "catch", title: tt("Yakala"), hint: tt("20 sn'de kaçan Nook'u yakala"), color: ACCENT.pink },
+  { id: "simon", title: tt("Hafıza"), hint: tt("Yanma sırasını aklında tut, tekrarla"), color: ACCENT.blue },
+  { id: "whack", title: tt("Köstebek"), hint: tt("Çıkanlara dokun, kırmızıdan kaç"), color: ACCENT.orange },
+  { id: "pairs", title: tt("Eşleştir"), hint: tt("Kartları çevir, aynı Nook'ları bul"), color: ACCENT.purple },
+  { id: "jump", title: tt("Zıpla"), hint: tt("Engellerin üstünden atla"), color: ACCENT.green },
 ];
 
 /** Nook'la oyun: beş mini oyun ve rekorlar. */
@@ -33,7 +34,7 @@ export function PlayPanel() {
 
   return (
     <div className="flex h-full flex-col gap-2">
-      <p className="text-[10.5px] text-label-3">Birlikte oynayınca {ek(name, "un")} keyfi yerine gelir</p>
+      <p className="text-[10.5px] text-label-3">{tt("Birlikte oynayınca {0} keyfi yerine gelir", ek(name, "un"))}</p>
       <div className="-mr-1.5 grid min-h-0 flex-1 auto-rows-[minmax(92px,1fr)] grid-cols-3 gap-2 overflow-y-auto pr-1.5">
         {GAMES.map((g) => (
           <motion.button
@@ -130,11 +131,11 @@ function Catch({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col gap-2">
       <Header
         onBack={onBack}
-        title="Yakala"
+        title={tt("Yakala")}
         right={
           <>
             <span style={{ color: tintText(ACCENT.pink) }}>{score}</span>
-            <span className="text-label-3">{(left / 1000).toFixed(1)} sn</span>
+            <span className="text-label-3">{(left / 1000).toFixed(1)}{" "}{tt("sn")}</span>
           </>
         }
       />
@@ -153,14 +154,12 @@ function Catch({ onBack }: { onBack: () => void }) {
         )}
         {phase === "ready" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-            <p className="text-[11px] text-label-3">Rekor: {best}</p>
+            <p className="text-[11px] text-label-3">{tt("Rekor:")}{" "}{best}</p>
             <button
               onClick={start}
               className="rounded-full border px-4 py-1.5 text-[12.5px] font-medium"
               style={{ background: tintBg(ACCENT.pink, 18), borderColor: tintBg(ACCENT.pink, 45), color: tintText(ACCENT.pink) }}
-            >
-              Başla
-            </button>
+            >{tt("Başla")}</button>
           </div>
         )}
         {phase === "over" && <Over score={score} best={best} onAgain={start} color={ACCENT.pink} />}
@@ -232,11 +231,11 @@ function Simon({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col gap-2">
       <Header
         onBack={onBack}
-        title="Hafıza"
+        title={tt("Hafıza")}
         right={
           <>
-            <span style={{ color: tintText(ACCENT.blue) }}>Seviye {level}</span>
-            <span className="text-label-3">{phase === "show" ? "İzle…" : phase === "input" ? "Sıra sende" : `Rekor ${best}`}</span>
+            <span style={{ color: tintText(ACCENT.blue) }}>{tt("Seviye")}{" "}{level}</span>
+            <span className="text-label-3">{phase === "show" ? tt("İzle…") : phase === "input" ? tt("Sıra sende") : `Rekor ${best}`}</span>
           </>
         }
       />
@@ -266,9 +265,7 @@ function Simon({ onBack }: { onBack: () => void }) {
                 onClick={start}
                 className="rounded-full border px-4 py-1.5 text-[12.5px] font-medium"
                 style={{ background: tintBg(ACCENT.blue, 18), borderColor: tintBg(ACCENT.blue, 45), color: tintText(ACCENT.blue) }}
-              >
-                Başla
-              </button>
+              >{tt("Başla")}</button>
             </motion.div>
           )}
         </AnimatePresence>

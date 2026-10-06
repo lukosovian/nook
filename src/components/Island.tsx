@@ -130,6 +130,11 @@ export function Island() {
 
   // Açılış: parçacıklar toplanır, Nook doğar ve el sallar. İlk kurulumda ardından tanıtım açılır.
   useEffect(() => {
+    if (skipIntro()) {
+      useNook.getState().setIntro(false);
+      if (isPrimary && !useNook.getState().toured) window.setTimeout(() => void startTour(), 300);
+      return;
+    }
     if (!useNook.getState().intro) return;
     // Hızlı geçen gemi/parçacıklar 60'lık sınırda yüksek Hz ekranda takılır — açılış boyunca serbest
     boostFrames(true);
@@ -331,4 +336,15 @@ function Halo({
       transition={{ ...transition, opacity: { duration: 0.35 }, background: { duration: 0.35 } }}
     />
   );
+}
+
+/** Dil değiştirilip sayfa yeniden yüklendiyse açılış animasyonu bir kez atlanır */
+function skipIntro() {
+  try {
+    if (!sessionStorage.getItem("nook-skip-intro")) return false;
+    sessionStorage.removeItem("nook-skip-intro");
+    return true;
+  } catch {
+    return false;
+  }
 }

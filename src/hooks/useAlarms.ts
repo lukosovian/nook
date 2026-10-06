@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { alarmNext, alarmRing, isPrimary, subscribe } from "../lib/bridge";
 import { useNook } from "../store/nook";
+import { tt, locale } from "../lib/i18n";
 
 /** Alarm bu kadar çalınca (kimse dokunmazsa) kendiliğinden susar. */
 const AUTO_STOP_MS = 3 * 60_000;
@@ -36,7 +37,7 @@ export function useAlarms() {
       if (now - due.next! > MISSED_AFTER_MS) {
         s.fireAlarm(due.id);
         const at = new Date(due.next!);
-        s.pushToast({ kind: "chat", title: `Kaçırılan alarm · ${at.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`, detail: due.label || "Bilgisayar o sırada uykudaydı", ms: 9000 });
+        s.pushToast({ kind: "chat", title: tt("Kaçırılan alarm · {0}", at.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })), detail: due.label || tt("Bilgisayar o sırada uykudaydı"), ms: 9000 });
         return;
       }
       s.fireAlarm(due.id);

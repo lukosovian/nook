@@ -10,6 +10,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { inTauri, isPrimary } from "./bridge";
 import { useNook } from "../store/nook";
+import { tt } from "./i18n";
 
 const FIRST_CHECK_MS = 30_000;
 const CHECK_EVERY_MS = 6 * 3600_000;
@@ -35,14 +36,14 @@ export async function checkUpdate(manual = false) {
   try {
     const u = await check();
     pending = u;
-    useUpdate.setState({ available: u?.version ?? null, status: u ? "" : "Güncel" });
+    useUpdate.setState({ available: u?.version ?? null, status: u ? "" : tt("Güncel") });
     if (u && announced !== u.version) {
       announced = u.version;
-      useNook.getState().pushToast({ kind: "update", title: `Yeni sürüm: ${u.version}`, detail: "Ayarlar › Güncelle", ms: 7000 });
+      useNook.getState().pushToast({ kind: "update", title: tt("Yeni sürüm: {0}", u.version), detail: tt("Ayarlar › Güncelle"), ms: 7000 });
     }
   } catch (e) {
     // Henüz yayın yoksa ya da internet yoksa sessizce geç; elle denetlendiyse söyle
-    useUpdate.setState({ status: manual ? "Denetlenemedi" : "" });
+    useUpdate.setState({ status: manual ? tt("Denetlenemedi") : "" });
     console.warn("[nook] güncelleme denetimi", e);
   }
 }
@@ -62,7 +63,7 @@ export async function installUpdate() {
     });
     await relaunch();
   } catch (e) {
-    useUpdate.setState({ progress: null, status: "Kurulamadı" });
+    useUpdate.setState({ progress: null, status: tt("Kurulamadı") });
     console.warn("[nook] güncelleme kurulumu", e);
   }
 }

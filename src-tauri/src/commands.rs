@@ -43,6 +43,8 @@ pub fn release_focus(shared: State<'_, Arc<Shared>>) {
 #[tauri::command]
 pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_, Arc<Shared>>) -> Result<(), String> {
     *shared.settings.lock().unwrap() = settings.clone();
+    window::set_zoom(&app, settings.ui_scale);
+    window::set_quit_label(&settings.quit_label);
     window::apply_monitor_mode(&app, &settings);
     shortcut::register(&app, &settings.shortcut, &settings.ask_shortcut, &settings.voice_shortcut, &settings.shield_shortcut)
 }

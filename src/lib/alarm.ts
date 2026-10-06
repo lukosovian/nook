@@ -1,3 +1,4 @@
+import { tt } from "./i18n";
 /** Alarm zamanlaması. Tüm zamanlar yerel saat; `next` ms cinsinden bir sonraki çalma anı. */
 
 export type Repeat = "once" | "daily" | "weekdays" | "weekend";
@@ -18,10 +19,10 @@ export interface Alarm {
 }
 
 export const REPEAT_LABEL: Record<Repeat, string> = {
-  once: "Bir kez",
-  daily: "Her gün",
-  weekdays: "Hafta içi",
-  weekend: "Hafta sonu",
+  once: tt("Bir kez"),
+  daily: tt("Her gün"),
+  weekdays: tt("Hafta içi"),
+  weekend: tt("Hafta sonu"),
 };
 
 const dayOk = (repeat: Repeat, d: Date) => {
@@ -50,9 +51,9 @@ export const clock = (a: Pick<Alarm, "hour" | "minute">) => `${pad(a.hour)}:${pa
 /** "2 sa 13 dk sonra" */
 export function until(ms: number, now = Date.now()) {
   const m = Math.max(0, Math.round((ms - now) / 60000));
-  if (m < 1) return "1 dakikadan az";
+  if (m < 1) return tt("1 dakikadan az");
   const h = Math.floor(m / 60);
   const d = Math.floor(h / 24);
-  if (d >= 1) return `${d} gün ${h % 24} sa sonra`;
-  return h ? `${h} sa ${m % 60} dk sonra` : `${m} dk sonra`;
+  if (d >= 1) return tt("{0} gün {1} sa sonra", d, h % 24);
+  return h ? tt("{0} sa {1} dk sonra", h, m % 60) : tt("{0} dk sonra", m);
 }

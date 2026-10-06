@@ -21,15 +21,66 @@ const EXTRA_PREFIX: &str = "island-";
 /// Varsayılan pencere boyutu (mantıksal px); ada bu şeffaf tuvalin içinde animasyonla büyür.
 pub const WIN_W: f64 = 680.0;
 pub const WIN_H: f64 = 350.0;
-/// Ana pencerenin şu anki mantıksal genişliği (f64 bitleri). Tanıtım sırasında büyür.
+/// Ana pencerenin şu anki genişliği ve yüksekliği, sayfanın gördüğü (CSS) px olarak (f64 bitleri). Tanıtımda büyür.
 static CUR_W: AtomicU64 = AtomicU64::new(WIN_W.to_bits());
+static CUR_H: AtomicU64 = AtomicU64::new(WIN_H.to_bits());
+/// Arayüz ölçeği (Ayarlar › Erişilebilirlik): sayfa bu kadar büyütülür, pencere de onunla birlikte
+static ZOOM: AtomicU64 = AtomicU64::new(1f64.to_bits());
 
-/// Pencerenin geçerli mantıksal genişliği — yalnızca ana ada büyüyebilir.
-pub fn width_of(label: &str) -> f64 {
+pub fn zoom() -> f64 {
+    f64::from_bits(ZOOM.load(Ordering::Relaxed))
+}
+
+/// Pencerenin sayfa içi (CSS) genişliği — yalnızca ana ada büyüyebilir.
+pub fn css_width_of(label: &str) -> f64 {
     if label == ISLAND {
         f64::from_bits(CUR_W.load(Ordering::Relaxed))
     } else {
         WIN_W
+    }
+}
+
+/// Pencerenin geçerli mantıksal genişliği (CSS genişliği × arayüz ölçeği)
+pub fn width_of(label: &str) -> f64 {
+    css_width_of(label) * zoom()
+}
+
+/// Arayüz ölçeği değişti: bütün adalar yeni ölçekle çizilir, pencereleri de büyür/küçülür
+pub fn set_zoom(app: &AppHandle, z: f64) {
+    let z = z.clamp(0.8, 1.5);
+    if (z - zoom()).abs() < 0.001 {
+        return;
+    }
+    ZOOM.store(z.to_bits(), Ordering::Relaxed);
+    let app2 = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        for (label, win) in app2.webview_windows() {
+            if label == ISLAND {
+                let _ = win.set_zoom(z);
+                let (w, h) = (f64::from_bits(CUR_W.load(Ordering::Relaxed)), f64::from_bits(CUR_H.load(Ordering::Relaxed)));
+                let _ = resize_island(&win, w, h);
+            } else if label.starts_with(EXTRA_PREFIX) {
+                let _ = win.set_zoom(z);
+                let _ = win.set_size(tauri::LogicalSize::new(WIN_W * z, WIN_H * z));
+                if let Some(m) = win.current_monitor().ok().flatten() {
+                    let _ = place_on(&win, &m);
+                }
+            } else if label == crate::buddy::PERCH {
+                // Tünekteki Nook adaya döner; bir dahaki tünekte yeni ölçekle açılır
+                crate::buddy::leave(&app2);
+            } else if label == crate::argus::CARD {
+                // Yeniden oluşturulunca yeni ölçekle açılır
+                let _ = win.close();
+            }
+        }
+    });
+}
+
+/// Pencere yeni oluştu: arayüz ölçeğini uygula
+pub fn apply_zoom(win: &WebviewWindow) {
+    let z = zoom();
+    if (z - 1.0).abs() > 0.001 {
+        let _ = win.set_zoom(z);
     }
 }
 /// Ekranlar arası geçişte "çıkış" animasyonunun süresi (frontend ile aynı).
@@ -41,7 +92,7 @@ const RELOCATE_OUT: Duration = Duration::from_millis(470);
 pub fn place_on(win: &WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
     let scale = monitor.scale_factor();
     let width = (width_of(win.label()) * scale).round() as i32;
-    let height = win.outer_size().map(|s| s.height as i32).unwrap_or((WIN_H * scale).round() as i32);
+    let height = win.outer_size().map(|s| s.height as i32).unwrap_or((WIN_H * zoom() * scale).round() as i32);
     let origin = monitor.position();
     let (mw, mh) = (monitor.size().width as i32, monitor.size().height as i32);
     let pos = win.app_handle().state::<Arc<Shared>>().settings().island_pos;
@@ -171,16 +222,19 @@ pub fn apply_monitor_mode(app: &AppHandle, settings: &Settings) {
 
 /// Ana adanın penceresini büyütür/küçültür (tanıtım ekranı için) ve aynı ekranın üst ortasına yeniden yapıştırır.
 /// Ekrandan büyük istenirse ekrana sığdırılır.
+/// `width`, `height` sayfanın istediği (CSS) boyut; pencere arayüz ölçeğiyle çarpılır.
 pub fn resize_island(win: &WebviewWindow, width: f64, height: f64) -> tauri::Result<()> {
     let monitor = win.current_monitor()?.or_else(|| primary_monitor(win.app_handle()));
+    let z = zoom();
     let (w, h) = match &monitor {
         Some(m) => {
             let s = m.scale_factor();
-            (width.min(m.size().width as f64 / s), height.min(m.size().height as f64 / s))
+            ((width * z).min(m.size().width as f64 / s), (height * z).min(m.size().height as f64 / s))
         }
-        None => (width, height),
+        None => (width * z, height * z),
     };
-    CUR_W.store(w.to_bits(), Ordering::Relaxed);
+    CUR_W.store((w / z).to_bits(), Ordering::Relaxed);
+    CUR_H.store((h / z).to_bits(), Ordering::Relaxed);
     win.set_size(tauri::LogicalSize::new(w, h))?;
     if let Some(m) = monitor {
         place_on(win, &m)?;
@@ -191,7 +245,7 @@ pub fn resize_island(win: &WebviewWindow, width: f64, height: f64) -> tauri::Res
 fn create_island(app: &AppHandle, label: &str) -> tauri::Result<WebviewWindow> {
     let win = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
         .title("Nook")
-        .inner_size(WIN_W, WIN_H)
+        .inner_size(WIN_W * zoom(), WIN_H * zoom())
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
@@ -205,6 +259,7 @@ fn create_island(app: &AppHandle, label: &str) -> tauri::Result<WebviewWindow> {
         // ve wry'nin dosya bırakma dinleyicisi ona kurulamıyor (sürükle-bırak çalışmıyor).
         .visible(true)
         .build()?;
+    apply_zoom(&win);
     win.set_ignore_cursor_events(true)?;
     clear_background(&win);
     Ok(win)
@@ -236,9 +291,19 @@ pub fn relocate(app: &AppHandle, shared: Arc<Shared>, label: String, monitor: Mo
     });
 }
 
+static QUIT: std::sync::OnceLock<MenuItem<tauri::Wry>> = std::sync::OnceLock::new();
+
+/// Tepsi menüsündeki "çık" yazısı seçili dilde
+pub fn set_quit_label(text: &str) {
+    if let (Some(item), false) = (QUIT.get(), text.is_empty()) {
+        let _ = item.set_text(text);
+    }
+}
+
 /// Görev çubuğunda görünmediğimiz için tek çıkış yolu tepsi menüsü.
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Nook'tan çık", true, None::<&str>)?;
+    let _ = QUIT.set(quit.clone());
     let menu = Menu::with_items(app, &[&quit])?;
 
     let mut tray = TrayIconBuilder::with_id("nook-tray")

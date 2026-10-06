@@ -144,7 +144,7 @@ pub async fn perch_start(app: AppHandle, shared: State<'_, Arc<Shared>>) -> Resu
     if app.get_webview_window(PERCH).is_none() {
         let win = WebviewWindowBuilder::new(&app, PERCH, WebviewUrl::App("index.html".into()))
             .title("Nook")
-            .inner_size(PERCH_W, PERCH_H)
+            .inner_size(PERCH_W * window::zoom(), PERCH_H * window::zoom())
             .position(-30000.0, -30000.0)
             .resizable(false)
             .maximizable(false)
@@ -160,6 +160,7 @@ pub async fn perch_start(app: AppHandle, shared: State<'_, Arc<Shared>>) -> Resu
             .map_err(|e| e.to_string())?;
         let _ = win.set_ignore_cursor_events(true);
         window::clear_background(&win);
+        window::apply_zoom(&win);
     }
     let frac = 0.3 + rand_unit() * 0.35;
     *STATE.lock().unwrap() =
@@ -178,7 +179,7 @@ pub fn perch_stop(app: AppHandle) {
 }
 
 /// Uygun pencere kalmadı: Nook adaya döner. Tünekteki Nook "zıplar", ada kendi Nook'unu geri getirir.
-fn leave(app: &AppHandle) {
+pub(crate) fn leave(app: &AppHandle) {
     *STATE.lock().unwrap() = None;
     let _ = app.emit("nook://perch-leave", ());
     let app = app.clone();

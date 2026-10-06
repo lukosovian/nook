@@ -42,6 +42,7 @@ import { SKY_LABEL, type Sky } from "../../lib/weather";
 import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { ek, useNookName } from "../../lib/look";
+import { tt, locale } from "../../lib/i18n";
 
 const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
 
@@ -104,7 +105,7 @@ function NameTag() {
       <motion.p key={name} className="truncate text-[17px] font-semibold tracking-tight text-label" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={CARD_SPRING}>
         {name}
       </motion.p>
-      <p className="mt-0.5 text-[10px] text-label-3">{custom ? "senin Nook'un" : "bir isim ver"}</p>
+      <p className="mt-0.5 text-[10px] text-label-3">{custom ? tt("senin Nook'un") : tt("bir isim ver")}</p>
     </div>
   );
 }
@@ -121,10 +122,10 @@ function HeaderNav({ title }: { title?: string }) {
   };
   return (
     <div className="absolute left-3.5 top-[9px] flex items-center gap-0.5">
-      <HeaderIcon icon={House} label="Ana sayfa" active={!searching && tab === "home"} onClick={() => go("home")} />
-      <HeaderIcon icon={MessageCircle} label={`${ek(name, "la")} sohbet`} active={!searching && tab === "chat"} onClick={() => go("chat")} />
-      <HeaderIcon icon={Search} label="Ara" active={searching} onClick={() => useNook.getState().setSearching(true)} />
-      <HeaderIcon icon={Settings} label="Ayarlar" active={!searching && tab === "settings"} onClick={() => go("settings")} />
+      <HeaderIcon icon={House} label={tt("Ana sayfa")} active={!searching && tab === "home"} onClick={() => go("home")} />
+      <HeaderIcon icon={MessageCircle} label={tt("{0} sohbet", ek(name, "la"))} active={!searching && tab === "chat"} onClick={() => go("chat")} />
+      <HeaderIcon icon={Search} label={tt("Ara")} active={searching} onClick={() => useNook.getState().setSearching(true)} />
+      <HeaderIcon icon={Settings} label={tt("Ayarlar")} active={!searching && tab === "settings"} onClick={() => go("settings")} />
       <AnimatePresence mode="wait" initial={false}>
         {title && (
           <motion.span
@@ -189,12 +190,12 @@ function StatusBar() {
   return (
     <div className="absolute right-4 top-[12px] flex items-center gap-2.5 text-[10.5px] font-medium tabular-nums text-label-3">
       {inUse && (
-        <span className="flex items-center" style={{ color: inUse.color }} title={`${inUse.apps.join(", ")} kullanıyor`}>
+        <span className="flex items-center" style={{ color: inUse.color }} title={tt("{0} kullanıyor", inUse.apps.join(", "))}>
           <inUse.icon size={11} strokeWidth={2.4} />
         </span>
       )}
       {weather && SkyIcon && (
-        <span className="flex items-center gap-1" title={`${weather.city} · ${SKY_LABEL[weather.sky]} · ${weather.high}° / ${weather.low}° · yağış %${weather.rainChance}`}>
+        <span className="flex items-center gap-1" title={tt("{0} · {1} · {2}° / {3}° · yağış %{4}", weather.city, SKY_LABEL[weather.sky], weather.high, weather.low, weather.rainChance)}>
           <SkyIcon size={11} strokeWidth={2.4} />
           {weather.temp}°
         </span>
@@ -205,7 +206,7 @@ function StatusBar() {
           {battery.percent <= 20 && !battery.charging ? <BatteryLow size={13} /> : <BatteryFull size={13} />}
         </span>
       )}
-      <span className="text-label-2">{now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
+      <span className="text-label-2">{now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
       <MoveHandle />
       <BigToggle />
     </div>
@@ -223,7 +224,7 @@ function MoveHandle() {
         e.preventDefault();
         void islandDrag();
       }}
-      title="Sürükleyerek taşı"
+      title={tt("Sürükleyerek taşı")}
       className="-my-1 flex h-[22px] w-[22px] cursor-grab items-center justify-center rounded-full text-label-3 transition-colors hover:bg-white/[0.08] hover:text-label active:cursor-grabbing"
     >
       <Move size={11} strokeWidth={2.4} />
@@ -239,7 +240,7 @@ function BigToggle() {
     <motion.button
       whileTap={{ scale: 0.88 }}
       onClick={toggleBig}
-      title={big ? "Küçült (Esc)" : "Tam ekran"}
+      title={big ? tt("Küçült (Esc)") : tt("Tam ekran")}
       className="-my-1 -mr-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 transition-colors hover:bg-white/[0.08] hover:text-label"
     >
       <Icon size={11} strokeWidth={2.4} />
@@ -265,9 +266,9 @@ const GRAY = "#8a8a93";
 /** "3 sa 12 dk sonra" */
 function untilText(ms: number) {
   const m = Math.max(1, Math.round(ms / 60_000));
-  if (m < 60) return `${m} dk sonra`;
+  if (m < 60) return tt("{0} dk sonra", m);
   const h = Math.floor(m / 60);
-  return m % 60 ? `${h} sa ${m % 60} dk sonra` : `${h} sa sonra`;
+  return m % 60 ? tt("{0} sa {1} dk sonra", h, m % 60) : tt("{0} sa sonra", h);
 }
 
 /**
@@ -297,14 +298,14 @@ function Activity({ view }: { view: View }) {
   }, [live]);
 
   const items: Item[] = [];
-  if (!online) items.push({ id: "offline", icon: WifiOff, title: "İnternet yok", sub: "Bağlantı bekleniyor", color: ACCENT.red });
+  if (!online) items.push({ id: "offline", icon: WifiOff, title: tt("İnternet yok"), sub: tt("Bağlantı bekleniyor"), color: ACCENT.red });
   if (focus) {
     const left = remaining(focus, now);
     items.push({
       id: "focus",
       icon: Target,
       title: PHASE_LABEL[focus.phase],
-      sub: focus.endsAt === null ? "Duraklatıldı" : focus.phase === "work" ? `${focus.round + 1}. tur` : "Biraz dinlen",
+      sub: focus.endsAt === null ? tt("Duraklatıldı") : focus.phase === "work" ? tt("{0}. tur", focus.round + 1) : tt("Biraz dinlen"),
       value: mmss(left),
       progress: 1 - left / focus.total,
       color: focus.phase === "work" ? ACCENT.red : ACCENT.teal,
@@ -312,20 +313,20 @@ function Activity({ view }: { view: View }) {
   }
   if (downloads.length) {
     const d = downloads[0];
-    items.push({ id: "dl", icon: ArrowDown, title: d.name, sub: d.speed ? `${formatSize(d.speed)}/s` : "İniyor", value: formatSize(d.received), color: ACCENT.blue });
+    items.push({ id: "dl", icon: ArrowDown, title: d.name, sub: d.speed ? `${formatSize(d.speed)}/s` : tt("İniyor"), value: formatSize(d.received), color: ACCENT.blue });
   }
   if (media?.playing) {
     const pos = Math.min(media.durationMs || Infinity, media.positionMs + (performance.now() - media.at));
-    items.push({ id: "music", icon: Music, title: media.title, sub: media.artist || "Çalıyor", progress: media.durationMs ? pos / media.durationMs : undefined, color: ACCENT.pink });
+    items.push({ id: "music", icon: Music, title: media.title, sub: media.artist || tt("Çalıyor"), progress: media.durationMs ? pos / media.durationMs : undefined, color: ACCENT.pink });
   }
   const cam = privacy.camera[0];
   const mic = privacy.mic[0];
-  if (cam || mic) items.push({ id: "mic", icon: cam ? Video : Mic, title: (cam ?? mic)!, sub: cam ? "Kamerayı kullanıyor" : "Mikrofonu kullanıyor", color: cam ? ACCENT.green : ACCENT.orange });
+  if (cam || mic) items.push({ id: "mic", icon: cam ? Video : Mic, title: (cam ?? mic)!, sub: cam ? tt("Kamerayı kullanıyor") : tt("Mikrofonu kullanıyor"), color: cam ? ACCENT.green : ACCENT.orange });
   for (const [key, label, p] of [
-    ["mouse", "Mouse", devices?.mouse?.percent],
-    ["headset", "Kulaklık", devices?.headset?.percent],
+    ["mouse", tt("Mouse"), devices?.mouse?.percent],
+    ["headset", tt("Kulaklık"), devices?.headset?.percent],
   ] as const) {
-    if (p != null && p <= 20) items.push({ id: `low-${key}`, icon: BatteryLow, title: label, sub: "Pil azalıyor", value: `%${p}`, progress: p / 100, color: ACCENT.red });
+    if (p != null && p <= 20) items.push({ id: `low-${key}`, icon: BatteryLow, title: label, sub: tt("Pil azalıyor"), value: `%${p}`, progress: p / 100, color: ACCENT.red });
   }
   const nextAlarm = alarms.filter((a) => a.enabled && a.next).sort((a, b) => a.next! - b.next!)[0];
   if (nextAlarm) {
@@ -333,9 +334,9 @@ function Activity({ view }: { view: View }) {
     items.push({
       id: "alarm",
       icon: AlarmClock,
-      title: nextAlarm.label || "Alarm",
+      title: nextAlarm.label || tt("Alarm"),
       sub: untilText(nextAlarm.next! - Date.now()),
-      value: d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+      value: d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }),
       color: ACCENT.yellow,
     });
   }
@@ -344,7 +345,7 @@ function Activity({ view }: { view: View }) {
     items.push({ id: "weather", icon: Sky, title: weather.city, sub: `${SKY_LABEL[weather.sky]} · ${weather.high}° / ${weather.low}°`, value: `${weather.temp}°`, color: ACCENT.blue });
   }
   const loved = !asleep && affection > 80;
-  items.push({ id: "mood", icon: loved ? Heart : Sparkles, title: moodLine(affection, asleep), sub: "Keyfi", progress: affection / 100, color: loved ? ACCENT.pink : GRAY });
+  items.push({ id: "mood", icon: loved ? Heart : Sparkles, title: moodLine(affection, asleep), sub: tt("Keyfi"), progress: affection / 100, color: loved ? ACCENT.pink : GRAY });
 
   const home = view === "home";
   const shown = items.slice(0, home ? 4 : 3);
@@ -402,9 +403,9 @@ function Row({ item: it, lead, compact }: { item: Item; lead: boolean; compact: 
 }
 
 function moodLine(affection: number, asleep: boolean) {
-  if (asleep) return "Uyuyor…";
-  if (affection < SULK_BELOW) return "Biraz küs";
+  if (asleep) return tt("Uyuyor…");
+  if (affection < SULK_BELOW) return tt("Biraz küs");
   const h = new Date().getHours();
-  const greet = h < 5 ? "Gece kuşu" : h < 12 ? "Günaydın" : h < 18 ? "Merhaba" : "İyi akşamlar";
+  const greet = h < 5 ? tt("Gece kuşu") : h < 12 ? tt("Günaydın") : h < 18 ? tt("Merhaba") : tt("İyi akşamlar");
   return greet;
 }

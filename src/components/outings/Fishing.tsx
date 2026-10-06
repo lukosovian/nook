@@ -9,6 +9,7 @@ import { haul } from "../../lib/outings";
 import { useNook, type Expression } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 import { OldFile, Paw, Star, useMyLook } from "./Parts";
+import { tt } from "../../lib/i18n";
 
 const SIZE = 28;
 const K = SIZE / 24;
@@ -17,7 +18,7 @@ const ROD = 46;
 const REST = 150;
 const WAIT_S = [9, 26];
 const STAR_CHANCE = 0.33;
-const JUNK = ["eski_ödev_SON_son2.docx", "Yeni klasör (7)", "fatura_2019.pdf", "kurulum_eski.exe", "Ekran görüntüsü (412).png", "notlar_yedek.txt", "deneme123.zip"];
+const JUNK = [tt("eski_ödev_SON_son2.docx"), tt("Yeni klasör (7)"), "fatura_2019.pdf", "kurulum_eski.exe", tt("Ekran görüntüsü (412).png"), "notlar_yedek.txt", "deneme123.zip"];
 
 type Catch = { kind: "star" | "trash"; name: string };
 const rad = (deg: number) => (deg * Math.PI) / 180;
@@ -67,7 +68,7 @@ export function Fishing({ width }: { width: number }) {
         await animate(dip, [0, 7, 1, 8, 0, 9, 0], { duration: 1.1, ease: "easeInOut" });
         setBiting(false);
         if (!alive.current) return;
-        const got: Catch = Math.random() < STAR_CHANCE ? { kind: "star", name: "Parlak yıldız!" } : { kind: "trash", name: JUNK[Math.floor(Math.random() * JUNK.length)] };
+        const got: Catch = Math.random() < STAR_CHANCE ? { kind: "star", name: tt("Parlak yıldız!") } : { kind: "trash", name: JUNK[Math.floor(Math.random() * JUNK.length)] };
         setHooked(got);
         // Sar: olta kalkar, ip kısalır
         void animate(angle, -62, { duration: 0.5 });

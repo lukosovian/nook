@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
+import { tt } from "../../lib/i18n";
 
 /** Vurgu renkleri */
 export const ACCENT = {
@@ -337,7 +338,7 @@ export function Dropdown<T extends string | number>({
         className="flex min-w-0 items-center gap-1 rounded-full bg-well py-0.5 pl-2.5 pr-1.5 text-[11px] font-medium text-label transition-colors hover:bg-well-hi"
         style={{ maxWidth }}
       >
-        <span className="min-w-0 truncate">{current?.label ?? "Seç"}</span>
+        <span className="min-w-0 truncate">{current?.label ?? tt("Seç")}</span>
         <ChevronDown size={11} strokeWidth={2.6} className={`shrink-0 text-label-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {createPortal(

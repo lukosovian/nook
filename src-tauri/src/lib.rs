@@ -61,10 +61,11 @@ pub fn run() {
             shared.set_hit(label, state::Rect::default(), None);
             if let Some(win) = app.get_webview_window(label) {
                 let _ = win.set_ignore_cursor_events(true);
-                if label == window::ISLAND && window::width_of(label) != window::WIN_W {
+                if label == window::ISLAND && window::css_width_of(label) != window::WIN_W {
                     let _ = window::resize_island(&win, window::WIN_W, window::WIN_H);
                 }
                 window::clear_background(&win);
+                window::apply_zoom(&win);
             }
             if was_forced {
                 focus::release(&shared);
@@ -127,6 +128,7 @@ pub fn run() {
             // Başlangıçta tamamen tıklama-geçirgen; tracker imleç adaya girince kapatır.
             island.set_ignore_cursor_events(true)?;
             window::clear_background(&island);
+            window::apply_zoom(&island);
 
             let shared = app.state::<Arc<Shared>>().inner().clone();
             shared.register(&island);

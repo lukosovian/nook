@@ -7,6 +7,7 @@ import { modelsFor } from "../hooks/useGemini";
 import { functions, runTool, systemPrompt } from "./aiTools";
 import { useNook, type ChatItem } from "../store/nook";
 import { nookName } from "./look";
+import { tt } from "./i18n";
 
 /** Modele gönderilen geçmiş (son N mesaj). */
 const HISTORY = 20;
@@ -19,7 +20,7 @@ const sleep = (ms: number, signal: AbortSignal) =>
     const t = window.setTimeout(resolve, ms);
     signal.addEventListener("abort", () => {
       window.clearTimeout(t);
-      reject(new DOMException("Durduruldu", "AbortError"));
+      reject(new DOMException(tt("Durduruldu"), "AbortError"));
     });
   });
 
@@ -36,7 +37,7 @@ export function stopChat() {
 export async function sendChat(text: string, opts: { image?: string | null; voice?: boolean } = {}) {
   const image = opts.image ?? undefined;
   // Görüntü varsa boş soru da olur: "bu ne?"
-  const q = text.trim() || (image ? "Ekranımda ne görüyorsun? Kısaca anlat, bir sorun varsa nasıl çözeceğimi söyle." : "");
+  const q = text.trim() || (image ? tt("Ekranımda ne görüyorsun? Kısaca anlat, bir sorun varsa nasıl çözeceğimi söyle.") : "");
   const s = useNook.getState();
   if (!q || s.chatBusy) return;
   const key = s.settings.geminiKey.trim();
@@ -55,7 +56,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   }
   contents.push({ role: "user", parts: image ? [inlinePart(image), { text: q }] : [{ text: q }] });
 
-  s.pushChat({ id: crypto.randomUUID(), role: "user", text: text.trim() || (image ? "Ekranıma bak" : q), image, voice: opts.voice });
+  s.pushChat({ id: crypto.randomUUID(), role: "user", text: text.trim() || (image ? tt("Ekranıma bak") : q), image, voice: opts.voice });
   const replyId = crypto.randomUUID();
   s.pushChat({ id: replyId, role: "nook", text: "" });
   s.setChatBusy(true);
@@ -65,8 +66,8 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   controller = new AbortController();
   let reply = "";
   try {
-    if (!key) throw new Error("Ayarlar'a Gemini API anahtarını yapıştırman lazım");
-    if (!model) throw new Error("Ayarlar'dan bir model seç");
+    if (!key) throw new Error(tt("Ayarlar'a Gemini API anahtarını yapıştırman lazım"));
+    if (!model) throw new Error(tt("Ayarlar'dan bir model seç"));
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const parts: Part[] = [];
@@ -104,7 +105,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
             fellBack = true;
             const item = useNook.getState().chat.find((m) => m.id === replyId);
             useNook.getState().patchChat(replyId, {
-              notes: [...(item?.notes ?? []), { icon: "error", text: `Pro meşguldü, ${fallback} cevapladı` }],
+              notes: [...(item?.notes ?? []), { icon: "error", text: tt("Pro meşguldü, {0} cevapladı", fallback) }],
             });
           }
         }
@@ -128,7 +129,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
     }
   } catch (e) {
     if ((e as Error).name !== "AbortError") {
-      reply = reply || `Bir sorun çıktı: ${(e as Error).message}`;
+      reply = reply || tt("Bir sorun çıktı: {0}", (e as Error).message);
       useNook.getState().patchChat(replyId, { text: reply, error: true });
     }
   } finally {

@@ -6,6 +6,7 @@ import { clock, pad, REPEAT_LABEL, until, type Repeat } from "../../lib/alarm";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText, Toggle } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 const QUICK = [5, 10, 25, 60];
 const REPEATS = Object.keys(REPEAT_LABEL) as Repeat[];
@@ -33,7 +34,7 @@ export function AlarmPanel() {
   const quick = (min: number) => {
     const at = Date.now() + min * 60_000;
     const d = new Date(at);
-    addAlarm({ hour: d.getHours(), minute: d.getMinutes(), label: `${min >= 60 ? `${min / 60} saat` : `${min} dakika`} sonra`, repeat: "once", oneShot: true, at, silent });
+    addAlarm({ hour: d.getHours(), minute: d.getMinutes(), label: tt("{0} sonra", min >= 60 ? tt("{0} saat", min / 60) : tt("{0} dakika", min)), repeat: "once", oneShot: true, at, silent });
   };
 
   return (
@@ -49,7 +50,7 @@ export function AlarmPanel() {
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="İsim (ör. Toplantı)"
+            placeholder={tt("İsim (ör. Toplantı)")}
             spellCheck={false}
             className="h-7 w-full rounded-full bg-well px-3 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-well-hi"
           />
@@ -57,7 +58,7 @@ export function AlarmPanel() {
           {/* Tekrar: tıkladıkça sıradaki seçenek */}
           <button
             onClick={() => setRepeat(REPEATS[(REPEATS.indexOf(repeat) + 1) % REPEATS.length])}
-            title="Değiştirmek için tıkla"
+            title={tt("Değiştirmek için tıkla")}
             className="flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-medium"
             style={{ background: tintBg(ACCENT.yellow, 10), borderColor: tintBg(ACCENT.yellow, 30), color: tintText(ACCENT.yellow) }}
           >
@@ -78,9 +79,7 @@ export function AlarmPanel() {
           className="flex h-[62px] w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[14px] border text-[11px] font-medium"
           style={{ background: tintBg(ACCENT.yellow, 16), borderColor: tintBg(ACCENT.yellow, 40), color: tintText(ACCENT.yellow) }}
         >
-          <AlarmClock size={16} strokeWidth={2.4} />
-          Kur
-        </motion.button>
+          <AlarmClock size={16} strokeWidth={2.4} />{tt("Kur")}</motion.button>
       </div>
 
       <div className="flex shrink-0 gap-1">
@@ -90,13 +89,13 @@ export function AlarmPanel() {
             onClick={() => quick(m)}
             className="rounded-full bg-well px-2.5 py-0.5 text-[11px] font-medium text-label-2 transition-colors hover:bg-well-hi hover:text-label"
           >
-            +{m >= 60 ? `${m / 60} sa` : `${m} dk`}
+            +{m >= 60 ? tt("{0} sa", m / 60) : tt("{0} dk", m)}
           </button>
         ))}
       </div>
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-        {!alarms.length && <p className="pt-3 text-center text-[11px] text-label-3">Kurulu alarm yok</p>}
+        {!alarms.length && <p className="pt-3 text-center text-[11px] text-label-3">{tt("Kurulu alarm yok")}</p>}
         <AnimatePresence initial={false}>
           {alarms.map((a) => (
             <motion.div
@@ -125,7 +124,7 @@ export function AlarmPanel() {
               <button
                 onClick={() => useNook.getState().removeAlarm(a.id)}
                 className="flex h-5 w-5 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label"
-                aria-label="Sil"
+                aria-label={tt("Sil")}
               >
                 <X size={11} strokeWidth={2.6} />
               </button>
@@ -154,7 +153,7 @@ function Digit({ value, max, onChange }: { value: number; max: number; onChange:
     <div
       className="group flex flex-col items-center"
       onWheel={(e) => (e.deltaY < 0 ? up(e.shiftKey ? 5 : 1) : down(e.shiftKey ? 5 : 1))}
-      title="Tıkla ve yaz · fare tekerleği ya da oklar (Shift ile 5'er)"
+      title={tt("Tıkla ve yaz · fare tekerleği ya da oklar (Shift ile 5'er)")}
     >
       <button onClick={() => up()} className="text-label-3 opacity-40 transition-opacity hover:text-label group-hover:opacity-100">
         <ChevronUp size={12} strokeWidth={2.6} />
@@ -214,7 +213,7 @@ function BellToggle({ silent, onChange, small }: { silent: boolean; onChange: (s
       whileTap={{ scale: 0.88 }}
       transition={spring.pop}
       onClick={() => onChange(!silent)}
-      title={silent ? "Sessiz — yalnızca ekranda görünür (sesli yapmak için tıkla)" : "Sesli (sessize almak için tıkla)"}
+      title={silent ? tt("Sessiz — yalnızca ekranda görünür (sesli yapmak için tıkla)") : tt("Sesli (sessize almak için tıkla)")}
       className={`flex shrink-0 items-center justify-center rounded-full border ${small ? "h-6 w-6" : "h-7 w-7"}`}
       style={
         silent

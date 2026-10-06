@@ -1,3 +1,4 @@
+import { tt } from "./i18n";
 /**
  * Hassas veri koruyucusu: panoya kart numarası, IBAN, API anahtarı ya da şifre gibi bir şey
  * kopyalanınca Nook uyarır, Pano geçmişine eklemez ve bir süre sonra panodan siler.
@@ -7,10 +8,10 @@
 export type SensitiveKind = "card" | "iban" | "key" | "password";
 
 export const SENSITIVE_LABEL: Record<SensitiveKind, string> = {
-  card: "Kart numarası",
+  card: tt("Kart numarası"),
   iban: "IBAN",
-  key: "API anahtarı",
-  password: "Şifre",
+  key: tt("API anahtarı"),
+  password: tt("Şifre"),
 };
 
 /** Kart numarası sağlaması (Luhn) */

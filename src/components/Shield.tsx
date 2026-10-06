@@ -8,6 +8,7 @@ import { shieldOff } from "../lib/bridge";
 import { CHIP_NOOKS, HALLOWEEN, normalizeColor, normalizeLook } from "../lib/look";
 import { useNook } from "../store/nook";
 import { NookFigure } from "./mascot/Figure";
+import { tt } from "../lib/i18n";
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -84,12 +85,8 @@ export function Shield() {
             </motion.span>
           ))}
         </div>
-        <motion.p className="mt-8 text-[22px] font-semibold tracking-tight text-white/85" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          Şşş… burada bir şey yok
-        </motion.p>
-        <motion.p className="mt-2 text-[13px] text-white/40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-          Kalkanı kaldırmak için {shortcut || "kısayola"} bas, Esc ya da çift tıkla
-        </motion.p>
+        <motion.p className="mt-8 text-[22px] font-semibold tracking-tight text-white/85" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>{tt("Şşş… burada bir şey yok")}</motion.p>
+        <motion.p className="mt-2 text-[13px] text-white/40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>{shortcut ? tt("Kalkanı kaldırmak için {0} bas, Esc ya da çift tıkla", shortcut) : tt("Kalkanı kaldırmak için kısayola bas, Esc ya da çift tıkla")}</motion.p>
       </div>
     </div>
   );

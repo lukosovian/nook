@@ -10,8 +10,10 @@ import type { DemoId } from "../../lib/notes";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 import { OldFile, Star } from "../outings/Parts";
+import { PALETTES } from "../../lib/palette";
 import { IntroPreview, MovePreview } from "../panels/EffectPreview";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Her `ms`'de bir artan sayaç (sahneler kendini tekrarlasın) */
 function useTick(ms: number) {
@@ -75,7 +77,7 @@ function NotesStack() {
       <div className="absolute left-1/2 top-0 -translate-x-1/2">
         <MiniIsland width={150}>
           <ScrollText size={13} className="mr-1.5" style={{ color: tintText(ACCENT.yellow) }} />
-          <span className="text-[10.5px] font-medium text-label">Yama notları</span>
+          <span className="text-[10.5px] font-medium text-label">{tt("Yama notları")}</span>
         </MiniIsland>
       </div>
       <div className="absolute inset-x-0 top-[62px] flex justify-center">
@@ -149,7 +151,7 @@ function NoGlow() {
         style={{ background: tintBg(fixed ? ACCENT.green : ACCENT.red, 18), color: tintText(fixed ? ACCENT.green : ACCENT.red) }}
       >
         {fixed ? <Check size={10} strokeWidth={3} /> : null}
-        {fixed ? "0.2.27: ışık yok" : "Önce: arkada ışık"}
+        {fixed ? tt("0.2.27: ışık yok") : tt("Önce: arkada ışık")}
       </motion.div>
     </Stage>
   );
@@ -186,10 +188,9 @@ function Reload() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <div className="rounded-[6px] px-1.5 py-1 text-label-3">Görünüm</div>
+            <div className="rounded-[6px] px-1.5 py-1 text-label-3">{tt("Görünüm")}</div>
             <div className="flex items-center gap-1 rounded-[6px] bg-white/10 px-1.5 py-1 text-label">
-              <RotateCw size={10} /> Yenile
-            </div>
+              <RotateCw size={10} />{" "}{tt("Yenile")}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -303,7 +304,7 @@ function Alarm() {
   const face = useFace();
   return (
     <Stage bg="linear-gradient(160deg, #1b3a24 0%, #0f1a12 60%, #0a0d0b 100%)">
-      <div className="absolute bottom-2 left-3 text-[9px] uppercase tracking-[0.18em] text-white/30">oyun</div>
+      <div className="absolute bottom-2 left-3 text-[9px] uppercase tracking-[0.18em] text-white/30">{tt("oyun")}</div>
       <div className="absolute left-1/2 top-0 -translate-x-1/2">
         <MiniIsland width={180} height={42} radius={18}>
           <NookFigure look={face.look} color={face.color} size={24} expression="surprised" />
@@ -349,7 +350,7 @@ function Drag() {
         className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[10px] font-medium"
         style={{ background: tintBg(ACCENT.blue, 18), color: tintText(ACCENT.blue) }}
       >
-        {n % spots.length === 3 ? "Ortala" : "Sürükle · bırak"}
+        {n % spots.length === 3 ? tt("Ortala") : tt("Sürükle · bırak")}
       </div>
     </Stage>
   );
@@ -369,9 +370,7 @@ function LookChip() {
           transition={{ duration: 0.35, repeat: Infinity, repeatDelay: 0.95 }}
         >
           <span className="h-6 w-6 rounded-full" style={{ background: ACCENT.pink }} />
-          <span className="text-[12px] font-medium" style={{ color: tintText(ACCENT.pink) }}>
-            Görünüm
-          </span>
+          <span className="text-[12px] font-medium" style={{ color: tintText(ACCENT.pink) }}>{tt("Görünüm")}</span>
         </motion.div>
         <AnimatePresence mode="popLayout">
           <motion.div key={n} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }}>
@@ -387,11 +386,11 @@ function LookChip() {
 function Games() {
   const n = useTick(500);
   const games = [
-    { c: ACCENT.pink, t: "Yakala" },
-    { c: ACCENT.blue, t: "Hafıza" },
-    { c: ACCENT.orange, t: "Köstebek" },
-    { c: ACCENT.purple, t: "Eşleştir" },
-    { c: ACCENT.green, t: "Zıpla" },
+    { c: ACCENT.pink, t: tt("Yakala") },
+    { c: ACCENT.blue, t: tt("Hafıza") },
+    { c: ACCENT.orange, t: tt("Köstebek") },
+    { c: ACCENT.purple, t: tt("Eşleştir") },
+    { c: ACCENT.green, t: tt("Zıpla") },
   ];
   return (
     <Stage>
@@ -442,9 +441,8 @@ function ArchiveDemo() {
     <Stage>
       <div className="absolute left-4 top-3 w-[150px] rounded-[10px] border border-white/10 bg-black/60 p-1.5">
         <div className="mb-1 flex items-center gap-1 text-[10px] text-label">
-          <FileArchive size={11} style={{ color: tintText(ACCENT.orange) }} /> ödev.zip
-        </div>
-        {["Görseller", "rapor.pdf", "not.txt"].map((f, i) => (
+          <FileArchive size={11} style={{ color: tintText(ACCENT.orange) }} />{" "}{tt("ödev.zip")}</div>
+        {[tt("Görseller"), "rapor.pdf", "not.txt"].map((f, i) => (
           <div key={f} className="flex items-center gap-1 rounded px-1 py-0.5 text-[9.5px] text-label-2" style={i === 1 ? { background: "rgb(255 255 255 / 0.07)" } : undefined}>
             {i === 0 ? <Folder size={10} style={{ color: tintText(ACCENT.yellow) }} /> : <FileText size={10} />} {f}
           </div>
@@ -455,10 +453,9 @@ function ArchiveDemo() {
         animate={out ? { left: "64%", top: "58%", opacity: 1 } : { left: "16%", top: "38%", opacity: 0 }}
         transition={{ duration: 0.9, ease: "easeInOut" }}
       >
-        <FileText size={10} /> rapor.pdf
-        <MousePointer2 size={12} className="ml-1 text-white" fill="white" />
+        <FileText size={10} />{" "}{tt("rapor.pdf")}<MousePointer2 size={12} className="ml-1 text-white" fill="white" />
       </motion.div>
-      <div className="absolute bottom-3 right-4 flex h-10 w-14 items-center justify-center rounded-[8px] border border-dashed border-white/20 text-[9px] text-label-3">Masaüstü</div>
+      <div className="absolute bottom-3 right-4 flex h-10 w-14 items-center justify-center rounded-[8px] border border-dashed border-white/20 text-[9px] text-label-3">{tt("Masaüstü")}</div>
     </Stage>
   );
 }
@@ -482,7 +479,7 @@ function ShieldDemo() {
         transition={{ duration: 0.4 }}
       >
         <NookFigure look={face.look} color={face.color} size={46} expression="sleepy" />
-        <span className="mt-1 text-[9.5px] text-white/60">Şşş… · Ctrl+Alt+H</span>
+        <span className="mt-1 text-[9.5px] text-white/60">{tt("Şşş… · Ctrl+Alt+H")}</span>
       </motion.div>
     </Stage>
   );
@@ -498,8 +495,8 @@ function SensitiveDemo() {
         <div className="flex h-[40px] w-[230px] items-center gap-2 bg-black px-3" style={{ borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
           <LockKeyhole size={14} style={{ color: tintText(ACCENT.yellow) }} />
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block text-[10.5px] font-medium text-label">Hassas veri · Kart numarası</span>
-            <span className="block text-[9px] text-label-3">{left} sn sonra panodan silinecek</span>
+            <span className="block text-[10.5px] font-medium text-label">{tt("Hassas veri · Kart numarası")}</span>
+            <span className="block text-[9px] text-label-3">{left}{" "}{tt("sn sonra panodan silinecek")}</span>
           </span>
         </div>
       </div>
@@ -603,7 +600,7 @@ function FishingDemo() {
           <motion.div key={`c${n}`} className="absolute left-[50%] top-[54px] flex flex-col items-center" initial={{ opacity: 0, y: 20, scale: 0.4 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}>
             {star ? <Star size={24} /> : <OldFile size={18} />}
             <span className="mt-0.5 text-[9px]" style={{ color: star ? "#ffd23f" : "rgba(255,255,255,0.6)" }}>
-              {star ? "Parlak yıldız!" : "eski_ödev_SON.docx"}
+              {star ? tt("Parlak yıldız!") : tt("eski_ödev_SON.docx")}
             </span>
           </motion.div>
         )}
@@ -626,10 +623,8 @@ function GuardDemo() {
           </motion.div>
           {caught && (
             <span className="min-w-0 whitespace-nowrap leading-tight">
-              <span className="block text-[11px] font-semibold" style={{ color: tintText(ACCENT.red) }}>
-                Çalışmıyor muyduk?
-              </span>
-              <span className="block text-[9px] text-label-3">YouTube açık · 14:04 kaldı</span>
+              <span className="block text-[11px] font-semibold" style={{ color: tintText(ACCENT.red) }}>{tt("Çalışmıyor muyduk?")}</span>
+              <span className="block text-[9px] text-label-3">{tt("YouTube açık · 14:04 kaldı")}</span>
             </span>
           )}
         </motion.div>
@@ -645,10 +640,10 @@ function GuardDemo() {
 /** Meşgul çip nefes alır, boş çip soluk kalır */
 function GlowDemo() {
   const rows = [
-    { id: "media", label: "Medya", sub: "Blinding Lights", color: ACCENT.pink, state: "active" },
-    { id: "focus", label: "Pomodoro", sub: "Odak · 14:04", color: ACCENT.red, state: "active" },
-    { id: "shelf", label: "Raf", sub: "Boş", color: ACCENT.teal, state: "empty" },
-    { id: "note", label: "Not", sub: "Boş", color: ACCENT.orange, state: "empty" },
+    { id: "media", label: tt("Medya"), sub: "Blinding Lights", color: ACCENT.pink, state: "active" },
+    { id: "focus", label: "Pomodoro", sub: tt("Odak · 14:04"), color: ACCENT.red, state: "active" },
+    { id: "shelf", label: tt("Raf"), sub: tt("Boş"), color: ACCENT.teal, state: "empty" },
+    { id: "note", label: tt("Not"), sub: tt("Boş"), color: ACCENT.orange, state: "empty" },
   ];
   return (
     <Stage>
@@ -689,8 +684,8 @@ function NowCards() {
   const n = useTick(1000);
   const rows = [
     { icon: Music, title: "Blinding Lights", sub: "The Weeknd", color: ACCENT.pink, p: ((n * 7) % 100) / 100 },
-    { icon: AlarmClock, title: "Toplantı", sub: "2 sa 10 dk sonra", value: "14:00", color: ACCENT.yellow },
-    { icon: CloudSun, title: "İstanbul", sub: "Parçalı bulutlu", value: "18°", color: ACCENT.blue },
+    { icon: AlarmClock, title: tt("Toplantı"), sub: tt("2 sa 10 dk sonra"), value: "14:00", color: ACCENT.yellow },
+    { icon: CloudSun, title: tt("İstanbul"), sub: tt("Parçalı bulutlu"), value: "18°", color: ACCENT.blue },
   ];
   return (
     <Stage>
@@ -751,7 +746,71 @@ function Colors() {
   );
 }
 
+/** Aynı Nook, dokuz dilde selam verir */
+function LangDemo() {
+  const face = useFace();
+  const n = useTick(1100);
+  const hellos = ["Merhaba, ben Nook", "Hi, I'm Nook", "Hola, soy Nook", "Olá, eu sou o Nook", "Hallo, ich bin Nook", "Salut, je suis Nook", "Привет, я Nook", "你好，我是 Nook", "こんにちは、Nook です"];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+        <motion.div animate={{ y: [0, -4, 0] }} transition={{ duration: 1.1, repeat: Infinity }}>
+          <NookFigure look={face.look} color={face.color} size={46} expression="happy" />
+        </motion.div>
+        <AnimatePresence mode="wait">
+          <motion.span key={n % hellos.length} className="rounded-full bg-white/[0.07] px-3 py-1 text-[12px] font-medium text-label" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+            {hellos[n % hellos.length]}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
+/** Mini ada %80'den %150'ye büyür */
+function ScaleDemo() {
+  const face = useFace();
+  const n = useTick(1200);
+  const scales = [0.8, 1, 1.3, 1.5, 1];
+  const k = scales[n % scales.length];
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-0 -translate-x-1/2">
+        <motion.div className="flex items-center justify-center bg-black" style={{ originY: 0 }} animate={{ width: 128 * k, height: 34 * k, borderBottomLeftRadius: 14 * k, borderBottomRightRadius: 14 * k }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
+          <motion.div animate={{ scale: k }}>
+            <NookFigure look={face.look} color={face.color} size={22} />
+          </motion.div>
+        </motion.div>
+      </div>
+      <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/[0.07] px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-label-2">%{Math.round(k * 100)}</span>
+    </Stage>
+  );
+}
+
+/** Aynı çipler normal ve renk körü paletlerinde */
+function CvdDemo() {
+  const n = useTick(1500);
+  const kinds = ["normal", "protan", "deutan", "tritan"] as const;
+  const p = PALETTES[kinds[n % kinds.length]];
+  const chips = [p.red, p.green, p.yellow, p.blue, p.orange, p.purple];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5">
+        <div className="flex gap-1.5">
+          {chips.map((c, i) => (
+            <motion.span key={i} className="h-7 w-7 rounded-full border-2 border-black/40" animate={{ backgroundColor: c }} transition={{ duration: 0.4 }} />
+          ))}
+        </div>
+        <span className="text-[11px] font-medium text-label-2">{["Normal", "Protanopia", "Deuteranopia", "Tritanopia"][n % 4]}</span>
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
+  lang: LangDemo,
+  scale: ScaleDemo,
+  cvd: CvdDemo,
   glow: GlowDemo,
   nowcards: NowCards,
   bodies: () => <Morph looks={NEW_BODIES} />,

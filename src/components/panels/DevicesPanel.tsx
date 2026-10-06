@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, levelColor, MiniNook, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Lukonnect'ten okunan cihazlar — Grok Bot'taki renkli ajan çipleri gibi. Nook yalnızca okur. */
 export function DevicesPanel() {
@@ -11,33 +12,31 @@ export function DevicesPanel() {
   return (
     <div className="flex h-full flex-col gap-1.5">
       <DeviceRow
-        name="Kulaklık"
+        name={tt("Kulaklık")}
         percent={headset?.percent ?? null}
         color={headset ? (charging ? ACCENT.green : levelColor(headset.percent)) : ACCENT.gray}
         detail={
           headset
             ? headset.charging === "Tam dolu"
-              ? "Tam dolu"
+              ? tt("Tam dolu")
               : charging
-                ? "Şarj oluyor"
-                : `~${hours((headset.percent / 100) * 80 * 3600)} kaldı`
+                ? tt("Şarj oluyor")
+                : tt("~{0} kaldı", hours((headset.percent / 100) * 80 * 3600))
             : lukonnect
-              ? "Bulunamadı"
-              : "Bilgi yok"
+              ? tt("Bulunamadı")
+              : tt("Bilgi yok")
         }
       />
       <DeviceRow
         name="Mouse"
         percent={mouse?.percent ?? null}
         color={mouse ? levelColor(mouse.percent) : ACCENT.gray}
-        detail={mouse ? (mouse.remainingSec > 0 ? `~${hours(mouse.remainingSec)} kaldı` : "Tahmini süre doldu") : "Bilgi yok"}
+        detail={mouse ? (mouse.remainingSec > 0 ? tt("~{0} kaldı", hours(mouse.remainingSec)) : tt("Tahmini süre doldu")) : tt("Bilgi yok")}
       />
       <FanRow on={fan?.on ?? false} speed={fan?.speed ?? 0} reachable={!!fan} />
       {!lukonnect && (
         <p className="mt-auto flex items-center gap-1.5 text-[10px] text-label-3">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT.orange }} />
-          Lukonnect kapalı — bilgiler güncel değil
-        </p>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT.orange }} />{tt("Lukonnect kapalı — bilgiler güncel değil")}</p>
       )}
     </div>
   );
@@ -46,7 +45,7 @@ export function DevicesPanel() {
 const hours = (sec: number) => {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
-  return h > 0 ? `${h} sa ${m} dk` : `${m} dk`;
+  return h > 0 ? tt("{0} sa {1} dk", h, m) : tt("{0} dk", m);
 };
 
 function DeviceRow({ name, percent, color, detail }: { name: string; percent: number | null; color: string; detail: string }) {
@@ -85,12 +84,12 @@ function FanRow({ on, speed, reachable }: { on: boolean; speed: number; reachabl
       </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between">
-          <span className="text-[12px] font-medium text-label">Vantilatör</span>
+          <span className="text-[12px] font-medium text-label">{tt("Vantilatör")}</span>
           <span className="text-[12px] font-medium" style={{ color: tintText(color) }}>
-            {!reachable ? "—" : on ? `Hız ${speed}` : "Kapalı"}
+            {!reachable ? "—" : on ? tt("Hız {0}", speed) : tt("Kapalı")}
           </span>
         </div>
-        <p className="mt-0.5 text-[10px] text-label-3">{!reachable ? "Bağlanılamadı" : on ? "Açık" : "Beklemede"}</p>
+        <p className="mt-0.5 text-[10px] text-label-3">{!reachable ? tt("Bağlanılamadı") : on ? tt("Açık") : tt("Beklemede")}</p>
       </div>
     </div>
   );

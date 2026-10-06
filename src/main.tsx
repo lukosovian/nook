@@ -9,6 +9,7 @@ import { Perch } from "./components/outings/Perch";
 import { windowLabel } from "./lib/bridge";
 import { installLogging } from "./lib/log";
 import "./styles.css";
+import { useColorVision } from "./lib/palette";
 
 async function boot() {
   installLogging();
@@ -27,12 +28,20 @@ async function boot() {
   // Yalnızca geliştirme: ?preview=perch ile pencere üstüne tüneyen Nook
   const perchDemo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "perch";
   const PerchStage = perchDemo ? (await import("./dev/PerchStage")).PerchStage : null;
+  const Logo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "logo" ? (await import("./dev/Logo")).Logo : null;
   const Gallery = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "gallery" ? (await import("./dev/Gallery")).Gallery : null;
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : <App />}
+      <ColorVision />
+      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Logo ? <Logo /> : <App />}
     </StrictMode>,
   );
 }
 
 void boot();
+
+/** Renk körlüğü paletini her pencerede uygular */
+function ColorVision() {
+  useColorVision();
+  return null;
+}
