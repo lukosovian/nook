@@ -35,6 +35,11 @@ pub fn spawn(app: AppHandle) {
         .expect("privacy thread başlatılamadı");
 }
 
+/// Şu an mikrofonu kullanan uygulamalar (görüşmedeki uygulamayı bulmak için)
+pub fn mic_apps() -> Vec<String> {
+    imp::in_use("microphone")
+}
+
 /// "C:#Program Files#Discord#app-1.0#Discord.exe" → "Discord"
 /// "Microsoft.WindowsCamera_8wekyb3d8bbwe" → "WindowsCamera"
 fn pretty(name: &str, non_packaged: bool) -> String {

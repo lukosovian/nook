@@ -2,6 +2,7 @@
  * Kalkan sahneleri (6–10): büyücü kütüphanesi, kristal madeni, zen bahçesi, sanat atölyesi, kış.
  */
 import { motion } from "motion/react";
+import { LibraryClock, MineClock, SnowClock, StudioClock, ZenClock } from "./clocks";
 import { Actor, breathe, Drift, Hand, hop, Layer, look, on, Stage, sway, useBeat, W } from "./kit";
 
 // ------------------------------------------------------------------ 6. Gizli kütüphane / büyücü odası
@@ -57,7 +58,7 @@ export function Library() {
         <motion.span key={`${i}-${beat.i === 0 ? k : 0}`} className="absolute rounded-full" style={{ left: 500 + i * 13, top: 680, width: 12 - (i % 3) * 2, height: 12 - (i % 3) * 2, background: "#8affc6", boxShadow: "0 0 10px #5df2a8" }} animate={{ y: [0, -120 - (i % 4) * 40], opacity: [1, 0] }} transition={{ duration: 1.6 + (i % 3) * 0.4, repeat: Infinity, delay: i * 0.3 }} />
       ))}
       {/* Havada süzülen parşömenler */}
-      {[[700, 220], [920, 300], [380, 260]].map(([x, y], i) => (
+      {[[560, 340], [1000, 380], [380, 260]].map(([x, y], i) => (
         <motion.div key={i} className="absolute" style={{ left: x, top: y, width: 60, height: 80, background: "linear-gradient(180deg, #f3e3bc, #e2c98f)", borderRadius: 6, boxShadow: "0 6px 16px rgba(0,0,0,0.4)" }} animate={{ y: [0, -24, 0], rotate: [-8, 8, -8] }} transition={{ duration: 5 + i, repeat: Infinity, ease: "easeInOut" }}>
           {[16, 30, 44, 58].map((t) => (
             <span key={t} className="absolute left-2 right-2 h-[3px] rounded bg-[#a88b52]/60" style={{ top: t }} />
@@ -65,6 +66,7 @@ export function Library() {
         </motion.div>
       ))}
 
+      <LibraryClock />
       {/* Cadı şapkalı iksirci */}
       <Actor x={420} y={790} size={110} look={look({ shape: "sphere", head: "witch" })} color="#6B4BFF" flip expression={beat.i === 0 ? "surprised" : "focused"} move={sway(3, 3)} act={on(beat, 0, hop(18))} actKey={k} front={<Potion pour={beat.i === 0} k={k} />} />
       {/* Merdivenin tepesinde büyü kitabı inceleyen */}
@@ -149,7 +151,7 @@ export function Mine() {
         <path d="M1600 0 L1600 900 L1360 900 Q1450 600 1330 360 Q1420 140 1600 0 Z" fill="#0d1f26" />
         <path d="M0 0 H1600 V120 Q1200 200 800 150 Q400 210 0 120 Z" fill="#0b1a20" />
         {/* Kristaller */}
-        {[[180, 500, 1.6, "#2fd4c0"], [260, 520, 1, "#5ce1e6"], [1380, 470, 1.8, "#2fd4c0"], [1300, 520, 1.1, "#7af0ff"], [680, 140, -1.2, "#2fd4c0"], [960, 150, -1.4, "#5ce1e6"], [420, 160, -1, "#7af0ff"]].map(([x, y, s, c], i) =>
+        {[[180, 500, 1.6, "#2fd4c0"], [260, 520, 1, "#5ce1e6"], [1380, 470, 1.8, "#2fd4c0"], [1300, 520, 1.1, "#7af0ff"], [520, 140, -1.2, "#2fd4c0"], [1090, 150, -1.4, "#5ce1e6"], [420, 160, -1, "#7af0ff"]].map(([x, y, s, c], i) =>
           crystal(x as number, y as number, s as number, c as string, i),
         )}
         <circle cx="200" cy="470" r="200" fill="#2fd4c0" opacity="0.08" />
@@ -168,6 +170,7 @@ export function Mine() {
           <motion.span key={`${i}-${k}`} className="absolute h-2 w-2 rounded-full bg-[#9ff6ff]" style={{ left: 1290, top: 450, boxShadow: "0 0 10px #2fd4c0" }} animate={{ x: Math.cos(i) * 90, y: Math.sin(i) * 70 - 30, opacity: [1, 0] }} transition={{ duration: 0.8, delay: 0.3 + (i % 3) * 0.4 }} />
         ))}
 
+      <MineClock />
       {/* Baretli kazmacı */}
       <Actor x={1220} y={770} size={108} look={look({ shape: "cube" })} color="#FFD21F" flip={false} expression="focused" move={breathe(3)} front={<><HardHat /><Pickaxe k={k} hit={beat.i === 0} /></>} />
       {/* Maden arabasında "hızlı git" diyen */}
@@ -278,6 +281,7 @@ export function Zen() {
       </Layer>
       <Drift count={26} from={240} to={900} xs={[900, 1600]} dur={[7, 12]} sway={120} rotate={260} render={() => <span className="block h-3 w-4 rounded-[60%_10%_60%_10%]" style={{ background: "#ffb7cf" }} />} />
 
+      <ZenClock />
       {/* Tırmıkla daire çizen */}
       <Actor x={340} y={800} size={100} look={look({ shape: "sphere", head: "sprout" })} color="#8FE03A" expression="focused" move={sway(3, 3)} act={on(beat, 0, { animate: { x: [0, 30, 0] }, transition: { duration: 2 } })} actKey={k} front={<Rake />} />
       {/* Meditasyon yapan; kafasına yaprak düşer */}
@@ -328,7 +332,7 @@ export function Studio() {
     <Stage sky="linear-gradient(180deg, #f4efe6 0%, #ebe3d4 100%)">
       <Layer>
         {/* Duvardaki renkli fırça darbeleri */}
-        {Array.from({ length: 14 }, (_, i) => (
+        {Array.from({ length: 14 }, (_, i) => i).filter((i) => { const x = 80 + i * 105; return x < 540 || x > 1010; }).map((i) => (
           <path key={i} d={`M${80 + i * 105} ${120 + (i % 4) * 70} q 40 -30 90 10`} stroke={paint[i % paint.length]} strokeWidth="18" strokeLinecap="round" fill="none" opacity="0.55" />
         ))}
         {/* Pencere ışığı */}
@@ -355,6 +359,7 @@ export function Studio() {
         <rect x="1130" y="680" width="200" height="110" rx="10" fill="#8a5a34" />
       </Layer>
 
+      <StudioClock />
       {/* Bereli, paletli ressam */}
       <Actor x={560} y={790} size={110} look={look({ shape: "sphere", head: "beret" })} color="#F4F4F6" flip expression="focused" move={breathe(3)} act={on(beat, 0, { animate: { x: [0, -10, 0] }, transition: { duration: 2 } })} actKey={k} front={<Palette k={beat.i === 0 ? k : 0} />} />
       {/* Boyaya bulanmış, boş boş bakan */}
@@ -457,6 +462,7 @@ export function Snow() {
       </Layer>
       <Drift count={70} from={-30} to={900} dur={[6, 12]} sway={40} render={(i) => <span className="block rounded-full bg-white" style={{ width: 4 + (i % 4) * 2, height: 4 + (i % 4) * 2, opacity: 0.85 }} />} />
 
+      <SnowClock />
       {/* Kardan adam yapan (burnu havuç) */}
       <Actor x={470} y={815} size={98} look={look({ shape: "sphere", texture: "plush" })} color="#FF3B4A" flip expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(14))} actKey={k} front={<motion.g animate={{ x: [0, -2, 0] }} transition={{ duration: 0.7, repeat: Infinity }}><Hand x={-4} y={10} /><Hand x={-2} y={18} /></motion.g>} />
       {/* Atkılı, kulaklıklı dev kartopu yuvarlayan */}

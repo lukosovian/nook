@@ -7,9 +7,9 @@
  *  - useBeat: birkaç saniyede bir sahnede bir olay seçer (odun atılır, çalı hışırdar…).
  */
 import { useEffect, useState, type ReactNode } from "react";
-import { motion, type TargetAndTransition, type Transition } from "motion/react";
+import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
 import type { Look } from "../../lib/look";
-import { DEFAULT_LOOK } from "../../lib/look";
+import { BODY_COLORS, DEFAULT_LOOK, EYE_STYLES, SHAPES, TEXTURES } from "../../lib/look";
 import type { Expression } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 
@@ -18,6 +18,38 @@ export const H = 900;
 
 export const look = (p: Partial<Look>): Look => ({ ...DEFAULT_LOOK, ...p });
 export const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+
+const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
+
+/** Rastgele bir Nook: gövde, doku, gözler, renk (şapka, gözlük gibi rol eşyaları ayrı kalır) */
+function randomBody() {
+  return {
+    shape: pick(SHAPES).id,
+    texture: pick(TEXTURES).id,
+    eyes: pick(EYE_STYLES).id,
+    color: pick(BODY_COLORS),
+  };
+}
+
+/**
+ * Sahnedeki karakterler sürekli değişir: rol (eşyalar, hareketler) aynı kalır, Nook başkası olur.
+ * Her oyuncu kendi zamanında (9–22 sn) değişir ki hepsi birden dönüşmesin.
+ */
+function useCastBody() {
+  const [body, setBody] = useState(randomBody);
+  useEffect(() => {
+    let t = 0;
+    const next = () => {
+      t = window.setTimeout(() => {
+        setBody(randomBody());
+        next();
+      }, rnd(9000, 22000));
+    };
+    next();
+    return () => window.clearTimeout(t);
+  }, []);
+  return body;
+}
 
 /** Ekranı kaplayan sahne */
 export function Stage({ children, sky }: { children: ReactNode; sky: string }) {
@@ -78,7 +110,6 @@ export function Actor({
   y,
   size,
   look: lk,
-  color,
   expression = "idle",
   flip = false,
   front,
@@ -93,7 +124,8 @@ export function Actor({
   y: number;
   size: number;
   look: Look;
-  color: string;
+  /** Rolün tasarımdaki rengi (oyuncu değiştikçe rastgele renk gelir) */
+  color?: string;
   expression?: Expression;
   flip?: boolean;
   front?: ReactNode;
@@ -104,6 +136,10 @@ export function Actor({
   z?: number;
   opacity?: number;
 }) {
+  // Rol aynı, oyuncu değişir: gövde/doku/göz/renk rastgele, aksesuarlar sahnenin
+  const body = useCastBody();
+  const cast: Look = { ...lk, shape: body.shape, texture: body.texture, eyes: body.eyes };
+  const id = `${body.shape}-${body.texture}-${body.eyes}-${body.color}`;
   const box = { left: -size / 2, top: -size / 2, width: size * 2, height: size * 2 };
   const svg = (children: ReactNode) => (
     <svg viewBox="-12 -12 48 48" className="pointer-events-none absolute overflow-visible" style={box}>
@@ -116,12 +152,46 @@ export function Actor({
         <motion.div key={actKey} className="absolute inset-0" style={{ originY: 1 }} animate={act?.animate} transition={act?.transition}>
           <motion.div className="absolute inset-0" animate={{ scaleX: flip ? -1 : 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }}>
             {back && svg(back)}
-            <NookFigure look={lk} color={color} size={size} expression={expression} />
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={id}
+                className="absolute inset-0"
+                initial={{ scale: 0.2, opacity: 0, rotate: -25 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                exit={{ scale: 0.2, opacity: 0, rotate: 25, transition: { duration: 0.25 } }}
+                transition={{ type: "spring", stiffness: 320, damping: 16 }}
+              >
+                <NookFigure look={cast} color={body.color} size={size} expression={expression} />
+              </motion.div>
+            </AnimatePresence>
+            <Poof k={id} />
             {front && svg(front)}
           </motion.div>
         </motion.div>
       </motion.div>
     </div>
+  );
+}
+
+/** Oyuncu değişirken küçük bir toz bulutu */
+function Poof({ k }: { k: string }) {
+  const [first] = useState(k);
+  if (k === first) return null;
+  return (
+    <span key={k} className="pointer-events-none absolute inset-0">
+      {Array.from({ length: 7 }, (_, i) => {
+        const a = (i / 7) * Math.PI * 2;
+        return (
+          <motion.span
+            key={`${k}-${i}`}
+            className="absolute left-1/2 top-1/2 h-4 w-4 rounded-full bg-white/70"
+            initial={{ x: -8, y: -8, scale: 0.4, opacity: 0.9 }}
+            animate={{ x: Math.cos(a) * 46 - 8, y: Math.sin(a) * 40 - 8, scale: 1.2, opacity: 0 }}
+            transition={{ duration: 0.55, ease: "easeOut" }}
+          />
+        );
+      })}
+    </span>
   );
 }
 

@@ -4,6 +4,7 @@
  * bir olay seçer ve ilgili Nook/eşya o olayı oynar.
  */
 import { motion } from "motion/react";
+import { BeachClock, CafeClock, CampClock, DiscoClock, SpaceClock } from "./clocks";
 import { Actor, breathe, Drift, Hand, hop, Layer, look, on, Stage, Stars, sway, useBeat, W } from "./kit";
 
 // ------------------------------------------------------------------ 1. Gece kamp ateşi
@@ -77,7 +78,7 @@ export function Campfire() {
         x={1190}
         y={790}
         size={108}
-        look={look({ shape: "bear", texture: "plush" })}
+        look={look({ head: "ears" })}
         color="#B5651D"
         expression={beat.i === 1 ? "happy" : "idle"}
         act={beat.i === 1 ? { animate: { y: [70, -40, -40, 70] }, transition: { duration: 2.4, times: [0, 0.2, 0.75, 1], ease: "easeOut" } } : { animate: { y: 70 }, transition: { duration: 0 } }}
@@ -91,6 +92,7 @@ export function Campfire() {
           ))}
         </motion.g>
       </Layer>
+      <CampClock />
     </Stage>
   );
 }
@@ -240,6 +242,7 @@ export function Cafe() {
         <rect x="0" y="720" width={W} height="8" fill="#a8744a" />
       </Layer>
 
+      <CafeClock />
       {/* Bereli, gözlüklü okur */}
       <Actor x={360} y={725} size={118} look={look({ shape: "sphere", head: "beret", glasses: "round" })} color="#F4F4F6" expression={beat.i === 0 ? "happy" : "idle"} move={breathe(4)} front={<OpenBook k={beat.i === 0 ? k : 0} />} />
       {/* Cama kalp çizen */}
@@ -373,6 +376,7 @@ export function Disco() {
       </div>
       <Drift count={30} from={160} to={900} xs={[200, 1400]} dur={[3, 6]} render={(i) => <span className="block h-1.5 w-1.5 rounded-full" style={{ background: tiles[i % tiles.length], boxShadow: `0 0 8px ${tiles[i % tiles.length]}` }} />} />
 
+      <DiscoClock />
       {/* Tütülü dansçı */}
       <Actor
         x={520}
@@ -474,6 +478,7 @@ export function Space() {
         />
       ))}
 
+      <SpaceClock />
       {/* Fanuslu süzülen */}
       <Actor x={320} y={430} size={116} look={look({ shape: "sphere" })} color="#F4F4F6" expression="happy" move={{ animate: { y: [0, -30, 0], rotate: [-8, 8, -8] }, transition: { duration: 6, repeat: Infinity, ease: "easeInOut" } }} front={<Helmet />} back={<><Hand x={-6} y={10} /><Hand x={30} y={8} /></>} />
       {/* Damlaları ağzıyla yakalayan */}
@@ -543,7 +548,7 @@ export function Beach() {
         {/* Güneş ve bulutlar */}
         <circle cx="1350" cy="140" r="70" fill="#fff3b0" />
         <circle cx="1350" cy="140" r="110" fill="#fff3b0" opacity="0.3" />
-        {[[250, 130], [600, 90], [980, 160]].map(([x, y], i) => (
+        {[[860, 110], [1080, 230], [470, 300]].map(([x, y], i) => (
           <motion.g key={i} animate={{ x: [0, 40, 0] }} transition={{ duration: 30 + i * 8, repeat: Infinity, ease: "easeInOut" }}>
             <ellipse cx={x} cy={y} rx="90" ry="26" fill="#fff" opacity="0.9" />
             <ellipse cx={x + 40} cy={y - 18} rx="50" ry="24" fill="#fff" opacity="0.9" />
@@ -584,6 +589,7 @@ export function Beach() {
         <path d="M760 760 L960 760 L1000 690" stroke="#2b8cff" strokeWidth="14" fill="none" strokeLinecap="round" />
         <path d="M790 760 l-10 50 M940 760 l10 50" stroke="#b9c0cc" strokeWidth="6" />
       </Layer>
+      <BeachClock />
       {/* Denizde can simidiyle batıp çıkan */}
       <Actor
         x={1000}

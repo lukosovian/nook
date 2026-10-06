@@ -14,6 +14,44 @@ pub const PREFIX: &str = "shield-";
 
 /// Mikrofonu kalkan kapattı: kalkan kalkınca yeniden açılır (zaten kapalıysa dokunulmaz)
 static MIC_RESTORE: AtomicBool = AtomicBool::new(false);
+/// Görüşmedeki (mikrofonu kullanan) uygulamaların kalkanın kapattığı sesleri — kalkınca açılır
+static CALL_MUTED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Mikrofonu kullanan uygulamaların hoparlör sesini kapat (görüşmedeki karşı tarafın sesi).
+/// Zaten sessizdekilere dokunulmaz; kapatılanlar hatırlanır. Kapatılan oldu mu döner.
+fn mute_calls() -> bool {
+    let users: Vec<String> = crate::privacy::mic_apps().into_iter().map(|n| n.to_lowercase()).collect();
+    if users.is_empty() {
+        return false;
+    }
+    let mut muted = CALL_MUTED.lock().unwrap();
+    for app in crate::mixer::apps() {
+        if app.muted || app.key == "system" {
+            continue;
+        }
+        let path = app.path.as_deref().unwrap_or("").to_lowercase();
+        let stem = path.rsplit(['\\', '/']).next().unwrap_or("").trim_end_matches(".exe").to_string();
+        // Masaüstü uygulaması: exe adı; mağaza uygulaması: paket adı yolun içinde geçer
+        let hit = users.iter().any(|u| !u.is_empty() && (stem == *u || path.contains(u.as_str()) || app.name.to_lowercase() == *u));
+        if hit && !muted.contains(&app.key) {
+            crate::mixer::set_muted(&app.key, true);
+            muted.push(app.key.clone());
+        }
+    }
+    !muted.is_empty()
+}
+
+fn unmute_calls() {
+    let keys = std::mem::take(&mut *CALL_MUTED.lock().unwrap());
+    if keys.is_empty() {
+        return;
+    }
+    std::thread::spawn(move || {
+        for k in keys {
+            crate::mixer::set_muted(&k, false);
+        }
+    });
+}
 
 fn open_labels(app: &AppHandle) -> Vec<String> {
     app.webview_windows().into_keys().filter(|l| l.starts_with(PREFIX)).collect()
@@ -58,17 +96,19 @@ fn open(app: &AppHandle, ask_now: bool) {
     });
     // Mikrofon açıksa kalkan boyunca sessize alınır; kapalıysa kapalı kalır.
     // COM çağrısı ana iş parçacığında değil, ayrı iş parçacığında (kısa sürer, sonucu beklenir).
-    let mic_off = std::thread::spawn(|| {
+    // Görüşmedeysen karşı tarafın sesi de kapanır.
+    let (mic_off, call_off) = std::thread::spawn(|| {
+        let call = mute_calls();
         if crate::quick::mic_muted() == Some(false) && crate::quick::set_mic_muted(true).is_ok() {
             MIC_RESTORE.store(true, Ordering::Relaxed);
-            return true;
+            return (true, call);
         }
-        false
+        (false, call)
     })
     .join()
-    .unwrap_or(false);
-    // Açılışta parola kutusu hemen görünsün mü (bilgisayar yeni açıldı); mikrofonu biz mi kapattık
-    let url = format!("index.html?{}{}", if ask_now { "ask=1&" } else { "" }, if mic_off { "mic=1" } else { "" });
+    .unwrap_or((false, false));
+    // Açılışta parola kutusu hemen görünsün mü (bilgisayar yeni açıldı); mikrofonu / görüşmeyi biz mi kapattık
+    let url = format!("index.html?{}{}{}", if ask_now { "ask=1&" } else { "" }, if mic_off { "mic=1&" } else { "" }, if call_off { "call=1" } else { "" });
     for (i, m) in monitors.iter().enumerate() {
         let scale = m.scale_factor();
         let (p, s) = (m.position(), m.size());
@@ -108,6 +148,7 @@ fn close(app: &AppHandle) {
 
 /// Kalkan mikrofonu kapattıysa geri aç; ada "mikrofon açıldı" rozetini gösterir
 fn restore_mic(app: &AppHandle) {
+    unmute_calls();
     if !MIC_RESTORE.swap(false, Ordering::Relaxed) {
         return;
     }

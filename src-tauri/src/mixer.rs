@@ -41,6 +41,22 @@ pub async fn mixer_set(
     }
 }
 
+/// Uygulamaların ses oturumları (Rust içinden: gizlilik kalkanı)
+pub fn apps() -> Vec<AppVolume> {
+    #[cfg(windows)]
+    return imp::list().unwrap_or_default();
+    #[cfg(not(windows))]
+    Vec::new()
+}
+
+/// Bir uygulamanın bütün ses oturumlarını sessize al / aç
+pub fn set_muted(key: &str, muted: bool) {
+    #[cfg(windows)]
+    let _ = imp::set(key, None, Some(muted));
+    #[cfg(not(windows))]
+    let _ = (key, muted);
+}
+
 #[cfg(windows)]
 mod imp {
     use super::*;

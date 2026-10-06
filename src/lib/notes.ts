@@ -60,6 +60,28 @@ export interface PatchNote {
 
 export const NOTES: PatchNote[] = [
   {
+    version: "0.2.39",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Sahneye göre saat, değişen Nook'lar"),
+    items: [
+      {
+        title: tt("Her sahnenin kendi saati"),
+        text: tt("Saat artık sahnenin bir parçası: kampta ahşap tabela, kafede kara tahta, diskoda neon, uzayda ekran, sahilde uçağın çektiği afiş, kütüphanede parşömen… Hiçbir şeyin önüne geçmez."),
+        demo: "shield",
+      },
+      {
+        title: tt("Sahnedeki Nook'lar değişir"),
+        text: tt("Roller aynı, oyuncular değişir: her Nook birkaç saniyede bir küçük bir toz bulutuyla başka bir gövdeye, renge ve dokuya dönüşür."),
+        demo: "bodies",
+      },
+      {
+        title: tt("Görüşmede karşı tarafın sesi de kapanır"),
+        text: tt("Kalkan açılınca mikrofonu kullanan uygulamanın (Discord, Teams, Zoom…) sesi kapanır, kalkınca geri açılır. Köşedeki rozet artık yalnızca simge."),
+        demo: "mixer",
+      },
+    ],
+  },
+  {
     version: "0.2.38",
     date: tt("6 Ekim 2026"),
     headline: tt("Parolalı kalkan, 10 canlı sahne, takvim"),

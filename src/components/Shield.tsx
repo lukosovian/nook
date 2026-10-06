@@ -7,28 +7,27 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { listen } from "@tauri-apps/api/event";
-import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Lock, MicOff, Moon, Sun, type LucideIcon } from "lucide-react";
+import { Lock, MicOff, VolumeX } from "lucide-react";
 import { inTauri, shieldOff, windowLabel } from "../lib/bridge";
 import { checkPassword } from "../lib/lock";
 import { micClick } from "../lib/clickSound";
-import { SKY_LABEL, type Sky } from "../lib/weather";
 import { useNook } from "../store/nook";
-import { tt, locale } from "../lib/i18n";
+import { tt } from "../lib/i18n";
 import { Beach, Cafe, Campfire, Disco, Space } from "./shield/scenesA";
 import { Library, Mine, Snow, Studio, Zen } from "./shield/scenesB";
 
-/** Sahneler; `bright`: açık renkli sahne (saat kartı biraz daha koyu ki yazı okunsun) */
-const SCENES: { id: string; C: () => React.JSX.Element; bright?: boolean }[] = [
+/** Sahneler: her biri kendi saatini kendi tasarımıyla çizer (shield/clocks) */
+const SCENES: { id: string; C: () => React.JSX.Element }[] = [
   { id: "campfire", C: Campfire },
   { id: "cafe", C: Cafe },
   { id: "disco", C: Disco },
   { id: "space", C: Space },
-  { id: "beach", C: Beach, bright: true },
+  { id: "beach", C: Beach },
   { id: "library", C: Library },
   { id: "mine", C: Mine },
-  { id: "zen", C: Zen, bright: true },
-  { id: "studio", C: Studio, bright: true },
-  { id: "snow", C: Snow, bright: true },
+  { id: "zen", C: Zen },
+  { id: "studio", C: Studio },
+  { id: "snow", C: Snow },
 ];
 
 function pickScene() {
@@ -68,9 +67,9 @@ export function Shield() {
       <motion.div className="absolute inset-0" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, ease: [0.2, 0.8, 0.3, 1] }}>
         <Scene />
       </motion.div>
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center pt-[6vh]">
-        <Clock bright={!!scene.bright} />
-        <div className="pointer-events-auto mt-5 h-[46px]">
+      {/* Saat her sahnenin kendi içinde; parola kutusu ortada, yalnızca sorulunca */}
+      <div className="pointer-events-none absolute inset-x-0 top-[42vh] flex justify-center">
+        <div className="pointer-events-auto h-[46px]">
           <AnimatePresence>{locked && asking && <PasswordBox onIdle={() => setAsking(false)} />}</AnimatePresence>
         </div>
       </div>
@@ -79,73 +78,33 @@ export function Shield() {
   );
 }
 
-const SKY_ICON: Record<Sky, LucideIcon> = {
-  clear: Sun,
-  partly: CloudSun,
-  cloudy: Cloud,
-  fog: CloudFog,
-  drizzle: CloudDrizzle,
-  rain: CloudRain,
-  snow: CloudSnow,
-  storm: CloudLightning,
-};
-
-/** Saat, gün/tarih ve hava durumu: buzlu cam üstünde, sade */
-function Clock({ bright }: { bright: boolean }) {
-  const [now, setNow] = useState(() => new Date());
-  const weather = useNook((s) => s.weather);
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
-  // Üç saatten eski hava bilgisi gösterilmez
-  const w = weather && Date.now() - weather.at < 3 * 3600_000 ? weather : null;
-  const Icon = w ? (w.sky === "clear" && !w.isDay ? Moon : SKY_ICON[w.sky]) : null;
-  return (
-    <motion.div
-      className="flex flex-col items-center rounded-[32px] px-10 pb-4 pt-3 text-white"
-      style={{ background: bright ? "rgba(10,12,24,0.38)" : "rgba(10,12,24,0.22)", backdropFilter: "blur(14px)", boxShadow: "0 20px 50px -20px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.12)" }}
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, type: "spring", stiffness: 260, damping: 26 }}
-    >
-      <span className="font-display text-[88px] font-semibold leading-none tracking-tight tabular-nums" style={{ textShadow: "0 4px 24px rgba(0,0,0,0.35)" }}>
-        {now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}
-      </span>
-      <span className="mt-1.5 text-[17px] font-medium capitalize text-white/85">{now.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" })}</span>
-      {w && Icon && (
-        <span className="mt-2 flex items-center gap-2 text-[14px] text-white/80" title={w.city}>
-          <Icon size={17} strokeWidth={2.2} />
-          <span className="font-semibold text-white">{w.temp}°</span>
-          <span>{SKY_LABEL[w.sky]}</span>
-          <span className="text-white/50">· {w.high}° / {w.low}°</span>
-        </span>
-      )}
-    </motion.div>
-  );
-}
-
-/** Kalkan mikrofonu kapattı: köşede rozet (Ayarlar'dan kapatılabilir), açılışta klik sesi */
+/**
+ * Kalkan mikrofonu (ve görüşmedeki karşı tarafın sesini) kapattı: köşede yalnızca simgeler, yazısız.
+ * Ayarlar'dan kapatılabilir; ilk ekrandaki kalkan klik sesi çıkarır.
+ */
 function MicBadge() {
   const fx = useNook((s) => s.settings.shieldMicFx);
-  const [muted] = useState(() => new URLSearchParams(location.search).has("mic"));
+  const [q] = useState(() => new URLSearchParams(location.search));
+  const mic = q.has("mic");
+  const call = q.has("call");
   useEffect(() => {
-    // Yalnızca ilk ekrandaki kalkan ses çıkarsın
-    if (muted && fx && (!inTauri || windowLabel === "shield-0")) micClick(false);
-  }, [muted, fx]);
-  if (!muted || !fx) return null;
+    if ((mic || call) && fx && (!inTauri || windowLabel === "shield-0")) micClick(false);
+  }, [mic, call, fx]);
+  if ((!mic && !call) || !fx) return null;
+  const icons = [mic && MicOff, call && VolumeX].filter(Boolean) as (typeof MicOff)[];
   return (
     <motion.div
-      className="absolute right-[4vh] top-[4vh] flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium text-white"
+      className="absolute right-[4vh] top-[4vh] flex items-center gap-1.5 rounded-full p-1.5"
       style={{ background: "rgba(10,12,24,0.45)", backdropFilter: "blur(12px)", boxShadow: "inset 0 0 0 1px rgba(255,140,60,0.45)" }}
-      initial={{ opacity: 0, y: -12, scale: 0.9 }}
-      animate={{ opacity: [0, 1, 1, 0.75], y: 0, scale: 1 }}
-      transition={{ duration: 1.2, times: [0, 0.2, 0.7, 1], delay: 0.6 }}
+      initial={{ opacity: 0, y: -12, scale: 0.8 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 380, damping: 22, delay: 0.6 }}
     >
-      <motion.span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#ff8a3d]" animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 0.5, delay: 0.7 }}>
-        <MicOff size={13} strokeWidth={2.6} />
-      </motion.span>
-      {tt("Mikrofon kapatıldı · kalkan kalkınca açılır")}
+      {icons.map((Icon, i) => (
+        <motion.span key={i} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8a3d] text-white" animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 0.5, delay: 0.8 + i * 0.15 }}>
+          <Icon size={16} strokeWidth={2.6} />
+        </motion.span>
+      ))}
     </motion.div>
   );
 }
