@@ -5,8 +5,8 @@
  */
 import { useNook } from "../store/nook";
 
-export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost";
-export type Texture = "smooth" | "plush";
+export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost" | "cube" | "egg" | "star" | "cat" | "bear";
+export type Texture = "smooth" | "plush" | "matte" | "jelly" | "metal" | "spots";
 export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm";
 export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle";
 export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat";
@@ -45,6 +45,11 @@ export const SHAPES: { id: ShapeId; label: string }[] = [
   { id: "flower", label: "Çiçek" },
   { id: "bean", label: "Fasulye" },
   { id: "blob", label: "Damla" },
+  { id: "cube", label: "Şeker" },
+  { id: "egg", label: "Yumurta" },
+  { id: "star", label: "Yıldız" },
+  { id: "cat", label: "Kedi" },
+  { id: "bear", label: "Ayıcık" },
   { id: "pumpkin", label: "Balkabağı" },
   { id: "ghost", label: "Hayalet" },
 ];
@@ -52,6 +57,10 @@ export const SHAPES: { id: ShapeId; label: string }[] = [
 export const TEXTURES: { id: Texture; label: string }[] = [
   { id: "smooth", label: "Vinil" },
   { id: "plush", label: "Peluş" },
+  { id: "matte", label: "Mat kil" },
+  { id: "jelly", label: "Jöle" },
+  { id: "metal", label: "Metalik" },
+  { id: "spots", label: "Benekli" },
 ];
 
 export const EYE_STYLES: { id: EyeStyle; label: string }[] = [
@@ -97,7 +106,10 @@ export const NECKS: { id: NeckId; label: string }[] = [
 ];
 
 /** Gövde renkleri: Nook'un beyazı + Dots gibi canlı, doygun tonlar */
-export const BODY_COLORS = ["#F4F4F6", "#2B8CFF", "#E23BD6", "#FFD21F", "#FF6A3D", "#8FE03A", "#9B7BFF", "#FF5C8A", "#2FD4C0", "#FF8A1F"];
+export const BODY_COLORS = [
+  "#F4F4F6", "#2B8CFF", "#E23BD6", "#FFD21F", "#FF6A3D", "#8FE03A", "#9B7BFF", "#FF5C8A", "#2FD4C0", "#FF8A1F",
+  "#FF3B4A", "#00B8FF", "#16C47F", "#C9F23A", "#6B4BFF", "#FF9EC4", "#B5651D", "#FFE3A8", "#8A8F99", "#1E3A8A",
+];
 
 /** Eski sürümlerden kalan ya da bozuk kaydı geçerli bir görünüme çevirir */
 export function normalizeLook(raw: Partial<Look> | undefined): Look {
@@ -124,7 +136,7 @@ export function randomLook(): { look: Look; color: string } {
   return {
     look: {
       shape: pick(SHAPES).id,
-      texture: Math.random() < 0.35 ? "plush" : "smooth",
+      texture: Math.random() < 0.45 ? "smooth" : pick(TEXTURES.slice(1)).id,
       eyes: pick(EYE_STYLES).id,
       glasses,
       head: slots.includes("head") ? pick(HEADS.slice(1)).id : "none",
@@ -192,8 +204,18 @@ const COLOR_NAMES: Record<string, string> = {
   "#FF5C8A": "pembe",
   "#2FD4C0": "turkuaz",
   "#FF8A1F": "turuncu",
+  "#FF3B4A": "kiraz kırmızısı",
+  "#00B8FF": "gök mavisi",
+  "#16C47F": "zümrüt yeşili",
+  "#C9F23A": "fosforlu yeşil",
+  "#6B4BFF": "çivit mavisi",
+  "#FF9EC4": "şeker pembesi",
+  "#B5651D": "karamel",
+  "#FFE3A8": "krem",
+  "#8A8F99": "gümüş grisi",
+  "#1E3A8A": "lacivert",
 };
-const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli", blob: "damla biçimli, tombul", pumpkin: "dilimli bir balkabağı", ghost: "etekleri dalgalı bir hayalet" };
+const SHAPE_WORDS: Record<ShapeId, string> = { sphere: "yuvarlak bir küre", cloud: "kabarık bir bulut", heart: "tombul bir kalp", triangle: "yumuşak bir üçgen", flower: "tırtıklı bir çiçek", bean: "fasulye biçimli", blob: "damla biçimli, tombul", pumpkin: "dilimli bir balkabağı", ghost: "etekleri dalgalı bir hayalet", cube: "yumuşak köşeli şeker küp", egg: "yumurta biçimli", star: "tombul bir yıldız", cat: "kedi kulaklı yuvarlak", bear: "ayıcık kulaklı yuvarlak" };
 const EYE_WORDS: Record<EyeStyle, string> = { pill: "iki siyah hap göz", bead: "parlak boncuk gözler", diamond: "elmas biçimli gözler", sparkle: "iri, parıltılı gözler", calm: "sakin, yarı kapalı gözler" };
 const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
   round: "yuvarlak tel gözlük",
@@ -222,7 +244,8 @@ export function describeLook(raw: Look, color = useNook.getState().settings.face
   const look = normalizeLook(raw);
   const tone = COLOR_NAMES[color.toUpperCase()] ?? "renkli";
   const wear = [look.glasses, look.head, look.neck].map((k) => WEAR_WORDS[k]).filter(Boolean);
-  return `${tone}${look.texture === "plush" ? ", peluş" : ""}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde ${wear.join(", ")}` : ""}`;
+  const tex = { smooth: "", plush: ", peluş", matte: ", mat kil", jelly: ", jöle gibi parlak", metal: ", metalik", spots: ", benekli" }[look.texture];
+  return `${tone}${tex}, ${SHAPE_WORDS[look.shape]} gövde, ${EYE_WORDS[look.eyes]}${wear.length ? `; üstünde ${wear.join(", ")}` : ""}`;
 }
 
 // ------------------------------------------------------------------ vitrin (tanıtım)

@@ -128,6 +128,10 @@ export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
   writing: [pill(3.6, 4.8, 1.4), pill(3.6, 4.8, 1.4)],
   // Büyüteçten bakan göz kocaman
   magnify: [pill(3.6, 7), pill(4.6, 9.4)],
+  // Masada: ekrana bakan, odaklanmış gözler
+  focused: [pill(3.6, 5, 1.2), pill(3.6, 5, 1.2)],
+  // Cama vururken: kaşları çatık, sana bakan gözler
+  knock: [pill(4.8, 4, 1.4), pill(4.8, 4, 1.4)],
 };
 
 interface EyeProps {

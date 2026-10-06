@@ -11,7 +11,8 @@ import { capColor, type Look } from "./look";
 /** Resmin kapsadığı alan, yüz çapının (2 birim) kaç katı: şapka, kulaklık, papyon sığsın */
 export const SPAN = 3.2;
 
-const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5, blob: 6, pumpkin: 7, ghost: 8 };
+const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5, blob: 6, pumpkin: 7, ghost: 8, cube: 9, egg: 10, star: 11, cat: 12, bear: 13 };
+const TEX_ID: Record<Look["texture"], number> = { smooth: 0, plush: 1, matte: 2, jelly: 3, metal: 4, spots: 5 };
 const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11, witch: 12, horns: 13, bat: 14 };
 const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4 };
 const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1 };
@@ -27,6 +28,11 @@ export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number 
   blob: { y: -0.1, gap: 0.33, z: 0.72 },
   pumpkin: { y: -0.06, gap: 0.36, z: 0.76 },
   ghost: { y: 0.08, gap: 0.3, z: 0.74 },
+  cube: { y: -0.04, gap: 0.32, z: 0.66 },
+  egg: { y: -0.08, gap: 0.3, z: 0.7 },
+  star: { y: -0.06, gap: 0.24, z: 0.36 },
+  cat: { y: -0.12, gap: 0.33, z: 0.74 },
+  bear: { y: -0.12, gap: 0.33, z: 0.74 },
 };
 
 /** Gözlük takılınca iki cam arasında köprüye yer kalsın diye gözler biraz açılır */
@@ -143,6 +149,7 @@ function makeRenderer(gl: WebGLRenderingContext, prog: WebGLProgram, canvas: HTM
       gl.uniform1i(u("uGlasses"), GLASSES_ID[look.glasses]);
       gl.uniform1i(u("uNeck"), NECK_ID[look.neck]);
       gl.uniform1f(u("uFur"), look.texture === "plush" ? 1 : 0);
+      gl.uniform1i(u("uTex"), TEX_ID[look.texture]);
       const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
       gl.uniform3fv(u("uColor"), rgb(color));
       gl.uniform3fv(u("uAcc"), rgb(capColor(color)));

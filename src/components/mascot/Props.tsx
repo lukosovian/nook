@@ -44,6 +44,8 @@ export function Props({ expression, sleepStyle }: { expression: Expression; slee
       {expression === "magnify" && <Magnifier key="lens" />}
       {expression === "gum" && <GumBubble key="gum" />}
       {expression === "sneeze" && <SneezePuff key="sneeze" />}
+      {expression === "focused" && <Desk key="desk" />}
+      {expression === "knock" && <Knock key="knock" />}
     </AnimatePresence>
   );
 }
@@ -357,6 +359,92 @@ function SneezePuff() {
           transition={{ duration: d * 0.6, delay: d * 0.5, times: [0, 0.1, 0.7, 1], ease: "easeOut" }}
         />
       ))}
+    </motion.div>
+  );
+}
+
+/** Pomodoro: önünde masa, üstünde dizüstü (kapağının arkası bize dönük) ve dumanı tüten kupa */
+function Desk() {
+  return (
+    <motion.div className="pointer-events-none absolute" style={{ left: -8, top: 13, width: 40, height: 16 }} {...pop}>
+      {/* Ekranın yüze vuran ışığı */}
+      <motion.span
+        className="absolute rounded-full"
+        style={{ left: 12, top: -8, width: 16, height: 11, background: "radial-gradient(circle, rgba(140,200,255,0.35) 0%, transparent 70%)" }}
+        animate={{ opacity: [0.6, 1, 0.7, 0.9, 0.6] }}
+        transition={{ duration: 2.2, repeat: Infinity }}
+      />
+      {/* Dizüstünün kapağı */}
+      <span
+        className="absolute"
+        style={{ left: 13, top: 3, width: 14, height: 5.6, borderRadius: "1.6px 1.6px 0.6px 0.6px", background: "linear-gradient(180deg, #d9dbe2 0%, #a9adb8 100%)", boxShadow: "0 1px 1.5px rgba(0,0,0,0.5)" }}
+      >
+        <span className="absolute rounded-full" style={{ left: 5.9, top: 1.7, width: 2.2, height: 2.2, background: "radial-gradient(circle, #ffffff 0%, #9fd0ff 70%)", boxShadow: "0 0 2px #9fd0ff" }} />
+      </span>
+      {/* Masanın üstü ve önü */}
+      <span className="absolute" style={{ left: 0, top: 8.6, width: 40, height: 2.2, borderRadius: 1.1, background: "linear-gradient(180deg, #c98f5c, #9b6438)" }} />
+      <span className="absolute" style={{ left: 2, top: 10.6, width: 36, height: 4.6, borderRadius: "0 0 1.4px 1.4px", background: "linear-gradient(180deg, #7d4e2b, #5e391e)" }} />
+      {/* Kupa ve buharı */}
+      <span className="absolute" style={{ left: 3.6, top: 4.4, width: 4.2, height: 4.4, borderRadius: "0.6px 0.6px 1.4px 1.4px", background: "linear-gradient(180deg, #ff6b5e, #d9443a)" }} />
+      <span className="absolute" style={{ left: 7.3, top: 5.2, width: 1.9, height: 2.4, borderRadius: "0 1.2px 1.2px 0", border: "0.7px solid #d9443a", borderLeft: "none" }} />
+      {[0, 1].map((i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full"
+          style={{ left: 4.6 + i * 1.6, top: 2.6, width: 1, height: 2.6, background: "rgba(255,255,255,0.5)" }}
+          animate={{ y: [0, -4], opacity: [0, 0.8, 0], scaleY: [0.6, 1.2] }}
+          transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.9, ease: "easeOut" }}
+        />
+      ))}
+    </motion.div>
+  );
+}
+
+/** Odak bekçisi: sol elinde çalar saat, sağ eliyle cama (ekrana) "tok tok" vurur */
+function Knock() {
+  const d = 1.6;
+  const hits = [0.2, 0.4];
+  return (
+    <motion.div className="pointer-events-none absolute" style={{ left: 0, top: 0, width: 24, height: 24 }} {...pop}>
+      {/* Çalar saat: zilleri ve dönen yelkovanı */}
+      <motion.div
+        className="absolute"
+        style={{ left: -12, top: 5, width: 11, height: 12 }}
+        animate={{ rotate: [0, -8, 8, -8, 8, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1.1 }}
+      >
+        <span className="absolute rounded-full" style={{ left: 0.2, top: 0, width: 3.6, height: 3.6, background: "#ffd23f", boxShadow: "inset 0 -0.6px 0 #c99a00" }} />
+        <span className="absolute rounded-full" style={{ left: 7.2, top: 0, width: 3.6, height: 3.6, background: "#ffd23f", boxShadow: "inset 0 -0.6px 0 #c99a00" }} />
+        <span className="absolute rounded-full" style={{ left: 0.5, top: 1.6, width: 10, height: 10, background: "radial-gradient(circle at 40% 35%, #ff7a6e 0%, #e0453a 70%, #b02e25 100%)" }} />
+        <span className="absolute rounded-full" style={{ left: 2, top: 3.1, width: 7, height: 7, background: "#fffaf0" }} />
+        <motion.span
+          className="absolute"
+          style={{ left: 5.15, top: 3.9, width: 0.7, height: 2.7, background: "#2a2a30", originY: 1, borderRadius: 0.4 }}
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        />
+        <span className="absolute rounded-full" style={{ left: 4.95, top: 6.05, width: 1.1, height: 1.1, background: "#2a2a30" }} />
+        <PropHand x={5.5} y={11.6} rotate={10} />
+      </motion.div>
+      {/* Vuruşların camdaki izi */}
+      {hits.map((t, i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full border"
+          style={{ left: 22, top: 4, width: 10, height: 10, borderColor: "rgba(200,225,255,0.9)", borderWidth: 0.7 }}
+          animate={{ scale: [0.2, 0.2, 1.6], opacity: [0, 0.9, 0] }}
+          transition={{ duration: d, repeat: Infinity, times: [0, t, Math.min(1, t + 0.25)], ease: "easeOut" }}
+        />
+      ))}
+      {/* Vuran el: her vuruşta öne (bize) gelip büyür */}
+      <motion.div
+        className="absolute"
+        style={{ left: 27, top: 9, width: 0, height: 0 }}
+        animate={{ scale: [1, 1, 1.9, 1.2, 1.9, 1, 1], x: [0, 0, -1.5, 0, -1.5, 0, 0], y: [0, 0, -1, 0, -1, 0, 0] }}
+        transition={{ duration: d, repeat: Infinity, times: [0, 0.1, 0.2, 0.3, 0.4, 0.55, 1], ease: "easeInOut" }}
+      >
+        <PropHand x={0} y={0} rotate={-30} />
+      </motion.div>
     </motion.div>
   );
 }

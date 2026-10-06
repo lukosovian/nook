@@ -111,3 +111,11 @@ button {
     transform: scale(0.85);
   }
 }
+
+/* Kaydırılabilir ama çubuğu görünmeyen şeritler (Ayarlar bölüm sekmeleri) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

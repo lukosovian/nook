@@ -3,6 +3,7 @@ mod archive;
 mod argus;
 mod audio;
 mod brightness;
+mod buddy;
 mod clipboard;
 mod commands;
 mod downloads;
@@ -79,6 +80,9 @@ pub fn run() {
             commands::island_drag,
             clipboard::clipboard_clear_if,
             shield::shield_off,
+            buddy::perch_start,
+            buddy::perch_stop,
+            buddy::guard_alert,
             archive::archive_list,
             archive::archive_extract,
             argus::argus_snapshot,
@@ -133,7 +137,8 @@ pub fn run() {
             clipboard::spawn(handle.clone());
             media::spawn(handle.clone());
             system::spawn(handle.clone(), shared.clone());
-            fullscreen::spawn(handle.clone(), shared);
+            fullscreen::spawn(handle.clone(), shared.clone());
+            buddy::spawn(handle.clone(), shared);
             privacy::spawn(handle.clone());
             downloads::spawn(handle.clone());
             audio::spawn(handle.clone());

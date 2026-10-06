@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { Eye, EyeOff, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
@@ -60,6 +61,7 @@ export function SettingsPanel() {
 
   return (
     <div ref={scroller} className="h-full space-y-3 overflow-y-auto pr-1.5">
+      <SectionIndex scroller={scroller} />
       <Section title="Nook">
         <Affection />
         <Row label="Adı ve görünümü">
@@ -67,6 +69,9 @@ export function SettingsPanel() {
         </Row>
         <Row label="Uyuma süresi">
           <Segmented id="sleep" options={SLEEP} value={s.sleepAfterSec} onChange={(v) => update({ sleepAfterSec: v })} />
+        </Row>
+        <Row label="Ara sıra dışarı çıksın (pencereye tüner, iple sarkar, balık tutar)">
+          <Toggle on={s.outings} onChange={(v) => update({ outings: v })} />
         </Row>
         <Row label="Nook nedir? Nasıl kullanılır?">
           <TextButton onClick={() => void startTour()}>Tanıtımı aç</TextButton>
@@ -82,6 +87,21 @@ export function SettingsPanel() {
           <Segmented id="settings-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
         </Row>
         <p className="-mt-0.5 pb-1 text-[10px] text-label-3">Odak modundan bağımsız, her zaman çalışır. Oyunda ve tam ekranda susar.</p>
+      </Section>
+
+      <Section title="Odak bekçisi">
+        <Row label="Pomodoro'da dikkat dağıtan siteye girince uyar">
+          <Toggle on={s.focusGuard} onChange={(v) => update({ focusGuard: v })} color={ACCENT.red} />
+        </Row>
+        {s.focusGuard && (
+          <Row label="Siteler / uygulamalar (virgülle)">
+            <TextInput
+              value={s.focusSites.join(", ")}
+              placeholder="YouTube, X, Discord"
+              onChange={(v) => update({ focusSites: v.split(",").map((x) => x.trim()).filter(Boolean) })}
+            />
+          </Row>
+        )}
       </Section>
 
       <AiSection />
@@ -304,9 +324,73 @@ function UpdateRow() {
   );
 }
 
+/** Bölümler arası hızlı geçiş: üstte yapışık kalan ince sekme şeridi; kaydırdıkça bulunulan bölüm parlar */
+const INDEX: { label: string; title: string }[] = [
+  { label: "Nook", title: "Nook" },
+  { label: "Molalar", title: "Mola hatırlatıcıları" },
+  { label: "Bekçi", title: "Odak bekçisi" },
+  { label: "Yapay zekâ", title: "Yapay zekâ" },
+  { label: "Argus", title: "Argus" },
+  { label: "Davranış", title: "Davranış" },
+  { label: "Bildirimler", title: "Bildirimler" },
+];
+
+function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement | null> }) {
+  const [current, setCurrent] = useState(0);
+  const strip = useRef<HTMLDivElement>(null);
+  const find = (title: string) => scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${title}"]`) ?? null;
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const onScroll = () => {
+      const y = el.scrollTop + 44;
+      let at = 0;
+      INDEX.forEach((it, i) => {
+        const sec = find(it.title);
+        if (sec && sec.offsetTop <= y) at = i;
+      });
+      // En alta gelindiyse son bölüm
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) at = INDEX.length - 1;
+      setCurrent(at);
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [scroller]);
+
+  // Seçili sekme şeritte görünür kalsın
+  useEffect(() => {
+    strip.current?.querySelector<HTMLElement>(`[data-i="${current}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [current]);
+
+  const go = (i: number) => {
+    const sec = find(INDEX[i].title);
+    if (sec && scroller.current) scroller.current.scrollTo({ top: sec.offsetTop - 36, behavior: "smooth" });
+  };
+
+  return (
+    <div className="sticky top-0 z-10 -mb-1 bg-[#1c1c1f] pb-2" style={{ boxShadow: "0 8px 10px -6px #1c1c1f" }}>
+      <div ref={strip} className="no-scrollbar flex gap-1 overflow-x-auto">
+        {INDEX.map((it, i) => (
+          <button
+            key={it.label}
+            data-i={i}
+            onClick={() => go(i)}
+            className={`relative shrink-0 rounded-full px-2.5 py-[3px] text-[10.5px] font-medium transition-colors ${i === current ? "text-label" : "text-label-3 hover:text-label-2"}`}
+          >
+            {i === current && <motion.span layoutId="set-idx" className="absolute inset-0 rounded-full bg-white/[0.09]" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+            <span className="relative">{it.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
+    <section data-sec={title}>
       <h3 className="mb-1 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">{title}</h3>
       <div className="divide-y divide-white/[0.05]">{children}</div>
     </section>

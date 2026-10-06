@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.33"
+version = "0.2.36"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -55,6 +55,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_Storage_FileSystem",
   "Win32_UI_Shell",
   "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dwm",
+  "Win32_UI_HiDpi",
   "Win32_System_Shutdown",
   "Win32_Media_Audio",
   "Win32_Devices_Bluetooth",

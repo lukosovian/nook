@@ -235,6 +235,10 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: "Toplantı", repeat: "once", enabled: false, next: null } });
   } else if (mode === "feeding") {
     useNook.setState({ media: null, mood: "hungry" });
+  } else if (mode === "hang" || mode === "fish") {
+    useNook.setState({ media: null, outing: mode });
+  } else if (mode === "guard") {
+    useNook.setState({ media: null, guard: { site: params.get("site") ?? "YouTube" }, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 1 } });
   } else if (mode === "focusmini") {
     useNook.setState({ media: null, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000, left: 0, total: 25 * 60_000, round: 1 } });
   } else if (mode === "listen") {
@@ -250,7 +254,7 @@ export function applyPreview(mode: string) {
   const freeze = useNook.getState();
   useNook.setState = ((orig) => (partial: Parameters<typeof orig>[0], replace?: boolean) => {
     const next = typeof partial === "function" ? partial(useNook.getState()) : partial;
-    const blocked = ["hovered", "osd", "toasts", "searching", "antic", "tab"];
+    const blocked = ["hovered", "osd", "toasts", "searching", "antic", "tab", "guard", "outing"];
     const filtered = Object.fromEntries(Object.entries(next as object).filter(([k]) => !blocked.includes(k)));
     orig(filtered as never, replace as never);
   })(useNook.setState) as typeof useNook.setState;

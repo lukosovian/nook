@@ -53,6 +53,9 @@ export type Antic =
   | "note"
   | "magnify";
 
+/** Nook adadan dışarıda: pencere üstüne tünemiş, iple sarkıyor ya da balık tutuyor */
+export type Outing = "perch" | "hang" | "fish";
+
 /** Yüz ifadesi = mood › antic › uyku › yorgunluk (düşük pil) › gece uykululuğu */
 export type Expression =
   | Mood
@@ -71,7 +74,11 @@ export type Expression =
   | "volUp"
   | "volDown"
   | "loud"
-  | "muted";
+  | "muted"
+  /** Pomodoro sürerken masasında çalışır */
+  | "focused"
+  /** Odak bekçisi: cama vurup saati gösterir */
+  | "knock";
 
 /** Sohbet mesajı (kalıcı) */
 export interface ChatItem {
@@ -235,6 +242,16 @@ export interface Settings extends NativeSettings {
   argusProfile: string;
   /** Argus klasörü elle seçildiyse (boş = otomatik bul) */
   argusDir: string;
+  /** Nook ara sıra dışarı çıksın: pencere üstüne tüner, iple sarkar, boştayken balık tutar */
+  outings: boolean;
+  /** Odak bekçisi: çalışırken dikkat dağıtan siteye girince uyarır */
+  focusGuard: boolean;
+  /** Bekçinin uyardığı siteler/uygulamalar (başlıkta ya da uygulama adında geçen) */
+  focusSites: string[];
+  /** Ana sayfa çiplerinin sırası (kullanıcı sürükleyip dizer; boşsa varsayılan) */
+  homeOrder: string[];
+  /** Ana sayfada gizlenen çipler */
+  homeHidden: string[];
   /** Argus'u olmayanlara Argus'u tanıt (ana sayfa çipi) */
   argusPromo: boolean;
   /** Takip ettiğin dizilerin yeni bölüm haberleri */
@@ -290,6 +307,11 @@ export const DEFAULT_SETTINGS: Settings = {
   argusDir: "",
   argusNews: true,
   argusDetect: true,
+  outings: true,
+  homeOrder: [],
+  homeHidden: [],
+  focusGuard: true,
+  focusSites: ["YouTube", "X", "Instagram", "TikTok", "Reddit", "Facebook", "Twitch"],
 };
 
 export interface Osd {
@@ -398,6 +420,12 @@ interface NookState {
   notesSeen: string;
   /** Son oyun teklifinin zamanı */
   lastOffer: number;
+  /** Nook adanın dışında (adadaki yeri boş) */
+  outing: Outing | null;
+  /** Odak bekçisi uyarıyor: hangi site */
+  guard: { site: string } | null;
+  /** Balıkta tutulanlar (toplam) */
+  catches: { stars: number; trash: number };
 
   setMood: (mood: Mood) => void;
   setAntic: (antic: Antic | null) => void;
@@ -472,6 +500,9 @@ interface NookState {
   setNotesSeen: (version: string) => void;
   setSummaryDay: (day: string) => void;
   setLastOffer: (at: number) => void;
+  setOuting: (outing: Outing | null) => void;
+  setGuard: (guard: NookState["guard"]) => void;
+  addCatch: (kind: "stars" | "trash") => void;
   patchClip: (id: string, patch: Partial<ClipItem>) => void;
 }
 
@@ -536,6 +567,9 @@ export const useNook = create<NookState>()(
       archive: null,
       notesSeen: "",
       lastOffer: 0,
+      outing: null,
+      guard: null,
+      catches: { stars: 0, trash: 0 },
 
       setMood: (mood) => set({ mood }),
       setAntic: (antic) => set({ antic }),
@@ -690,6 +724,9 @@ export const useNook = create<NookState>()(
       setArchive: (archive) => set({ archive }),
       setNotesSeen: (notesSeen) => set({ notesSeen }),
       setLastOffer: (lastOffer) => set({ lastOffer }),
+      setOuting: (outing) => set({ outing }),
+      setGuard: (guard) => set({ guard }),
+      addCatch: (kind) => set((s) => ({ catches: { ...s.catches, [kind]: s.catches[kind] + 1 } })),
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       setBusy: (key, on) =>
         set((s) => ({ busy: on ? [...s.busy.filter((k) => k !== key), key] : s.busy.filter((k) => k !== key) })),
@@ -718,6 +755,7 @@ export const useNook = create<NookState>()(
         summaryDay: s.summaryDay,
         lastOffer: s.lastOffer,
         toured: s.toured,
+        catches: s.catches,
       }),
       // Yeni eklenen ayar alanları eski kayıtlarda da varsayılanla gelsin.
       merge: (persisted, current) => {
@@ -749,8 +787,12 @@ export const SULK_BELOW = 25;
  */
 export const isSleeping = (s: Pick<NookState, "asleep" | "media">) => s.asleep && !s.media?.playing;
 
+/** Pomodoro'nun çalışma fazı sürüyor (duraklatılmamış) */
+export const isWorking = (s: Pick<NookState, "focus">) => !!s.focus && s.focus.phase === "work" && s.focus.endsAt !== null;
+
 export function expressionOf(s: NookState): Expression {
   if (s.ringing) return "alarm";
+  if (s.guard) return "knock";
   if (s.mood !== "idle") return s.mood;
   if (s.grabbed) return "surprised";
   // Ses/parlaklık değişirken Nook bara tepki verir
@@ -766,6 +808,8 @@ export function expressionOf(s: NookState): Expression {
   // Sohbette cevabı kâğıda yazar
   if (s.talking) return "writing";
   if (s.downloads.length) return "downloading";
+  // Pomodoro sürerken masasında çalışır
+  if (isWorking(s)) return "focused";
   // Müzik/video çalarken dalgalı gözler (idle) gece/yorgun/küs hâllerin önüne geçer
   if (s.media?.playing) return "idle";
   // Tanıtımı anlatırken uyumaz

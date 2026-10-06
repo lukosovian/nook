@@ -93,7 +93,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     rung_for = next;
                     let _ = app.emit("nook://alarm-due", next);
                 }
-                let enabled = settings.hide_in_fullscreen && !alarm;
+                let guard = shared.guard.load(Ordering::Relaxed);
+                let enabled = settings.hide_in_fullscreen && !alarm && !guard;
                 let mut break_due: Option<GamePeek> = None;
                 let detected = imp::fullscreen_monitor(&shared);
 
@@ -163,7 +164,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", false);
                     }
                     // Oyun da "en üstte" olabilir — alarm/kısa gösterim sırasında adayı tekrar tekrar en öne it
-                    if alarm || (peek && in_game) {
+                    if alarm || guard || (peek && in_game) {
                         imp::raise(ws.hwnd);
                     }
                 }
@@ -190,6 +191,12 @@ fn webview_visible(app: &AppHandle, label: &str, on: bool) {
     }
     #[cfg(not(windows))]
     let _ = (app, label, on);
+}
+
+/// Pencerenin sahibi sürecin exe yolu (Odak bekçisi için)
+#[cfg(windows)]
+pub fn exe_path(hwnd: isize) -> Option<String> {
+    imp::exe_of(hwnd as _).map(|(_, e)| e)
 }
 
 #[cfg(windows)]
@@ -253,7 +260,7 @@ mod imp {
     }
 
     /// Pencerenin sahibi sürecin kimliği ve tam yolu.
-    fn exe_of(hwnd: HWND) -> Option<(u32, String)> {
+    pub fn exe_of(hwnd: HWND) -> Option<(u32, String)> {
         use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
         let mut pid = 0u32;
         unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };

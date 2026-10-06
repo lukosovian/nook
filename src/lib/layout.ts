@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "guard";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -19,6 +19,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   alarm: { width: 360, height: 70, radius: 26 },
   /** Su hatırlatması: cevaplanana kadar durur */
   reminder: { width: 440, height: 66, radius: 26 },
+  /** Odak bekçisi: Nook cama vurup saati gösterir */
+  guard: { width: 500, height: 78, radius: 28 },
   /** "Nook nedir?" tanıtımı: ada ekrana yayılır */
   tour: { width: 900, height: 520, radius: 40 },
   /** Günün özeti: ada büyür, solda kocaman Nook, sağda kartlar */
@@ -160,6 +162,8 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
     case "alarm":
     case "reminder":
       return center(36, height / 2 + 2, 1.45);
+    case "guard":
+      return center(44, height / 2 + 3, 1.75);
     default:
       return center(width / 2, height / 2, 1);
   }

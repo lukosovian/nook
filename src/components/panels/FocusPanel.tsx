@@ -74,6 +74,9 @@ export function FocusPanel() {
           <Row label="Süre (dk)">
             <Segmented id="work" options={WORK} value={s.focusWork} onChange={(v) => update({ focusWork: v, focusBreak: v >= 50 ? 10 : 5, focusLong: v >= 50 ? 20 : 15 })} color={ACCENT.red} />
           </Row>
+          <Row label="Odak bekçisi (YouTube, X…)">
+            <Toggle on={s.focusGuard} onChange={(v) => update({ focusGuard: v })} color={ACCENT.red} />
+          </Row>
           <Row label="Odakta bildirim yok">
             <Toggle on={s.focusMute} onChange={(v) => update({ focusMute: v })} color={ACCENT.red} />
           </Row>

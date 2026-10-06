@@ -173,7 +173,7 @@ export function TextButton({
       disabled={disabled}
       onClick={onClick}
       className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-35 ${
-        tone === "danger" ? "text-red/90 enabled:hover:bg-red/10" : "text-label-2 enabled:hover:bg-well-hi enabled:hover:text-label"
+        tone === "danger" ? "border border-red/30 bg-red/[0.07] text-red/90 enabled:hover:border-red/50 enabled:hover:bg-red/15" : "text-label-2 enabled:hover:bg-well-hi enabled:hover:text-label"
       }`}
     >
       {children}

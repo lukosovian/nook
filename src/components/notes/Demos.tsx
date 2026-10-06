@@ -4,11 +4,12 @@
  */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, Check, FileArchive, FileText, Folder, LockKeyhole, Maximize2, MousePointer2, Move, RotateCw, ScrollText, Sparkles } from "lucide-react";
+import { AlarmClock, Bell, Check, CloudSun, FileArchive, FileText, Folder, LockKeyhole, Maximize2, MousePointer2, Move, RotateCw, Music, ScrollText, Sparkles } from "lucide-react";
 import { CHIP_NOOKS, DEFAULT_LOOK, HALLOWEEN, normalizeColor, normalizeLook, SHOWCASE, type Look } from "../../lib/look";
 import type { DemoId } from "../../lib/notes";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
+import { OldFile, Star } from "../outings/Parts";
 import { IntroPreview, MovePreview } from "../panels/EffectPreview";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 
@@ -524,7 +525,242 @@ function Chips() {
   );
 }
 
+/** Pencere sağa sola taşınır, üstündeki Nook geride kalıp sendeler */
+function PerchDemo() {
+  const face = useFace();
+  const n = useTick(1400);
+  const right = n % 2 === 0;
+  return (
+    <Stage bg="linear-gradient(160deg,#2b4a6b,#1a2433)">
+      <motion.div className="absolute top-[58px] h-[90px] w-[170px]" animate={{ left: right ? 120 : 30 }} transition={{ duration: 0.7, ease: "easeInOut" }}>
+        <div className="absolute inset-0 overflow-hidden rounded-[6px] bg-[#f0f0f0] shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+          <div className="flex h-[18px] items-center justify-end gap-2 bg-[#e2e2e2] px-2 text-[8px] text-[#444]">
+            <span>—</span>
+            <span>▢</span>
+            <span>✕</span>
+          </div>
+        </div>
+        <motion.div
+          className="absolute left-[56px] top-[-31px]"
+          style={{ originY: 1 }}
+          animate={{ rotate: right ? [0, -26, 14, -7, 3, 0] : [0, 26, -14, 7, -3, 0] }}
+          transition={{ duration: 1.3, times: [0, 0.3, 0.5, 0.7, 0.85, 1] }}
+        >
+          <NookFigure look={face.look} color={face.color} size={34} expression="surprised" />
+        </motion.div>
+      </motion.div>
+    </Stage>
+  );
+}
+
+/** Ekranın altında çalışırken Nook ipiyle iner; imleç yaklaşınca kaçar */
+function DangleDemo() {
+  const face = useFace();
+  const n = useTick(1600);
+  const phase = n % 3; // 0 iner, 1 izler, 2 imleç gelir ve kaçar
+  const down = phase !== 2;
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-0 -translate-x-1/2">
+        <MiniIsland />
+      </div>
+      <motion.div className="absolute left-1/2 top-[34px]" style={{ originY: 0 }} animate={{ rotate: [-4, 4, -4] }} transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}>
+        <motion.span className="absolute left-[-0.5px] top-0 w-px bg-white/70" animate={{ height: down ? 56 : 0 }} transition={down ? { type: "spring", stiffness: 90, damping: 8 } : { duration: 0.25 }} />
+        <motion.div className="absolute left-[-14px]" animate={{ top: down ? 56 : -10, opacity: down ? 1 : 0 }} transition={down ? { type: "spring", stiffness: 90, damping: 8 } : { duration: 0.25 }}>
+          <NookFigure look={face.look} color={face.color} size={28} expression={phase === 2 ? "surprised" : "idle"} />
+        </motion.div>
+      </motion.div>
+      <motion.div className="absolute" animate={{ left: phase === 2 ? "46%" : "78%", top: phase === 2 ? 122 : 150 }} transition={{ duration: 0.5 }}>
+        <MousePointer2 size={16} className="fill-white text-black" />
+      </motion.div>
+    </Stage>
+  );
+}
+
+/** Boşta: adanın kenarında olta, bazen yıldız bazen eski dosya */
+function FishingDemo() {
+  const face = useFace();
+  const n = useTick(1500);
+  const step = n % 4; // 0-1 bekler, 2 vurdu, 3 çıkardı
+  const star = Math.floor(n / 4) % 2 === 0;
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-0 -translate-x-[70%]">
+        <MiniIsland />
+      </div>
+      <div className="absolute left-[52%] top-[22px]">
+        <NookFigure look={face.look} color={face.color} size={26} expression={step === 2 ? "surprised" : step === 3 ? (star ? "happy" : "annoyed") : "drowsy"} />
+      </div>
+      <svg className="absolute inset-0 h-full w-full overflow-visible">
+        <line x1="57%" y1="44" x2="72%" y2="18" stroke="#c99a5c" strokeWidth="2" strokeLinecap="round" />
+        <motion.line x1="72%" y1="18" x2="73%" stroke="rgba(255,255,255,0.55)" strokeWidth="1" animate={{ y2: step === 3 ? 40 : step === 2 ? 142 : 134 }} transition={{ duration: 0.4 }} />
+      </svg>
+      {step < 3 && (
+        <motion.span className="absolute left-[73%] -ml-[3px] block h-[7px] w-[7px] rounded-full" style={{ background: "linear-gradient(180deg,#ff453a 0 50%,#fff 50%)" }} animate={{ top: step === 2 ? [131, 139, 131, 140] : [128, 130, 128] }} transition={{ duration: 0.9, repeat: Infinity }} />
+      )}
+      <AnimatePresence>
+        {step === 3 && (
+          <motion.div key={`c${n}`} className="absolute left-[50%] top-[54px] flex flex-col items-center" initial={{ opacity: 0, y: 20, scale: 0.4 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}>
+            {star ? <Star size={24} /> : <OldFile size={18} />}
+            <span className="mt-0.5 text-[9px]" style={{ color: star ? "#ffd23f" : "rgba(255,255,255,0.6)" }}>
+              {star ? "Parlak yıldız!" : "eski_ödev_SON.docx"}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Stage>
+  );
+}
+
+/** Pomodoro'da YouTube açılınca Nook cama vurur */
+function GuardDemo() {
+  const face = useFace();
+  const n = useTick(2400);
+  const caught = n % 2 === 0;
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-0 -translate-x-1/2">
+        <motion.div className="flex items-center gap-2 overflow-hidden bg-black px-3" animate={{ width: caught ? 270 : 150, height: caught ? 54 : 30 }} style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }} transition={{ type: "spring", stiffness: 380, damping: 30 }}>
+          <motion.div animate={caught ? { scale: [1, 1.12, 1, 1.12, 1] } : { scale: 1 }} transition={{ duration: 0.8, repeat: caught ? Infinity : 0, repeatDelay: 0.6 }}>
+            <NookFigure look={face.look} color={face.color} size={caught ? 30 : 20} expression={caught ? "annoyed" : "read"} />
+          </motion.div>
+          {caught && (
+            <span className="min-w-0 whitespace-nowrap leading-tight">
+              <span className="block text-[11px] font-semibold" style={{ color: tintText(ACCENT.red) }}>
+                Çalışmıyor muyduk?
+              </span>
+              <span className="block text-[9px] text-label-3">YouTube açık · 14:04 kaldı</span>
+            </span>
+          )}
+        </motion.div>
+      </div>
+      <div className="absolute inset-x-5 bottom-3 top-[64px] overflow-hidden rounded-[6px] bg-[#202024]">
+        <div className="flex h-[14px] items-center bg-[#2c2c31] px-2 text-[8px] text-white/50">{caught ? "YouTube" : "rapor.docx"}</div>
+        <div className="m-2 h-[40px] rounded" style={{ background: caught ? "linear-gradient(135deg,#ff0033,#7a0018)" : "rgba(255,255,255,0.06)" }} />
+      </div>
+    </Stage>
+  );
+}
+
+/** Meşgul çip nefes alır, boş çip soluk kalır */
+function GlowDemo() {
+  const rows = [
+    { id: "media", label: "Medya", sub: "Blinding Lights", color: ACCENT.pink, state: "active" },
+    { id: "focus", label: "Pomodoro", sub: "Odak · 14:04", color: ACCENT.red, state: "active" },
+    { id: "shelf", label: "Raf", sub: "Boş", color: ACCENT.teal, state: "empty" },
+    { id: "note", label: "Not", sub: "Boş", color: ACCENT.orange, state: "empty" },
+  ];
+  return (
+    <Stage>
+      <div className="absolute inset-4 grid grid-cols-2 content-center gap-2">
+        {rows.map((r, i) => {
+          const c = CHIP_NOOKS[r.id];
+          const on = r.state === "active";
+          return (
+            <div key={r.id} className="relative">
+              {on && (
+                <motion.span
+                  className="absolute inset-0 rounded-full"
+                  style={{ boxShadow: `0 0 16px -3px ${r.color}` }}
+                  animate={{ opacity: [0.25, 1, 0.25] }}
+                  transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.4 }}
+                />
+              )}
+              <div className="relative flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-2" style={{ background: tintBg(r.color, on ? 18 : 7), borderColor: tintBg(r.color, on ? 62 : 20), opacity: on ? 1 : 0.6 }}>
+                <motion.span animate={on ? { y: [0, -1.6, 0], rotate: [-5, 5, -5] } : {}} transition={{ duration: 1, repeat: Infinity }}>
+                  <NookFigure look={c.look} color={c.color} size={20} expression={on ? "happy" : "drowsy"} />
+                </motion.span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-[10.5px] font-medium" style={{ color: tintText(r.color) }}>{r.label}</span>
+                  <span className="block truncate text-[9px] text-label-3">{r.sub}</span>
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Stage>
+  );
+}
+
+/** Nook'un yanındaki "şu an" kartları */
+function NowCards() {
+  const face = useFace();
+  const n = useTick(1000);
+  const rows = [
+    { icon: Music, title: "Blinding Lights", sub: "The Weeknd", color: ACCENT.pink, p: ((n * 7) % 100) / 100 },
+    { icon: AlarmClock, title: "Toplantı", sub: "2 sa 10 dk sonra", value: "14:00", color: ACCENT.yellow },
+    { icon: CloudSun, title: "İstanbul", sub: "Parçalı bulutlu", value: "18°", color: ACCENT.blue },
+  ];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex items-center gap-3 px-4">
+        <NookFigure look={face.look} color={face.color} size={52} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {rows.map((r, i) => (
+            <div key={r.title} className="relative flex items-center gap-1.5 overflow-hidden rounded-[10px] border px-1.5 py-1" style={{ background: i === 0 ? tintBg(r.color, 10) : "rgb(255 255 255 / 0.03)", borderColor: i === 0 ? tintBg(r.color, 30) : "rgb(255 255 255 / 0.05)" }}>
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full" style={{ background: tintBg(r.color, 20), color: r.color }}>
+                <r.icon size={10} strokeWidth={2.4} />
+              </span>
+              <span className="min-w-0 flex-1 leading-tight">
+                <span className="block truncate text-[10.5px] font-medium text-label">{r.title}</span>
+                <span className="block truncate text-[8.5px] text-label-3">{r.sub}</span>
+              </span>
+              {r.value && <span className="text-[10px] font-semibold tabular-nums text-label-2">{r.value}</span>}
+              {r.p != null && (
+                <span className="absolute inset-x-1.5 bottom-[2px] h-[2px] rounded-full bg-white/[0.06]">
+                  <motion.span className="block h-full rounded-full" style={{ background: r.color }} animate={{ width: `${r.p * 100}%` }} />
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
+const NEW_BODIES: { look: Look; color: string }[] = [
+  { look: { ...DEFAULT_LOOK, shape: "cube" }, color: "#FF5C8A" },
+  { look: { ...DEFAULT_LOOK, shape: "egg", texture: "matte" }, color: "#FFE3A8" },
+  { look: { ...DEFAULT_LOOK, shape: "star", texture: "jelly" }, color: "#FFD21F" },
+  { look: { ...DEFAULT_LOOK, shape: "cat", texture: "plush" }, color: "#FF8A1F" },
+  { look: { ...DEFAULT_LOOK, shape: "bear", texture: "plush" }, color: "#B5651D" },
+];
+const NEW_TEXTURES: { look: Look; color: string }[] = [
+  { look: { ...DEFAULT_LOOK, texture: "matte" }, color: "#16C47F" },
+  { look: { ...DEFAULT_LOOK, texture: "jelly" }, color: "#00B8FF" },
+  { look: { ...DEFAULT_LOOK, texture: "metal" }, color: "#8A8F99" },
+  { look: { ...DEFAULT_LOOK, texture: "spots" }, color: "#FF3B4A" },
+];
+
+/** Yeni renkler sırayla dalga yapar */
+function Colors() {
+  const n = useTick(150);
+  const list = ["#FF3B4A", "#00B8FF", "#16C47F", "#C9F23A", "#6B4BFF", "#FF9EC4", "#B5651D", "#FFE3A8", "#8A8F99", "#1E3A8A"];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-wrap content-center items-center justify-center gap-1.5 px-4">
+        {list.map((c, i) => (
+          <motion.div key={c} animate={{ y: n % list.length === i ? -8 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 16 }}>
+            <NookFigure look={DEFAULT_LOOK} color={c} size={30} />
+          </motion.div>
+        ))}
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
+  glow: GlowDemo,
+  nowcards: NowCards,
+  bodies: () => <Morph looks={NEW_BODIES} />,
+  textures: () => <Morph looks={NEW_TEXTURES} />,
+  colors: Colors,
+  perch: PerchDemo,
+  dangle: DangleDemo,
+  fishing: FishingDemo,
+  guard: GuardDemo,
   archive: ArchiveDemo,
   shield: ShieldDemo,
   sensitive: SensitiveDemo,

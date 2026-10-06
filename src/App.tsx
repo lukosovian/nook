@@ -9,6 +9,7 @@ import { useAlarms } from "./hooks/useAlarms";
 import { useAntics } from "./hooks/useAntics";
 import { useCursorFeed } from "./hooks/useCursorFeed";
 import { useFeeding } from "./hooks/useFeeding";
+import { useFocusGuard, useOutings } from "./hooks/useOutings";
 import {
   useAskScreenFeed,
   useDayTracker,
@@ -81,6 +82,8 @@ export default function App() {
   useUpdateCheck();
   useArgusFeed();
   useArgusDetect();
+  useOutings();
+  useFocusGuard();
 
   return <Island />;
 }

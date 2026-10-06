@@ -26,6 +26,8 @@ import {
   Video,
   type LucideIcon,
   Heart,
+  Fish,
+  ShieldCheck,
 } from "lucide-react";
 import type { SysEventKind } from "../../lib/bridge";
 import { useNook } from "../../store/nook";
@@ -62,6 +64,8 @@ const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
   update: { icon: Download, color: ACCENT.green },
   argus: { icon: Clapperboard, color: ACCENT.orange },
   welcome: { icon: Heart, color: ACCENT.pink },
+  fish: { icon: Fish, color: ACCENT.yellow },
+  guard: { icon: ShieldCheck, color: ACCENT.green },
 };
 
 /** Sistem olayı kartı: solda Nook (rozetli), ortada metin, sağda renkli mini avatar. */

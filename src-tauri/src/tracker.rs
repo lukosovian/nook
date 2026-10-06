@@ -239,7 +239,7 @@ pub fn cursor_position(app: &AppHandle) -> Option<(f64, f64)> {
 }
 
 #[cfg(windows)]
-fn system_idle() -> Option<Duration> {
+pub(crate) fn system_idle() -> Option<Duration> {
     use windows_sys::Win32::{
         System::SystemInformation::GetTickCount,
         UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO},
@@ -253,6 +253,6 @@ fn system_idle() -> Option<Duration> {
 }
 
 #[cfg(not(windows))]
-fn system_idle() -> Option<Duration> {
+pub(crate) fn system_idle() -> Option<Duration> {
     None
 }

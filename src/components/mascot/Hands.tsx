@@ -115,6 +115,13 @@ const POSES: Partial<Record<Expression, [Pose, Pose]>> = {
   magnify: [show({ x: 1, y: 5, rotate: 10 }), HIDE],
   umbrella: [show({ x: 1, y: 5, rotate: 10 }), HIDE],
   hot: [HIDE, show({ x: -1, y: 6, rotate: -10 })],
+  // Masada: eller dizüstünün iki yanında, sırayla tuşlara basar
+  focused: [
+    show({ x: 8.2, y: [7, 5.8, 7], rotate: 15, transition: { duration: 0.34, repeat: Infinity, ease: "easeInOut" } }),
+    show({ x: -8.2, y: [5.8, 7, 5.8], rotate: -15, transition: { duration: 0.34, repeat: Infinity, ease: "easeInOut" } }),
+  ],
+  // Cama vurma: saat ve vuran el eşyayla birlikte çizilir
+  knock: [HIDE, HIDE],
   // Alarm: iki el havada sallanır
   alarm: [
     show({ x: -2, y: [-6, -9, -6], rotate: [25, 45, 25], transition: { duration: 0.3, repeat: Infinity } }),

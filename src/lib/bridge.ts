@@ -46,6 +46,11 @@ export const EVENTS = {
   islandPos: "nook://island-pos",
   gameStart: "nook://game-start",
   gameBreak: "nook://game-break",
+  foreground: "nook://foreground",
+  lowWork: "nook://low-work",
+  perchMove: "nook://perch-move",
+  perchHop: "nook://perch-hop",
+  perchLeave: "nook://perch-leave",
 } as const;
 
 /** Windows bildirim merkezine düşen bir bildirim (Discord, WhatsApp, Mail…). */
@@ -125,7 +130,9 @@ export type SysEventKind =
   | "play"
   | "update"
   | "argus"
-  | "welcome";
+  | "welcome"
+  | "fish"
+  | "guard";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {
@@ -280,6 +287,18 @@ export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promis
 export const clipboardClearIf = (text: string) => (inTauri ? invoke<boolean>("clipboard_clear_if", { text }) : Promise.resolve(false));
 /** Gizlilik kalkanını kapat (kalkanın kendisinden: Esc, çift tık) */
 export const shieldOff = () => (inTauri ? invoke<void>("shield_off") : Promise.resolve());
+/** Öndeki pencerenin başlık çubuğuna tün (uygun pencere yoksa false) */
+export const perchStart = () => (inTauri ? invoke<boolean>("perch_start") : Promise.resolve(false));
+export const perchStop = () => (inTauri ? invoke<void>("perch_stop") : Promise.resolve());
+/** Odak bekçisi uyarıyor: tam ekranda da ada görünsün */
+export const guardAlert = (on: boolean) => (inTauri ? invoke<void>("guard_alert", { on }) : Promise.resolve());
+
+/** Öndeki pencere (Odak bekçisi) */
+export interface ForegroundPayload {
+  title: string;
+  /** Küçük harf, .exe'siz ("chrome") */
+  app: string;
+}
 /** Arşivin içi (zip, rar) — açmadan */
 export interface ArchiveEntry {
   path: string;
@@ -424,6 +443,11 @@ export async function copyText(text: string) {
 const webBus = new Map<string, Set<Handler<unknown>>>();
 let webHit: Rect = { x: 0, y: 0, width: 0, height: 0 };
 const WEB_SLEEP_MS = 30_000;
+
+/** Yalnızca geliştirme önizlemesi: Rust olayını taklit et */
+export function devEmit<T>(event: string, payload: T) {
+  if (import.meta.env.DEV) webEmit(event, payload);
+}
 
 function webEmit<T>(event: string, payload: T) {
   webBus.get(event)?.forEach((h) => h(payload));

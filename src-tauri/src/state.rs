@@ -138,6 +138,8 @@ pub struct Shared {
     pub relocating: AtomicBool,
     /// Alarm çalıyor — tam ekranda bile ada görünür kalır.
     pub alert: AtomicBool,
+    /// Odak bekçisi uyarıyor (yasaklı site) — tam ekranda da ada görünür kalır.
+    pub guard: AtomicBool,
     /// Sıradaki alarmın zamanı (Unix ms, 0 = yok). Tam ekrandayken gizli pencerenin
     /// zamanlayıcıları kısılır; vakit yaklaşınca ada önceden açılsın ki alarm kaçmasın.
     pub next_alarm: std::sync::atomic::AtomicI64,

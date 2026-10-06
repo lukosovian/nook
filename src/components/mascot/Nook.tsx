@@ -142,6 +142,17 @@ const BODY: Record<Expression, TargetAndTransition> = {
   note: { x: 0, y: 0.5, rotate: [-2, 1, -2], transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } },
   writing: { x: 0, y: 0.5, rotate: [-2, 1, -2], transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } },
   magnify: { x: 0, y: 0, rotate: [0, 4, -2, 0], transition: { duration: 2.6, repeat: Infinity, ease: "easeInOut" } },
+  // Masada yazarken hafifçe ileri geri sallanır
+  focused: { x: 0, rotate: 0, scaleX: 1, scaleY: 1, y: [0.4, 1, 0.4], transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } },
+  // Cama yaklaşıp vurur: her vuruşta biraz öne gelir
+  knock: {
+    x: 0,
+    y: 0,
+    rotate: [0, 0, -3, 0, -3, 0],
+    scaleX: [1, 1, 1.05, 1, 1.05, 1],
+    scaleY: [1, 1, 1.05, 1, 1.05, 1],
+    transition: { duration: 1.6, repeat: Infinity, times: [0, 0.12, 0.2, 0.32, 0.4, 0.6], ease: "easeOut" },
+  },
 };
 
 /**
@@ -188,12 +199,13 @@ const EYE_OFFSET: Partial<Record<Expression, TargetAndTransition>> = {
   shy: { x: 0, y: 1.5 },
   volUp: { x: 2.6, y: 0 },
   volDown: { x: 2.4, y: 0.6 },
+  focused: { x: -0.8, y: 2.2 },
 };
 
 /** Gözleri kapalı/özel çizimli ifadeler — imleç takibi yok. */
-const NO_LOOK = new Set<Expression>(["lookAround", "sneeze", "spin", "read", "campfire", "note", "writing", "magnify", "hot", "volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
+const NO_LOOK = new Set<Expression>(["focused", "knock", "lookAround", "sneeze", "spin", "read", "campfire", "note", "writing", "magnify", "hot", "volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
 /** Kendiliğinden göz kırpan ifadeler. */
-const BLINKS = new Set<Expression>(["idle", "drowsy", "tired", "wander", "hop", "surprised", "hungry", "lookAround", "gum", "umbrella", "magnify", "read", "note", "writing"]);
+const BLINKS = new Set<Expression>(["focused", "knock", "idle", "drowsy", "tired", "wander", "hop", "surprised", "hungry", "lookAround", "gum", "umbrella", "magnify", "read", "note", "writing"]);
 
 /** Bu hızdan (px/sn) sert fırlatılırsa Nook sersemler. */
 const FLING_SPEED = 900;

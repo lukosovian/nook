@@ -13,10 +13,13 @@ import { spring } from "../lib/motion";
 import { startTour } from "../lib/tour";
 import { exitBig } from "../lib/big";
 import { useExpanded } from "../hooks/useExpanded";
-import { expressionOf, statusOf, useNook, type Mood } from "../store/nook";
+import { expressionOf, statusOf, useNook, type Mood, type Outing } from "../store/nook";
 import { Nook, STATUS_COLOR } from "./mascot/Nook";
 import { MiniPlayer } from "./media/MiniPlayer";
 import { AlarmView } from "./overlays/AlarmView";
+import { GuardView } from "./overlays/GuardView";
+import { Dangle } from "./outings/Dangle";
+import { Fishing } from "./outings/Fishing";
 import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { FocusMini } from "./overlays/FocusMini";
@@ -73,6 +76,20 @@ function jellyPose(mood: Mood, away: boolean): TargetAndTransition {
   }
 }
 
+/** Nook dışarı çıkınca adadaki yeri boşalır: ipe tutunup aşağı iner, kenara kayar ya da zıplayıp gider */
+function awayPose(outing: Outing | null): TargetAndTransition {
+  switch (outing) {
+    case "hang":
+      return { x: 0, y: 18, scale: 0.8, opacity: 0, transition: { duration: 0.22, ease: "easeIn" } };
+    case "fish":
+      return { x: 44, y: 12, scale: 0.8, opacity: 0, transition: { duration: 0.3, ease: "easeIn" } };
+    case "perch":
+      return { x: 0, y: [0, -9, 22], scale: [1, 1.12, 0.6], opacity: [1, 1, 0], transition: { duration: 0.45, times: [0, 0.4, 1] } };
+    default:
+      return { x: 0, y: 0, scale: 1, opacity: 1, transition: spring.stretch };
+  }
+}
+
 /** Nook'un doğuşu: açılış efektine göre (açılış yoksa ortada "pop") */
 const nookBirth = () => birthMotion(useNook.getState().intro ? introKind() : "dust");
 
@@ -109,6 +126,7 @@ export function Island() {
   const focusing = useNook((s) => !!s.focus);
   const listening = useNook((s) => s.listening);
   const intro = useNook((s) => s.intro);
+  const outing = useNook((s) => s.outing);
 
   // Açılış: parçacıklar toplanır, Nook doğar ve el sallar. İlk kurulumda ardından tanıtım açılır.
   useEffect(() => {
@@ -218,6 +236,7 @@ export function Island() {
           <motion.div className="absolute z-10" initial={false} animate={pose} transition={transition}>
             <motion.div {...nookBirth()}>
               <motion.div animate={nudge}>
+              <motion.div initial={false} animate={awayPose(outing)}>
               <Nook
                 expression={expression}
                 status={status}
@@ -226,6 +245,7 @@ export function Island() {
                 look={normalizeLook(settings.look)}
                 bounds={ref}
               />
+              </motion.div>
               </motion.div>
             </motion.div>
           </motion.div>
@@ -243,8 +263,14 @@ export function Island() {
             {mode === "toast" && <ToastView key="toast" />}
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
+            {mode === "guard" && <GuardView key="guard" />}
           </AnimatePresence>
         </motion.div>
+        {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}
+        <AnimatePresence>
+          {outing === "hang" && <Dangle key="hang" />}
+          {outing === "fish" && <Fishing key="fish" width={width} />}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

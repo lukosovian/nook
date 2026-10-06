@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isSleeping, SULK_BELOW, useNook, type Antic } from "../store/nook";
+import { isSleeping, isWorking, SULK_BELOW, useNook, type Antic } from "../store/nook";
 
 /** Her hareketin süresi (ms) — Nook bileşenindeki keyframe'lerle uyumlu. */
 export const ANTIC_MS: Record<Antic, number> = {
@@ -73,7 +73,7 @@ export function useAntics() {
       const s = useNook.getState();
       s.setNight(isNight());
       const free =
-        s.mood === "idle" && !s.antic && !isSleeping(s) && !s.searching && !s.osd && !s.toasts.length && !s.relocating;
+        s.mood === "idle" && !s.antic && !isSleeping(s) && !s.searching && !s.osd && !s.toasts.length && !s.relocating && !s.outing && !isWorking(s);
 
       // Küsken çoğu zaman kıpırdamaz
       const sulking = s.affection < SULK_BELOW && Math.random() < 0.75;

@@ -7,6 +7,7 @@ uniform vec2 uRes;
 uniform float uSpan;
 uniform int uShape, uHat, uGlasses, uNeck;
 uniform float uFur;
+uniform int uTex; // 0 vinil, 1 peluş, 2 mat kil, 3 jöle, 4 metalik, 5 benekli
 uniform vec3 uColor;
 uniform vec4 uEye; // y, gap, z
 uniform vec3 uAcc; // renkli aksesuarın rengi (şapka)
@@ -91,6 +92,27 @@ float body0(vec3 q){
     float d=min(top,skirt);
     d=max(d,-(q.y+.86+.08*cos(q.x*9.+.6)*cos(q.z*2.5)));
     return d;}
+  if(uShape==9){
+    // şeker küp: köşeleri bol yuvarlak
+    vec3 d3=abs(q)-vec3(.56,.54,.56); return length(max(d3,0.))+min(max(d3.x,max(d3.y,d3.z)),0.)-.34;}
+  if(uShape==10){
+    // yumurta: altı geniş, tepesi daralan
+    float k=clamp(q.y,-1.,1.);
+    return sdEll(q-vec3(0.,.04,0.),vec3(.8-.13*k,1.,.8-.13*k));}
+  if(uShape==11){
+    // tombul yıldız: düz yıldızdan eşit uzaklıktaki yüzey
+    float st=sdStar5(q.xy-vec2(0.,-.04),.82,.52);
+    return length(vec2(max(st,0.),q.z))-.3+min(st,0.)*0.;}
+  if(uShape==12){
+    // kedi: küre ve iki sivri kulak
+    vec3 r=q; r.x=abs(r.x);
+    float ear=sdTri(r.xy,vec2(.26,.66),vec2(.8,.4),vec2(.7,1.12));
+    ear=length(vec2(max(ear,0.),r.z*1.3))-.1;
+    return smin(sdSph(q-vec3(0.,-.06,0.),.92),ear,.1);}
+  if(uShape==13){
+    // ayıcık: küre ve iki yuvarlak kulak
+    vec3 r=q; r.x=abs(r.x);
+    return smin(sdSph(q-vec3(0.,-.06,0.),.92),sdSph(r-vec3(.62,.74,-.08),.3),.1);}
   if(uShape==5){
     return smin(sdSph(q-vec3(-.12,.3,0.),.66),sdSph(q-vec3(.1,-.3,0.),.68),.55)+.0;}
   return sdSph(q,1.);
@@ -229,6 +251,47 @@ vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
     vec3 col=mix(deep,base,wrap*sh);
     col+=base*.12*(.5+.5*n.y);
     col*=mix(.6,1.,o);
+    if(id<.5 && uTex==2){
+      // mat kil: parlama yok, ince toprak dokusu, yumuşak ışık
+      col=mix(deep,base,(wrap*.85+.15)*sh)*mix(.6,1.,o);
+      col*=.93+.1*noise(p*38.);
+      col+=rim*base*.08;
+      return col;
+    }
+    if(id<.5 && uTex==3){
+      // jöle: içten aydınlık, kenarları koyu, ıslak parlak
+      float thick=clamp(dot(n,v),0.,1.);
+      col=mix(deep*.8,base*1.18+.08,thick*thick)*mix(.75,1.,o);
+      vec3 h=normalize(L+v);
+      col+=pow(clamp(dot(n,h),0.,1.),70.)*.95*sh;
+      col+=pow(clamp(dot(n,normalize(vec3(.5,.3,1.))),0.,1.),40.)*.35;
+      col+=rim*mix(base,vec3(1.),.6)*.3;
+      return col;
+    }
+    if(id<.5 && uTex==4){
+      // metalik: ortamı yansıtır (üstte açık gök, altta koyu zemin), keskin parlama
+      vec3 rf=reflect(-v,n);
+      float env=smoothstep(-.35,.35,rf.y)*.75+.15*smoothstep(.6,1.,rf.x)+.1*smoothstep(-.6,-.95,rf.y);
+      col=base*(.32+.85*env)*mix(.7,1.,o)*mix(.8,1.,sh)+base*.06;
+      vec3 h=normalize(L+v);
+      col+=pow(clamp(dot(n,h),0.,1.),48.)*.9*sh;
+      col+=rim*mix(base,vec3(1.),.7)*.22;
+      return col;
+    }
+    if(id<.5 && uTex==5){
+      // benekli: rastgele yuvarlak benekler (uğur böceği, dalmaçyalı)
+      // yüzeye dağılmış yuvarlak benekler: hücre başına bir benek, boyu ve yeri rastgele
+      vec3 g=p*2.3; vec3 c=floor(g); float sp=0.;
+      for(int i=ZERO;i<8;i++){ vec3 o=vec3(float(i&1),float((i>>1)&1),float((i>>2)&1));
+        vec3 cc=c+o; float h=hash(cc+.7);
+        vec3 ctr=cc+vec3(hash(cc+1.3),hash(cc+2.9),hash(cc+4.1))*.6+.2;
+        float r=mix(.2,.36,hash(cc+5.7))*step(.4,h);
+        sp=max(sp,smoothstep(r,r-.05,length(g-ctr))); }
+      // gözlerin çevresi temiz kalsın
+      float eye=min(length(p.xy-vec2(-uEye.y,uEye.x)),length(p.xy-vec2(uEye.y,uEye.x)));
+      sp*=smoothstep(.17,.3,eye);
+      col=mix(col,deep*.45,sp);
+    }
     if(fur>0.){
       float strands=noise(p*vec3(70.,70.,70.)+n*8.);
       col*=.84+.26*strands;

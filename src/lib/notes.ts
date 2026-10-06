@@ -10,6 +10,15 @@ import { useNook } from "../store/nook";
 
 /** Notun görseli (components/notes/Demos'ta çizilir) */
 export type DemoId =
+  | "glow"
+  | "nowcards"
+  | "bodies"
+  | "textures"
+  | "colors"
+  | "perch"
+  | "dangle"
+  | "fishing"
+  | "guard"
   | "halloween"
   | "notes"
   | "move"
@@ -46,6 +55,73 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.36",
+    date: "6 Ekim 2026",
+    headline: "Yeni gövdeler, dokular, renkler",
+    items: [
+      {
+        title: "Beş yeni gövde",
+        text: "Şeker küp, Yumurta, Yıldız, Kedi ve Ayıcık. Görünüm › Gövde'den seç; her biri bütün dokular ve aksesuarlarla giyilebilir.",
+        demo: "bodies",
+      },
+      {
+        title: "Dört yeni doku",
+        text: "Vinil ve Peluş'un yanına Mat kil, ıslak parlak Jöle, ortamı yansıtan Metalik ve uğur böceği gibi Benekli geldi.",
+        demo: "textures",
+      },
+      { title: "20 renk", text: "Kiraz, gök mavisi, zümrüt, fosforlu yeşil, çivit, şeker pembesi, karamel, krem, gümüş ve lacivert eklendi.", demo: "colors" },
+      {
+        title: "Şu an kartları",
+        text: "Nook'un yanındaki bilgiler düzenli küçük kartlara dönüştü: renkli ikon, alt satırda ayrıntı (sanatçı, kaç dakika sonra, hava), sağda saat ya da yüzde, şarkıda ve Pomodoro'da ilerleme çubuğu.",
+        demo: "nowcards",
+      },
+    ],
+  },
+  {
+    version: "0.2.35",
+    date: "6 Ekim 2026",
+    headline: "Daha canlı ana sayfa",
+    items: [
+      {
+        title: "Meşgul bölümler parlar",
+        text: "Müzik çalarken Medya, Pomodoro sürerken Pomodoro çipi kendi renginde yavaşça nefes alır; boş olanlar (Raf, Not…) soluk kalır. Çiplerdeki Nook'lar da kıpırdar: ara sıra göz kırpar, alarm yaklaşınca zıplar.",
+        demo: "glow",
+      },
+      {
+        title: "Ana sayfayı düzenle",
+        text: "Çiplerin sonundaki Düzenle'ye bas: çipi tutup istediğin yere sürükle, kullanmadıklarını göz simgesiyle gizle. Ayarlar'da üstte bölüm sekmeleri var, Temizle gibi düğmeler çerçeveli.",
+        demo: "chips",
+      },
+    ],
+  },
+  {
+    version: "0.2.34",
+    date: "6 Ekim 2026",
+    headline: "Nook dışarı çıkıyor",
+    items: [
+      {
+        title: "Pencere üstüne tüneme",
+        text: "Nook ara sıra adadan atlayıp önündeki pencerenin başlık çubuğuna oturur. Pencereyi taşıdıkça dengesini kaybetmemek için sendeler, başka pencereye geçince ona zıplar. Adanın üstüne gelince hemen geri döner.",
+        demo: "perch",
+      },
+      {
+        title: "Adadan iple sarkma",
+        text: "Uzun süre ekranın alt kısmında çalışırken Nook adanın altından minik bir iple sarkıp seni izler. Fareyi ona yaklaştırırsan ipi hızla sarıp adaya kaçar.",
+        demo: "dangle",
+      },
+      {
+        title: "Masaüstü balıkçılığı",
+        text: "Bilgisayar boştayken Nook adanın kenarına oturup masaüstüne olta sallar. Bazen eski bir çöp dosyası çıkar, bazen parlak bir yıldız; döndüğünde neler tuttuğunu anlatır.",
+        demo: "fishing",
+      },
+      {
+        title: "Odak bekçisi",
+        text: "Pomodoro başlayınca Nook masasına geçer. Çalışırken YouTube, X gibi bir siteye girersen cama vurup saati gösterir: \"Çalışmıyor muyduk?\" Siteleri Ayarlar › Odak bekçisi'nden değiştirebilirsin.",
+        demo: "guard",
+      },
+    ],
+  },
   {
     version: "0.2.33",
     date: "6 Ekim 2026",
@@ -207,6 +283,28 @@ export const NOTES: PatchNote[] = [
 ];
 
 export const latestNote = () => NOTES[0];
+
+/** Aynı gün çıkan sürümler tek notta: sürüm numaraları ayrı kalır, yenilikler birlikte gösterilir */
+export interface DayNote {
+  date: string;
+  /** En yeniden eskiye */
+  versions: string[];
+  headline: string;
+  items: (NoteItem & { version: string })[];
+}
+
+export const DAYS: DayNote[] = NOTES.reduce<DayNote[]>((days, n) => {
+  const day = days.find((d) => d.date === n.date);
+  const items = n.items.map((it) => ({ ...it, version: n.version }));
+  if (day) {
+    day.versions.push(n.version);
+    day.items.push(...items);
+  } else days.push({ date: n.date, versions: [n.version], headline: n.headline, items });
+  return days;
+}, []);
+
+/** Sürümün bulunduğu gün */
+export const dayOf = (version: string) => DAYS.find((d) => d.versions.includes(version)) ?? DAYS[0];
 
 /** Ada küçülme animasyonu bitmeden pencere küçülmesin */
 const SHRINK_AFTER_MS = 700;

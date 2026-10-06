@@ -40,7 +40,7 @@ import { islandDrag } from "../../lib/bridge";
 import { easeOut } from "../../lib/motion";
 import { SKY_LABEL, type Sky } from "../../lib/weather";
 import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
-import { ACCENT, Card } from "../ui/primitives";
+import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { ek, useNookName } from "../../lib/look";
 
 const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
@@ -250,13 +250,30 @@ function BigToggle() {
 interface Item {
   id: string;
   icon: LucideIcon;
-  text: string;
+  title: string;
+  /** İkinci satır (sanatçı, "pil azalıyor", "3 sa sonra") */
+  sub?: string;
+  /** Sağda kısa değer (14:05, %7, 18°) */
+  value?: string;
+  /** Alttaki ince çubuk (0–1) */
+  progress?: number;
   color?: string;
 }
 
+const GRAY = "#8a8a93";
+
+/** "3 sa 12 dk sonra" */
+function untilText(ms: number) {
+  const m = Math.max(1, Math.round(ms / 60_000));
+  if (m < 60) return `${m} dk sonra`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} sa ${m % 60} dk sonra` : `${h} sa sonra`;
+}
+
 /**
- * "Şu an" listesi — Grok Bot'taki adım listesi gibi: en önemli iş parlak ve büyük, diğerleri soluk.
- * Ana sayfada Nook'un sağında dikey ortalı, bölüm görünümünde Nook'un altında.
+ * "Şu an" kartları — Nook'un yanında küçük, düzenli satırlar: renkli ikon, başlık ve alt satır,
+ * sağda kısa değer, gerekirse altta ilerleme çubuğu. En önemli iş en üstte ve kendi renginde çerçeveli.
+ * Ana sayfada Nook'un sağında, bölüm görünümünde Nook'un altında (orada daha sade).
  */
 function Activity({ view }: { view: View }) {
   const ex = useExpanded();
@@ -270,64 +287,116 @@ function Activity({ view }: { view: View }) {
   const alarms = useNook((s) => s.alarms);
   const focus = useNook((s) => s.focus);
   const online = useNook((s) => s.online);
-  // Odak sayacı listede canlı aksın
-  const [, tick] = useState(0);
+  // Odak sayacı ve şarkının ilerlemesi canlı aksın
+  const [now, setNow] = useState(Date.now());
+  const live = !!focus || !!media?.playing;
   useEffect(() => {
-    if (!focus) return;
-    const t = window.setInterval(() => tick((n) => n + 1), 1000);
+    if (!live) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
-  }, [focus]);
+  }, [live]);
 
   const items: Item[] = [];
-  if (!online) items.push({ id: "offline", icon: WifiOff, text: "İnternet yok", color: ACCENT.red });
-  if (focus) items.push({ id: "focus", icon: Target, text: `${PHASE_LABEL[focus.phase]} · ${mmss(remaining(focus))}`, color: focus.phase === "work" ? ACCENT.red : ACCENT.teal });
+  if (!online) items.push({ id: "offline", icon: WifiOff, title: "İnternet yok", sub: "Bağlantı bekleniyor", color: ACCENT.red });
+  if (focus) {
+    const left = remaining(focus, now);
+    items.push({
+      id: "focus",
+      icon: Target,
+      title: PHASE_LABEL[focus.phase],
+      sub: focus.endsAt === null ? "Duraklatıldı" : focus.phase === "work" ? `${focus.round + 1}. tur` : "Biraz dinlen",
+      value: mmss(left),
+      progress: 1 - left / focus.total,
+      color: focus.phase === "work" ? ACCENT.red : ACCENT.teal,
+    });
+  }
   if (downloads.length) {
     const d = downloads[0];
-    items.push({ id: "dl", icon: ArrowDown, text: d.speed ? `${d.name} · ${formatSize(d.speed)}/s` : d.name, color: ACCENT.blue });
+    items.push({ id: "dl", icon: ArrowDown, title: d.name, sub: d.speed ? `${formatSize(d.speed)}/s` : "İniyor", value: formatSize(d.received), color: ACCENT.blue });
   }
-  if (media?.playing) items.push({ id: "music", icon: Music, text: media.title, color: ACCENT.pink });
-  const mic = privacy.camera[0] ?? privacy.mic[0];
-  if (mic) items.push({ id: "mic", icon: privacy.camera.length ? Video : Mic, text: `${mic} dinliyor`, color: ACCENT.orange });
-  const low = [
-    devices?.headset && devices.headset.percent <= 20 ? `Kulaklık %${devices.headset.percent}` : null,
-    devices?.mouse && devices.mouse.percent <= 20 ? `Mouse %${devices.mouse.percent}` : null,
-  ].filter(Boolean) as string[];
-  if (low.length) items.push({ id: "low", icon: BatteryLow, text: low.join(" · "), color: ACCENT.red });
+  if (media?.playing) {
+    const pos = Math.min(media.durationMs || Infinity, media.positionMs + (performance.now() - media.at));
+    items.push({ id: "music", icon: Music, title: media.title, sub: media.artist || "Çalıyor", progress: media.durationMs ? pos / media.durationMs : undefined, color: ACCENT.pink });
+  }
+  const cam = privacy.camera[0];
+  const mic = privacy.mic[0];
+  if (cam || mic) items.push({ id: "mic", icon: cam ? Video : Mic, title: (cam ?? mic)!, sub: cam ? "Kamerayı kullanıyor" : "Mikrofonu kullanıyor", color: cam ? ACCENT.green : ACCENT.orange });
+  for (const [key, label, p] of [
+    ["mouse", "Mouse", devices?.mouse?.percent],
+    ["headset", "Kulaklık", devices?.headset?.percent],
+  ] as const) {
+    if (p != null && p <= 20) items.push({ id: `low-${key}`, icon: BatteryLow, title: label, sub: "Pil azalıyor", value: `%${p}`, progress: p / 100, color: ACCENT.red });
+  }
   const nextAlarm = alarms.filter((a) => a.enabled && a.next).sort((a, b) => a.next! - b.next!)[0];
   if (nextAlarm) {
     const d = new Date(nextAlarm.next!);
-    items.push({ id: "alarm", icon: AlarmClock, text: `Alarm ${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`, color: ACCENT.yellow });
+    items.push({
+      id: "alarm",
+      icon: AlarmClock,
+      title: nextAlarm.label || "Alarm",
+      sub: untilText(nextAlarm.next! - Date.now()),
+      value: d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+      color: ACCENT.yellow,
+    });
   }
-  if (weather) items.push({ id: "weather", icon: weather.isDay ? CloudSun : Moon, text: `${weather.temp}° ${weather.city}` });
-  // Çok seviyorsa kalp ikonu söyler — yazı kısa kalır, dar kartta kesilmez
+  if (weather) {
+    const Sky = weather.sky === "clear" && !weather.isDay ? Moon : SKY_ICON[weather.sky];
+    items.push({ id: "weather", icon: Sky, title: weather.city, sub: `${SKY_LABEL[weather.sky]} · ${weather.high}° / ${weather.low}°`, value: `${weather.temp}°`, color: ACCENT.blue });
+  }
   const loved = !asleep && affection > 80;
-  items.push({ id: "mood", icon: loved ? Heart : Sparkles, text: moodLine(affection, asleep), color: loved ? ACCENT.pink : undefined });
+  items.push({ id: "mood", icon: loved ? Heart : Sparkles, title: moodLine(affection, asleep), sub: "Keyfi", progress: affection / 100, color: loved ? ACCENT.pink : GRAY });
 
   const home = view === "home";
   const shown = items.slice(0, home ? 4 : 3);
   return (
     <motion.div
-      className={home ? "absolute bottom-0 right-3 top-0 flex flex-col justify-center gap-1.5" : "absolute inset-x-3 bottom-3 space-y-1"}
+      className={home ? "absolute bottom-0 right-3 top-0 flex flex-col justify-center gap-1.5" : "absolute inset-x-2 bottom-2 flex flex-col gap-1"}
       style={home ? { left: ex.homeListX / ex.zoom } : undefined}
       layout
       transition={CARD_SPRING}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {shown.map((it, i) => (
-          <motion.div
-            key={it.id}
-            layout
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ type: "spring", stiffness: 400, damping: 32 }}
-            className={`flex min-w-0 items-center gap-1.5 ${i === 0 ? "text-[13.5px] font-medium text-label" : "text-[11.5px] text-label-3"}`}
-          >
-            <it.icon size={i === 0 ? 13 : 11} strokeWidth={2.3} className="shrink-0" style={{ color: i === 0 || it.id === "mood" ? (it.color ?? (i === 0 ? "var(--color-label-2)" : undefined)) : undefined }} />
-            <span className="truncate">{it.text}</span>
-          </motion.div>
+          <Row key={it.id} item={it} lead={i === 0} compact={!home} />
         ))}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function Row({ item: it, lead, compact }: { item: Item; lead: boolean; compact: boolean }) {
+  const c = it.color ?? GRAY;
+  const bubble = compact ? 18 : 22;
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+      className={`relative flex min-w-0 items-center gap-2 overflow-hidden rounded-[12px] border ${compact ? "px-1.5 py-1" : "px-2 py-[5px]"}`}
+      style={{
+        background: lead ? tintBg(c, 10) : "rgb(255 255 255 / 0.03)",
+        borderColor: lead ? tintBg(c, 30) : "rgb(255 255 255 / 0.05)",
+      }}
+    >
+      <span className="flex shrink-0 items-center justify-center rounded-full" style={{ width: bubble, height: bubble, background: tintBg(c, 20), color: c }}>
+        <it.icon size={compact ? 10 : 11.5} strokeWidth={2.4} />
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className={`block truncate font-medium ${lead ? "text-label" : "text-label-2"} ${compact ? "text-[11px]" : "text-[12px]"}`}>{it.title}</span>
+        {it.sub && !compact && <span className="block truncate text-[9.5px] text-label-3">{it.sub}</span>}
+      </span>
+      {it.value && (
+        <span className={`shrink-0 font-semibold tabular-nums ${compact ? "text-[10.5px]" : "text-[11.5px]"}`} style={{ color: lead ? tintText(c) : "var(--color-label-2)" }}>
+          {it.value}
+        </span>
+      )}
+      {it.progress != null && (
+        <span className="absolute inset-x-2 bottom-[2px] h-[2px] overflow-hidden rounded-full bg-white/[0.06]">
+          <motion.span className="block h-full rounded-full" style={{ background: c }} initial={false} animate={{ width: `${Math.max(2, Math.min(100, it.progress * 100))}%` }} transition={{ duration: 0.4 }} />
+        </span>
+      )}
     </motion.div>
   );
 }
