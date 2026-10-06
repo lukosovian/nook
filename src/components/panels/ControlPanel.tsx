@@ -231,7 +231,7 @@ function AppMixer({ onBack }: { onBack: () => void }) {
   );
 }
 
-function AppIcon({ path }: { path: string | null }) {
+export function AppIcon({ path }: { path: string | null }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     if (path) void fileIcon(path, 32).then(setSrc).catch(() => undefined);
@@ -246,7 +246,7 @@ function AppIcon({ path }: { path: string | null }) {
 }
 
 /** "Hoparlör (Realtek(R) Audio)" → "Hoparlör"; ad yalnızca genel bir sözcükse parantezdeki marka */
-function shortName(name: string) {
+export function shortName(name: string) {
   const head = name.split(" (")[0].trim();
   const inner = name.match(/\(([^)]+)/)?.[1]?.trim();
   return /^(hoparlör|hoparlörler|speakers?|headphones?|kulaklık|headset)$/i.test(head) && inner && !/realtek|high definition/i.test(inner) ? inner : head || name;

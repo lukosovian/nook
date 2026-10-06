@@ -360,6 +360,7 @@ const native = (s: Settings) => ({
   askShortcut: s.askShortcut,
   voiceShortcut: s.voiceShortcut,
   shieldShortcut: s.shieldShortcut,
+  shieldLock: s.lockEnabled && !!s.lockHash,
   autoScreenshots: s.autoScreenshots,
   hideInFullscreen: s.hideInFullscreen,
   gameIntro: s.gameIntro,

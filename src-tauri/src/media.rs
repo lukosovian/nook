@@ -36,6 +36,11 @@ pub fn media_control(action: String) -> Result<(), String> {
     imp::control(&action)
 }
 
+/// Çalan bütün medya oturumlarını duraklat (gizlilik kalkanı). Duraklatılan oldu mu döner.
+pub fn pause_all() -> bool {
+    imp::pause_all()
+}
+
 pub use imp::spawn;
 
 #[cfg(windows)]
@@ -182,6 +187,24 @@ mod imp {
         (unix.as_nanos() / 100) as i64 + EPOCH_DIFF_100NS
     }
 
+    pub fn pause_all() -> bool {
+        let run = || -> windows::core::Result<bool> {
+            let sessions = Manager::RequestAsync()?.join()?.GetSessions()?;
+            let mut paused = false;
+            for s in sessions {
+                let playing = s.GetPlaybackInfo().and_then(|i| i.PlaybackStatus()).is_ok_and(|st| st == Status::Playing);
+                if playing && s.TryPauseAsync().and_then(|op| op.join()).unwrap_or(false) {
+                    paused = true;
+                }
+            }
+            if paused {
+                RESEND.store(true, Ordering::Relaxed);
+            }
+            Ok(paused)
+        };
+        run().unwrap_or(false)
+    }
+
     pub fn control(action: &str) -> Result<(), String> {
         let run = || -> windows::core::Result<()> {
             let session = Manager::RequestAsync()?.join()?.GetCurrentSession()?;
@@ -201,6 +224,9 @@ mod imp {
 #[cfg(not(windows))]
 mod imp {
     pub fn spawn(_app: tauri::AppHandle) {}
+    pub fn pause_all() -> bool {
+        false
+    }
     pub fn control(_action: &str) -> Result<(), String> {
         Err("yalnızca Windows'ta destekleniyor".into())
     }

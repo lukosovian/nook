@@ -579,8 +579,8 @@ export function useArgusCard(mode: IslandMode) {
         .then(() => sendCard(data))
         .catch((e) => console.warn("[nook] argus kartı", e));
       // İmleç karta (ve aradaki boşluğa) geçince ada kapanmasın
-      setHitExtra({ x: x - CARD_GAP - 4, y: ISLAND_TOP, width: CARD_GAP + 4 + 6 + CARD_SIZE.width + 6, height: CARD_SIZE.height + 6 });
-      return () => setHitExtra(null);
+      setHitExtra("argus", { x: x - CARD_GAP - 4, y: ISLAND_TOP, width: CARD_GAP + 4 + 6 + CARD_SIZE.width + 6, height: CARD_SIZE.height + 6 });
+      return () => setHitExtra("argus", null);
     }
     // Önce kart kendi çıkış animasyonunu oynasın, sonra pencere gizlensin
     void sendCard({ visible: false });

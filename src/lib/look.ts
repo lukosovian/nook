@@ -301,6 +301,7 @@ export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
   clip: { color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", glasses: "bold" } },
   note: { color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "triangle", head: "beret" } },
   alarm: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "diamond", head: "antenna" } },
+  calendar: { color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "bean", eyes: "calm", glasses: "round" } },
   apps: { color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "cap" } },
   notify: { color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "ears" } },
   control: { color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "sphere", head: "bowler", neck: "bowtie" } },

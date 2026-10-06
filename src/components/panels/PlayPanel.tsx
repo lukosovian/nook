@@ -7,10 +7,10 @@ import { useNook } from "../../store/nook";
 import { ek, useNookName } from "../../lib/look";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { Header, Over } from "./games/kit";
-import { Jump, Pairs, Whack } from "./games/MoreGames";
+import { Aim, Jump, Pairs, Whack } from "./games/MoreGames";
 import { tt } from "../../lib/i18n";
 
-type Game = "catch" | "simon" | "whack" | "pairs" | "jump";
+type Game = "catch" | "simon" | "whack" | "pairs" | "jump" | "aim";
 
 const GAMES: { id: Game; title: string; hint: string; color: string }[] = [
   { id: "catch", title: tt("Yakala"), hint: tt("20 sn'de kaçan Nook'u yakala"), color: ACCENT.pink },
@@ -18,9 +18,10 @@ const GAMES: { id: Game; title: string; hint: string; color: string }[] = [
   { id: "whack", title: tt("Köstebek"), hint: tt("Çıkanlara dokun, kırmızıdan kaç"), color: ACCENT.orange },
   { id: "pairs", title: tt("Eşleştir"), hint: tt("Kartları çevir, aynı Nook'ları bul"), color: ACCENT.purple },
   { id: "jump", title: tt("Zıpla"), hint: tt("Engellerin üstünden atla"), color: ACCENT.green },
+  { id: "aim", title: tt("Nişan"), hint: tt("Hedefleri küçülmeden vur, nişanını kas"), color: ACCENT.red },
 ];
 
-/** Nook'la oyun: beş mini oyun ve rekorlar. */
+/** Nook'la oyun: altı mini oyun ve rekorlar. */
 export function PlayPanel() {
   const [game, setGame] = useState<Game | null>(null);
   const scores = useNook((s) => s.scores);
@@ -31,6 +32,7 @@ export function PlayPanel() {
   if (game === "whack") return <Whack onBack={() => setGame(null)} />;
   if (game === "pairs") return <Pairs onBack={() => setGame(null)} />;
   if (game === "jump") return <Jump onBack={() => setGame(null)} />;
+  if (game === "aim") return <Aim onBack={() => setGame(null)} />;
 
   return (
     <div className="flex h-full flex-col gap-2">

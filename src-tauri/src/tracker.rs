@@ -32,6 +32,8 @@ const MONITOR_REFRESH: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Serialize)]
 struct CursorPayload {
+    /// Hangi pencere için: dinleyiciler bütün pencerelerin olaylarını alır, kendininkini seçer
+    label: String,
     x: f64,
     y: f64,
     inside: bool,
@@ -76,6 +78,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 if let Some((px, py)) = cursor_position(&app) {
                     let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                     let forced = shared.forced.lock().unwrap().clone();
+                    // Parolalı kalkan açıkken hiçbir pencere (ada, yan kart) açılmaz/tıklanmaz
+                    let locked = shared.locked.load(Ordering::Relaxed);
                     // Tam ekran oyunun ekranında ada açılmaz (alarm çalarken hariç)
                     let in_game = shared
                         .game_screen
@@ -92,7 +96,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let (x, y) = ((px - g.x) / k, (py - g.y) / k);
                         // Ada içinde basılıp (metin seçerken, kaydırıcı çekerken) imleç dışarı kayarsa
                         // tuş bırakılana kadar ada kapanmaz.
-                        let over = !in_game && (ws.hit.contains(x, y) || ws.extra.contains(x, y));
+                        let over = !in_game && !locked && (ws.hit.contains(x, y) || ws.extra.contains(x, y));
                         let down = left_button_down();
                         if !down {
                             p.drag = false;
@@ -101,7 +105,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         }
                         p.down = down;
                         let hit = over || p.drag;
-                        let inside = hit || forced.contains(&label);
+                        let inside = !locked && (hit || forced.contains(&label));
                         let near = inside || ws.hit.distance(x, y) < TRACK_RADIUS;
 
                         if inside != p.inside {
@@ -122,7 +126,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let moved = (x, y) != p.last;
                         let due = p.emitted.elapsed() >= EMIT_EVERY;
                         if ((moved && (near || p.near)) && due) || inside != p.inside {
-                            let _ = app.emit_to(label.as_str(), "nook://cursor", CursorPayload { x, y, inside: hit, near });
+                            let _ = app.emit_to(label.as_str(), "nook://cursor", CursorPayload { label: label.clone(), x, y, inside: hit, near });
                             p.emitted = Instant::now();
                             // Yalnızca gönderilen konumu hatırla — ara hareketler bir sonraki gönderimde gider
                             p.last = (x, y);

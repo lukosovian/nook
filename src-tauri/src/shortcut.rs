@@ -84,7 +84,7 @@ fn target(app: &AppHandle) -> String {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let monitors = app.available_monitors().unwrap_or_default();
     // Etiketleri önce kopyala: monitor_of aynı kilidi tekrar alır.
-    let labels: Vec<String> = shared.windows.lock().unwrap().keys().cloned().collect();
+    let labels: Vec<String> = shared.windows.lock().unwrap().keys().filter(|l| l.starts_with(ISLAND)).cloned().collect();
     cursor_position(app)
         .and_then(|(x, y)| window::monitor_at(&monitors, x, y))
         .and_then(|m| {

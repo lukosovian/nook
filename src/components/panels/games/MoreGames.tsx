@@ -107,21 +107,22 @@ export function Whack({ onBack }: { onBack: () => void }) {
         }
       />
       <div className="relative min-h-0 flex-1">
-        <div className={`grid h-full grid-cols-3 gap-1.5 transition-opacity ${phase === "play" ? "" : "opacity-20"}`}>
+        {/* Satırlar sabit: çıkan Nook kutuyu büyütüp diğerlerini kaydırmasın */}
+        <div className={`grid h-full grid-cols-3 grid-rows-3 gap-1.5 transition-opacity ${phase === "play" ? "" : "opacity-20"}`}>
           {[...Array(HOLES).keys()].map((i) => (
             <button
               key={i}
               onPointerDown={() => whack(i)}
-              className="relative flex items-end justify-center overflow-hidden rounded-[14px] bg-well"
+              className="relative min-h-0 overflow-hidden rounded-[14px] bg-well"
               style={hit === i ? { background: tintBg(ACCENT.orange, 22) } : undefined}
             >
               {/* Delik */}
-              <span className="absolute bottom-1.5 h-[9px] w-[46%] rounded-[50%] bg-black/70" />
+              <span className="absolute bottom-1.5 left-1/2 h-[9px] w-[46%] -translate-x-1/2 rounded-[50%] bg-black/70" />
               <AnimatePresence>
                 {up[i] && (
                   <motion.span
                     key="n"
-                    className="relative mb-1.5"
+                    className="absolute bottom-1.5 left-1/2 -ml-[13px]"
                     initial={{ y: 34 }}
                     animate={{ y: 0 }}
                     exit={{ y: 34 }}
@@ -361,4 +362,192 @@ export function Jump({ onBack }: { onBack: () => void }) {
       </div>
     </div>
   );
+}
+
+// ------------------------------------------------------------------ Nişan (aim)
+
+const AIM_MS = 30_000;
+/** Hedef doğarken çapı (px); ömrü boyunca küçülür, bitince kaçar */
+const TARGET = 34;
+
+interface Target {
+  id: number;
+  x: number;
+  y: number;
+  born: number;
+  life: number;
+}
+
+/**
+ * Nişan: arenada hedefler belirir ve küçülerek kaybolur. Erken vurmak çok puan (merkeze yakın +1).
+ * Boşa tıklamak seriyi bozar; skor = puan, yanında isabet oranı.
+ */
+export function Aim({ onBack }: { onBack: () => void }) {
+  const arena = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<"ready" | "play" | "over">("ready");
+  // Hedefler her karede değişir: ref'te tutulur, kare başına bir kez çizilir
+  const targetsRef = useRef<Target[]>([]);
+  const [score, setScore] = useState(0);
+  const [left, setLeft] = useState(AIM_MS);
+  const [shots, setShots] = useState({ hit: 0, miss: 0, streak: 0 });
+  const [pops, setPops] = useState<{ id: number; x: number; y: number; pts: number }[]>([]);
+  const best = useNook((s) => s.scores.aim ?? 0);
+  const scoreRef = useRef(0);
+  const nextId = useRef(0);
+  const [, render] = useState(0);
+
+  useEffect(() => {
+    if (phase !== "play") return;
+    const end = Date.now() + AIM_MS;
+    let raf = 0;
+    let spawnAt = 0;
+    const step = () => {
+      const now = Date.now();
+      const l = end - now;
+      setLeft(Math.max(0, l));
+      if (l <= 0) {
+        targetsRef.current = [];
+        setPhase("over");
+        finish("aim", scoreRef.current, 40);
+        return;
+      }
+      const elapsed = AIM_MS - l;
+      // Zamanla hedefler daha kısa yaşar ve daha sık gelir
+      const life = Math.max(700, 1500 - elapsed / 30);
+      const ts = targetsRef.current;
+      const alive = ts.filter((t) => now - t.born < t.life);
+      // Kaçan hedef seriyi bozar
+      if (alive.length !== ts.length) setShots((s) => (s.streak ? { ...s, streak: 0 } : s));
+      if (now >= spawnAt && alive.length < 3) {
+        const el = arena.current;
+        const w = el?.clientWidth ?? 380;
+        const h = el?.clientHeight ?? 150;
+        const pad = TARGET / 2 + 4;
+        alive.push({ id: nextId.current++, x: pad + Math.random() * (w - pad * 2), y: pad + Math.random() * (h - pad * 2), born: now, life });
+        spawnAt = now + Math.max(320, 750 - elapsed / 50);
+      }
+      targetsRef.current = alive;
+      render((n) => n + 1);
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  const start = () => {
+    scoreRef.current = 0;
+    setScore(0);
+    setShots({ hit: 0, miss: 0, streak: 0 });
+    targetsRef.current = [];
+    setPops([]);
+    setLeft(AIM_MS);
+    setPhase("play");
+  };
+
+  const shoot = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (phase !== "play" || e.button !== 0) return;
+    const el = arena.current!;
+    const r = el.getBoundingClientRect();
+    const k = el.offsetWidth ? r.width / el.offsetWidth : 1;
+    const x = (e.clientX - r.left) / k;
+    const y = (e.clientY - r.top) / k;
+    const now = Date.now();
+    const target = targetsRef.current.find((t) => Math.hypot(t.x - x, t.y - y) <= radius(t, now) + 2);
+    if (!target) {
+      setShots((s) => ({ ...s, miss: s.miss + 1, streak: 0 }));
+      return;
+    }
+    const rad = radius(target, now);
+    // Erken vuruş ve merkeze yakınlık ödüllendirilir; seri arttıkça +1
+    const fresh = 1 - (now - target.born) / target.life;
+    const center = Math.hypot(target.x - x, target.y - y) < rad * 0.4;
+    const streak = shots.streak + 1;
+    const pts = 1 + (fresh > 0.6 ? 1 : 0) + (center ? 1 : 0) + (streak >= 5 ? 1 : 0);
+    scoreRef.current += pts;
+    setScore(scoreRef.current);
+    setShots((s) => ({ hit: s.hit + 1, miss: s.miss, streak }));
+    targetsRef.current = targetsRef.current.filter((t) => t.id !== target.id);
+    const pop = { id: target.id, x: target.x, y: target.y, pts };
+    setPops((p) => [...p.slice(-5), pop]);
+    window.setTimeout(() => setPops((p) => p.filter((q) => q !== pop)), 600);
+    if (streak % 10 === 0) playAntic("hop");
+  };
+
+  const total = shots.hit + shots.miss;
+  const accuracy = total ? Math.round((shots.hit / total) * 100) : 100;
+  const now = Date.now();
+
+  return (
+    <div className="flex h-full flex-col gap-2">
+      <Header
+        onBack={onBack}
+        title={tt("Nişan")}
+        right={
+          <>
+            <span style={{ color: tintText(ACCENT.red) }}>{score}</span>
+            {shots.streak >= 3 && <span style={{ color: tintText(ACCENT.yellow) }}>×{shots.streak}</span>}
+            <span className="text-label-3">%{accuracy}</span>
+            <span className="text-label-3">{(left / 1000).toFixed(1)}{" "}{tt("sn")}</span>
+          </>
+        }
+      />
+      <div
+        ref={arena}
+        onPointerDown={shoot}
+        className="relative min-h-0 flex-1 overflow-hidden rounded-[14px] bg-well"
+        style={{ cursor: phase === "play" ? "crosshair" : undefined }}
+      >
+        {targetsRef.current.map((t) => {
+          const d = radius(t, now) * 2;
+          return (
+            <span
+              key={t.id}
+              className="pointer-events-none absolute rounded-full"
+              style={{
+                left: t.x - d / 2,
+                top: t.y - d / 2,
+                width: d,
+                height: d,
+                background: `radial-gradient(circle, #fff 0 18%, ${ACCENT.red} 19% 42%, #fff 43% 58%, ${ACCENT.red} 59% 100%)`,
+                boxShadow: `0 0 14px -2px ${ACCENT.red}`,
+              }}
+            />
+          );
+        })}
+        <AnimatePresence>
+          {pops.map((p) => (
+            <motion.span
+              key={p.id}
+              className="pointer-events-none absolute -translate-x-1/2 text-[12px] font-semibold"
+              style={{ left: p.x, top: p.y - 10, color: tintText(p.pts >= 3 ? ACCENT.yellow : ACCENT.red) }}
+              initial={{ opacity: 1, y: 0, scale: 0.8 }}
+              animate={{ opacity: 0, y: -18, scale: 1.1 }}
+              transition={{ duration: 0.55 }}
+            >
+              +{p.pts}
+            </motion.span>
+          ))}
+        </AnimatePresence>
+        {phase === "ready" && (
+          <>
+            <StartButton onClick={start} color={ACCENT.red} best={best} />
+            <p className="absolute inset-x-0 bottom-1 text-center text-[10px] text-label-3">{tt("Erken ve ortadan vur, fazla puan · boşa atış seriyi bozar")}</p>
+          </>
+        )}
+        {phase === "over" && (
+          <>
+            <Over score={score} best={best} onAgain={start} color={ACCENT.red} />
+            <p className="absolute inset-x-0 bottom-1.5 text-center text-[10.5px] text-label-3">{tt("{0} isabet · %{1} doğruluk", shots.hit, accuracy)}</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Hedefin şu anki yarıçapı: doğunca büyür, sonra ömrü boyunca küçülür */
+function radius(t: Target, now: number) {
+  const p = Math.min(1, (now - t.born) / t.life);
+  const grow = Math.min(1, (now - t.born) / 120);
+  return (TARGET / 2) * grow * (1 - p * 0.75);
 }

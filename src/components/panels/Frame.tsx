@@ -43,6 +43,7 @@ import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { ek, useNookName } from "../../lib/look";
 import { tt, locale } from "../../lib/i18n";
+import { PROFILES } from "../../lib/profiles";
 
 const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
 
@@ -126,6 +127,7 @@ function HeaderNav({ title }: { title?: string }) {
       <HeaderIcon icon={MessageCircle} label={tt("{0} sohbet", ek(name, "la"))} active={!searching && tab === "chat"} onClick={() => go("chat")} />
       <HeaderIcon icon={Search} label={tt("Ara")} active={searching} onClick={() => useNook.getState().setSearching(true)} />
       <HeaderIcon icon={Settings} label={tt("Ayarlar")} active={!searching && tab === "settings"} onClick={() => go("settings")} />
+      {!searching && tab === "home" && <ProfilePills />}
       <AnimatePresence mode="wait" initial={false}>
         {title && (
           <motion.span
@@ -141,6 +143,29 @@ function HeaderNav({ title }: { title?: string }) {
           </motion.span>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** Ana sayfa profili: Hepsi · İş · Oyun · Eğlence */
+function ProfilePills() {
+  const profile = useNook((s) => s.settings.homeProfile);
+  return (
+    <div className="ml-2 flex items-center gap-0.5 rounded-full bg-white/[0.04] p-[2px]">
+      {PROFILES.map((p) => {
+        const on = p.id === profile;
+        return (
+          <button
+            key={p.id}
+            onClick={() => useNook.getState().updateSettings({ homeProfile: p.id })}
+            className={`relative rounded-full px-2 py-[2px] text-[10px] font-medium transition-colors ${on ? "" : "text-label-3 hover:text-label-2"}`}
+            style={on ? { color: tintText(p.color) } : undefined}
+          >
+            {on && <motion.span layoutId="hdr-profile" className="absolute inset-0 rounded-full" style={{ background: tintBg(p.color, 20) }} transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+            <span className="relative">{p.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

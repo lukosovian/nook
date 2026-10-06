@@ -7,6 +7,7 @@ import { useHitRect } from "../hooks/useHitRect";
 import { boostFrames } from "../lib/frameCap";
 import { useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
+import { useSoundCard } from "../lib/soundCard";
 import { isPrimary } from "../lib/bridge";
 import { FACE, ISLAND, ISLAND_TOP, MEDIA_COLLAPSED_WIDTH, mascotPose, tourPose } from "../lib/layout";
 import { spring } from "../lib/motion";
@@ -113,6 +114,7 @@ function toastFit(title?: string, detail?: string) {
 export function Island() {
   const mode = useIslandMode();
   useArgusCard(mode);
+  useSoundCard(mode);
   const mood = useNook((s) => s.mood);
   const move = useNook((s) => s.move);
   const expression = useNook(expressionOf);

@@ -85,6 +85,8 @@ pub struct Settings {
     pub voice_shortcut: String,
     /// Gizlilik kalkanı (aç/kapat)
     pub shield_shortcut: String,
+    /// Parola kilidi açık: kalkan kısayolla/Esc ile kalkmaz, yalnızca parolayla
+    pub shield_lock: bool,
     pub auto_screenshots: bool,
     pub hide_in_fullscreen: bool,
     /// Oyun açılınca ada gizlenmeden önce birkaç saniye özet gösterir
@@ -117,6 +119,7 @@ impl Default for Settings {
             ask_shortcut: "Ctrl+Shift+A".into(),
             voice_shortcut: "Ctrl+Shift+D".into(),
             shield_shortcut: "Ctrl+Alt+H".into(),
+            shield_lock: false,
             auto_screenshots: true,
             hide_in_fullscreen: true,
             game_intro: true,
@@ -155,6 +158,8 @@ pub struct Shared {
     /// Öndeki tam ekran oyunun monitörü (sol, üst, sağ, alt — fiziksel px). İmleç oradayken
     /// ada açılmaz: pencere etkileşimli olunca tam ekran oyun odağı kaybedip alta düşer.
     pub game_screen: Mutex<Option<(i32, i32, i32, i32)>>,
+    /// Parolalı kalkan açık: adalar ve yan kartlar etkileşime kapalı
+    pub locked: AtomicBool,
 }
 
 impl Shared {

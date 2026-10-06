@@ -5,9 +5,11 @@ import { animate, AnimatePresence, motion, PresenceContext, useMotionValue } fro
 import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { easeOut } from "../../lib/motion";
-import { dayKey, useNook, type Tab } from "../../store/nook";
+import { dayKey, useNook, type HomeProfile, type Tab } from "../../store/nook";
+import { PROFILES } from "../../lib/profiles";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
+import { CalendarPanel } from "./CalendarPanel";
 import { ArgusPanel } from "./ArgusPanel";
 import { ArchivePanel } from "./ArchivePanel";
 import { ARGUS_BLUE } from "../ArgusPromo";
@@ -47,6 +49,7 @@ const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "clip", label: tt("Pano"), color: ACCENT.purple },
   { id: "note", label: tt("Not"), color: ACCENT.orange },
   { id: "alarm", label: tt("Alarm"), color: ACCENT.yellow },
+  { id: "calendar", label: tt("Takvim"), color: ACCENT.blue },
   { id: "apps", label: tt("Kısayollar"), color: ACCENT.blue },
   { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple },
   { id: "control", label: tt("Kontrol"), color: ACCENT.green },
@@ -68,6 +71,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   clip: ClipboardPanel,
   note: ScratchPanel,
   alarm: AlarmPanel,
+  calendar: CalendarPanel,
   focus: FocusPanel,
   apps: AppsPanel,
   notify: NotifyPanel,
@@ -187,6 +191,13 @@ function ordered(order: string[]) {
   return [...MODULES].sort((a, b) => (pos.get(a.id) ?? 1000 + MODULES.indexOf(a)) - (pos.get(b.id) ?? 1000 + MODULES.indexOf(b)));
 }
 
+function byProfile<T extends { id: Tab }>(list: T[], profile: HomeProfile) {
+  const p = PROFILES.find((x) => x.id === profile);
+  if (!p || !p.ids.length) return list;
+  const front = p.ids.flatMap((id) => list.filter((m) => m.id === id));
+  return p.only ? front : [...front, ...list.filter((m) => !p.ids.includes(m.id))];
+}
+
 /** Ana sayfa: Grok Bot'taki renkli ajan çipleri gibi — her modül bir mini Nook, yanında canlı bilgi. */
 function ModuleGrid() {
   const scroller = useRef<HTMLDivElement>(null);
@@ -198,6 +209,7 @@ function ModuleGrid() {
   const promo = useNook((s) => s.settings.argusPromo);
   const order = useNook((s) => s.settings.homeOrder);
   const hidden = useNook((s) => s.settings.homeHidden);
+  const profile = useNook((s) => s.settings.homeProfile);
   // Geliştirmede ?edit ile düzenleme kipi açık başlar (önizleme)
   const [editing, setEditing] = useState(() => import.meta.env.DEV && new URLSearchParams(location.search).has("edit"));
   // Sürüklerken sıra yerelde tutulur, bırakınca kaydedilir
@@ -210,7 +222,8 @@ function ModuleGrid() {
   const drag = useRef<{ id: string; dx: number; dy: number; slots: { x: number; y: number }[]; px: number; py: number; raf: number } | null>(null);
 
   const available = ordered(draft ?? order).filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo));
-  const modules = editing ? available : available.filter((m) => !hidden.includes(m.id));
+  // Düzenlerken profil uygulanmaz: bütün sıra görünür
+  const modules = editing ? available : byProfile(available.filter((m) => !hidden.includes(m.id)), profile);
 
   const toggleHidden = (id: string) => {
     const s = useNook.getState();
@@ -520,6 +533,7 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
   const notifs = useNook((s) => s.notifications.length);
   const active = useNook((s) => s.days[dayKey()]?.active ?? 0);
   const argusSnap = useArgus((s) => s.snap);
+  const events = useNook((s) => s.events);
   const newToday = todayEpisodes(argusSnap);
   const watchingList = watching(argusSnap);
   // Pomodoro ve alarm yakınlığı canlı aksın
@@ -534,12 +548,21 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
   const batteries = [devices?.headset?.percent, devices?.mouse?.percent].filter((p): p is number => p != null);
   const lowest = batteries.length ? Math.min(...batteries) : null;
   const running = !!focus && focus.endsAt !== null;
+  const clockNow = new Date(now).toTimeString().slice(0, 5);
 
   return {
     media: { text: media ? (media.playing ? media.title : tt("Duraklatıldı")) : tt("Sessiz"), state: media?.playing ? "active" : media ? "idle" : "empty" },
     shelf: { text: shelf ? tt("{0} öğe", shelf) : tt("Boş"), state: shelf ? "idle" : "empty" },
     clip: { text: clips ? tt("{0} kayıt", clips) : tt("Boş"), state: clips ? "idle" : "empty" },
     note: { text: note ? note.split("\n")[0] : tt("Boş"), state: note ? "idle" : "empty" },
+    calendar: (() => {
+      const today = dayKey();
+      const upcoming = events.filter((e) => e.day > today || (e.day === today && (!e.time || e.time >= clockNow)));
+      const first = upcoming[0];
+      if (!first) return { text: tt("Boş"), state: "empty" as const };
+      const when = first.day === today ? first.time || tt("Bugün") : new Date(first.day + "T00:00").toLocaleDateString(locale(), { day: "numeric", month: "short" });
+      return { text: `${when} · ${first.title}`, state: first.day === today ? ("active" as const) : ("idle" as const) };
+    })(),
     alarm: {
       text: next ? `${clock(next)}${next.label ? ` · ${next.label}` : ""}` : tt("Kurulu değil"),
       state: ringing ? "alert" : alarmSoon ? "active" : next ? "idle" : "empty",
@@ -551,7 +574,7 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
     focus: { text: focus ? `${PHASE_LABEL[focus.phase]} · ${mmss(remaining(focus, now))}` : tt("Başlat"), state: running ? "active" : "idle" },
     apps: { text: apps ? tt("{0} kısayol", apps) : tt("Ekle"), state: apps ? "idle" : "empty" },
     notify: { text: notifs ? tt("{0} bildirim", notifs) : tt("Sessiz"), state: notifs ? "idle" : "empty" },
-    play: { text: tt("5 mini oyun") },
+    play: { text: tt("{0} mini oyun", 6) },
     notes: { text: `${latestNote().version} · ${latestNote().headline}` },
     look: { text: tt("Kostüm, renk, şapka") },
     report: { text: active ? tt("Bugün {0}", active >= 60 ? tt("{0} sa {1} dk", Math.floor(active / 60), active % 60) : tt("{0} dk", active)) : tt("Bu hafta") },

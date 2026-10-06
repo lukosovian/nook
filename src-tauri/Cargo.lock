@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "nook"
-version = "0.2.37"
+version = "0.2.38"
 dependencies = [
  "base64 0.22.1",
  "jpeg-encoder",

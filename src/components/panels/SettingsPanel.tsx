@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { Eye, EyeOff, Play, X } from "lucide-react";
+import { Eye, EyeOff, Lock, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
-import { alarmRing, listMonitors, openPath, type MonitorInfo } from "../../lib/bridge";
+import { alarmRing, listMonitors, openPath, shieldOn, type MonitorInfo } from "../../lib/bridge";
+import { checkPassword, hashPassword } from "../../lib/lock";
 import { startTour } from "../../lib/tour";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
 import { chooseArgusDir, installArgus, openArgus, useArgus } from "../../lib/argus";
@@ -138,6 +139,8 @@ export function SettingsPanel() {
         )}
       </Section>
 
+      <LockSection />
+
       <AiSection />
 
       <ArgusSection />
@@ -163,6 +166,12 @@ export function SettingsPanel() {
         </Row>
         <Row label={tt("Gizlilik kalkanı")}>
           <ShortcutInput value={s.shieldShortcut} onChange={(v) => update({ shieldShortcut: v })} />
+        </Row>
+        <Row label={tt("Kalkanda mikrofon rozeti ve klik sesi")}>
+          <Toggle on={s.shieldMicFx} onChange={(v) => update({ shieldMicFx: v })} color={ACCENT.orange} />
+        </Row>
+        <Row label={tt("Ada açılınca solunda ses kartı")}>
+          <Toggle on={s.soundCard} onChange={(v) => update({ soundCard: v })} color={ACCENT.green} />
         </Row>
         <Row label={tt("Hassas veri koruyucu (kart, IBAN, anahtar, şifre)")}>
           <Toggle on={s.sensitiveGuard} onChange={(v) => update({ sensitiveGuard: v })} />
@@ -385,6 +394,7 @@ const INDEX: { label: string; title: string }[] = [
   { label: tt("Erişilebilirlik"), title: tt("Erişilebilirlik") },
   { label: tt("Molalar"), title: tt("Mola hatırlatıcıları") },
   { label: tt("Bekçi"), title: tt("Odak bekçisi") },
+  { label: tt("Kilit"), title: tt("Parola kilidi") },
   { label: tt("Yapay zekâ"), title: tt("Yapay zekâ") },
   { label: "Argus", title: "Argus" },
   { label: tt("Davranış"), title: tt("Davranış") },
@@ -394,12 +404,21 @@ const INDEX: { label: string; title: string }[] = [
 function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement | null> }) {
   const [current, setCurrent] = useState(0);
   const strip = useRef<HTMLDivElement>(null);
+  // Sekmeye tıklayınca kayma bitene kadar aradaki bölümler parlamasın: hedef sabit kalır
+  const jumping = useRef<{ i: number; timer: number } | null>(null);
   const find = (title: string) => scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${title}"]`) ?? null;
 
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const onScroll = () => {
+      const j = jumping.current;
+      if (j) {
+        // Kayma durunca (son olaydan 140 ms sonra) kilit kalkar
+        window.clearTimeout(j.timer);
+        j.timer = window.setTimeout(() => (jumping.current = null), 140);
+        return;
+      }
       const y = el.scrollTop + 44;
       let at = 0;
       INDEX.forEach((it, i) => {
@@ -411,8 +430,20 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
       setCurrent(at);
     };
     onScroll();
+    // Kullanıcı kendisi kaydırmaya başlarsa kilit hemen kalkar
+    const release = () => {
+      if (jumping.current) window.clearTimeout(jumping.current.timer);
+      jumping.current = null;
+    };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    el.addEventListener("wheel", release, { passive: true });
+    el.addEventListener("pointerdown", release);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("wheel", release);
+      el.removeEventListener("pointerdown", release);
+      release();
+    };
   }, [scroller]);
 
   // Seçili sekme şeritte görünür kalsın
@@ -422,7 +453,15 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
 
   const go = (i: number) => {
     const sec = find(INDEX[i].title);
-    if (sec && scroller.current) scroller.current.scrollTo({ top: sec.offsetTop - 36, behavior: "smooth" });
+    const el = scroller.current;
+    if (!sec || !el) return;
+    setCurrent(i);
+    const top = Math.max(0, Math.min(sec.offsetTop - 36, el.scrollHeight - el.clientHeight));
+    if (Math.abs(top - el.scrollTop) < 1) return;
+    if (jumping.current) window.clearTimeout(jumping.current.timer);
+    // Hiç scroll olayı gelmezse de kilit kalksın
+    jumping.current = { i, timer: window.setTimeout(() => (jumping.current = null), 1200) };
+    el.scrollTo({ top, behavior: "smooth" });
   };
 
   return (
@@ -649,6 +688,155 @@ export function KeyInput({ value, onChange }: { value: string; onChange: (v: str
       >
         {show ? <EyeOff size={11} /> : <Eye size={11} />}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Parola kilidi: kalkan yalnızca parolayla kalkar, istenirse bilgisayar açılınca kalkanla başlar.
+ * Parola kurulduktan sonra bu bölümün ayarları da parolayla açılır.
+ */
+function LockSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const has = !!s.lockHash;
+  // Bu bölüm parolayla açıldı mı (panel kapanınca yeniden kilitlenir)
+  const [open, setOpen] = useState(false);
+  const [setting, setSetting] = useState(false);
+
+  if (!has || setting)
+    return (
+      <Section title={tt("Parola kilidi")}>
+        {setting ? (
+          <NewPassword
+            onCancel={() => setSetting(false)}
+            onSave={async (pw) => {
+              update({ lockHash: await hashPassword(pw), lockEnabled: true });
+              setSetting(false);
+              setOpen(true);
+            }}
+          />
+        ) : (
+          <Row label={tt("Kalkan yalnızca parolayla kalksın")}>
+            <TextButton onClick={() => setSetting(true)}>{tt("Parola belirle")}</TextButton>
+          </Row>
+        )}
+        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Bilgisayardan kalkarken {0} ile kilitle; dönünce parolayla aç. İstersen bilgisayar açılınca da parola sorar.", s.shieldShortcut.split("+").join(" + "))}</p>
+      </Section>
+    );
+
+  if (!open)
+    return (
+      <Section title={tt("Parola kilidi")}>
+        <div className="flex items-center justify-between gap-2 py-1.5">
+          <span className="flex items-center gap-1.5 text-[12px] text-label">
+            <Lock size={12} strokeWidth={2.4} className="text-label-3" />
+            {tt("Bu bölüm parolalı")}
+          </span>
+          <PasswordInput placeholder={tt("Parola")} action={tt("Aç")} verify={(pw) => checkPassword(pw, s.lockHash)} onOk={() => setOpen(true)} />
+        </div>
+      </Section>
+    );
+
+  return (
+    <Section title={tt("Parola kilidi")}>
+      <Row label={tt("Kalkan yalnızca parolayla kalksın")}>
+        <Toggle on={s.lockEnabled} onChange={(v) => update({ lockEnabled: v })} color={ACCENT.red} />
+      </Row>
+      {s.lockEnabled && (
+        <Row label={tt("Bilgisayar açılınca")}>
+          <Segmented
+            id="lock-boot"
+            options={[
+              { id: 1, label: tt("Kalkanla") },
+              { id: 0, label: tt("Kalkansız") },
+            ]}
+            value={s.lockOnBoot ? 1 : 0}
+            onChange={(v) => update({ lockOnBoot: v === 1 })}
+            color={ACCENT.red}
+          />
+        </Row>
+      )}
+      {s.lockEnabled && (
+        <Row label={tt("Şimdi kilitle")}>
+          <TextButton onClick={() => void shieldOn(false)}>{s.shieldShortcut.split("+").join(" + ")}</TextButton>
+        </Row>
+      )}
+      <Row label={tt("Parola")}>
+        <div className="flex items-center gap-1">
+          <TextButton onClick={() => setSetting(true)}>{tt("Değiştir")}</TextButton>
+          <TextButton
+            tone="danger"
+            onClick={() => {
+              update({ lockHash: "", lockEnabled: false });
+              setOpen(false);
+            }}
+          >
+            {tt("Kaldır")}
+          </TextButton>
+        </div>
+      </Row>
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Unutursan: Görev Yöneticisi'nden Nook'u kapatınca kalkan da kalkar.")}</p>
+    </Section>
+  );
+}
+
+/** Yeni parola: iki kez yazılır, en az 4 karakter */
+function NewPassword({ onSave, onCancel }: { onSave: (pw: string) => Promise<void>; onCancel: () => void }) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const save = () => {
+    if (a.length < 4) return setErr(tt("En az 4 karakter"));
+    if (a !== b) return setErr(tt("Parolalar aynı değil"));
+    void onSave(a);
+  };
+  const field = "w-[130px] rounded-full bg-well px-2.5 py-0.5 text-[11px] font-medium text-label outline-none placeholder:text-label-3 focus:bg-well-hi";
+  return (
+    <>
+      <Row label={tt("Yeni parola")}>
+        <input type="password" autoFocus value={a} placeholder="••••" onChange={(e) => (setA(e.target.value), setErr(null))} className={field} />
+      </Row>
+      <Row label={tt("Tekrar")}>
+        <input
+          type="password"
+          value={b}
+          placeholder="••••"
+          onChange={(e) => (setB(e.target.value), setErr(null))}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+          className={field}
+        />
+      </Row>
+      <div className="flex items-center justify-end gap-1.5 py-1.5">
+        {err && <span className="mr-auto text-[10.5px]" style={{ color: ACCENT.red }}>{err}</span>}
+        <TextButton onClick={onCancel}>{tt("Vazgeç")}</TextButton>
+        <TextButton onClick={save}>{tt("Kaydet")}</TextButton>
+      </div>
+    </>
+  );
+}
+
+/** Parola sorup doğrulayan küçük kutu (yanlışsa kırmızı) */
+function PasswordInput({ placeholder, action, verify, onOk }: { placeholder: string; action: string; verify: (pw: string) => Promise<boolean>; onOk: () => void }) {
+  const [v, setV] = useState("");
+  const [wrong, setWrong] = useState(false);
+  const go = async () => {
+    if (!v) return;
+    if (await verify(v)) return onOk();
+    setWrong(true);
+    setV("");
+  };
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="password"
+        value={v}
+        placeholder={wrong ? tt("Yanlış parola") : placeholder}
+        onChange={(e) => (setV(e.target.value), setWrong(false))}
+        onKeyDown={(e) => e.key === "Enter" && void go()}
+        className={`w-[110px] rounded-full bg-well px-2.5 py-0.5 text-[11px] font-medium text-label outline-none focus:bg-well-hi ${wrong ? "placeholder:text-[color:var(--color-red)]" : "placeholder:text-label-3"}`}
+      />
+      <TextButton onClick={() => void go()}>{action}</TextButton>
     </div>
   );
 }

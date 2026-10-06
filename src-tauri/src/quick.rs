@@ -64,6 +64,15 @@ pub async fn quick_set(key: String, on: bool) -> Result<(), String> {
     }
 }
 
+/// Mikrofon sessizde mi (yoksa None) — gizlilik kalkanı için
+pub fn mic_muted() -> Option<bool> {
+    imp::endpoint_muted(true)
+}
+
+pub fn set_mic_muted(muted: bool) -> Result<(), String> {
+    imp::set_endpoint_muted(true, muted)
+}
+
 /// action: lock | screen-off
 #[tauri::command]
 pub fn quick_action(action: String) -> Result<(), String> {

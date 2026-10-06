@@ -81,6 +81,9 @@ pub fn run() {
             commands::island_drag,
             clipboard::clipboard_clear_if,
             shield::shield_off,
+            shield::shield_on,
+            shield::system_uptime,
+            argus::side_card,
             buddy::perch_start,
             buddy::perch_stop,
             buddy::guard_alert,
@@ -153,6 +156,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|win, event| {
+            shield::on_window_event(win, event);
             let shared = win.state::<Arc<Shared>>();
             match event {
                 // Tracker, imleci pencere-yerel koordinata çevirmek için konum/ölçeği önbellekte tutar.

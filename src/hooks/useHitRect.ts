@@ -17,11 +17,25 @@ function layoutRect(el: HTMLElement) {
   return { x, y, width: el.offsetWidth, height: el.offsetHeight };
 }
 
-/** Adaya bağlı ek alan (yandaki Argus kartı); değişince sınırlar yeniden gönderilir. */
+/**
+ * Adaya bağlı ek alanlar (sağda Argus kartı, solda ses kartı); Rust tek dikdörtgen alır, hepsini
+ * kapsayan kutu gönderilir. Değişince sınırlar yeniden gönderilir.
+ */
+const extras = new Map<string, Rect>();
 let extra: Rect | null = null;
 let onExtra: (() => void) | null = null;
-export function setHitExtra(rect: Rect | null) {
-  extra = rect;
+export function setHitExtra(key: string, rect: Rect | null) {
+  if (rect) extras.set(key, rect);
+  else extras.delete(key);
+  const all = [...extras.values()];
+  if (!all.length) extra = null;
+  else {
+    const x = Math.min(...all.map((r) => r.x));
+    const y = Math.min(...all.map((r) => r.y));
+    const right = Math.max(...all.map((r) => r.x + r.width));
+    const bottom = Math.max(...all.map((r) => r.y + r.height));
+    extra = { x, y, width: right - x, height: bottom - y };
+  }
   onExtra?.();
 }
 

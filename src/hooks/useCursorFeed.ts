@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { EVENTS, subscribe, type CursorPayload } from "../lib/bridge";
+import { EVENTS, subscribe, windowLabel, type CursorPayload } from "../lib/bridge";
 import { cursorX, cursorY, FAR } from "../lib/cursor";
 import { isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
@@ -17,6 +17,8 @@ export function useCursorFeed() {
     let greeted = 0;
 
     const off = subscribe<CursorPayload>(EVENTS.cursor, (p) => {
+      // Olaylar bütün pencerelere ulaşır (yan kart, öbür ekrandaki ada): yalnızca bu pencereninki
+      if (p.label && p.label !== windowLabel) return;
       cursorX.set(p.near ? p.x : FAR);
       cursorY.set(p.near ? p.y : FAR);
 

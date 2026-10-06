@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { ArgusCard } from "./components/ArgusCard";
 import { Shield } from "./components/Shield";
+import { SoundCard } from "./components/SoundCard";
 import { Perch } from "./components/outings/Perch";
 import { windowLabel } from "./lib/bridge";
 import { installLogging } from "./lib/log";
@@ -23,6 +24,8 @@ async function boot() {
     import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "argcard"
       ? { visible: true, title: "Tuzlu Kahve", episode: "S1B6 · 6. Bölüm", poster: null, meta: ["2025", "Dram, Romantik", "★ 7.8"], status: "İzleniyor", playedMs: 11 * 60_000, needMs: 15 * 60_000 }
       : null;
+  // Yalnızca geliştirme: ?preview=soundcard ile soldaki ses kartı
+  const soundDemo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "soundcard" ? { visible: true, detached: false } : null;
   // Yalnızca geliştirme: ?preview=shield ile gizlilik kalkanı
   const shieldDemo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "shield";
   // Yalnızca geliştirme: ?preview=perch ile pencere üstüne tüneyen Nook
@@ -30,10 +33,11 @@ async function boot() {
   const PerchStage = perchDemo ? (await import("./dev/PerchStage")).PerchStage : null;
   const Logo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "logo" ? (await import("./dev/Logo")).Logo : null;
   const Gallery = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "gallery" ? (await import("./dev/Gallery")).Gallery : null;
+  const Poster = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "poster" ? (await import("./dev/Poster")).Poster : null;
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ColorVision />
-      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Logo ? <Logo /> : <App />}
+      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : <App />}
     </StrictMode>,
   );
 }

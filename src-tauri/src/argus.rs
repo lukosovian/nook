@@ -905,14 +905,30 @@ pub const CARD_H: f64 = 290.0;
 /// Pencere oluşturduğu için async olmalı: senkron komutta Windows'ta kilitlenir (wry#583).
 #[tauri::command]
 pub async fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
-    let r = card_inner(&window, show, x, y);
+    let r = card_inner(&window, CARD, CARD_W, CARD_H, false, show, x, y);
     if let Err(e) = &r {
         crate::log::write("warn", &format!("argus kartı: {e}"));
     }
     r
 }
 
-fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
+/// Adanın solundaki ses kartı: Argus kartı gibi ayrı pencere ama tıklanabilir — tracker kendi
+/// sınırları içinde tıklama-geçirgenliğini kapatır (bkz. SoundCard.tsx).
+pub const SOUND: &str = "sound-card";
+pub const SOUND_W: f64 = 300.0;
+pub const SOUND_H: f64 = 300.0;
+
+#[tauri::command]
+pub async fn side_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
+    let r = card_inner(&window, SOUND, SOUND_W, SOUND_H, true, show, x, y);
+    if let Err(e) = &r {
+        crate::log::write("warn", &format!("ses kartı: {e}"));
+    }
+    r
+}
+
+#[allow(clippy::too_many_arguments)]
+fn card_inner(window: &tauri::WebviewWindow, label: &str, w: f64, h: f64, interactive: bool, show: bool, x: f64, y: f64) -> Result<(), String> {
     let app = window.app_handle();
     // Pencere hiç gizlenip yeniden gösterilmez (show() odağı çalıp tam ekran oyunu alta atabilir);
     // kart içeriği kendi animasyonuyla kaybolur, şeffaf ve tıklanamaz pencere yerinde kalır.
@@ -923,14 +939,14 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let k = scale * crate::window::zoom();
     let at = tauri::PhysicalPosition::new(pos.x + (x * k).round() as i32, pos.y + (y * k).round() as i32);
-    let card = match app.get_webview_window(CARD) {
+    let card = match app.get_webview_window(label) {
         Some(c) => c,
         None => {
             // Görünür oluşturulmalı (gizli oluşturulan WebView2 içeriği geç/eksik açabiliyor); doğrudan yerinde
-            let c = tauri::WebviewWindowBuilder::new(app, CARD, tauri::WebviewUrl::App("index.html".into()))
+            let c = tauri::WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App("index.html".into()))
                 .position(at.x as f64 / scale, at.y as f64 / scale)
                 .title("Nook")
-                .inner_size(CARD_W * crate::window::zoom(), CARD_H * crate::window::zoom())
+                .inner_size(w * crate::window::zoom(), h * crate::window::zoom())
                 .resizable(false)
                 .maximizable(false)
                 .minimizable(false)
@@ -946,6 +962,10 @@ fn card_inner(window: &tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Resu
             c.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
             crate::window::clear_background(&c);
             crate::window::apply_zoom(&c);
+            if interactive {
+                // Tracker imleç kartın üstündeyken tıklanabilir yapar (sınırları sayfa bildirir)
+                app.state::<std::sync::Arc<crate::state::Shared>>().register(&c);
+            }
             c
         }
     };

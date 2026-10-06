@@ -7,7 +7,7 @@ import { MotionGlobalConfig } from "motion/react";
 import { dayKey, useNook, type Tab } from "../store/nook";
 import { useArgus, type ArgusItem } from "../lib/argus";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "settings"];
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -41,6 +41,7 @@ function demoArgus() {
 }
 
 export function applyPreview(mode: string) {
+  const tr = (new URLSearchParams(location.search).get("lang") ?? "tr") === "tr";
   if (!new URLSearchParams(location.search).has("noargus")) demoArgus();
   document.documentElement.style.background = "#3a4a5c";
   // Ekran görüntüsü animasyonun ortasında çekilmesin
@@ -50,6 +51,7 @@ export function applyPreview(mode: string) {
     st.textContent = ".nook-fade{animation:none!important}";
     document.head.appendChild(st);
   }
+  if (new URLSearchParams(location.search).has("happy")) useNook.setState({ affection: 90 });
   const s = useNook.getState();
   const now = performance.now();
 
@@ -100,8 +102,8 @@ export function applyPreview(mode: string) {
       { id: "s4", path: "C:/Fotoğraflar", name: "Fotoğraflar", ext: "", size: 0, isDir: true, isImage: false, addedAt: 4 },
     ],
     alarms: [
-      { id: "a1", hour: 7, minute: 30, label: "Kalk", repeat: "weekdays", enabled: true, next: Date.now() + 8.5 * 3600_000 },
-      { id: "a2", hour: 14, minute: 0, label: "Toplantı", repeat: "once", enabled: false, next: null },
+      { id: "a1", hour: 7, minute: 30, label: tr ? "Kalk" : "Wake up", repeat: "weekdays", enabled: true, next: Date.now() + 8.5 * 3600_000 },
+      { id: "a2", hour: 14, minute: 0, label: tr ? "Toplantı" : "Meeting", repeat: "once", enabled: false, next: null },
     ],
     note: mode === "note" ? "Market: süt, ekmek\nPazartesi sunum provası" : "",
     focus: mode === "focus" ? { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 2 } : null,
@@ -150,6 +152,20 @@ export function applyPreview(mode: string) {
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
+  // ?profile=work|game|fun → ana sayfa profili
+  const profile = params.get("profile");
+  if (profile) useNook.getState().updateSettings({ homeProfile: profile as never });
+  // ?lock → parola kilidi açık (yalnızca görünüm: hiçbir parola tutmaz)
+  if (params.has("lock")) useNook.getState().updateSettings({ lockEnabled: true, lockHash: "00:" + "x" });
+  if (mode === "calendar" && !useNook.getState().events.length) {
+    const st = useNook.getState();
+    const d = (n: number) => dayKey(new Date(Date.now() + n * 86_400_000));
+    st.addEvent({ day: d(0), time: "10:30", title: "Sprint toplantısı", remind: 10 });
+    st.addEvent({ day: d(0), time: "", title: "Annemi ara", remind: -1 });
+    st.addEvent({ day: d(0), time: "19:00", title: "Halı saha", remind: 60 });
+    st.addEvent({ day: d(3), time: "14:00", title: "Diş hekimi", remind: 1440 });
+    st.addEvent({ day: d(9), time: "", title: "Kira", remind: 0 });
+  }
   // ?scroll=px → görünüm panelinin aşağısı
   if (params.get("scroll")) window.setInterval(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 500);
   // ?look=şekil,göz,gözlük,başlık,boyun,doku&color=… &name=…
@@ -232,7 +248,7 @@ export function applyPreview(mode: string) {
   } else if (mode === "reminder" || mode === "drinking") {
     useNook.setState({ media: null, reminder: { kind: "water", phase: mode === "drinking" ? "drinking" : "due" }, antic: mode === "drinking" ? "drink" : null });
   } else if (mode === "ringing") {
-    useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: "Toplantı", repeat: "once", enabled: false, next: null } });
+    useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: tr ? "Toplantı" : "Meeting", repeat: "once", enabled: false, next: null } });
   } else if (mode === "feeding") {
     useNook.setState({ media: null, mood: "hungry" });
   } else if (mode === "hang" || mode === "fish") {

@@ -237,6 +237,8 @@ export interface NativeSettings {
   voiceShortcut: string;
   /** Gizlilik kalkanı (aç/kapat) */
   shieldShortcut: string;
+  /** Parola kilidi: kalkan yalnızca parolayla kalkar */
+  shieldLock: boolean;
   autoScreenshots: boolean;
   hideInFullscreen: boolean;
   /** Oyun açılınca ada gizlenmeden önce kısa özet */
@@ -292,6 +294,12 @@ export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promis
 export const clipboardClearIf = (text: string) => (inTauri ? invoke<boolean>("clipboard_clear_if", { text }) : Promise.resolve(false));
 /** Gizlilik kalkanını kapat (kalkanın kendisinden: Esc, çift tık) */
 export const shieldOff = () => (inTauri ? invoke<void>("shield_off") : Promise.resolve());
+/** Kalkanı aç; ask: parola kutusu hemen görünsün (açılış kilidi) */
+export const shieldOn = (ask: boolean) => (inTauri ? invoke<void>("shield_on", { ask }) : Promise.resolve());
+/** Bilgisayar ne kadar süredir açık (sn) */
+export const systemUptime = () => (inTauri ? invoke<number>("system_uptime") : Promise.resolve(99_999));
+/** Adanın solundaki ses kartı penceresi (x, y: bu pencereye göre mantıksal konum) */
+export const sideCard = (show: boolean, x: number, y: number) => invoke<void>("side_card", { show, x, y });
 /** Öndeki pencerenin başlık çubuğuna tün (uygun pencere yoksa false) */
 export const perchStart = () => (inTauri ? invoke<boolean>("perch_start") : Promise.resolve(false));
 export const perchStop = () => (inTauri ? invoke<void>("perch_stop") : Promise.resolve());
@@ -366,6 +374,8 @@ export interface Rect {
 }
 
 export interface CursorPayload {
+  /** Hangi pencere için (yoksa tarayıcı önizlemesi) — her pencere yalnızca kendininkini dinler */
+  label?: string;
   x: number;
   y: number;
   /** İmleç adanın hit rect'i içinde mi (click-through kapalı mı) */
@@ -390,7 +400,9 @@ export function subscribe<T>(event: string, handler: Handler<T>): () => void {
   if (inTauri) {
     let unlisten: (() => void) | undefined;
     let disposed = false;
-    void listen<T>(event, (e) => handler(e.payload)).then((fn) => {
+    // Bu pencereye yönelik ve herkese gönderilen olaylar; başka pencereye (yan kart, öbür ekrandaki
+    // ada) gönderilenler gelmez — yoksa ada, ses kartının "imleç bende değil" olayıyla kapanıyordu
+    void listen<T>(event, (e) => handler(e.payload), { target: { kind: "WebviewWindow", label: windowLabel } }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
     });

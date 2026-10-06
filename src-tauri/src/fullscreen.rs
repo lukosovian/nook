@@ -144,6 +144,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
 
                 let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                 for (label, ws) in windows {
+                    // Yan kartlar (ses kartı) adaya bağlı: içeriğini ada gizler
+                    if !label.starts_with(crate::window::ISLAND) {
+                        continue;
+                    }
                     // Ada penceresinin üst-orta noktası tam ekran monitörün içinde mi?
                     let cx = ws.geom.x + crate::window::width_of(&label) * ws.geom.scale / 2.0;
                     let covered = full.is_some_and(|(l, t, r, b)| cx >= l as f64 && cx < r as f64 && ws.geom.y + 1.0 >= t as f64 && ws.geom.y < b as f64);

@@ -60,6 +60,28 @@ export interface PatchNote {
 
 export const NOTES: PatchNote[] = [
   {
+    version: "0.2.38",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Parolalı kalkan, 10 canlı sahne, takvim"),
+    items: [
+      {
+        title: tt("Gizlilik kalkanı yenilendi"),
+        text: tt("Her açılışta 10 canlı sahneden biri (kamp ateşi, kafe, disko, uzay, sahil, kütüphane, maden, zen, atölye, kar), üstte saat, tarih ve hava. Medya durur; mikrofon açıksa kalkan boyunca kapanır, sonra geri açılır. İstersen parolayla kilitlenir ve bilgisayar açılınca parola sorar."),
+        demo: "shield",
+      },
+      {
+        title: tt("Takvim ve profiller"),
+        text: tt("Yeni Takvim bölümü: etkinlik ekle, saatinde ya da önceden hatırlatsın. Ana sayfanın üstünden İş, Oyun ya da Eğlence profilini seç; o işe yarayan bölümler öne çıkar."),
+        demo: "chips",
+      },
+      {
+        title: tt("Ses kartı ve Nişan oyunu"),
+        text: tt("Ada açılınca solunda ses kartı: çıkış cihazı, ses, mikrofon ve uygulama sesleri (Ayarlar'dan kapatılır). Oyunlara Nişan eklendi: hedefler küçülmeden vur. Köstebek'te kutular artık kaymıyor."),
+        demo: "games",
+      },
+    ],
+  },
+  {
     version: "0.2.37",
     date: tt("6 Ekim 2026"),
     headline: tt("Nook artık 9 dil konuşuyor"),

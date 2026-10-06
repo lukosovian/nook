@@ -119,6 +119,7 @@ export type Tab =
   | "look"
   | "notes"
   | "archive"
+  | "calendar"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -263,6 +264,34 @@ export interface Settings extends NativeSettings {
   argusNews: boolean;
   /** Tarayıcıda izlediğini Argus'la eşleştirip işaretlemeyi teklif et */
   argusDetect: boolean;
+  /** Parola kilidi: kalkan yalnızca parolayla kalkar */
+  lockEnabled: boolean;
+  /** Parolanın tuzlu SHA-256 özeti ("tuz:özet"); parolanın kendisi saklanmaz */
+  lockHash: string;
+  /** Bilgisayar açılınca kalkanla (parola sorarak) başla */
+  lockOnBoot: boolean;
+  /** Ana sayfa profili: hepsi, iş, oyun, eğlence */
+  homeProfile: HomeProfile;
+  /** Ada açılınca solunda ses kartı */
+  soundCard: boolean;
+  /** Kalkan mikrofonu kapatıp açarken rozet ve klik sesi */
+  shieldMicFx: boolean;
+}
+
+export type HomeProfile = "all" | "work" | "game" | "fun";
+
+/** Takvim etkinliği; hatırlatması tek seferlik bir alarm olarak kurulur */
+export interface CalEvent {
+  id: string;
+  /** Yerel gün: 2026-10-06 */
+  day: string;
+  /** "14:30"; boşsa gün boyu */
+  time: string;
+  title: string;
+  /** Kaç dakika önce hatırlatılsın; -1 = hatırlatma yok */
+  remind: number;
+  /** Hatırlatma alarmı */
+  alarmId?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -321,6 +350,13 @@ export const DEFAULT_SETTINGS: Settings = {
   homeHidden: [],
   focusGuard: true,
   focusSites: ["YouTube", "X", "Instagram", "TikTok", "Reddit", "Facebook", "Twitch"],
+  shieldLock: false,
+  lockEnabled: false,
+  lockHash: "",
+  lockOnBoot: true,
+  homeProfile: "all",
+  soundCard: true,
+  shieldMicFx: true,
 };
 
 export interface Osd {
@@ -435,6 +471,8 @@ interface NookState {
   guard: { site: string } | null;
   /** Balıkta tutulanlar (toplam) */
   catches: { stars: number; trash: number };
+  /** Takvim etkinlikleri */
+  events: CalEvent[];
 
   setMood: (mood: Mood) => void;
   setAntic: (antic: Antic | null) => void;
@@ -513,6 +551,8 @@ interface NookState {
   setGuard: (guard: NookState["guard"]) => void;
   addCatch: (kind: "stars" | "trash") => void;
   patchClip: (id: string, patch: Partial<ClipItem>) => void;
+  addEvent: (e: Omit<CalEvent, "id" | "alarmId">) => void;
+  removeEvent: (id: string) => void;
 }
 
 const push = (list: number[], v: number) => [...list, v].slice(-HISTORY);
@@ -579,6 +619,7 @@ export const useNook = create<NookState>()(
       outing: null,
       guard: null,
       catches: { stars: 0, trash: 0 },
+      events: [],
 
       setMood: (mood) => set({ mood }),
       setAntic: (antic) => set({ antic }),
@@ -737,6 +778,32 @@ export const useNook = create<NookState>()(
       setGuard: (guard) => set({ guard }),
       addCatch: (kind) => set((s) => ({ catches: { ...s.catches, [kind]: s.catches[kind] + 1 } })),
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
+      addEvent: (e) =>
+        set((s) => {
+          const id = crypto.randomUUID();
+          const at = remindAt(e);
+          let alarms = s.alarms;
+          let alarmId: string | undefined;
+          // Hatırlatma: o an çalan tek seferlik alarm (sesi, tam ekranda uyanması alarmlarla aynı)
+          if (at !== null && at > Date.now()) {
+            alarmId = crypto.randomUUID();
+            const d = new Date(at);
+            const label = e.time ? `${e.title} · ${e.time}` : e.title;
+            alarms = [...alarms, { id: alarmId, hour: d.getHours(), minute: d.getMinutes(), label, repeat: "once" as const, oneShot: true, enabled: true, next: at }].sort(
+              (x, y) => (x.next ?? Infinity) - (y.next ?? Infinity),
+            );
+          }
+          const events = [...s.events, { ...e, id, alarmId }]
+            .sort((x, y) => (x.day + (x.time || "00:00")).localeCompare(y.day + (y.time || "00:00")))
+            // Üç aydan eski etkinlikler atılır
+            .filter((x) => x.day >= dayKey(new Date(Date.now() - 90 * 86_400_000)));
+          return { events, alarms };
+        }),
+      removeEvent: (id) =>
+        set((s) => {
+          const ev = s.events.find((x) => x.id === id);
+          return { events: s.events.filter((x) => x.id !== id), alarms: ev?.alarmId ? s.alarms.filter((a) => a.id !== ev.alarmId) : s.alarms };
+        }),
       setBusy: (key, on) =>
         set((s) => ({ busy: on ? [...s.busy.filter((k) => k !== key), key] : s.busy.filter((k) => k !== key) })),
       setHold: (key, on) =>
@@ -765,6 +832,9 @@ export const useNook = create<NookState>()(
         lastOffer: s.lastOffer,
         toured: s.toured,
         catches: s.catches,
+        events: s.events,
+        // Kalkan ekranı (ayrı pencere) son hava durumunu gösterebilsin
+        weather: s.weather,
       }),
       // Yeni eklenen ayar alanları eski kayıtlarda da varsayılanla gelsin.
       merge: (persisted, current) => {
@@ -782,6 +852,14 @@ export const useNook = create<NookState>()(
     },
   ),
 );
+
+/** Etkinliğin hatırlatma anı (ms); hatırlatma yoksa null. Gün boyu etkinlik sabah 09:00 sayılır. */
+export function remindAt(e: Pick<CalEvent, "day" | "time" | "remind">): number | null {
+  if (e.remind < 0) return null;
+  const [y, m, d] = e.day.split("-").map(Number);
+  const [hh, mm] = (e.time || "09:00").split(":").map(Number);
+  return new Date(y, m - 1, d, hh, mm).getTime() - e.remind * 60_000;
+}
 
 /** Pil yok/şarjda değilse ve %20 altındaysa Nook yorgun görünür. */
 export const selectBatteryLow = (s: NookState) =>

@@ -6,6 +6,8 @@ import { Island } from "./components/Island";
 import { useUpdateCheck } from "./lib/update";
 import { useArgusDetect, useArgusFeed } from "./lib/argus";
 import { useAlarms } from "./hooks/useAlarms";
+import { bootLock, useShieldMicFeed } from "./lib/lock";
+import { isPrimary } from "./lib/bridge";
 import { useAntics } from "./hooks/useAntics";
 import { useCursorFeed } from "./hooks/useCursorFeed";
 import { useFeeding } from "./hooks/useFeeding";
@@ -46,6 +48,11 @@ import {
 
 export default function App() {
   useSettingsSync();
+  useShieldMicFeed();
+  // Bilgisayar yeni açıldıysa ve parola kilidi açıksa kalkanla başla
+  useEffect(() => {
+    if (isPrimary) void bootLock();
+  }, []);
   useStorageSync();
   useCursorFeed();
   useIdleFeed();
