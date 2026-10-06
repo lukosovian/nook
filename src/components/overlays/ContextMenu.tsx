@@ -16,9 +16,10 @@ const editable = (el: EventTarget | null) =>
 
 /**
  * Tarayıcının sağ tık menüsü (Farklı kaydet, Yazdır…) yerine küçük bir Nook menüsü: Yenile
- * (seçili metin varsa Kopyala). Adanın içinde açılır — dışı tıklanamaz.
+ * (seçili metin varsa Kopyala). Adanın içinde açılır — dışı tıklanamaz. `refreshOnly`: yalnızca
+ * Yenile (gizlilik kalkanı gibi ada dışı pencereler).
  */
-export function ContextMenu({ bounds }: { bounds: RefObject<HTMLElement | null> }) {
+export function ContextMenu({ bounds, refreshOnly = false }: { bounds: RefObject<HTMLElement | null>; refreshOnly?: boolean }) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: Item[] } | null>(null);
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export function ContextMenu({ bounds }: { bounds: RefObject<HTMLElement | null> 
       const box = bounds.current?.getBoundingClientRect();
       if (!box) return;
       const selected = window.getSelection()?.toString() ?? "";
-      const items: Item[] = [
+      const items: Item[] = refreshOnly ? [{ label: tt("Yenile"), icon: RotateCw, run: () => location.reload() }] : [
         ...(selected.trim() ? [{ label: tt("Kopyala"), icon: Copy, run: () => void copyText(selected) }] : []),
         { label: tt("Görünüm"), icon: Palette, run: () => useNook.getState().setTab("look") },
         ...(useNook.getState().settings.islandPos ? [{ label: tt("Ortala"), icon: Crosshair, run: () => useNook.getState().updateSettings({ islandPos: null }) }] : []),
@@ -60,7 +61,7 @@ export function ContextMenu({ bounds }: { bounds: RefObject<HTMLElement | null> 
       window.removeEventListener("blur", close);
       off();
     };
-  }, [bounds]);
+  }, [bounds, refreshOnly]);
 
   return (
     <AnimatePresence>

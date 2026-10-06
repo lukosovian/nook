@@ -21,7 +21,7 @@ const SKY_ICON: Record<Sky, LucideIcon> = {
 };
 
 /** Saat, tarih ve (taze ise) hava durumu */
-function useClock() {
+export function useClock() {
   const [now, setNow] = useState(() => new Date());
   const weather = useNook((s) => s.weather);
   useEffect(() => {
@@ -36,10 +36,10 @@ function useClock() {
   };
 }
 
-type Clock = ReturnType<typeof useClock>;
+export type Clock = ReturnType<typeof useClock>;
 
 /** Tabelaya yazılmış saat: büyük saat, altında tarih ve hava */
-function Face({ c, time, sub, gap = 6, wxSize = 20 }: { c: Clock; time: CSSProperties; sub: CSSProperties; gap?: number; wxSize?: number }) {
+export function Face({ c, time, sub, gap = 6, wxSize = 20 }: { c: Clock; time: CSSProperties; sub: CSSProperties; gap?: number; wxSize?: number }) {
   return (
     <div className="flex flex-col items-center leading-none">
       <span className="tabular-nums" style={time}>
@@ -59,7 +59,7 @@ function Face({ c, time, sub, gap = 6, wxSize = 20 }: { c: Clock; time: CSSPrope
   );
 }
 
-function At({ x, y, w, h, children, style }: { x: number; y: number; w: number; h: number; children: ReactNode; style?: CSSProperties }) {
+export function At({ x, y, w, h, children, style }: { x: number; y: number; w: number; h: number; children: ReactNode; style?: CSSProperties }) {
   return (
     <div className="pointer-events-none absolute" style={{ left: x, top: y, width: w, height: h, ...style }}>
       {children}

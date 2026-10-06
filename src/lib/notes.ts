@@ -60,6 +60,28 @@ export interface PatchNote {
 
 export const NOTES: PatchNote[] = [
   {
+    version: "0.2.40",
+    date: tt("6 Ekim 2026"),
+    headline: tt("Kalkana 12 yeni sahne"),
+    items: [
+      {
+        title: tt("12 yeni kalkan sahnesi"),
+        text: tt("Atari salonu, deniz altı, sera, gece treni, sinema, Vahşi Batı, korsan gemisi, çılgın laboratuvar, lavanta tarlası, sığınak, dönme dolap ve eskiz defteri. Her birinin kendi saati var: skor tabelası, pirinç lombar, buğulu cam, tren bileti, Nixie tüpleri, balona bağlı bilet…"),
+        demo: "shield",
+      },
+      {
+        title: tt("Kalkanda sade sağ tık"),
+        text: tt("Kalkanda sağ tıklayınca tarayıcı menüsü yerine yalnızca Yenile çıkar; yeni bir sahne gelir."),
+        demo: "shield",
+      },
+      {
+        title: tt("Mikrofon daha güvenilir geri açılır"),
+        text: tt("Kalkan birden fazla mikrofonu kapatır ve kalkınca yalnızca kendi kapattıklarını geri açar; kalkan hemen yeniden açılsa da mikrofon unutulmaz."),
+        demo: "mixer",
+      },
+    ],
+  },
+  {
     version: "0.2.39",
     date: tt("6 Ekim 2026"),
     headline: tt("Sahneye göre saat, değişen Nook'lar"),

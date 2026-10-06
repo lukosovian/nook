@@ -1,5 +1,5 @@
 /**
- * Gizlilik kalkanı: ekranı tamamen örten canlı bir "Nook ortamı" (10 sahneden biri, rastgele) ve
+ * Gizlilik kalkanı: ekranı tamamen örten canlı bir "Nook ortamı" (22 sahneden biri, rastgele) ve
  * üstte saat, tarih, hava durumu. Kısayol, Esc ya da çift tıkla kalkar (bkz. src-tauri/src/shield.rs).
  * Parola kilidi açıksa yalnızca parolayla kalkar: bir tuşa basınca ya da tıklayınca parola kutusu çıkar.
  * Kalkan açılırken çalan medya durur; mikrofon açıksa kalkan boyunca kapanır (Rust), rozeti burada.
@@ -12,9 +12,12 @@ import { inTauri, shieldOff, windowLabel } from "../lib/bridge";
 import { checkPassword } from "../lib/lock";
 import { micClick } from "../lib/clickSound";
 import { useNook } from "../store/nook";
+import { ContextMenu } from "./overlays/ContextMenu";
 import { tt } from "../lib/i18n";
 import { Beach, Cafe, Campfire, Disco, Space } from "./shield/scenesA";
 import { Library, Mine, Snow, Studio, Zen } from "./shield/scenesB";
+import { Arcade, Cinema, Greenhouse, Ocean, Train, Western } from "./shield/scenesC";
+import { Bunker, Ferris, Lab, Lavender, Pirate, Sketchbook } from "./shield/scenesD";
 
 /** Sahneler: her biri kendi saatini kendi tasarımıyla çizer (shield/clocks) */
 const SCENES: { id: string; C: () => React.JSX.Element }[] = [
@@ -28,6 +31,18 @@ const SCENES: { id: string; C: () => React.JSX.Element }[] = [
   { id: "zen", C: Zen },
   { id: "studio", C: Studio },
   { id: "snow", C: Snow },
+  { id: "arcade", C: Arcade },
+  { id: "ocean", C: Ocean },
+  { id: "greenhouse", C: Greenhouse },
+  { id: "train", C: Train },
+  { id: "cinema", C: Cinema },
+  { id: "western", C: Western },
+  { id: "pirate", C: Pirate },
+  { id: "lab", C: Lab },
+  { id: "lavender", C: Lavender },
+  { id: "bunker", C: Bunker },
+  { id: "ferris", C: Ferris },
+  { id: "sketch", C: Sketchbook },
 ];
 
 function pickScene() {
@@ -61,9 +76,10 @@ export function Shield() {
     };
   }, [locked]);
 
+  const root = useRef<HTMLDivElement>(null);
   const Scene = scene.C;
   return (
-    <div className="fixed inset-0 cursor-default select-none overflow-hidden bg-black" onDoubleClick={() => !locked && void shieldOff()} onPointerDown={() => locked && setAsking(true)}>
+    <div ref={root} className="fixed inset-0 cursor-default select-none overflow-hidden bg-black" onDoubleClick={() => !locked && void shieldOff()} onPointerDown={() => locked && setAsking(true)}>
       <motion.div className="absolute inset-0" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, ease: [0.2, 0.8, 0.3, 1] }}>
         <Scene />
       </motion.div>
@@ -74,6 +90,8 @@ export function Shield() {
         </div>
       </div>
       <MicBadge />
+      {/* Sağ tık: yalnızca Yenile (yeni bir sahne gelir) */}
+      <ContextMenu bounds={root} refreshOnly />
     </div>
   );
 }

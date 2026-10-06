@@ -3,7 +3,7 @@
 //! Parola kilidi açıksa kalkan yalnızca parolayla kalkar (doğrulama kalkanın sayfasında yapılır);
 //! kısayol o sırada parola kutusunu açar. Kilitliyken adalar ve yan kartlar etkileşime kapanır.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -12,8 +12,9 @@ use crate::state::Shared;
 
 pub const PREFIX: &str = "shield-";
 
-/// Mikrofonu kalkan kapattı: kalkan kalkınca yeniden açılır (zaten kapalıysa dokunulmaz)
-static MIC_RESTORE: AtomicBool = AtomicBool::new(false);
+/// Kalkanın kapattığı mikrofonlar (cihaz kimlikleri): kalkan kalkınca yalnızca bunlar açılır,
+/// zaten kapalı olanlara dokunulmaz
+static MICS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 /// Görüşmedeki (mikrofonu kullanan) uygulamaların kalkanın kapattığı sesleri — kalkınca açılır
 static CALL_MUTED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
@@ -43,14 +44,10 @@ fn mute_calls() -> bool {
 
 fn unmute_calls() {
     let keys = std::mem::take(&mut *CALL_MUTED.lock().unwrap());
-    if keys.is_empty() {
-        return;
+    for k in keys {
+        crate::mixer::set_muted(&k, false);
+        crate::log::write("info", &format!("kalkan: görüşme sesi geri açıldı ({k})"));
     }
-    std::thread::spawn(move || {
-        for k in keys {
-            crate::mixer::set_muted(&k, false);
-        }
-    });
 }
 
 fn open_labels(app: &AppHandle) -> Vec<String> {
@@ -99,11 +96,15 @@ fn open(app: &AppHandle, ask_now: bool) {
     // Görüşmedeysen karşı tarafın sesi de kapanır.
     let (mic_off, call_off) = std::thread::spawn(|| {
         let call = mute_calls();
-        if crate::quick::mic_muted() == Some(false) && crate::quick::set_mic_muted(true).is_ok() {
-            MIC_RESTORE.store(true, Ordering::Relaxed);
-            return (true, call);
+        let ids = crate::quick::mute_mics();
+        let mut mics = MICS.lock().unwrap();
+        // Önceki kalkandan geri açılmamış kalan varsa onu da unutma
+        for id in ids {
+            if !mics.contains(&id) {
+                mics.push(id);
+            }
         }
-        (false, call)
+        (!mics.is_empty(), call)
     })
     .join()
     .unwrap_or((false, false));
@@ -147,17 +148,19 @@ fn close(app: &AppHandle) {
 }
 
 /// Kalkan mikrofonu kapattıysa geri aç; ada "mikrofon açıldı" rozetini gösterir
+/// Geri açma beklenerek yapılır: kalkan hemen yeniden açılırsa mikrofon hâlâ "kapalı" görünüp
+/// unutulmasın. COM çağrıları ana iş parçacığında değil, ayrı iş parçacığında.
 fn restore_mic(app: &AppHandle) {
-    unmute_calls();
-    if !MIC_RESTORE.swap(false, Ordering::Relaxed) {
-        return;
+    let ids = std::mem::take(&mut *MICS.lock().unwrap());
+    let opened = std::thread::spawn(move || {
+        unmute_calls();
+        !ids.is_empty() && crate::quick::unmute_mics(&ids)
+    })
+    .join()
+    .unwrap_or(false);
+    if opened {
+        let _ = app.emit("nook://shield-mic", false);
     }
-    let app = app.clone();
-    std::thread::spawn(move || {
-        if crate::quick::set_mic_muted(false).is_ok() {
-            let _ = app.emit("nook://shield-mic", false);
-        }
-    });
 }
 
 /// Kalkan penceresi kapanmak üzere: kilitliyken (Alt+F4) engellenir. Hepsi kapandıysa kilit ve

@@ -64,13 +64,43 @@ pub async fn quick_set(key: String, on: bool) -> Result<(), String> {
     }
 }
 
-/// Mikrofon sessizde mi (yoksa None) — gizlilik kalkanı için
-pub fn mic_muted() -> Option<bool> {
-    imp::endpoint_muted(true)
+/// Gizlilik kalkanı: açık olan BÜTÜN mikrofonları (varsayılan, iletişim cihazı, kulaklık…) sessize alır,
+/// kapattıklarının kimliğini döner. Teams gibi uygulamalar varsayılandan farklı bir "iletişim"
+/// cihazı kullanabildiği için yalnızca varsayılanı kapatmak yetmez.
+pub fn mute_mics() -> Vec<String> {
+    let mut done = Vec::new();
+    for (id, name, muted) in imp::captures() {
+        if muted {
+            continue;
+        }
+        match imp::set_capture_muted(&id, true) {
+            Ok(()) => {
+                crate::log::write("info", &format!("kalkan: mikrofon kapatıldı ({name})"));
+                done.push(id);
+            }
+            Err(e) => crate::log::write("warn", &format!("kalkan: mikrofon kapatılamadı ({name}): {e}")),
+        }
+    }
+    done
 }
 
-pub fn set_mic_muted(muted: bool) -> Result<(), String> {
-    imp::set_endpoint_muted(true, muted)
+/// Kalkanın kapattığı mikrofonları geri açar; açıldığını doğrular, tutmadıysa birkaç kez yeniden dener.
+pub fn unmute_mics(ids: &[String]) -> bool {
+    let mut all = true;
+    for id in ids {
+        let mut ok = false;
+        for _ in 0..4 {
+            let _ = imp::set_capture_muted(id, false);
+            if imp::capture_muted(id) == Some(false) {
+                ok = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
+        crate::log::write(if ok { "info" } else { "warn" }, &format!("kalkan: mikrofon geri açıldı mı: {ok} ({id})"));
+        all &= ok;
+    }
+    all
 }
 
 /// action: lock | screen-off
@@ -166,6 +196,41 @@ mod imp {
             let d = e.GetDefaultAudioEndpoint(if capture { eCapture } else { eRender }, eConsole)?;
             d.Activate(CLSCTX_ALL, None)
         }
+    }
+
+    /// Etkin bütün mikrofonlar: (kimlik, ad, sessiz mi)
+    pub fn captures() -> Vec<(String, String, bool)> {
+        let Ok(e) = enumerator() else { return Vec::new() };
+        unsafe {
+            let Ok(list) = e.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE) else { return Vec::new() };
+            let count = list.GetCount().unwrap_or(0);
+            (0..count)
+                .filter_map(|i| {
+                    let d = list.Item(i).ok()?;
+                    let raw = d.GetId().ok()?;
+                    let id = raw.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(raw.0 as _));
+                    let name = d.OpenPropertyStore(STGM_READ).and_then(|p| p.GetValue(&PKEY_Device_FriendlyName)).map(|v| v.to_string()).unwrap_or_default();
+                    let v: IAudioEndpointVolume = d.Activate(CLSCTX_ALL, None).ok()?;
+                    let muted = v.GetMute().ok()?.as_bool();
+                    Some((id, name, muted))
+                })
+                .collect()
+        }
+    }
+
+    fn capture_volume(id: &str) -> windows::core::Result<IAudioEndpointVolume> {
+        let e = enumerator()?;
+        let wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
+        unsafe { e.GetDevice(PCWSTR(wide.as_ptr()))?.Activate(CLSCTX_ALL, None) }
+    }
+
+    pub fn capture_muted(id: &str) -> Option<bool> {
+        unsafe { capture_volume(id).and_then(|v| v.GetMute()).ok().map(|b| b.as_bool()) }
+    }
+
+    pub fn set_capture_muted(id: &str, muted: bool) -> Result<(), String> {
+        unsafe { capture_volume(id).and_then(|v| v.SetMute(muted, std::ptr::null())).map_err(|e| e.to_string()) }
     }
 
     pub fn endpoint_muted(capture: bool) -> Option<bool> {
@@ -306,6 +371,15 @@ mod imp {
     }
     pub fn set_dark_mode(_d: bool) -> Result<(), String> {
         Err("yalnızca Windows".into())
+    }
+    pub fn captures() -> Vec<(String, String, bool)> {
+        Vec::new()
+    }
+    pub fn capture_muted(_id: &str) -> Option<bool> {
+        None
+    }
+    pub fn set_capture_muted(_id: &str, _m: bool) -> Result<(), String> {
+        Ok(())
     }
     pub fn endpoint_muted(_c: bool) -> Option<bool> {
         None
