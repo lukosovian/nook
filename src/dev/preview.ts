@@ -7,7 +7,7 @@ import { MotionGlobalConfig } from "motion/react";
 import { dayKey, useNook, type Tab } from "../store/nook";
 import { useArgus, type ArgusItem } from "../lib/argus";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings"];
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings", "year"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -40,7 +40,10 @@ function demoArgus() {
   });
 }
 
+const DEMO_NOTE = "# Hafta\n- [x] Market: **süt**, ekmek\n- [ ] Pazartesi sunum provası\n> `npm run build` unutma";
+
 export function applyPreview(mode: string) {
+  const params0 = new URLSearchParams(location.search);
   const tr = (new URLSearchParams(location.search).get("lang") ?? "tr") === "tr";
   if (!new URLSearchParams(location.search).has("noargus")) demoArgus();
   document.documentElement.style.background = "#3a4a5c";
@@ -78,7 +81,9 @@ export function applyPreview(mode: string) {
       diskTotal: 476 * 1024 ** 3,
       battery: null,
       saver: false,
+      gpu: 41,
     },
+    netTotals: { down: 1.8 * 1024 ** 3, up: 210 * 1024 ** 2 },
     netHistory: Array.from({ length: 40 }, (_, i) => (Math.sin(i / 3) + 1.3) * 1e6 + Math.random() * 4e5),
     cpuHistory: Array.from({ length: 40 }, () => 10 + Math.random() * 30),
     devices: {
@@ -92,12 +97,14 @@ export function applyPreview(mode: string) {
       { id: "c2", text: "#30D158", color: "#30D158", at: 2 },
       { id: "c3", text: "#0A84FF", color: "#0A84FF", at: 3 },
       { id: "c4", text: "https://github.com/tauri-apps/tauri", color: null, at: 4 },
-      { id: "c5", text: "Toplantı notları: perşembe 14:00", color: null, at: 5 },
+      { id: "c5", text: "Toplantı notları: perşembe 14:00", color: null, at: 5, pinned: true },
+      { id: "c7", kind: "files", text: "rapor.pdf, sunum.docx", paths: ["C:/rapor.pdf", "C:/sunum.docx"], color: null, at: 7, app: "explorer" },
+      { id: "c8", kind: "image", text: "1920×1080", path: "C:/x.png", color: null, at: 8, app: "snippingtool" },
       { id: "c6", text: "npm run tauri build", color: null, at: 6 },
     ],
     shelf: [
       { id: "s1", path: "C:/rapor.pdf", name: "rapor.pdf", ext: "pdf", size: 1_240_000, isDir: false, isImage: false, addedAt: 1 },
-      { id: "s2", path: "C:/proje.zip", name: "proje.zip", ext: "zip", size: 48_000_000, isDir: false, isImage: false, addedAt: 2 },
+      { id: "s2", path: "C:/proje.zip", name: "proje.zip", ext: "zip", size: 48_000_000, isDir: false, isImage: false, addedAt: 2, pinned: true },
       { id: "s3", path: "C:/sunum.docx", name: "sunum.docx", ext: "docx", size: 380_000, isDir: false, isImage: false, addedAt: 3 },
       { id: "s4", path: "C:/Fotoğraflar", name: "Fotoğraflar", ext: "", size: 0, isDir: true, isImage: false, addedAt: 4 },
     ],
@@ -105,8 +112,20 @@ export function applyPreview(mode: string) {
       { id: "a1", hour: 7, minute: 30, label: tr ? "Kalk" : "Wake up", repeat: "weekdays", enabled: true, next: Date.now() + 8.5 * 3600_000 },
       { id: "a2", hour: 14, minute: 0, label: tr ? "Toplantı" : "Meeting", repeat: "once", enabled: false, next: null },
     ],
-    note: mode === "note" ? "Market: süt, ekmek\nPazartesi sunum provası" : "",
-    focus: mode === "focus" ? { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 2 } : null,
+    note: mode === "note" ? DEMO_NOTE : "",
+    pads: [
+      { id: "p1", title: "Not 1", text: DEMO_NOTE, at: Date.now() },
+      { id: "p2", title: "Fikirler", text: "Raf sallama", at: Date.now() },
+      { id: "p3", title: "Not 3", text: "", at: Date.now() },
+    ],
+    padId: "p1",
+    stopwatch: mode === "watchmini" || params0.has("sw") ? { startedAt: Date.now() - 754_300, acc: 0, laps: params0.has("sw") ? [512_400, 260_100] : [] } : null,
+    extSyncedAt: 0,
+    extEvents: [
+      { id: "e1", day: dayKey(), time: "14:00", title: "Sprint planlama", start: Date.now() + 12 * 60_000, end: Date.now() + 72 * 60_000, allDay: false },
+      { id: "e2", day: dayKey(), time: "", title: "Annemin doğum günü", start: Date.now(), end: Date.now() + 86_400_000, allDay: true },
+    ],
+    focus: mode === "focus" && !params0.has("sw") ? { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 2 } : null,
     notifications: [
       { id: 1, app: "Discord", appId: "d", title: "Ayşe", body: "Akşam maça geliyor musun?", icon: null, at: Date.now() - 3 * 60_000 },
       { id: 2, app: "WhatsApp", appId: "w", title: "Annem", body: "Eve gelirken ekmek al", icon: null, at: Date.now() - 50 * 60_000 },
@@ -129,6 +148,23 @@ export function applyPreview(mode: string) {
     weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() },
     privacy: { mic: mode === "privacy" || TABS.includes(mode as Tab) ? ["Discord"] : [], camera: [] },
   });
+  // ?lyrics → şarkı sözleri açık · ?live → yayın maskesi · yıl özeti örnek verisi
+  if (params0.has("lyrics")) useNook.setState({ settings: { ...useNook.getState().settings, lyrics: true } });
+  if (params0.has("live")) useNook.setState({ liveManual: true, liveAuto: { on: true, source: "Teams" } });
+  {
+    const y = String(new Date().getFullYear());
+    const hours = Array.from({ length: 24 }, (_, h) => Math.round(Math.max(0, Math.sin(((h - 7) / 24) * Math.PI * 2) * 900 + (h >= 20 ? 1200 : 0) + (h < 2 ? 700 : 0))));
+    useNook.setState({
+      year: {
+        [y]: {
+          active: 52_000, music: 14_400, focus: 6_200, pomodoros: 214, game: 9_800, notifs: 3_120, care: 860, water: 412, plays: 96, feeds: 143, songs: 2_870,
+          hours, days: Array.from({ length: 180 }, (_, i) => dayKey(new Date(Date.now() - i * 86_400_000))),
+          artists: { "The Weeknd": 2_100, "Sezen Aksu": 1_640, "Daft Punk": 980, Tarkan: 700 },
+        },
+      },
+      scores: { catch: 17, simon: 9, whack: 42, aim: 31 },
+    });
+  }
   const params = new URLSearchParams(location.search);
   // ?ask=… → soruyu yerel yapay zekâya gönder (uçtan uca sohbet testi)
   const ask = params.get("ask");
@@ -231,6 +267,8 @@ export function applyPreview(mode: string) {
     useNook.setState({ hovered: true, tab: mode as Tab });
     // ?big → tam ekran
     if (params.has("big")) window.setTimeout(() => void import("../lib/big").then((m) => m.enterBig()), 100);
+    // ?bigstate → büyük adanın düzeni doğrudan (tarayıcıda pencere büyütülemez)
+    if (params.has("bigstate")) useNook.setState({ big: { width: window.innerWidth - 40, height: window.innerHeight - 20 } });
     // Panels açılınca çalan müzik yüzünden medyaya geçer; istenen sekmeye geri dön
     window.setTimeout(() => useNook.getState().setTab(mode as Tab), 50);
   } else if (mode.startsWith("osd")) {
@@ -245,6 +283,8 @@ export function applyPreview(mode: string) {
     useNook.setState({ searching: true });
   } else if (mode === "collapsed" || mode === "privacy") {
     useNook.setState({ media: null });
+  } else if (mode === "gate") {
+    useNook.setState({ media: null, gate: true, notesSeen: "999", settings: { ...useNook.getState().settings, lockHash: "a:b" } });
   } else if (mode === "reminder" || mode === "drinking") {
     useNook.setState({ media: null, reminder: { kind: "water", phase: mode === "drinking" ? "drinking" : "due" }, antic: mode === "drinking" ? "drink" : null });
   } else if (mode === "ringing") {
@@ -257,6 +297,8 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, guard: { site: params.get("site") ?? "YouTube" }, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 1 } });
   } else if (mode === "focusmini") {
     useNook.setState({ media: null, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000, left: 0, total: 25 * 60_000, round: 1 } });
+  } else if (mode === "watchmini" || mode === "eventmini") {
+    useNook.setState({ media: null });
   } else if (mode === "listen") {
     useNook.setState({ media: null, listening: true });
   } else if (mode === "notifytoast") {
@@ -270,7 +312,7 @@ export function applyPreview(mode: string) {
   const freeze = useNook.getState();
   useNook.setState = ((orig) => (partial: Parameters<typeof orig>[0], replace?: boolean) => {
     const next = typeof partial === "function" ? partial(useNook.getState()) : partial;
-    const blocked = ["hovered", "osd", "toasts", "searching", "antic", "tab", "guard", "outing"];
+    const blocked = ["big", "hovered", "osd", "toasts", "searching", "antic", "tab", "guard", "outing"];
     const filtered = Object.fromEntries(Object.entries(next as object).filter(([k]) => !blocked.includes(k)));
     orig(filtered as never, replace as never);
   })(useNook.setState) as typeof useNook.setState;

@@ -42,7 +42,23 @@ export type DemoId =
   | "archive"
   | "shield"
   | "sensitive"
-  | "chips";
+  | "chips"
+  | "clipboard"
+  | "pads"
+  | "shake"
+  | "route"
+  | "calsync"
+  | "system"
+  | "soundside"
+  | "profiles"
+  | "lyrics"
+  | "live"
+  | "year"
+  | "shieldmic"
+  | "teamsmic"
+  | "scenepick"
+  | "lively"
+  | "newwear";
 
 export interface NoteItem {
   title: string;
@@ -59,6 +75,100 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.42",
+    date: tt("7 Ekim 2026"),
+    headline: tt("Şarkı sözleri, yayın maskesi, yıl özeti"),
+    items: [
+      {
+        title: tt("Şarkı sözleri"),
+        text: tt("Medya'da \"Sözler\"e bas: çalan şarkının sözleri müzikle birlikte akar, şu anki satır parlar. Erken ya da geç kalırsa ±0,5 sn kaydır. Açık adada şarkının altında da o anki satır görünür. Sözler lrclib.net'ten gelir."),
+        demo: "lyrics",
+      },
+      {
+        title: tt("Canlı yayındayız"),
+        text: tt("Teams, Zoom, Meet ya da tarayıcıdan ekran paylaşınca, OBS açıkken Nook eline mikrofon alır, CANLI tabelasını açar; Not, Pano, Bildirimler, Sohbet ve Takvim buzlanır, bildirim kartlarında içerik görünmez. Ctrl+Alt+L elle açar / kapatır."),
+        demo: "live",
+      },
+      {
+        title: tt("Yıl özeti"),
+        text: tt("Ana sayfadaki Yıl özeti: birlikte geçen saatler, en çok hangi saatte buradaydın, en çok dinlediğin sanatçılar, Pomodoro turları, oynattığın oyunlar, içilen su. Aralık sonunda kendiliğinden gelir; kayıt bugünden başlar."),
+        demo: "year",
+      },
+      {
+        title: tt("Ses kartı adayla gider"),
+        text: tt("Ada taşınınca yanındaki ses kartı da gelir; ekranın solunda yer yoksa adanın sağına geçer. Çıkışı listeden seç, uygulamaların yüzdesi görünür. Üst çubuktaki hoparlörle kartı aç / kapat; büyük adada ses ayarları Nook'un altında."),
+        demo: "soundside",
+      },
+      {
+        title: tt("Kendi profillerin"),
+        text: tt("Ana sayfada profil şeridindeki + ile yeni profil ekle, göz simgesiyle hangi bölümlerin gireceğini seç; adını değiştir ya da profili sil."),
+        demo: "profiles",
+      },
+      {
+        title: tt("Pano yenilendi"),
+        text: tt("Arama, sabitleme, görsel ve dosya geçmişi, kaydı açıp düzenleme. Ctrl+Alt+V düz metin yapıştırır; pano kilitlenince ya da birkaç dakika sonra boşalabilir; parola yöneticilerinin kopyaları hiç kaydedilmez. Renk HEX, RGB ya da HSL kopyalanır."),
+        demo: "clipboard",
+      },
+      {
+        title: tt("Karalama defterinde sekmeler"),
+        text: tt("En fazla 8 not, kendiliğinden kaydedilir; çift tıkla adını değiştir. Başlık, kalın, liste ve görev kutularıyla biçimli önizleme, dosyaya kaydetme."),
+        demo: "pads",
+      },
+      {
+        title: tt("Raf: salla, sabitle"),
+        text: tt("Bir dosyayı sürüklerken fareyi sağa sola salla, raf açılsın. Ctrl+Alt+S Gezgin'de seçili dosyaları rafa ekler. İğneyle sabitlenen öğe raftan düşmez; \"Birlikte aç\" da var."),
+        demo: "shake",
+      },
+      {
+        title: tt("Uygulama başına ses çıkışı"),
+        text: tt("Kontrol › Uygulama sesi: oyun hoparlörden, Discord kulaklıktan; çıkışı ve mikrofonu oradan seç, uygulamaları üste sabitle ya da gizle. Kulaklık çıkınca ses kısılabilir, kısayolla çıkışlar arasında dönülebilir."),
+        demo: "route",
+      },
+      {
+        title: tt("Google / Outlook takvimi ve geri sayım"),
+        text: tt("Ayarlar › Takvim'e takviminin gizli iCal adresini ekle: etkinlikler Takvim'de görünür, vakti yaklaşınca haber verir. Toplantıya bir saat kala kapalı adada geri sayım; Odak'ta kronometre."),
+        demo: "calsync",
+      },
+      {
+        title: tt("Sistem ayrıntıları"),
+        text: tt("Ekran kartı kullanımı, bütün diskler ve sağlıkları, USB'yi güvenle çıkarma, yerel IP, oturumdaki trafik ve hız testi. İşlemci ya da bellek uzun süre dolu kalırsa, disk dolarsa Nook uyarır."),
+        demo: "system",
+      },
+    ],
+  },
+  {
+    version: "0.2.41",
+    date: tt("7 Ekim 2026"),
+    headline: tt("Sahneni seç, kalkandan sesi yönet"),
+    items: [
+      {
+        title: tt("Hangi sahne gelsin"),
+        text: tt("Ayarlar › Gizlilik kalkanı: sahneler karışık, sırayla ya da hep aynısı gelsin; karışık ve sırayla modunda hangi sahnelerin geleceğini seç."),
+        demo: "scenepick",
+      },
+      {
+        title: tt("Kalkandan mikrofon ve ses"),
+        text: tt("Sağ üstteki mikrofon ve hoparlöre tıklayınca kapanır / açılır (kilitliyken önce parola sorar). Kalkan açılınca mikrofon ve görüşme sesi kapansın mı, Ayarlar'dan seç."),
+        demo: "shieldmic",
+      },
+      {
+        title: tt("Teams'te mikrofon kapalı kalmıyor"),
+        text: tt("Görüşmedeyken kalkan mikrofonu susturmak yerine seviyesini sıfıra indirir; Teams kendi düğmesini kapatmaz, kalkan kalkınca mikrofon eski seviyesine döner."),
+        demo: "teamsmic",
+      },
+      {
+        title: tt("Daha canlı sahneler"),
+        text: tt("Nook'lar göz kırpar, etrafa bakınır, zıplarken çömelip yaylanır. Karakterler artık birkaç saniyede bir değil, sahnenin bir olayında dönüşür: iksir dökülünce, deney patlayınca, ışık sönünce…"),
+        demo: "lively",
+      },
+      {
+        title: tt("Yeni 3B aksesuarlar"),
+        text: tt("Kovboy, korsan, hasır şapka, kondüktör kepi, miğfer, baret, koruyucu gözlük, göz bandı ve atkı: Görünüm'de seçebilirsin, sahnelerde de bunları giyerler."),
+        demo: "newwear",
+      },
+    ],
+  },
   {
     version: "0.2.40",
     date: tt("6 Ekim 2026"),

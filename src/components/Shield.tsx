@@ -1,14 +1,16 @@
 /**
- * Gizlilik kalkanı: ekranı tamamen örten canlı bir "Nook ortamı" (22 sahneden biri, rastgele) ve
+ * Gizlilik kalkanı: ekranı tamamen örten canlı bir "Nook ortamı" (22 sahneden biri; Ayarlar'a göre
+ * karışık, sırayla ya da hep aynısı) ve
  * üstte saat, tarih, hava durumu. Kısayol, Esc ya da çift tıkla kalkar (bkz. src-tauri/src/shield.rs).
  * Parola kilidi açıksa yalnızca parolayla kalkar: bir tuşa basınca ya da tıklayınca parola kutusu çıkar.
- * Kalkan açılırken çalan medya durur; mikrofon açıksa kalkan boyunca kapanır (Rust), rozeti burada.
+ * Kalkan açılırken çalan medya durur; mikrofon ve görüşme sesi kalkan boyunca kapanır (Rust). Sağ üstteki
+ * düğmelerle kalkan açıkken de kapatılıp açılabilir.
  */
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { listen } from "@tauri-apps/api/event";
-import { Lock, MicOff, VolumeX } from "lucide-react";
-import { inTauri, shieldOff, windowLabel } from "../lib/bridge";
+import { Lock, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { inTauri, shieldOff, shieldSet, shieldState, windowLabel, type ShieldMute } from "../lib/bridge";
 import { checkPassword } from "../lib/lock";
 import { micClick } from "../lib/clickSound";
 import { useNook } from "../store/nook";
@@ -18,6 +20,7 @@ import { Beach, Cafe, Campfire, Disco, Space } from "./shield/scenesA";
 import { Library, Mine, Snow, Studio, Zen } from "./shield/scenesB";
 import { Arcade, Cinema, Greenhouse, Ocean, Train, Western } from "./shield/scenesC";
 import { Bunker, Ferris, Lab, Lavender, Pirate, Sketchbook } from "./shield/scenesD";
+import { activeScenes } from "./shield/catalog";
 
 /** Sahneler: her biri kendi saatini kendi tasarımıyla çizer (shield/clocks) */
 const SCENES: { id: string; C: () => React.JSX.Element }[] = [
@@ -45,10 +48,28 @@ const SCENES: { id: string; C: () => React.JSX.Element }[] = [
   { id: "sketch", C: Sketchbook },
 ];
 
+/** Kaçıncı ekranın kalkanı (shield-0, shield-1…) */
+const screenIndex = Number(windowLabel.match(/^shield-(\d+)$/)?.[1] ?? 0);
+
+/**
+ * Ayarlara göre sahne: hep aynısı, sırayla (her ekran sıradakini alır, ilk ekran sırayı ilerletir)
+ * ya da seçili sahnelerden rastgele.
+ */
 function pickScene() {
+  const byId = (id: string | null | undefined) => SCENES.find((s) => s.id === id);
   // Geliştirme önizlemesi: ?scene=snow
-  const want = new URLSearchParams(location.search).get("scene");
-  return SCENES.find((s) => s.id === want) ?? SCENES[Math.floor(Math.random() * SCENES.length)];
+  const want = byId(new URLSearchParams(location.search).get("scene"));
+  if (want) return want;
+  const st = useNook.getState();
+  const s = st.settings;
+  if (s.shieldSceneMode === "fixed") return byId(s.shieldScene) ?? SCENES[0];
+  const list = activeScenes(s.shieldScenes ?? []);
+  if (s.shieldSceneMode === "order") {
+    const n = (s.shieldSceneNext ?? 0) % list.length;
+    if (screenIndex === 0) st.updateSettings({ shieldSceneNext: (n + 1) % list.length });
+    return byId(list[(n + screenIndex) % list.length]) ?? SCENES[0];
+  }
+  return byId(list[Math.floor(Math.random() * list.length)]) ?? SCENES[0];
 }
 
 export function Shield() {
@@ -89,7 +110,7 @@ export function Shield() {
           <AnimatePresence>{locked && asking && <PasswordBox onIdle={() => setAsking(false)} />}</AnimatePresence>
         </div>
       </div>
-      <MicBadge />
+      <MuteButtons locked={locked} onLocked={() => setAsking(true)} />
       {/* Sağ tık: yalnızca Yenile (yeni bir sahne gelir) */}
       <ContextMenu bounds={root} refreshOnly />
     </div>
@@ -97,31 +118,62 @@ export function Shield() {
 }
 
 /**
- * Kalkan mikrofonu (ve görüşmedeki karşı tarafın sesini) kapattı: köşede yalnızca simgeler, yazısız.
- * Ayarlar'dan kapatılabilir; ilk ekrandaki kalkan klik sesi çıkarır.
+ * Sağ üstte mikrofon ve görüşme sesi düğmeleri: kalkanın kapattığı turuncu, açık olan soluk. Tıklayınca
+ * kapanır / açılır (bütün ekranlardaki kalkanlar birlikte güncellenir). Kilitliyken önce parola sorulur
+ * — bilgisayarın başındaki başkası mikrofonunu açamasın. Görüşme yoksa hoparlör düğmesi görünmez.
+ * Ayarlar'dan gizlenebilir; ilk ekrandaki kalkan açılışta klik sesi çıkarır.
  */
-function MicBadge() {
+function MuteButtons({ locked, onLocked }: { locked: boolean; onLocked: () => void }) {
   const fx = useNook((s) => s.settings.shieldMicFx);
   const [q] = useState(() => new URLSearchParams(location.search));
-  const mic = q.has("mic");
-  const call = q.has("call");
+  const [st, setSt] = useState<ShieldMute>(() => ({ mic: q.has("mic"), call: q.has("call"), callAvail: q.has("call") }));
+  const first = !inTauri || windowLabel === "shield-0";
+
   useEffect(() => {
-    if ((mic || call) && fx && (!inTauri || windowLabel === "shield-0")) micClick(false);
-  }, [mic, call, fx]);
-  if ((!mic && !call) || !fx) return null;
-  const icons = [mic && MicOff, call && VolumeX].filter(Boolean) as (typeof MicOff)[];
+    if ((q.has("mic") || q.has("call")) && fx && first) micClick(false);
+    void shieldState().then(setSt);
+    const off = inTauri ? listen<ShieldMute>("nook://shield-state", (e) => setSt(e.payload)) : null;
+    return () => void off?.then((f) => f());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!fx) return null;
+  const toggle = (kind: "mic" | "call") => {
+    if (locked) return onLocked();
+    const muted = !st[kind];
+    // Hemen göster, Rust'ın cevabıyla düzelt
+    setSt((s) => ({ ...s, [kind]: muted }));
+    micClick(!muted);
+    void shieldSet(kind, muted).then((r) => r && setSt(r));
+  };
+  const buttons = [
+    { kind: "mic" as const, off: st.mic, On: Mic, Off: MicOff, label: st.mic ? tt("Mikrofonu aç") : tt("Mikrofonu kapat") },
+    ...(st.callAvail ? [{ kind: "call" as const, off: st.call, On: Volume2, Off: VolumeX, label: st.call ? tt("Görüşme sesini aç") : tt("Görüşme sesini kapat") }] : []),
+  ];
   return (
     <motion.div
       className="absolute right-[4vh] top-[4vh] flex items-center gap-1.5 rounded-full p-1.5"
-      style={{ background: "rgba(10,12,24,0.45)", backdropFilter: "blur(12px)", boxShadow: "inset 0 0 0 1px rgba(255,140,60,0.45)" }}
+      style={{ background: "rgba(10,12,24,0.45)", backdropFilter: "blur(12px)", boxShadow: `inset 0 0 0 1px ${st.mic || st.call ? "rgba(255,140,60,0.45)" : "rgba(255,255,255,0.14)"}` }}
       initial={{ opacity: 0, y: -12, scale: 0.8 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 380, damping: 22, delay: 0.6 }}
+      // Düğmelere basmak kalkanı kapatmasın / parola kutusunu açmasın
+      onPointerDown={(e) => !locked && e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
     >
-      {icons.map((Icon, i) => (
-        <motion.span key={i} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8a3d] text-white" animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 0.5, delay: 0.8 + i * 0.15 }}>
-          <Icon size={16} strokeWidth={2.6} />
-        </motion.span>
+      {buttons.map((b) => (
+        <motion.button
+          key={b.kind}
+          title={b.label}
+          onClick={() => toggle(b.kind)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-colors"
+          style={{ background: b.off ? "#ff8a3d" : "rgba(255,255,255,0.12)" }}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.9 }}
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 0.4 }}
+        >
+          {b.off ? <b.Off size={16} strokeWidth={2.6} /> : <b.On size={16} strokeWidth={2.4} className="opacity-80" />}
+        </motion.button>
       ))}
     </motion.div>
   );

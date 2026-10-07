@@ -102,11 +102,27 @@ mod imp {
                 let id = default_id(&enumerator);
                 if id.as_deref() != endpoint.as_ref().map(|e| e.id.as_str()) {
                     let had_device = endpoint.is_some();
+                    let was_headphone = endpoint.as_ref().is_some_and(|e| is_headphone(&e.name));
                     endpoint = open(&enumerator).ok();
                     last_volume = None; // yeni cihazın seviyesi için gösterge açılmasın
                     if let (true, Some(e)) = (had_device, &endpoint) {
-                        let title = if is_headphone(&e.name) { "Kulaklık bağlandı" } else { "Ses çıkışı değişti" };
-                        emit_event(&app, "audio", title, e.name.clone());
+                        // Kulaklık çıktı, ses hoparlöre geçti: ayarlıysa ses kısılır (ortalık birden çınlamasın)
+                        let drop = {
+                            use tauri::Manager;
+                            app.state::<std::sync::Arc<crate::state::Shared>>().settings().headphone_drop
+                        };
+                        if was_headphone && !is_headphone(&e.name) && drop > 0 {
+                            let level = drop.min(100) as f32 / 100.0;
+                            let lowered = unsafe { e.volume.GetMasterVolumeLevelScalar().map(|v| v > level).unwrap_or(false) };
+                            if lowered {
+                                let _ = unsafe { e.volume.SetMasterVolumeLevelScalar(level, std::ptr::null()) };
+                            }
+                            let detail = if lowered { format!("{} · ses %{}", e.name, drop) } else { e.name.clone() };
+                            emit_event(&app, "audio", "Kulaklık çıkarıldı", detail);
+                        } else {
+                            let title = if is_headphone(&e.name) { "Kulaklık bağlandı" } else { "Ses çıkışı değişti" };
+                            emit_event(&app, "audio", title, e.name.clone());
+                        }
                     }
                 }
             }

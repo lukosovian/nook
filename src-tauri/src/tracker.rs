@@ -2,6 +2,7 @@
 //!  1) imleç adanın "hit rect"i içindeyse click-through'u kapatır, dışındaysa açar,
 //!  2) imleç yakındaysa konumu o pencereye yayınlar (göz takibi),
 //! ayrıca sistem boşta kalma süresini (uyku) ve "imleci takip et" modunu yönetir.
+//! Bir şey sürüklenirken fare sağa sola sallanırsa raf açılır (bırakılacak yer).
 //!
 //! Neden Rust? Pencere click-through iken webview hiçbir fare olayı almaz;
 //! imleci ancak işletim sisteminden okuyarak "uyandırabiliriz".
@@ -56,11 +57,60 @@ impl Default for Prev {
     }
 }
 
+/// Sürüklerken sallama: kısa sürede birkaç kez yön değiştiren yatay hareket
+#[derive(Default)]
+struct Shake {
+    last_x: Option<f64>,
+    dir: i8,
+    travel: f64,
+    flips: Vec<Instant>,
+    fired: bool,
+}
+
+/// Her yön değişiminden önce en az bu kadar (fiziksel px) yol alınmalı
+const SHAKE_TRAVEL: f64 = 28.0;
+const SHAKE_FLIPS: usize = 4;
+const SHAKE_WINDOW: Duration = Duration::from_millis(750);
+
+impl Shake {
+    /// Sol tuş basılıyken her adımda çağrılır; sallama algılanınca bir kez true döner
+    fn step(&mut self, x: f64, down: bool) -> bool {
+        if !down {
+            *self = Self::default();
+            return false;
+        }
+        let Some(last) = self.last_x.replace(x) else { return false };
+        let dx = x - last;
+        if dx.abs() < 1.0 {
+            return false;
+        }
+        let d = if dx > 0.0 { 1 } else { -1 };
+        if d != self.dir {
+            if self.dir != 0 && self.travel >= SHAKE_TRAVEL {
+                self.flips.push(Instant::now());
+            }
+            self.dir = d;
+            self.travel = 0.0;
+        }
+        self.travel += dx.abs();
+        self.flips.retain(|t| t.elapsed() < SHAKE_WINDOW);
+        if !self.fired && self.flips.len() >= SHAKE_FLIPS {
+            self.fired = true;
+            return true;
+        }
+        false
+    }
+}
+
 pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
     thread::Builder::new()
         .name("nook-tracker".into())
         .spawn(move || {
             let mut prev: HashMap<String, Prev> = HashMap::new();
+            let mut shake = Shake::default();
+            // Basış Nook'un üstünde başladıysa (raftan dışarı sürükleme) sallama sayılmaz
+            let mut press_on_us = false;
+            let mut was_down = false;
             let mut asleep = false;
             let mut idle_checked = Instant::now();
             let mut follow_checked = Instant::now();
@@ -79,7 +129,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                     let forced = shared.forced.lock().unwrap().clone();
                     // Parolalı kalkan açıkken hiçbir pencere (ada, yan kart) açılmaz/tıklanmaz
-                    let locked = shared.locked.load(Ordering::Relaxed);
+                    let shield_locked = shared.locked.load(Ordering::Relaxed);
+                    let gated = shared.gated.load(Ordering::Relaxed);
                     // Tam ekran oyunun ekranında ada açılmaz (alarm çalarken hariç)
                     let in_game = shared
                         .game_screen
@@ -88,8 +139,11 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         .is_some_and(|(l, t, r, b)| px >= l as f64 && px < r as f64 && py >= t as f64 && py < b as f64)
                         && !crate::alarm::imminent(&shared);
 
+                    let mut over_any = false;
                     for (label, ws) in windows {
                         let p = prev.entry(label.clone()).or_default();
+                        // Açılış kilidinde parola kutusu ana adada: yalnızca o açık kalır
+                        let locked = shield_locked || (gated && label != window::ISLAND);
                         let g = ws.geom;
                         // Sayfanın gördüğü (CSS) px: ekran ölçeği × arayüz ölçeği
                         let k = g.scale * window::zoom();
@@ -105,6 +159,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         }
                         p.down = down;
                         let hit = over || p.drag;
+                        over_any |= hit;
                         let inside = !locked && (hit || forced.contains(&label));
                         let near = inside || ws.hit.distance(x, y) < TRACK_RADIUS;
 
@@ -133,6 +188,16 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         }
                         p.inside = inside;
                         p.near = near;
+                    }
+
+                    let down = left_button_down();
+                    if down && !was_down {
+                        press_on_us = over_any;
+                    }
+                    was_down = down;
+                    if shake.step(px, down && !press_on_us && !in_game && !shield_locked) && shared.settings().shelf_shake {
+                        crate::log::write("info", "raf: sallama");
+                        let _ = app.emit_to(crate::shortcut::target(&app).as_str(), "nook://shelf-shake", ());
                     }
 
                     if follow_checked.elapsed() >= FOLLOW_POLL {

@@ -44,7 +44,7 @@ export function Campfire() {
       <Actor x={470} y={800} size={104} look={look({ shape: "bean" })} color="#2FD4C0" expression={beat.i === 3 ? "happy" : "idle"} move={breathe(4, 2)} front={<SleepingBag />} />
 
       {/* Marşmelov kızartan */}
-      <Actor
+      <Actor morph={beat.n[0]} morphDelay={600}
         x={640}
         y={805}
         size={110}
@@ -74,7 +74,7 @@ export function Campfire() {
       />
 
       {/* Çalının arkasından fırlayan, ayı kulaklı şakacı */}
-      <Actor
+      <Actor morph={beat.n[1]} morphDelay={0}
         x={1190}
         y={790}
         size={108}
@@ -250,7 +250,7 @@ export function Cafe() {
       {/* Dev kupaya sarılan */}
       <Actor x={720} y={725} size={96} look={look({ shape: "bean" })} color="#FFD21F" expression="sleepy" move={breathe(3.6, 2)} front={<BigMug steam={beat.i === 2} k={k} />} />
       {/* Arkada fincan silen barista */}
-      <Actor x={1340} y={725} size={100} look={look({ shape: "egg", neck: "bowtie" })} color="#8A8F99" expression={beat.i === 3 ? "happy" : "idle"} move={breathe(3)} act={on(beat, 3, { animate: { rotate: [0, -6, 6, 0] }, transition: { duration: 1 } })} actKey={k} front={<Barista k={k} />} />
+      <Actor morph={beat.n[3]} morphDelay={700} x={1340} y={725} size={100} look={look({ shape: "egg", neck: "bowtie" })} color="#8A8F99" expression={beat.i === 3 ? "happy" : "idle"} move={breathe(3)} act={on(beat, 3, { animate: { rotate: [0, -6, 6, 0] }, transition: { duration: 1 } })} actKey={k} front={<Barista k={k} />} />
     </Stage>
   );
 }
@@ -378,7 +378,7 @@ export function Disco() {
 
       <DiscoClock />
       {/* Tütülü dansçı */}
-      <Actor
+      <Actor morph={beat.n[0]} morphDelay={500}
         x={520}
         y={790}
         size={112}
@@ -486,7 +486,7 @@ export function Space() {
       {/* Vida sıkan tamirci */}
       <Actor x={360} y={760} size={104} look={look({ shape: "cube", head: "cap" })} color="#FFD21F" expression="focused" move={breathe(3, 2)} act={on(beat, 2, { animate: { rotate: [0, -5, 5, -5, 0] }, transition: { duration: 0.8 } })} actKey={k} front={<Wrench k={beat.i === 2 ? k : 0} />} flip />
       {/* Jetpack'li */}
-      <Actor
+      <Actor morph={beat.n[3]} morphDelay={800}
         x={720}
         y={700}
         size={100}
@@ -591,7 +591,7 @@ export function Beach() {
       </Layer>
       <BeachClock />
       {/* Denizde can simidiyle batıp çıkan */}
-      <Actor
+      <Actor morph={beat.n[3]} morphDelay={550}
         x={1000}
         y={600}
         size={86}
@@ -608,7 +608,7 @@ export function Beach() {
         <Actor x={880} y={755} size={108} look={look({ shape: "bean", glasses: "shades" })} color="#FFD21F" expression="sleepy" move={breathe(4.5, 2)} act={on(beat, 0, { animate: { rotate: [0, 8, 0] }, transition: { duration: 1.6 } })} actKey={k} front={<><Hand x={-2} y={2} /><Hand x={26} y={2} /></>} />
       </div>
       {/* Hasır şapkalı, hindistan cevizi içen */}
-      <Actor x={660} y={790} size={104} look={look({ shape: "cloud", texture: "plush" })} color="#2FD4C0" expression={beat.i === 1 ? "happy" : "idle"} move={breathe(3)} act={on(beat, 1, { animate: { rotate: [0, -8, 0] }, transition: { duration: 1.4 } })} actKey={k} front={<><StrawHat /><Coconut sip={beat.i === 1} k={k} /></>} />
+      <Actor x={660} y={790} size={104} look={look({ shape: "cloud", texture: "plush", head: "straw" })} color="#2FD4C0" expression={beat.i === 1 ? "happy" : "idle"} move={breathe(3)} act={on(beat, 1, { animate: { rotate: [0, -8, 0] }, transition: { duration: 1.4 } })} actKey={k} front={<><Coconut sip={beat.i === 1} k={k} /></>} />
       {/* Heykel yapan */}
       <Actor x={1360} y={820} size={96} look={look({ shape: "egg" })} color="#FF9EC4" flip expression="focused" move={breathe(2.4)} act={on(beat, 2, { animate: { rotate: [0, -10, 0, -10, 0] }, transition: { duration: 1.4 } })} actKey={k} front={<motion.g animate={{ y: [0, -2, 0] }} transition={{ duration: 0.5, repeat: Infinity }}><Hand x={26} y={18} /><Hand x={-2} y={20} /></motion.g>} />
     </Stage>
@@ -623,16 +623,6 @@ function Ring() {
       {[-12, 0, 12].map((d) => (
         <rect key={d} x={11 + d * 1.1} y="16" width="3" height="10" fill="#fff" transform={`rotate(${d * 3} ${12 + d} 21)`} />
       ))}
-    </g>
-  );
-}
-
-function StrawHat() {
-  return (
-    <g>
-      <ellipse cx="12" cy="1.5" rx="17" ry="3.6" fill="#e9c46a" />
-      <path d="M4 1.5 Q5 -7 12 -7 Q19 -7 20 1.5 Z" fill="#f2d27e" />
-      <path d="M4.4 -0.5 Q12 1.5 19.6 -0.5" stroke="#e15a5a" strokeWidth="1.6" fill="none" />
     </g>
   );
 }

@@ -15,6 +15,8 @@ pub struct QuickState {
     volume: Option<f32>,
     /// Ses çıkış cihazları (kulaklık ↔ hoparlör geçişi)
     outputs: Vec<Output>,
+    /// Mikrofonlar (varsayılanı seçmek için)
+    inputs: Vec<Output>,
 }
 
 #[derive(Serialize, Clone)]
@@ -36,7 +38,36 @@ pub async fn quick_state() -> QuickState {
         mic_muted: imp::endpoint_muted(true),
         volume: imp::volume(),
         outputs: imp::outputs(),
+        inputs: imp::inputs(),
     }
+}
+
+/// Varsayılan mikrofonu değiştirir (tüm roller)
+#[tauri::command]
+pub async fn quick_input(id: String) -> Result<(), String> {
+    imp::set_input(&id)
+}
+
+/// Kısayol: seçili çıkışlar (boşsa hepsi) arasında sıradakine geç ve adada göster
+pub fn cycle_output(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let want = app.state::<std::sync::Arc<crate::state::Shared>>().settings().output_cycle;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let all = imp::outputs();
+        let ring: Vec<&Output> = all.iter().filter(|o| want.is_empty() || want.contains(&o.id)).collect();
+        if ring.len() < 2 {
+            crate::system::emit_event(&app, "audio", "Geçilecek başka çıkış yok", "Ayarlar › Ses'ten çıkış seç");
+            return;
+        }
+        let at = ring.iter().position(|o| o.default);
+        let next = ring[at.map(|i| (i + 1) % ring.len()).unwrap_or(0)];
+        match imp::set_output(&next.id) {
+            // Olay kartını ses izleyicisi zaten gösterir (varsayılan çıkış değişti)
+            Ok(()) => crate::log::write("info", &format!("çıkış kısayolu: {}", next.name)),
+            Err(e) => crate::log::write("warn", &format!("çıkış kısayolu: {e}")),
+        }
+    });
 }
 
 /// Varsayılan ses çıkışını değiştirir (tüm roller: oyun, müzik, sesli görüşme).
@@ -82,6 +113,51 @@ pub fn mute_mics() -> Vec<String> {
         }
     }
     done
+}
+
+/// Gizlilik kalkanı, görüşmedeyken: açık mikrofonların seviyesini 0'a indirir (susturmaz), eski
+/// seviyeleriyle döner. Teams gibi uygulamalar cihaz susturulunca kendi düğmesini de kapatıp cihaz
+/// açılınca geri açmıyor; seviye değişince buna dokunmuyorlar.
+pub fn zero_mics() -> Vec<(String, f32)> {
+    let mut done = Vec::new();
+    for (id, name, muted) in imp::captures() {
+        if muted {
+            continue;
+        }
+        let Some(level) = imp::capture_level(&id) else { continue };
+        match imp::set_capture_level(&id, 0.0) {
+            Ok(()) => {
+                crate::log::write("info", &format!("kalkan: görüşmede mikrofon seviyesi 0 ({name}, önce {:.0}%)", level * 100.0));
+                done.push((id, level));
+            }
+            Err(e) => crate::log::write("warn", &format!("kalkan: mikrofon seviyesi indirilemedi ({name}): {e}")),
+        }
+    }
+    done
+}
+
+/// Seviyesi 0'dan yukarı çıkmış mikrofonu yeniden 0'a indir (görüşme uygulaması seviyeyi kendisi
+/// ayarlıyor olabilir); indirilen oldu mu
+pub fn keep_zero(ids: &[String]) -> bool {
+    let mut any = false;
+    for id in ids {
+        if imp::capture_level(id).is_some_and(|l| l > 0.001) {
+            let _ = imp::set_capture_level(id, 0.0);
+            any = true;
+        }
+    }
+    any
+}
+
+/// Seviyesi indirilen mikrofonları eski seviyelerine döndür
+pub fn restore_levels(levels: &[(String, f32)]) -> bool {
+    let mut all = true;
+    for (id, level) in levels {
+        let ok = imp::set_capture_level(id, *level).is_ok();
+        crate::log::write(if ok { "info" } else { "warn" }, &format!("kalkan: mikrofon seviyesi geri geldi mi: {ok} ({:.0}%)", level * 100.0));
+        all &= ok;
+    }
+    all
 }
 
 /// Kalkanın kapattığı mikrofonları geri açar; açıldığını doğrular, tutmadıysa birkaç kez yeniden dener.
@@ -233,6 +309,14 @@ mod imp {
         unsafe { capture_volume(id).and_then(|v| v.SetMute(muted, std::ptr::null())).map_err(|e| e.to_string()) }
     }
 
+    pub fn capture_level(id: &str) -> Option<f32> {
+        unsafe { capture_volume(id).and_then(|v| v.GetMasterVolumeLevelScalar()).ok() }
+    }
+
+    pub fn set_capture_level(id: &str, level: f32) -> Result<(), String> {
+        unsafe { capture_volume(id).and_then(|v| v.SetMasterVolumeLevelScalar(level.clamp(0.0, 1.0), std::ptr::null())).map_err(|e| e.to_string()) }
+    }
+
     pub fn endpoint_muted(capture: bool) -> Option<bool> {
         unsafe { endpoint(capture).and_then(|v| v.GetMute()).ok().map(|b| b.as_bool()) }
     }
@@ -268,14 +352,22 @@ mod imp {
     }
 
     pub fn outputs() -> Vec<super::Output> {
+        devices(eRender)
+    }
+
+    pub fn inputs() -> Vec<super::Output> {
+        devices(eCapture)
+    }
+
+    fn devices(flow: windows::Win32::Media::Audio::EDataFlow) -> Vec<super::Output> {
         let Ok(e) = enumerator() else { return Vec::new() };
         unsafe {
-            let default = e.GetDefaultAudioEndpoint(eRender, eConsole).and_then(|d| d.GetId()).ok().map(|raw| {
+            let default = e.GetDefaultAudioEndpoint(flow, eConsole).and_then(|d| d.GetId()).ok().map(|raw| {
                 let id = raw.to_string().unwrap_or_default();
                 CoTaskMemFree(Some(raw.0 as _));
                 id
             });
-            let Ok(list) = e.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) else { return Vec::new() };
+            let Ok(list) = e.EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE) else { return Vec::new() };
             let count = list.GetCount().unwrap_or(0);
             (0..count)
                 .filter_map(|i| {
@@ -327,6 +419,17 @@ mod imp {
         if !outputs().iter().any(|o| o.id == id) {
             return Err("ses cihazı bulunamadı".into());
         }
+        set_default(id)
+    }
+
+    pub fn set_input(id: &str) -> Result<(), String> {
+        if !inputs().iter().any(|o| o.id == id) {
+            return Err("mikrofon bulunamadı".into());
+        }
+        set_default(id)
+    }
+
+    fn set_default(id: &str) -> Result<(), String> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
             let policy: IPolicyConfig = CoCreateInstance(&POLICY_CONFIG_CLIENT, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
@@ -381,6 +484,12 @@ mod imp {
     pub fn set_capture_muted(_id: &str, _m: bool) -> Result<(), String> {
         Ok(())
     }
+    pub fn capture_level(_id: &str) -> Option<f32> {
+        None
+    }
+    pub fn set_capture_level(_id: &str, _l: f32) -> Result<(), String> {
+        Ok(())
+    }
     pub fn endpoint_muted(_c: bool) -> Option<bool> {
         None
     }
@@ -396,7 +505,13 @@ mod imp {
     pub fn outputs() -> Vec<super::Output> {
         Vec::new()
     }
+    pub fn inputs() -> Vec<super::Output> {
+        Vec::new()
+    }
     pub fn set_output(_id: &str) -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+    pub fn set_input(_id: &str) -> Result<(), String> {
         Err("yalnızca Windows".into())
     }
     pub fn lock() -> Result<(), String> {

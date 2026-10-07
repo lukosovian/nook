@@ -68,7 +68,7 @@ export function Library() {
 
       <LibraryClock />
       {/* Cadı şapkalı iksirci */}
-      <Actor x={420} y={790} size={110} look={look({ shape: "sphere", head: "witch" })} color="#6B4BFF" flip expression={beat.i === 0 ? "surprised" : "focused"} move={sway(3, 3)} act={on(beat, 0, hop(18))} actKey={k} front={<Potion pour={beat.i === 0} k={k} />} />
+      <Actor morph={beat.n[0]} morphDelay={1000} x={420} y={790} size={110} look={look({ shape: "sphere", head: "witch" })} color="#6B4BFF" flip expression={beat.i === 0 ? "surprised" : "focused"} move={sway(3, 3)} act={on(beat, 0, hop(18))} actKey={k} front={<Potion pour={beat.i === 0} k={k} />} />
       {/* Merdivenin tepesinde büyü kitabı inceleyen */}
       <Actor x={1250} y={440} size={98} look={look({ shape: "triangle", glasses: "round" })} color="#FF8A1F" expression={beat.i === 1 ? "surprised" : "focused"} move={sway(4, 2)} act={on(beat, 1, { animate: { rotate: [0, -10, 10, 0] }, transition: { duration: 1.2 } })} actKey={k} front={<Tome />} />
       {/* Monokllü, büyüteçle parşömen okuyan */}
@@ -172,10 +172,10 @@ export function Mine() {
 
       <MineClock />
       {/* Baretli kazmacı */}
-      <Actor x={1220} y={770} size={108} look={look({ shape: "cube" })} color="#FFD21F" flip={false} expression="focused" move={breathe(3)} front={<><HardHat /><Pickaxe k={k} hit={beat.i === 0} /></>} />
+      <Actor x={1220} y={770} size={108} look={look({ shape: "cube", head: "hardhat" })} color="#FFD21F" flip={false} expression="focused" move={breathe(3)} front={<><Pickaxe k={k} hit={beat.i === 0} /></>} />
       {/* Maden arabasında "hızlı git" diyen */}
       <motion.div className="absolute inset-0" animate={beat.i === 1 ? { x: [0, -260, -260, 0] } : { x: 0 }} transition={{ duration: 4, times: [0, 0.35, 0.7, 1], ease: "easeInOut" }} key={`cart${beat.i === 1 ? k : 0}`}>
-        <Actor x={760} y={745} size={96} look={look({ shape: "bean", head: "cap" })} color="#FF6A3D" expression="happy" move={{ animate: { y: [0, -3, 0] }, transition: { duration: 0.4, repeat: Infinity } }} front={<><Hand x={-4} y={2} /><Hand x={28} y={-2} /></>} />
+        <Actor morph={beat.n[1]} morphDelay={1400} x={760} y={745} size={96} look={look({ shape: "bean", head: "cap" })} color="#FF6A3D" expression="happy" move={{ animate: { y: [0, -3, 0] }, transition: { duration: 0.4, repeat: Infinity } }} front={<><Hand x={-4} y={2} /><Hand x={28} y={-2} /></>} />
         <Layer>
           <path d="M680 700 h160 l-16 76 h-128 Z" fill="#5a5f6b" />
           <rect x="676" y="696" width="168" height="12" rx="4" fill="#7a808c" />
@@ -192,17 +192,6 @@ export function Mine() {
       {/* Fener tutan */}
       <Actor x={300} y={790} size={92} look={look({ shape: "egg", head: "antenna" })} color="#2FD4C0" expression="idle" move={sway(3, 3)} act={on(beat, 3, { animate: { rotate: [0, 12, -12, 0] }, transition: { duration: 1.4 } })} actKey={k} front={<Lamp />} />
     </Stage>
-  );
-}
-
-function HardHat() {
-  return (
-    <g>
-      <path d="M1 3 Q2 -8 12 -8 Q22 -8 23 3 Z" fill="#ffb21f" />
-      <rect x="-2" y="1.5" width="28" height="3" rx="1.5" fill="#e09a10" />
-      <circle cx="12" cy="-3" r="2.6" fill="#fff6c4" />
-      <path d="M12 -3 L40 -12 L40 6 Z" fill="#fff6c4" opacity="0.18" />
-    </g>
   );
 }
 
@@ -289,7 +278,7 @@ export function Zen() {
       {/* Çay kasesine sarılan */}
       <Actor x={810} y={772} size={92} look={look({ shape: "bean", texture: "matte" })} color="#2FD4C0" expression={beat.i === 2 ? "happy" : "sleepy"} move={breathe(3.6)} act={on(beat, 2, { animate: { rotate: [0, -8, 0] }, transition: { duration: 1.4 } })} actKey={k} front={<TeaBowl />} />
       {/* Bambu çeşmeyi pür dikkat izleyen */}
-      <Actor x={990} y={800} size={96} look={look({ shape: "cat" })} color="#FF8A1F" expression={beat.i === 3 ? "surprised" : "focused"} move={sway(4, 2)} act={on(beat, 3, hop(22))} actKey={k} />
+      <Actor morph={beat.n[3]} morphDelay={300} x={990} y={800} size={96} look={look({ shape: "cat" })} color="#FF8A1F" expression={beat.i === 3 ? "surprised" : "focused"} move={sway(4, 2)} act={on(beat, 3, hop(22))} actKey={k} />
     </Stage>
   );
 }
@@ -363,7 +352,7 @@ export function Studio() {
       {/* Bereli, paletli ressam */}
       <Actor x={560} y={790} size={110} look={look({ shape: "sphere", head: "beret" })} color="#F4F4F6" flip expression="focused" move={breathe(3)} act={on(beat, 0, { animate: { x: [0, -10, 0] }, transition: { duration: 2 } })} actKey={k} front={<Palette k={beat.i === 0 ? k : 0} />} />
       {/* Boyaya bulanmış, boş boş bakan */}
-      <Actor x={820} y={800} size={104} look={look({ shape: "blob", texture: "spots" })} color="#E23BD6" expression={beat.i === 1 ? "dizzy" : "idle"} move={sway(3.6, 4)} act={on(beat, 1, { animate: { rotate: [0, -14, 14, 0] }, transition: { duration: 1.6 } })} actKey={k} />
+      <Actor morph={beat.n[1]} morphDelay={400} x={820} y={800} size={104} look={look({ shape: "blob", texture: "spots" })} color="#E23BD6" expression={beat.i === 1 ? "dizzy" : "idle"} move={sway(3.6, 4)} act={on(beat, 1, { animate: { rotate: [0, -14, 14, 0] }, transition: { duration: 1.6 } })} actKey={k} />
       {/* Rulo ile kayan */}
       <motion.div key={`roll${beat.i === 2 ? k : 0}`} className="absolute inset-0" animate={beat.i === 2 ? { x: [0, 520, 520, 0] } : { x: 0 }} transition={{ duration: 5, times: [0, 0.45, 0.6, 1], ease: "easeInOut" }}>
         {beat.i === 2 && (
@@ -467,14 +456,14 @@ export function Snow() {
       <Actor x={470} y={815} size={98} look={look({ shape: "sphere", texture: "plush" })} color="#FF3B4A" flip expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(14))} actKey={k} front={<motion.g animate={{ x: [0, -2, 0] }} transition={{ duration: 0.7, repeat: Infinity }}><Hand x={-4} y={10} /><Hand x={-2} y={18} /></motion.g>} />
       {/* Atkılı, kulaklıklı dev kartopu yuvarlayan */}
       <motion.div key={`ball${beat.i === 1 ? k : 0}`} className="absolute inset-0" animate={beat.i === 1 ? { x: [0, 160, 160, 0] } : { x: 0 }} transition={{ duration: 6, times: [0, 0.5, 0.75, 1], ease: "easeInOut" }}>
-        <Actor x={620} y={830} size={96} look={look({ shape: "bean", head: "headphones" })} color="#2B8CFF" expression="happy" move={breathe(2.4)} front={<><Scarf /><Hand x={26} y={16} /></>} />
+        <Actor x={620} y={830} size={96} look={look({ shape: "bean", head: "headphones", neck: "scarf" })} color="#2B8CFF" expression="happy" move={breathe(2.4)} front={<><Hand x={26} y={16} /></>} />
         <motion.div className="absolute rounded-full" style={{ left: 690, top: 700, width: 130, height: 130, background: "radial-gradient(circle at 35% 30%, #fff, #dbe8f5)", boxShadow: "0 10px 20px -10px rgba(40,60,90,0.4)" }} animate={{ rotate: beat.i === 1 ? 360 : 0 }} transition={{ duration: 3, ease: "linear" }} />
       </motion.div>
       {/* Barikatın arkasında nişan alan yaramaz */}
-      <Actor x={1470} y={760} size={92} look={look({ shape: "cat" })} color="#9B7BFF" flip expression={beat.i === 2 ? "happy" : "focused"} act={beat.i === 2 ? { animate: { y: [20, -20, -20, 20] }, transition: { duration: 1.8, times: [0, 0.2, 0.7, 1] } } : { animate: { y: 20 }, transition: { duration: 0 } }} actKey={k} front={<Hand x={-4} y={4} />} />
+      <Actor morph={beat.n[2]} morphDelay={0} x={1470} y={760} size={92} look={look({ shape: "cat" })} color="#9B7BFF" flip expression={beat.i === 2 ? "happy" : "focused"} act={beat.i === 2 ? { animate: { y: [20, -20, -20, 20] }, transition: { duration: 1.8, times: [0, 0.2, 0.7, 1] } } : { animate: { y: 20 }, transition: { duration: 0 } }} actKey={k} front={<Hand x={-4} y={4} />} />
       {beat.i === 2 && <motion.span key={`sb${k}`} className="absolute rounded-full bg-white" style={{ left: 1420, top: 680, width: 26, height: 26, boxShadow: "0 2px 6px rgba(40,60,90,0.3)" }} initial={{ x: 0, y: 0, opacity: 0 }} animate={{ x: [0, -400, -760], y: [0, -140, 40], opacity: [1, 1, 0] }} transition={{ duration: 1.3, delay: 0.5, ease: "easeOut" }} />}
       {/* Patenle dönerken popo üstü oturan */}
-      <Actor
+      <Actor morph={beat.n[3]} morphDelay={900}
         x={1080}
         y={770}
         size={92}
@@ -487,15 +476,6 @@ export function Snow() {
         front={<Skates />}
       />
     </Stage>
-  );
-}
-
-function Scarf() {
-  return (
-    <g>
-      <path d="M1 20 Q12 25 23 20 L23 23.5 Q12 28 1 23.5 Z" fill="#ff3b4a" />
-      <path d="M17 23 l3 8 l3 -1 l-2 -8 Z" fill="#e02a3a" />
-    </g>
   );
 }
 

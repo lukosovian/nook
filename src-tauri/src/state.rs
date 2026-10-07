@@ -87,6 +87,10 @@ pub struct Settings {
     pub shield_shortcut: String,
     /// Parola kilidi açık: kalkan kısayolla/Esc ile kalkmaz, yalnızca parolayla
     pub shield_lock: bool,
+    /// Kalkan açılınca mikrofonu sustur
+    pub shield_mute_mic: bool,
+    /// Kalkan açılınca görüşmedeki uygulamanın (karşı tarafın) sesini kapat
+    pub shield_mute_calls: bool,
     pub auto_screenshots: bool,
     pub hide_in_fullscreen: bool,
     /// Oyun açılınca ada gizlenmeden önce birkaç saniye özet gösterir
@@ -99,6 +103,20 @@ pub struct Settings {
     pub ui_scale: f64,
     /// Tepsi menüsündeki "çık" yazısı (seçili dilde)
     pub quit_label: String,
+    /// Dosya sürüklerken fareyi sallayınca raf açılır
+    pub shelf_shake: bool,
+    /// Gezgin'de seçili dosyaları rafa ekle
+    pub shelf_shortcut: String,
+    /// Panodakini biçimsiz (düz metin) yapıştır
+    pub plain_paste_shortcut: String,
+    /// Ses çıkışları arasında dön
+    pub output_shortcut: String,
+    /// Kısayolun döndüğü çıkışlar (boşsa hepsi)
+    pub output_cycle: Vec<String>,
+    /// Kulaklık çıkınca ses bu seviyeye iner (%; 0 = kapalı)
+    pub headphone_drop: u8,
+    /// Yayın maskesini elle aç / kapat
+    pub live_shortcut: String,
 }
 
 /// Adanın ekrandaki yeri, ekran boyuna oranla: fx üst-orta noktanın yatay yeri, fy üst kenarın
@@ -120,6 +138,8 @@ impl Default for Settings {
             voice_shortcut: "Ctrl+Shift+D".into(),
             shield_shortcut: "Ctrl+Alt+H".into(),
             shield_lock: false,
+            shield_mute_mic: true,
+            shield_mute_calls: true,
             auto_screenshots: true,
             hide_in_fullscreen: true,
             game_intro: true,
@@ -127,6 +147,13 @@ impl Default for Settings {
             island_pos: None,
             ui_scale: 1.0,
             quit_label: String::new(),
+            shelf_shake: true,
+            shelf_shortcut: "Ctrl+Alt+S".into(),
+            plain_paste_shortcut: "Ctrl+Alt+V".into(),
+            output_shortcut: String::new(),
+            output_cycle: Vec::new(),
+            headphone_drop: 0,
+            live_shortcut: "Ctrl+Alt+L".into(),
         }
     }
 }
@@ -160,6 +187,8 @@ pub struct Shared {
     pub game_screen: Mutex<Option<(i32, i32, i32, i32)>>,
     /// Parolalı kalkan açık: adalar ve yan kartlar etkileşime kapalı
     pub locked: AtomicBool,
+    /// Açılış kilidi: parola adada yazılana kadar yalnızca ana ada etkileşimli (diğer adalar ve yan kartlar kapalı)
+    pub gated: AtomicBool,
 }
 
 impl Shared {

@@ -1,6 +1,7 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { motion } from "motion/react";
 import { normalizeColor, normalizeLook, type Look } from "../../lib/look";
-import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, SPAN, useBodyImageQueued } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, lensOn, SPAN, useBodyImageQueued } from "../../lib/nook3d";
 import { useNook, type Expression } from "../../store/nook";
 import { eyesFor } from "./Eye";
 
@@ -20,6 +21,7 @@ export function NookFigure({
   style,
   smile = false,
   res,
+  alive = false,
 }: {
   look: Look;
   color: string;
@@ -32,6 +34,8 @@ export function NookFigure({
   smile?: boolean;
   /** Çizim çözünürlüğü (varsayılan boya göre 160/256; logo gibi büyük çizimler için daha yüksek) */
   res?: number;
+  /** Canlı dursun: ara sıra göz kırpar ve yana bakınır (kalkan sahneleri) */
+  alive?: boolean;
 }) {
   const img = useBodyImageQueued(look, color, res ?? figureRes(size));
   const [eye, , shine] = eyesFor(expression, look.eyes);
@@ -39,15 +43,30 @@ export function NookFigure({
   const unit = size / 2; // 1 birim (yüz yarıçapı) kaç px
   const a = ANCHORS[look.shape];
   const k = unit / 12; // göz ölçüleri yüz yarıçapı 12 px'e göre
-  const lens = look.glasses === "none" ? 1 : EYE_SCALE_GLASSES;
+  const lens = lensOn(look) ? EYE_SCALE_GLASSES : 1;
+  // Her Nook kendi ritminde kırpsın: hepsi aynı anda kırpmasın
+  const [rhythm] = useState(() => ({ blink: 2.6 + Math.random() * 3.4, glance: 5 + Math.random() * 6, delay: Math.random() * 3 }));
+  const eyeLine = span / 2 - a.y * unit;
   return (
     // Konumu çağıran belirleyebilsin (absolute); yoksa relative. İkisi birden verilirse CSS sırası relative'i seçer ve Nook kayar.
     <span className={`${/\b(absolute|fixed)\b/.test(className) ? "" : "relative "}inline-block shrink-0 ${className}`} style={{ width: size, height: size, ...style }}>
       {img ? (
         <span className="nook-fade absolute" style={{ width: span, height: span, left: (size - span) / 2, top: (size - span) / 2 }}>
           <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />
-          {look.glasses !== "shades" &&
-            [-1, 1].map((side) => (
+          {look.glasses !== "shades" && (
+            <motion.span
+              className="absolute inset-0"
+              style={{ originY: `${eyeLine}px` }}
+              animate={alive && expression !== "sleepy" ? { scaleY: [1, 1, 0.12, 1] } : undefined}
+              transition={alive ? { scaleY: { duration: 0.22, times: [0, 0.4, 0.6, 1], repeat: Infinity, repeatDelay: rhythm.blink, delay: rhythm.delay } } : undefined}
+            >
+              <motion.span
+                className="absolute inset-0"
+                animate={alive && !lensOn(look) ? { x: [0, 0, unit * 0.09, unit * 0.09, -unit * 0.07, -unit * 0.07, 0] } : undefined}
+                transition={alive ? { duration: 3.2, times: [0, 0.1, 0.18, 0.45, 0.53, 0.8, 0.9], repeat: Infinity, repeatDelay: rhythm.glance, delay: rhythm.delay + 1, ease: "easeInOut" } : undefined}
+              >
+            {/* Göz bandı sol gözü örter */}
+            {(look.glasses === "eyepatch" ? [1] : [-1, 1]).map((side) => (
               <span
                 key={side}
                 className="absolute bg-black"
@@ -63,6 +82,9 @@ export function NookFigure({
                 {shine && <span className="absolute rounded-full bg-white/90" style={{ width: 1.3 * k, height: 1.3 * k, left: "16%", top: "14%" }} />}
               </span>
             ))}
+              </motion.span>
+            </motion.span>
+          )}
           {smile && (
             <span
               className="absolute border-black"

@@ -28,9 +28,15 @@ import {
   Heart,
   Fish,
   ShieldCheck,
+  Gauge,
+  CalendarClock,
+  ClipboardList,
+  Inbox,
+  Radio,
 } from "lucide-react";
 import type { SysEventKind } from "../../lib/bridge";
-import { useNook } from "../../store/nook";
+import { isLive, useNook } from "../../store/nook";
+import { tt } from "../../lib/i18n";
 import { ACCENT, MiniNook, tintText } from "../ui/primitives";
 
 const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
@@ -66,11 +72,21 @@ const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
   welcome: { icon: Heart, color: ACCENT.pink },
   fish: { icon: Fish, color: ACCENT.yellow },
   guard: { icon: ShieldCheck, color: ACCENT.green },
+  alert: { icon: Gauge, color: ACCENT.orange },
+  calendar: { icon: CalendarClock, color: ACCENT.blue },
+  clip: { icon: ClipboardList, color: ACCENT.purple },
+  shelf: { icon: Inbox, color: ACCENT.teal },
+  live: { icon: Radio, color: ACCENT.red },
 };
 
 /** Sistem olayı kartı: solda Nook (rozetli), ortada metin, sağda renkli mini avatar. */
+/** Yayında içeriği gizlenen kartlar (bildirim, çeviri, hassas veri, etkinlik, pano) */
+const LIVE_MASKED = new Set<SysEventKind>(["notify", "translate", "sensitive", "calendar", "clip"]);
+
 export function ToastView() {
-  const toast = useNook((s) => s.toasts[0]);
+  const raw = useNook((s) => s.toasts[0]);
+  const live = useNook(isLive);
+  const toast = raw && live && LIVE_MASKED.has(raw.kind) ? { ...raw, title: raw.kind === "notify" ? tt("Yeni bildirim") : tt("Yeni olay"), detail: tt("Yayındayken gizli"), icon: null } : raw;
 
   return (
     <motion.div

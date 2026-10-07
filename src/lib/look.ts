@@ -10,9 +10,9 @@ import { tt } from "./i18n";
 export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost" | "cube" | "egg" | "star" | "cat" | "bear";
 export type Texture = "smooth" | "plush" | "matte" | "jelly" | "metal" | "spots";
 export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm";
-export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle";
-export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat";
-export type NeckId = "none" | "bowtie";
+export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle" | "eyepatch" | "goggles";
+export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat" | "cowboy" | "pirate" | "straw" | "conductor" | "helmet" | "hardhat";
+export type NeckId = "none" | "bowtie" | "scarf";
 
 export interface Look {
   shape: ShapeId;
@@ -79,6 +79,8 @@ export const GLASSES: { id: GlassesId; label: string }[] = [
   { id: "bold", label: tt("Kalın") },
   { id: "shades", label: tt("Güneş") },
   { id: "monocle", label: tt("Monokl") },
+  { id: "goggles", label: tt("Koruyucu") },
+  { id: "eyepatch", label: tt("Göz bandı") },
 ];
 
 export const HEADS: { id: HeadId; label: string }[] = [
@@ -97,6 +99,12 @@ export const HEADS: { id: HeadId; label: string }[] = [
   { id: "witch", label: tt("Cadı") },
   { id: "horns", label: tt("Boynuz") },
   { id: "bat", label: tt("Yarasa") },
+  { id: "cowboy", label: tt("Kovboy") },
+  { id: "pirate", label: tt("Korsan") },
+  { id: "straw", label: tt("Hasır") },
+  { id: "conductor", label: tt("Kondüktör") },
+  { id: "helmet", label: tt("Miğfer") },
+  { id: "hardhat", label: tt("Baret") },
 ];
 
 /** Kepin rengi: gövdeyle karışmasın diye mavi gövdede mercan, öbürlerinde koyu mavi (Dots'taki gibi) */
@@ -105,6 +113,7 @@ export const capColor = (body: string) => (["#2B8CFF", "#9B7BFF", "#E23BD6"].inc
 export const NECKS: { id: NeckId; label: string }[] = [
   { id: "none", label: tt("Yok") },
   { id: "bowtie", label: tt("Papyon") },
+  { id: "scarf", label: tt("Atkı") },
 ];
 
 /** Gövde renkleri: Nook'un beyazı + Dots gibi canlı, doygun tonlar */
@@ -311,6 +320,7 @@ export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
   report: { color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", glasses: "monocle" } },
   notes: { color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", head: "witch" } },
   look: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "bow" } },
+  year: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "star", eyes: "sparkle", head: "bow" } },
 };
 
 /** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */

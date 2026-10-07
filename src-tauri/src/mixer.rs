@@ -16,6 +16,8 @@ pub struct AppVolume {
     pub muted: bool,
     /// Şu an ses çalıyor mu
     pub active: bool,
+    /// Uygulamaya özel çıkış cihazı (yoksa Windows'un varsayılanı)
+    pub output: Option<String>,
 }
 
 #[tauri::command]
@@ -38,6 +40,18 @@ pub async fn mixer_set(
     {
         let _ = (key, volume, muted);
         Ok(())
+    }
+}
+
+/// Uygulamayı belirli bir çıkışa yönlendir (id yoksa varsayılana döner)
+#[tauri::command]
+pub async fn mixer_output(key: String, id: Option<String>) -> Result<(), String> {
+    #[cfg(windows)]
+    return imp::set_output(&key, id.as_deref());
+    #[cfg(not(windows))]
+    {
+        let _ = (key, id);
+        Err("yalnızca Windows".into())
     }
 }
 
@@ -82,6 +96,7 @@ mod imp {
         display: String,
         volume: ISimpleAudioVolume,
         active: bool,
+        pid: u32,
     }
 
     fn exe_path(pid: u32) -> Option<String> {
@@ -206,6 +221,7 @@ mod imp {
                         display,
                         volume,
                         active: state == AudioSessionStateActive,
+                        pid,
                     });
                 }
             }
@@ -215,6 +231,7 @@ mod imp {
 
     pub fn list() -> windows::core::Result<Vec<AppVolume>> {
         let mut apps: BTreeMap<String, AppVolume> = BTreeMap::new();
+        let policy = route::factory();
         for s in sessions()? {
             let (volume, muted) = unsafe {
                 (
@@ -238,7 +255,11 @@ mod imp {
                 volume,
                 muted,
                 active: false,
+                output: None,
             });
+            if e.output.is_none() && s.pid != 0 && s.key != "system" {
+                e.output = policy.as_ref().and_then(|f| route::get(f, s.pid));
+            }
             e.active |= s.active;
             // Birden çok oturum: en yüksek seviye görünsün
             e.volume = e.volume.max(volume);
@@ -252,6 +273,93 @@ mod imp {
                 .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
         });
         Ok(v)
+    }
+
+    pub fn set_output(key: &str, id: Option<&str>) -> Result<(), String> {
+        let f = route::factory().ok_or("bu Windows sürümünde desteklenmiyor")?;
+        let pids: Vec<u32> = sessions().map_err(|e| e.to_string())?.into_iter().filter(|s| s.key == key && s.pid != 0).map(|s| s.pid).collect();
+        if pids.is_empty() {
+            return Err("uygulama şu an ses çalmıyor".into());
+        }
+        for pid in pids {
+            route::set(&f, pid, id)?;
+        }
+        Ok(())
+    }
+
+    /// Windows'un "Uygulama ses seçenekleri" sayfasının kullandığı (belgelenmemiş) arayüz:
+    /// uygulamaya özel çıkışı kalıcı olarak kaydeder. EarTrumpet de bunu kullanır.
+    #[allow(non_snake_case)]
+    mod route {
+        use core::ffi::c_void;
+        use windows::core::{IUnknown, IUnknown_Vtbl, HRESULT, HSTRING};
+        use windows::Win32::System::WinRT::RoGetActivationFactory;
+        use windows_core::interface;
+
+        #[interface("ab3d4648-e242-459f-b02f-541c70306324")]
+        pub unsafe trait IAudioPolicyConfigFactory: IUnknown {
+            // IInspectable
+            fn GetIids(&self) -> HRESULT;
+            fn GetRuntimeClassName(&self) -> HRESULT;
+            fn GetTrustLevel(&self) -> HRESULT;
+            // Yer tutucular (vtable sırası)
+            fn add_CtxVolumeChange(&self) -> HRESULT;
+            fn remove_CtxVolumeChanged(&self) -> HRESULT;
+            fn add_RingerVibrateStateChanged(&self) -> HRESULT;
+            fn remove_RingerVibrateStateChange(&self) -> HRESULT;
+            fn SetVolumeGroupGainForId(&self) -> HRESULT;
+            fn GetVolumeGroupGainForId(&self) -> HRESULT;
+            fn GetActiveVolumeGroupForEndpointId(&self) -> HRESULT;
+            fn GetVolumeGroupsForEndpoint(&self) -> HRESULT;
+            fn GetCurrentVolumeContext(&self) -> HRESULT;
+            fn SetVolumeGroupMuteForId(&self) -> HRESULT;
+            fn GetVolumeGroupMuteForId(&self) -> HRESULT;
+            fn SetRingerVibrateState(&self) -> HRESULT;
+            fn GetRingerVibrateState(&self) -> HRESULT;
+            fn SetPreferredChatApplication(&self) -> HRESULT;
+            fn ResetPreferredChatApplication(&self) -> HRESULT;
+            fn GetPreferredChatApplication(&self) -> HRESULT;
+            fn GetCurrentChatApplications(&self) -> HRESULT;
+            fn add_ChatContextChanged(&self) -> HRESULT;
+            fn remove_ChatContextChanged(&self) -> HRESULT;
+            fn SetPersistedDefaultAudioEndpoint(&self, pid: u32, flow: i32, role: i32, id: *mut c_void) -> HRESULT;
+            fn GetPersistedDefaultAudioEndpoint(&self, pid: u32, flow: i32, role: i32, id: *mut *mut c_void) -> HRESULT;
+            fn ClearAllPersistedApplicationDefaultEndpoints(&self) -> HRESULT;
+        }
+
+        const PREFIX: &str = r"\?\SWD#MMDEVAPI#";
+        const RENDER: &str = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
+
+        pub fn factory() -> Option<IAudioPolicyConfigFactory> {
+            let name = HSTRING::from("Windows.Media.Internal.AudioPolicyConfig");
+            unsafe { RoGetActivationFactory::<IAudioPolicyConfigFactory>(&name).ok() }
+        }
+
+        pub fn get(f: &IAudioPolicyConfigFactory, pid: u32) -> Option<String> {
+            unsafe {
+                let mut raw: *mut c_void = std::ptr::null_mut();
+                if f.GetPersistedDefaultAudioEndpoint(pid, 0, 1, &mut raw).is_err() || raw.is_null() {
+                    return None;
+                }
+                let h: HSTRING = std::mem::transmute(raw);
+                let s = h.to_string();
+                let id = s.strip_prefix(PREFIX)?.strip_suffix(RENDER)?.to_string();
+                (!id.is_empty()).then_some(id)
+            }
+        }
+
+        pub fn set(f: &IAudioPolicyConfigFactory, pid: u32, id: Option<&str>) -> Result<(), String> {
+            let full = id.map(|i| HSTRING::from(format!("{PREFIX}{i}{RENDER}")));
+            let raw: *mut c_void = match &full {
+                Some(h) => unsafe { std::mem::transmute_copy(h) },
+                None => std::ptr::null_mut(),
+            };
+            // eConsole ve eMultimedia
+            for role in [0, 1] {
+                unsafe { f.SetPersistedDefaultAudioEndpoint(pid, 0, role, raw) }.ok().map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        }
     }
 
     pub fn set(key: &str, volume: Option<f32>, muted: Option<bool>) -> windows::core::Result<()> {

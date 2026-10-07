@@ -10,16 +10,19 @@ import {
   FileVideo,
   Folder,
   FolderOpen,
+  AppWindow,
+  Pin,
+  PinOff,
   X,
   type LucideIcon,
 } from "lucide-react";
-import { openPath, revealPath } from "../../lib/bridge";
+import { openPath, openWith, revealPath } from "../../lib/bridge";
 import { formatSize } from "../../lib/format";
 import { spring } from "../../lib/motion";
 import { dragOut, thumbnailSrc } from "../../lib/shelf";
 import { useNook, type ShelfItem } from "../../store/nook";
 import { ek, useNookName } from "../../lib/look";
-import { ACCENT, EmptyState, TextButton } from "../ui/primitives";
+import { ACCENT, EmptyState, TextButton, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
 /** Bu kadar px hareket etmeden sürükleme başlamaz (tıklama ile karışmasın). */
@@ -38,7 +41,7 @@ export function ShelfPanel() {
     <div className="flex h-full flex-col">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[11px] text-label-3">{tt("{0} öğe · sürükle, çift tıkla, sağ tıkla", shelf.length)}</span>
-        <TextButton tone="danger" onClick={clearShelf}>{tt("Temizle")}</TextButton>
+        {shelf.some((i) => !i.pinned) && <TextButton tone="danger" onClick={clearShelf}>{tt("Temizle")}</TextButton>}
       </div>
       <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden pb-1" onWheel={(e) => (e.currentTarget.scrollLeft += e.deltaY)}>
         <AnimatePresence initial={false}>
@@ -53,6 +56,7 @@ export function ShelfPanel() {
 
 function ShelfCard({ item }: { item: ShelfItem }) {
   const removeShelf = useNook((s) => s.removeShelf);
+  const pinShelf = useNook((s) => s.pinShelf);
   const origin = useRef<{ x: number; y: number } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -62,7 +66,11 @@ function ShelfCard({ item }: { item: ShelfItem }) {
     const o = origin.current;
     if (!o || Math.hypot(e.clientX - o.x, e.clientY - o.y) < DRAG_THRESHOLD) return;
     origin.current = null;
-    void dragOut(item);
+    // Ayarlar › Raf: başka bir yere bırakılınca raftan kalksın (sabitlenen kalır)
+    void dragOut(item, () => {
+      const st = useNook.getState();
+      if (st.settings.shelfRemoveAfterDrop && !st.shelf.find((i) => i.id === item.id)?.pinned) st.removeShelf(item.id);
+    });
   };
   const reset = () => (origin.current = null);
 
@@ -85,6 +93,7 @@ function ShelfCard({ item }: { item: ShelfItem }) {
         void revealPath(item.path);
       }}
       className="group relative flex h-full w-[92px] shrink-0 flex-col gap-1.5 rounded-[14px] bg-well p-1.5 transition-colors hover:bg-well-hi"
+      style={item.pinned ? { boxShadow: `inset 0 0 0 1px ${tintBg(ACCENT.yellow, 35)}` } : undefined}
     >
       <Thumb item={item} />
       <div className="min-w-0 px-0.5 leading-tight">
@@ -92,13 +101,30 @@ function ShelfCard({ item }: { item: ShelfItem }) {
         <p className="mt-0.5 text-[10px] tabular-nums text-label-3">{item.isDir ? tt("Klasör") : formatSize(item.size)}</p>
       </div>
 
+      {item.pinned && (
+        <span className="absolute right-2.5 top-2.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/80 transition-opacity group-hover:opacity-0" style={{ color: tintText(ACCENT.yellow) }}>
+          <Pin size={10} strokeWidth={2.4} />
+        </span>
+      )}
       <div className="absolute inset-x-2.5 top-2.5 flex justify-between opacity-0 transition-opacity group-hover:opacity-100">
-        <CardAction label={tt("Klasörde göster")} onClick={() => void revealPath(item.path)}>
-          <FolderOpen size={10} strokeWidth={2.4} />
-        </CardAction>
-        <CardAction label={tt("Raftan kaldır")} onClick={() => removeShelf(item.id)}>
-          <X size={10} strokeWidth={2.6} />
-        </CardAction>
+        <div className="flex gap-1">
+          <CardAction label={tt("Klasörde göster")} onClick={() => void revealPath(item.path)}>
+            <FolderOpen size={10} strokeWidth={2.4} />
+          </CardAction>
+          {!item.isDir && (
+            <CardAction label={tt("Birlikte aç")} onClick={() => void openWith(item.path)}>
+              <AppWindow size={10} strokeWidth={2.4} />
+            </CardAction>
+          )}
+        </div>
+        <div className="flex gap-1">
+          <CardAction label={item.pinned ? tt("Sabitlemeyi kaldır") : tt("Sabitle")} onClick={() => pinShelf(item.id, !item.pinned)}>
+            {item.pinned ? <PinOff size={10} strokeWidth={2.4} /> : <Pin size={10} strokeWidth={2.4} />}
+          </CardAction>
+          <CardAction label={tt("Raftan kaldır")} onClick={() => removeShelf(item.id)}>
+            <X size={10} strokeWidth={2.6} />
+          </CardAction>
+        </div>
       </div>
     </motion.div>
   );

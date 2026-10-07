@@ -3,7 +3,9 @@ import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { Eye, EyeOff, Lock, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
-import { alarmRing, listMonitors, openPath, shieldOn, type MonitorInfo } from "../../lib/bridge";
+import { alarmRing, listMonitors, openPath, quickState, shieldOn, type AudioOutput, type MonitorInfo } from "../../lib/bridge";
+import { syncFeeds } from "../../lib/ics";
+import { shortName } from "./ControlPanel";
 import { checkPassword, hashPassword } from "../../lib/lock";
 import { startTour } from "../../lib/tour";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
@@ -15,6 +17,7 @@ import { MOVE_KINDS } from "../../lib/moveFx";
 import { IntroPreview, MovePreview } from "./EffectPreview";
 import { LangDropdown } from "../ui/LangPicker";
 import { tt } from "../../lib/i18n";
+import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: tt("Ana") },
@@ -74,6 +77,17 @@ export function SettingsPanel() {
   const update = useNook((st) => st.updateSettings);
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   useEffect(() => void listMonitors().then(setMonitors), []);
+  // Önizleme: ?sec=Pano → o bölüme kaydır (ekran görüntüsü için)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const sec = new URLSearchParams(location.search).get("sec");
+    if (!sec) return;
+    const t = window.setTimeout(() => {
+      const el = scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${sec}"]`);
+      if (el && scroller.current) scroller.current.scrollTop = el.offsetTop - 36;
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, []);
   // Önizleme sahneleri: ilk oynatışta açılır, her basışta baştan oynar
   const [preview, setPreview] = useState({ move: 0, intro: 0 });
   const replay = (k: "move" | "intro") => setPreview((p) => ({ ...p, [k]: p[k] + 1 }));
@@ -139,6 +153,28 @@ export function SettingsPanel() {
         )}
       </Section>
 
+      <ClipSection />
+
+      <ShelfSection />
+
+      <SoundSection />
+
+      <CalendarSection />
+
+      <Section title={tt("Yayın")}>
+        <Row label={tt("Ekran paylaşınca / yayında hassas bölümleri gizle")}>
+          <Toggle on={s.liveMask} onChange={(v) => update({ liveMask: v })} color={ACCENT.red} />
+        </Row>
+        <Row label={tt("Yayın maskesini elle aç / kapat")}>
+          <ShortcutInput value={s.liveShortcut} onChange={(v) => update({ liveShortcut: v })} clearable />
+        </Row>
+        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+          {tt("Teams, Zoom, Meet ya da tarayıcıdan ekran paylaşınca, OBS açıkken Not, Pano, Bildirimler, Sohbet ve Takvim buzlanır; bildirim kartlarında içerik görünmez. Üstteki CANLI rozetine tıklayınca o yayın için kapanır.")}
+        </p>
+      </Section>
+
+      <ShieldSection />
+
       <LockSection />
 
       <AiSection />
@@ -163,12 +199,6 @@ export function SettingsPanel() {
         </Row>
         <Row label={tt("Sesli komut (basılı tut)")}>
           <ShortcutInput value={s.voiceShortcut} onChange={(v) => update({ voiceShortcut: v })} />
-        </Row>
-        <Row label={tt("Gizlilik kalkanı")}>
-          <ShortcutInput value={s.shieldShortcut} onChange={(v) => update({ shieldShortcut: v })} />
-        </Row>
-        <Row label={tt("Kalkanda mikrofon rozeti ve klik sesi")}>
-          <Toggle on={s.shieldMicFx} onChange={(v) => update({ shieldMicFx: v })} color={ACCENT.orange} />
         </Row>
         <Row label={tt("Ada açılınca solunda ses kartı")}>
           <Toggle on={s.soundCard} onChange={(v) => update({ soundCard: v })} color={ACCENT.green} />
@@ -210,6 +240,9 @@ export function SettingsPanel() {
         </Row>
         <Row label={tt("Windows bildirimlerini göster")}>
           <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} />
+        </Row>
+        <Row label={tt("Uzun süre yüksek işlemci / bellek, dolan disk için uyar")}>
+          <Toggle on={s.sysAlerts} onChange={(v) => update({ sysAlerts: v })} color={ACCENT.orange} />
         </Row>
         <Row label={tt("Kopyalanan yabancı metni çevir")}>
           <Toggle on={s.translate} onChange={(v) => update({ translate: v })} />
@@ -394,6 +427,12 @@ const INDEX: { label: string; title: string }[] = [
   { label: tt("Erişilebilirlik"), title: tt("Erişilebilirlik") },
   { label: tt("Molalar"), title: tt("Mola hatırlatıcıları") },
   { label: tt("Bekçi"), title: tt("Odak bekçisi") },
+  { label: tt("Pano"), title: tt("Pano ve notlar") },
+  { label: tt("Raf"), title: tt("Raf") },
+  { label: tt("Ses"), title: tt("Ses") },
+  { label: tt("Takvim"), title: tt("Takvim") },
+  { label: tt("Yayın"), title: tt("Yayın") },
+  { label: tt("Kalkan"), title: tt("Gizlilik kalkanı") },
   { label: tt("Kilit"), title: tt("Parola kilidi") },
   { label: tt("Yapay zekâ"), title: tt("Yapay zekâ") },
   { label: "Argus", title: "Argus" },
@@ -560,13 +599,17 @@ const MODIFIERS: [keyof KeyboardEvent, string][] = [
   ["metaKey", "Super"],
 ];
 
-/** Tıkla, tuş kombinasyonuna bas — kaydedilir. En az bir değiştirici tuş gerekir. */
-function ShortcutInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/** Tıkla, tuş kombinasyonuna bas — kaydedilir. En az bir değiştirici tuş gerekir. `clearable`: Sil tuşu kısayolu kaldırır. */
+function ShortcutInput({ value, onChange, clearable }: { value: string; onChange: (v: string) => void; clearable?: boolean }) {
   const [recording, setRecording] = useState(false);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     e.preventDefault();
     if (e.key === "Escape") return setRecording(false);
+    if (clearable && (e.key === "Backspace" || e.key === "Delete")) {
+      onChange("");
+      return setRecording(false);
+    }
     if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return;
     const mods = MODIFIERS.filter(([k]) => e.nativeEvent[k]).map(([, n]) => n);
     if (!mods.length) return;
@@ -583,8 +626,220 @@ function ShortcutInput({ value, onChange }: { value: string; onChange: (v: strin
       className="flex items-center gap-1 rounded-full bg-well px-2 py-0.5 text-[11px] font-medium text-label-2 transition-colors hover:bg-well-hi"
       style={recording ? { color: ACCENT.teal } : undefined}
     >
-      {recording ? tt("Tuşlara bas…") : value.replace("Space", tt("Boşluk")).split("+").join(" + ")}
+      {recording ? (clearable ? tt("Tuşlara bas… (Sil: kaldır)") : tt("Tuşlara bas…")) : value ? value.replace("Space", tt("Boşluk")).split("+").join(" + ") : tt("Yok")}
     </button>
+  );
+}
+
+const AUTO_CLEAR: { id: number; label: string }[] = [
+  { id: 0, label: tt("Hiç") },
+  { id: 1, label: tt("1 dk") },
+  { id: 5, label: tt("5 dk") },
+  { id: 15, label: tt("15 dk") },
+];
+const COLOR_FORMATS: { id: Settings["colorFormat"]; label: string }[] = [
+  { id: "hex", label: "HEX" },
+  { id: "rgb", label: "RGB" },
+  { id: "hsl", label: "HSL" },
+];
+const PAD_CLEAR: { id: number; label: string }[] = [
+  { id: 0, label: tt("Asla") },
+  { id: 1, label: tt("1 gün") },
+  { id: 7, label: tt("1 hafta") },
+  { id: 30, label: tt("1 ay") },
+];
+
+/** Pano geçmişi, düz metin yapıştırma, renk biçimi, karalama defteri */
+function ClipSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  return (
+    <Section title={tt("Pano ve notlar")}>
+      <Row label={tt("Düz metin olarak yapıştır")}>
+        <ShortcutInput value={s.plainPasteShortcut} onChange={(v) => update({ plainPasteShortcut: v })} clearable />
+      </Row>
+      <Row label={tt("Kopyaladıktan sonra panoyu boşalt")}>
+        <Segmented id="clip-clear" options={AUTO_CLEAR} value={s.clipAutoClear} onChange={(v) => update({ clipAutoClear: v })} color={ACCENT.purple} />
+      </Row>
+      <Row label={tt("Ekran kilitlenince panoyu boşalt")}>
+        <Toggle on={s.clipClearOnLock} onChange={(v) => update({ clipClearOnLock: v })} color={ACCENT.purple} />
+      </Row>
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Yalnızca pano boşalır; Nook'taki geçmiş kalır. Parola yöneticilerinin kopyaları hiç kaydedilmez.")}</p>
+      <Row label={tt("Geçmişe almadığı uygulamalar (virgülle)")}>
+        <TextInput
+          value={s.clipIgnore.join(", ")}
+          placeholder="keepass, bitwarden"
+          onChange={(v) => update({ clipIgnore: v.split(",").map((x) => x.trim().toLowerCase().replace(/\.exe$/, "")).filter(Boolean) })}
+        />
+      </Row>
+      <Row label={tt("Ekrandan alınan renk")}>
+        <div className="flex items-center gap-1.5">
+          {s.colorFormat === "hex" && (
+            <button onClick={() => update({ colorNoHash: !s.colorNoHash })} className="rounded-full bg-well px-2 py-[2px] text-[10.5px] font-medium text-label-2 hover:bg-well-hi" title={tt("# işaretiyle ya da onsuz")}>
+              {s.colorNoHash ? tt("# yok") : "#"}
+            </button>
+          )}
+          <Segmented id="color-format" options={COLOR_FORMATS} value={s.colorFormat} onChange={(v) => update({ colorFormat: v })} color={ACCENT.purple} />
+        </div>
+      </Row>
+      <Row label={tt("Karalama sekmesi dokunulmazsa temizlensin")}>
+        <Segmented id="pad-clear" options={PAD_CLEAR} value={s.padClear} onChange={(v) => update({ padClear: v })} color={ACCENT.yellow} />
+      </Row>
+    </Section>
+  );
+}
+
+/** Raf: sallayınca açılma, bırakınca kaldırma, Gezgin seçimini ekleme kısayolu */
+function ShelfSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  return (
+    <Section title={tt("Raf")}>
+      <Row label={tt("Dosya sürüklerken fareyi sallayınca raf açılsın")}>
+        <Toggle on={s.shelfShake} onChange={(v) => update({ shelfShake: v })} />
+      </Row>
+      <Row label={tt("Başka yere bırakılan öğe raftan kalksın")}>
+        <Toggle on={s.shelfRemoveAfterDrop} onChange={(v) => update({ shelfRemoveAfterDrop: v })} />
+      </Row>
+      <Row label={tt("Gezgin'de seçili dosyaları rafa ekle")}>
+        <ShortcutInput value={s.shelfShortcut} onChange={(v) => update({ shelfShortcut: v })} clearable />
+      </Row>
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Sabitlediğin öğeler (iğne) Temizle'de de, bırakınca da rafta kalır.")}</p>
+    </Section>
+  );
+}
+
+const HEADPHONE_DROP: { id: number; label: string }[] = [
+  { id: 0, label: tt("Kapalı") },
+  { id: 10, label: "%10" },
+  { id: 25, label: "%25" },
+  { id: 40, label: "%40" },
+];
+
+/** Ses: kulaklık çıkınca kısma, çıkışlar arasında kısayolla dönme */
+function SoundSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const [outputs, setOutputs] = useState<AudioOutput[]>([]);
+  useEffect(() => void quickState().then((q) => q && setOutputs(q.outputs)), []);
+  const cycle = s.outputCycle;
+  return (
+    <Section title={tt("Ses")}>
+      <Row label={tt("Şarkı sözleri (lrclib.net)")}>
+        <Toggle on={s.lyrics} onChange={(v) => update({ lyrics: v })} color={ACCENT.pink} />
+      </Row>
+      <Row label={tt("Kulaklık çıkınca sesi kıs")}>
+        <Segmented id="hp-drop" options={HEADPHONE_DROP} value={s.headphoneDrop} onChange={(v) => update({ headphoneDrop: v })} color={ACCENT.pink} />
+      </Row>
+      <Row label={tt("Ses çıkışını değiştir")}>
+        <ShortcutInput value={s.outputShortcut} onChange={(v) => update({ outputShortcut: v })} clearable />
+      </Row>
+      {s.outputShortcut && outputs.length > 1 && (
+        <div className="py-1.5">
+          <p className="mb-1 text-[10.5px] text-label-3">{tt("Kısayolun sırayla geçtiği çıkışlar (hiçbiri seçili değilse hepsi)")}</p>
+          <div className="flex flex-wrap gap-1">
+            {outputs.map((o) => {
+              const on = cycle.includes(o.id);
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => update({ outputCycle: on ? cycle.filter((x) => x !== o.id) : [...cycle, o.id] })}
+                  title={o.name}
+                  className="max-w-[160px] truncate rounded-full border px-2 py-[2px] text-[10.5px] font-medium"
+                  style={on ? { background: tintBg(ACCENT.pink, 16), borderColor: tintBg(ACCENT.pink, 40), color: tintText(ACCENT.pink) } : { background: "rgb(255 255 255 / 0.035)", borderColor: "rgb(255 255 255 / 0.06)", color: "var(--color-label-2)" }}
+                >
+                  {shortName(o.name)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Uygulamaları başka çıkışa yönlendirmek, sabitlemek ve gizlemek: Kontrol › Uygulama sesi.")}</p>
+    </Section>
+  );
+}
+
+const REMIND_EXT: { id: number; label: string }[] = [
+  { id: -1, label: tt("Yok") },
+  { id: 0, label: tt("Vaktinde") },
+  { id: 5, label: tt("5 dk") },
+  { id: 10, label: tt("10 dk") },
+  { id: 15, label: tt("15 dk") },
+];
+
+/** Takvim: Google/Outlook abonelikleri, kapalı adada geri sayım */
+function CalendarSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const count = useNook((st) => st.extEvents.length);
+  const syncedAt = useNook((st) => st.extSyncedAt);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const feeds = s.calFeeds;
+  const add = () => {
+    const url = draft.trim();
+    if (!url) return;
+    if (!/^(https|webcal):\/\//i.test(url)) return setError(tt("Adres https:// ya da webcal:// ile başlamalı"));
+    setError(null);
+    setDraft("");
+    if (!feeds.includes(url)) update({ calFeeds: [...feeds, url] });
+  };
+  const syncNow = () => {
+    setBusy(true);
+    setError(null);
+    void syncFeeds(feeds)
+      .then(({ events, errors }) => {
+        if (events.length || !errors.length) useNook.getState().setExtEvents(events);
+        if (errors.length) setError(errors[0]);
+      })
+      .finally(() => setBusy(false));
+  };
+  const ago = syncedAt ? Math.round((Date.now() - syncedAt) / 60_000) : null;
+  return (
+    <Section title={tt("Takvim")}>
+      <Row label={tt("Kapalı adada sıradaki etkinliğe geri sayım")}>
+        <Toggle on={s.calCountdown} onChange={(v) => update({ calCountdown: v })} color={ACCENT.blue} />
+      </Row>
+      <Row label={tt("Abone takvimde etkinlikten önce haber ver")}>
+        <Segmented id="cal-remind" options={REMIND_EXT} value={s.calRemindExt} onChange={(v) => update({ calRemindExt: v })} color={ACCENT.blue} />
+      </Row>
+      <div className="space-y-1 py-1.5">
+        <p className="text-[12px] text-label">{tt("Takvim aboneliği (Google, Outlook, iCloud)")}</p>
+        <p className="text-[10px] leading-snug text-label-3">
+          {tt("Google Takvim › Ayarlar › takvimin › \"iCal biçiminde gizli adres\"; Outlook › Paylaşılan takvimler › Takvim yayımla › ICS. Etkinlikler yalnızca okunur.")}
+        </p>
+        {feeds.map((f) => (
+          <div key={f} className="flex items-center gap-1.5 rounded-full bg-well py-[3px] pl-2.5 pr-1">
+            <span className="min-w-0 flex-1 truncate text-[10.5px] text-label-2" title={f}>
+              {f.replace(/^(https|webcal):\/\//, "")}
+            </span>
+            <button onClick={() => update({ calFeeds: feeds.filter((x) => x !== f) })} className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-white/10 hover:text-label" title={tt("Kaldır")}>
+              <X size={9} strokeWidth={3} />
+            </button>
+          </div>
+        ))}
+        <div className="flex items-center gap-1">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="https://calendar.google.com/…/basic.ics"
+            spellCheck={false}
+            className="h-6 min-w-0 flex-1 rounded-full bg-well px-2.5 text-[10.5px] text-label outline-none placeholder:text-label-3 focus:bg-well-hi"
+          />
+          <TextButton disabled={!draft.trim()} onClick={add}>{tt("Ekle")}</TextButton>
+        </div>
+        {feeds.length > 0 && (
+          <div className="flex items-center justify-between text-[10px] text-label-3">
+            <span>{ago === null ? tt("Henüz eşitlenmedi") : tt("{0} etkinlik · {1}", count, ago < 1 ? tt("az önce") : tt("{0} dk önce", ago))}</span>
+            <TextButton disabled={busy} onClick={syncNow}>{busy ? tt("Eşitleniyor…") : tt("Şimdi eşitle")}</TextButton>
+          </div>
+        )}
+        {error && <p className="truncate text-[10px] text-red/90" title={error}>{error}</p>}
+      </div>
+    </Section>
   );
 }
 
@@ -692,8 +947,83 @@ export function KeyInput({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
+const SCENE_MODES: { id: SceneMode; label: string }[] = [
+  { id: "random", label: tt("Karışık") },
+  { id: "order", label: tt("Sırayla") },
+  { id: "fixed", label: tt("Hep aynısı") },
+];
+
 /**
- * Parola kilidi: kalkan yalnızca parolayla kalkar, istenirse bilgisayar açılınca kalkanla başlar.
+ * Gizlilik kalkanı: kısayol, gelen sahneler (karışık / sırayla / hep aynısı; hangileri gelsin),
+ * kalkan açılınca mikrofon ve görüşme sesi kapansın mı, sağ üstteki düğmeler.
+ */
+function ShieldSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const picked = s.shieldScenes ?? [];
+  const on = activeScenes(picked);
+  const all = picked.length === 0 || on.length === SCENE_LIST.length;
+  const toggle = (id: string) => {
+    const next = on.includes(id) ? on.filter((x) => x !== id) : [...on, id];
+    // Hepsi kapanmasın: en az bir sahne kalır
+    if (next.length === 0) return;
+    update({ shieldScenes: next.length === SCENE_LIST.length ? [] : next, shieldSceneNext: 0 });
+  };
+  return (
+    <Section title={tt("Gizlilik kalkanı")}>
+      <Row label={tt("Kısayol")}>
+        <ShortcutInput value={s.shieldShortcut} onChange={(v) => update({ shieldShortcut: v })} />
+      </Row>
+      <Row label={tt("Sahneler")}>
+        <Segmented id="shield-mode" options={SCENE_MODES} value={s.shieldSceneMode ?? "random"} onChange={(v) => update({ shieldSceneMode: v, shieldSceneNext: 0 })} color={ACCENT.purple} />
+      </Row>
+      {s.shieldSceneMode === "fixed" ? (
+        <Row label={tt("Gelen sahne")}>
+          <Dropdown value={s.shieldScene ?? "campfire"} onChange={(v) => update({ shieldScene: v })} options={SCENE_LIST} color={ACCENT.purple} maxWidth={170} />
+        </Row>
+      ) : (
+        <div className="py-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[11px] text-label-2">{all ? tt("Hepsi geliyor") : tt("{0} sahne seçili", String(on.length))}</span>
+            <TextButton disabled={all} onClick={() => update({ shieldScenes: [], shieldSceneNext: 0 })}>{tt("Hepsini seç")}</TextButton>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {SCENE_LIST.map((sc) => {
+              const active = on.includes(sc.id);
+              return (
+                <button
+                  key={sc.id}
+                  onClick={() => toggle(sc.id)}
+                  className="rounded-full border px-2 py-[3px] text-[10.5px] font-medium transition-colors"
+                  style={{
+                    background: active ? tintBg(ACCENT.purple, 16) : "rgb(255 255 255 / 0.03)",
+                    borderColor: active ? tintBg(ACCENT.purple, 40) : "rgb(255 255 255 / 0.06)",
+                    color: active ? tintText(ACCENT.purple) : "var(--color-label-3)",
+                  }}
+                >
+                  {sc.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <Row label={tt("Kalkan açılınca mikrofonu kapat")}>
+        <Toggle on={s.shieldMuteMic ?? true} onChange={(v) => update({ shieldMuteMic: v })} color={ACCENT.orange} />
+      </Row>
+      <Row label={tt("Görüşmedeysen gelen sesi kapat")}>
+        <Toggle on={s.shieldMuteCalls ?? true} onChange={(v) => update({ shieldMuteCalls: v })} color={ACCENT.orange} />
+      </Row>
+      <Row label={tt("Sağ üstte mikrofon / ses düğmeleri ve klik sesi")}>
+        <Toggle on={s.shieldMicFx} onChange={(v) => update({ shieldMicFx: v })} color={ACCENT.orange} />
+      </Row>
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Kalkan kalkınca kapattıkları geri açılır. Kalkan açıkken sağ üstteki düğmelerle de kapatıp açabilirsin.")}</p>
+    </Section>
+  );
+}
+
+/**
+ * Parola kilidi: kalkan yalnızca parolayla kalkar, istenirse bilgisayar açılınca ada parola sorar.
  * Parola kurulduktan sonra bu bölümün ayarları da parolayla açılır.
  */
 function LockSection() {
@@ -721,7 +1051,7 @@ function LockSection() {
             <TextButton onClick={() => setSetting(true)}>{tt("Parola belirle")}</TextButton>
           </Row>
         )}
-        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Bilgisayardan kalkarken {0} ile kilitle; dönünce parolayla aç. İstersen bilgisayar açılınca da parola sorar.", s.shieldShortcut.split("+").join(" + "))}</p>
+        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Bilgisayardan kalkarken {0} ile kilitle; dönünce parolayla aç. İstersen bilgisayar açılınca ada da parola sorar.", s.shieldShortcut.split("+").join(" + "))}</p>
       </Section>
     );
 
@@ -748,8 +1078,8 @@ function LockSection() {
           <Segmented
             id="lock-boot"
             options={[
-              { id: 1, label: tt("Kalkanla") },
-              { id: 0, label: tt("Kalkansız") },
+              { id: 1, label: tt("Parola sor") },
+              { id: 0, label: tt("Sorma") },
             ]}
             value={s.lockOnBoot ? 1 : 0}
             onChange={(v) => update({ lockOnBoot: v === 1 })}

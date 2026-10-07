@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { AppWindow, Bluetooth, ChevronLeft, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, SlidersHorizontal, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
-import { brightnessGet, brightnessSet, fileIcon, mixerList, mixerSet, quickAction, quickOutput, quickSet, quickState, quickVolume, type AppVolume, type QuickKey, type QuickState } from "../../lib/bridge";
+import { AppWindow, Bluetooth, ChevronLeft, Eye, EyeOff, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, Pin, SlidersHorizontal, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { brightnessGet, brightnessSet, fileIcon, mixerList, mixerOutput, mixerSet, quickAction, quickInput, quickOutput, quickSet, quickState, quickVolume, type AppVolume, type AudioOutput, type QuickKey, type QuickState } from "../../lib/bridge";
+import { useNook } from "../../store/nook";
 import { spring } from "../../lib/motion";
-import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, Dropdown, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
 /**
@@ -14,11 +15,11 @@ import { tt } from "../../lib/i18n";
 export function ControlPanel() {
   const [state, setState] = useState<QuickState | null>(null);
   const [busy, setBusy] = useState<QuickKey | null>(null);
-  const [outputBusy, setOutputBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Parlaklık yavaş okunur (DDC/CI) — yalnızca açılışta; desteklenmiyorsa kaydırıcı gizlenir
   const [light, setLight] = useState<number | null | undefined>(undefined);
-  const [mixer, setMixer] = useState(false);
+  // Önizlemede ?mixer ile doğrudan uygulama sesi açılır
+  const [mixer, setMixer] = useState(() => import.meta.env.DEV && new URLSearchParams(location.search).has("mixer"));
   const verify = useRef(0);
 
   const refresh = useCallback(() => void quickState().then((s) => s && setState(s)), []);
@@ -67,15 +68,6 @@ export function ControlPanel() {
   const outputs = s?.outputs ?? [];
   const current = outputs.find((o) => o.default) ?? null;
   const nextOutput = outputs.length > 1 ? outputs[(outputs.findIndex((o) => o.default) + 1) % outputs.length] : null;
-  const switchOutput = async () => {
-    if (!nextOutput) return;
-    setOutputBusy(true);
-    setError(null);
-    setState((p) => (p ? { ...p, outputs: p.outputs.map((o) => ({ ...o, default: o.id === nextOutput.id })) } : p));
-    await quickOutput(nextOutput.id).catch((e) => setError(String(e)));
-    setOutputBusy(false);
-    refresh();
-  };
   // Wi-Fi, Bluetooth, ses çıkışı, (ses kaydırıcısı yoksa) Ses + her zaman olan dört düğme
   const toggles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (nextOutput ? 1 : 0) + (vol == null ? 1 : 0) + 5;
   return (
@@ -121,9 +113,8 @@ export function ControlPanel() {
               icon={current.headphone ? Headphones : Speaker}
               on
               color={ACCENT.pink}
-              busy={outputBusy}
-              tip={tt("{0}\nTıkla: {1}", current.name, nextOutput.name)}
-              onClick={() => void switchOutput()}
+              tip={tt("{0}\nTıkla: çıkışı seç", current.name)}
+              onClick={() => setMixer(true)}
             />
           )}
           <Toggle label={s?.dark ? tt("Karanlık") : tt("Aydınlık")} icon={s?.dark ? Moon : Sun} on={!!s?.dark} color={ACCENT.purple} busy={busy === "dark"} onClick={() => toggle("dark", !s?.dark)} />
@@ -158,24 +149,53 @@ const markBrightnessBroken = () => {
   }
 };
 
+/** Sabitlenenler (sabitleme sırasıyla) başta; gizlenenler yalnızca istenince */
+export function arrangeApps(apps: AppVolume[], hidden: string[], pinned: string[], showHidden = false): AppVolume[] {
+  const shown = showHidden ? apps : apps.filter((a) => !hidden.includes(a.key));
+  const pin = pinned.flatMap((k) => shown.filter((a) => a.key === k));
+  return [...pin, ...shown.filter((a) => !pinned.includes(a.key))];
+}
+
 /**
- * Uygulama bazlı ses: her uygulama bir satır (ikon, ad, yatay kaydırıcı, sessiz). Çalanlar üstte.
+ * Uygulama bazlı ses: üstte çıkış ve mikrofon seçimi; her uygulama bir satır (ikon, ad, yatay
+ * kaydırıcı, kendi çıkışı, sessiz). Sabitlenenler üstte, gizlenenler "Gizli"den açılır.
  * Liste 2 sn'de bir tazelenir — yeni açılan uygulama da gelir.
  */
 function AppMixer({ onBack }: { onBack: () => void }) {
   const [apps, setApps] = useState<AppVolume[] | null>(null);
+  const [devices, setDevices] = useState<{ outputs: AudioOutput[]; inputs: AudioOutput[] }>({ outputs: [], inputs: [] });
+  const [showHidden, setShowHidden] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hidden = useNook((s) => s.settings.mixerHidden);
+  const pinned = useNook((s) => s.settings.mixerPinned);
+  const update = useNook((s) => s.updateSettings);
   // Kaydırırken tazeleme değeri geri itmesin
   const dragging = useRef<string | null>(null);
   useEffect(() => {
-    const load = () =>
+    const load = () => {
       void mixerList().then((l) =>
         setApps((prev) => (dragging.current && prev ? l.map((a) => (a.key === dragging.current ? (prev.find((p) => p.key === a.key) ?? a) : a)) : l)),
       );
+      void quickState().then((q) => q && setDevices({ outputs: q.outputs, inputs: q.inputs ?? [] }));
+    };
     load();
     const t = window.setInterval(load, 2000);
     return () => window.clearInterval(t);
   }, []);
   const patchApp = (key: string, p: Partial<AppVolume>) => setApps((l) => l?.map((a) => (a.key === key ? { ...a, ...p } : a)) ?? l);
+  const list = apps ? arrangeApps(apps, hidden, pinned, showHidden) : null;
+  const hiddenCount = apps ? apps.filter((a) => hidden.includes(a.key)).length : 0;
+  const outputs = devices.outputs;
+  const inputs = devices.inputs;
+
+  /** Uygulamanın çıkışı: tıkladıkça Varsayılan → 1. cihaz → 2. cihaz … */
+  const cycleOutput = (a: AppVolume) => {
+    const ring: (string | null)[] = [null, ...outputs.map((o) => o.id)];
+    const next = ring[(ring.indexOf(a.output ?? null) + 1) % ring.length];
+    patchApp(a.key, { output: next });
+    setError(null);
+    void mixerOutput(a.key, next).catch((e) => setError(String(e)));
+  };
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -184,16 +204,40 @@ function AppMixer({ onBack }: { onBack: () => void }) {
           <ChevronLeft size={13} strokeWidth={2.4} />
         </button>
         <span className="text-[11.5px] font-medium text-label-2">{tt("Uygulama sesi")}</span>
+        {hiddenCount > 0 && (
+          <button
+            onClick={() => setShowHidden((v) => !v)}
+            className="ml-auto flex items-center gap-1 rounded-full px-2 py-[2px] text-[10px] font-medium text-label-3 hover:bg-well-hi hover:text-label"
+            title={showHidden ? tt("Gizlenenleri sakla") : tt("Gizlenenleri göster")}
+          >
+            {showHidden ? <EyeOff size={10} strokeWidth={2.4} /> : <Eye size={10} strokeWidth={2.4} />}
+            {tt("Gizli ({0})", hiddenCount)}
+          </button>
+        )}
       </div>
+      {(outputs.length > 1 || inputs.length > 1) && (
+        <div className="mb-1.5 flex gap-1">
+          {outputs.length > 1 && (
+            <DeviceDropdown icon={Speaker} list={outputs} color={ACCENT.pink} onPick={(id) => void quickOutput(id).then(() => setDevices((d) => ({ ...d, outputs: d.outputs.map((o) => ({ ...o, default: o.id === id })) })))} />
+          )}
+          {inputs.length > 1 && (
+            <DeviceDropdown icon={Mic} list={inputs} color={ACCENT.orange} onPick={(id) => void quickInput(id).then(() => setDevices((d) => ({ ...d, inputs: d.inputs.map((o) => ({ ...o, default: o.id === id })) })))} />
+          )}
+        </div>
+      )}
       <div className="-mr-1.5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1.5">
-        {apps === null && <p className="py-4 text-center text-[11px] text-label-3">{tt("Yükleniyor…")}</p>}
-        {apps?.length === 0 && <p className="py-4 text-center text-[11px] text-label-3">{tt("Şu an ses çıkaran bir uygulama yok")}</p>}
-        {apps?.map((a) => {
+        {list === null && <p className="py-4 text-center text-[11px] text-label-3">{tt("Yükleniyor…")}</p>}
+        {list?.length === 0 && <p className="py-4 text-center text-[11px] text-label-3">{tt("Şu an ses çıkaran bir uygulama yok")}</p>}
+        {list?.map((a) => {
           const pct = Math.round((a.muted ? 0 : a.volume) * 100);
+          const isPinned = pinned.includes(a.key);
+          const isHidden = hidden.includes(a.key);
+          const own = a.output ? outputs.find((o) => o.id === a.output) : null;
           return (
-            <div key={a.key} className="flex items-center gap-2 rounded-[12px] bg-well px-2 py-1.5">
+            <div key={a.key} className={`group flex items-center gap-1.5 rounded-[12px] bg-well px-2 py-1.5 ${isHidden ? "opacity-50" : ""}`}>
               <AppIcon path={a.path} />
-              <span className="w-[74px] shrink-0 truncate text-[11px] font-medium text-label" title={a.name}>
+              <span className="w-[66px] shrink-0 truncate text-[11px] font-medium text-label" title={a.name}>
+                {isPinned && <Pin size={8} strokeWidth={3} className="mr-0.5 inline align-[-1px]" style={{ color: tintText(ACCENT.yellow) }} />}
                 {a.name}
               </span>
               <input
@@ -211,7 +255,32 @@ function AppMixer({ onBack }: { onBack: () => void }) {
                 className="min-w-0 flex-1"
                 style={{ accentColor: ACCENT.pink }}
               />
-              <span className="w-[24px] shrink-0 text-right text-[10px] tabular-nums text-label-3">{pct}</span>
+              {/* Yüzde; üzerine gelince sabitle / gizle */}
+              <div className="relative h-[22px] w-[40px] shrink-0">
+                <span className="absolute inset-0 flex items-center justify-end text-[10px] tabular-nums text-label-3 transition-opacity group-hover:opacity-0">{pct}</span>
+                <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <SmallButton
+                    label={isPinned ? tt("Sabitlemeyi kaldır") : tt("Üste sabitle")}
+                    onClick={() => update({ mixerPinned: isPinned ? pinned.filter((k) => k !== a.key) : [...pinned, a.key] })}
+                    color={isPinned ? ACCENT.yellow : undefined}
+                  >
+                    <Pin size={10} strokeWidth={2.4} />
+                  </SmallButton>
+                  <SmallButton label={isHidden ? tt("Listede göster") : tt("Listeden gizle")} onClick={() => update({ mixerHidden: isHidden ? hidden.filter((k) => k !== a.key) : [...hidden, a.key] })}>
+                    {isHidden ? <Eye size={10} strokeWidth={2.4} /> : <EyeOff size={10} strokeWidth={2.4} />}
+                  </SmallButton>
+                </div>
+              </div>
+              {a.key !== "system" && outputs.length > 1 && (
+                <button
+                  onClick={() => cycleOutput(a)}
+                  title={tt("Çıkış: {0}\nTıkla: sıradaki", own ? own.name : tt("Varsayılan"))}
+                  className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full hover:bg-well-hi"
+                  style={{ color: own ? tintText(ACCENT.purple) : "var(--color-label-3)", background: own ? tintBg(ACCENT.purple, 16) : undefined }}
+                >
+                  {own?.headphone ? <Headphones size={11} /> : <Speaker size={11} />}
+                </button>
+              )}
               <button
                 onClick={() => {
                   patchApp(a.key, { muted: !a.muted });
@@ -226,6 +295,28 @@ function AppMixer({ onBack }: { onBack: () => void }) {
             </div>
           );
         })}
+      </div>
+      {error && <p className="truncate pt-1 text-[10px] text-red/90" title={error}>{error}</p>}
+    </div>
+  );
+}
+
+function SmallButton({ label, onClick, color, children }: { label: string; onClick: () => void; color?: string; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} title={label} aria-label={label} className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-label-3 hover:bg-white/10 hover:text-label" style={color ? { color: tintText(color) } : undefined}>
+      {children}
+    </button>
+  );
+}
+
+/** Varsayılan çıkış / mikrofon seçimi (açılır liste adanın içinde açılır) */
+function DeviceDropdown({ icon: Icon, list, color, onPick }: { icon: LucideIcon; list: AudioOutput[]; color: string; onPick: (id: string) => void }) {
+  const current = list.find((o) => o.default)?.id ?? list[0]?.id ?? "";
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-well pl-2" title={list.find((o) => o.id === current)?.name}>
+      <Icon size={11} strokeWidth={2.4} className="shrink-0" style={{ color: tintText(color) }} />
+      <div className="min-w-0 flex-1">
+        <Dropdown options={list.map((o) => ({ id: o.id, label: shortName(o.name) }))} value={current} onChange={onPick} color={color} maxWidth={130} />
       </div>
     </div>
   );

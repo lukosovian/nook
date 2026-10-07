@@ -321,7 +321,7 @@ export function useDailySummaryOpen() {
     const tryOpen = () => {
       const s = useNook.getState();
       // İlk kurulumda tanıtım var; oyun/alarm sırasında araya girme — ilk üzerine gelişte açılır
-      if (done || s.intro || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes) return;
+      if (done || s.intro || s.gate || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes) return;
       // Güncellemeden sonra önce yama notları; kapanınca sıra özete gelir
       if (notesDue()) {
         void openNotes();
@@ -340,6 +340,11 @@ export function useDailySummaryOpen() {
       if (prev.intro && !st.intro) {
         window.clearTimeout(wait);
         wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);
+      }
+      // Açılış kilidi açıldı: günün karşılaması şimdi
+      if (prev.gate && !st.gate) {
+        window.clearTimeout(wait);
+        wait = window.setTimeout(tryOpen, 1200);
       }
       if (prev.notes && !st.notes) {
         window.clearTimeout(wait);

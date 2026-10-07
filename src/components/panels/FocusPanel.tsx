@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Pause, Play, SkipForward, Square } from "lucide-react";
+import { Flag, Pause, Play, RotateCcw, SkipForward, Square } from "lucide-react";
+import { swElapsed, swLap, swReset, swText, swToggle } from "../../lib/stopwatch";
 import { mmss, nextPhase, pauseFocus, PHASE_LABEL, remaining, resumeFocus, startFocus, stopFocus } from "../../lib/focus";
 import { spring } from "../../lib/motion";
 import { dayKey, useNook } from "../../store/nook";
@@ -19,8 +20,72 @@ const WATER = [
   { id: 90, label: tt("90 dk") },
 ];
 
-/** Odak: solda büyük halka ve kalan süre, sağda kontroller ve mola hatırlatıcıları. */
+const MODES = [
+  { id: "focus" as const, label: tt("Pomodoro") },
+  { id: "stopwatch" as const, label: tt("Kronometre") },
+];
+
+/** Odak: Pomodoro ya da kronometre. Solda büyük halka, sağda kontroller. */
 export function FocusPanel() {
+  const focus = useNook((s) => s.focus);
+  const stopwatch = useNook((s) => s.stopwatch);
+  // Kronometre çalışıyor, Pomodoro yoksa doğrudan kronometre açılır
+  const [mode, setMode] = useState<"focus" | "stopwatch">(() => (!focus && stopwatch ? "stopwatch" : "focus"));
+  return mode === "focus" ? <PomodoroView mode={mode} setMode={setMode} /> : <StopwatchView mode={mode} setMode={setMode} />;
+}
+
+function ModeSwitch({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode: (m: "focus" | "stopwatch") => void }) {
+  return <Segmented id="focus-mode" options={MODES} value={mode} onChange={setMode} color={mode === "focus" ? ACCENT.red : ACCENT.purple} />;
+}
+
+function StopwatchView({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode: (m: "focus" | "stopwatch") => void }) {
+  const sw = useNook((s) => s.stopwatch);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 100);
+    return () => window.clearInterval(t);
+  }, []);
+  const color = ACCENT.purple;
+  const ms = swElapsed(sw, now);
+  const running = !!sw && sw.startedAt !== null;
+  const laps = sw?.laps ?? [];
+  return (
+    <div className="flex h-full gap-3">
+      <div className="flex w-[124px] shrink-0 flex-col items-center justify-center gap-2">
+        <ModeSwitch mode={mode} setMode={setMode} />
+        {/* Halka her dakika bir tur atar */}
+        <Ring p={(ms % 60_000) / 60_000} color={color}>
+          <span className={`font-medium leading-none tabular-nums tracking-tight text-label ${ms >= 3600_000 ? "text-[17px]" : "text-[21px]"}`}>{swText(ms)}</span>
+          <span className="mt-1 text-[10.5px] font-medium" style={{ color: tintText(color) }}>
+            {sw ? (running ? tt("Çalışıyor") : tt("Duraklatıldı")) : tt("Hazır")}
+          </span>
+        </Ring>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex gap-1.5">
+          <Big color={color} icon={running ? Pause : Play} label={!sw ? tt("Başlat") : running ? tt("Duraklat") : tt("Devam")} onClick={swToggle} />
+          {running && <Small icon={Flag} label={tt("Tur")} onClick={swLap} />}
+          {sw && <Small icon={RotateCcw} label={tt("Sıfırla")} onClick={swReset} />}
+        </div>
+        <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
+          {!laps.length && <p className="px-1 pt-1 text-[10.5px] text-label-3">{tt("Çalışırken bayrağa basınca tur alınır")}</p>}
+          {laps.map((t, i) => {
+            const split = t - (laps[i + 1] ?? 0);
+            return (
+              <div key={laps.length - i} className="flex items-center justify-between rounded-[8px] px-2 py-[3px] text-[11px] tabular-nums odd:bg-well">
+                <span className="text-label-3">{tt("Tur {0}", laps.length - i)}</span>
+                <span className="text-label-2">+{swText(split)}</span>
+                <span className="text-label">{swText(t)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PomodoroView({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode: (m: "focus" | "stopwatch") => void }) {
   const focus = useNook((s) => s.focus);
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
@@ -40,7 +105,8 @@ export function FocusPanel() {
 
   return (
     <div className="flex h-full gap-3">
-      <div className="flex w-[118px] shrink-0 flex-col items-center justify-center gap-2">
+      <div className="flex w-[124px] shrink-0 flex-col items-center justify-center gap-2">
+        <ModeSwitch mode={mode} setMode={setMode} />
         <Ring p={p} color={color}>
           <span className="text-[24px] font-medium leading-none tabular-nums tracking-tight text-label">{mmss(left)}</span>
           <span className="mt-1 text-[10.5px] font-medium" style={{ color: tintText(color) }}>

@@ -28,6 +28,9 @@ import {
   Sun,
   Target,
   Video,
+  Plus,
+  Volume2,
+  VolumeX,
   WifiOff,
   type LucideIcon,
 } from "lucide-react";
@@ -39,11 +42,13 @@ import { toggleBig } from "../../lib/big";
 import { islandDrag } from "../../lib/bridge";
 import { easeOut } from "../../lib/motion";
 import { SKY_LABEL, type Sky } from "../../lib/weather";
-import { isSleeping, SULK_BELOW, useNook } from "../../store/nook";
+import { isLive, isSleeping, SULK_BELOW, useNook } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { ek, useNookName } from "../../lib/look";
 import { tt, locale } from "../../lib/i18n";
-import { PROFILES } from "../../lib/profiles";
+import { allProfiles, MAX_PROFILES, newProfile, userProfiles } from "../../lib/profiles";
+import { SoundBody } from "../SoundCard";
+import { lineAt, lyricOffset, useLyrics } from "../../lib/lyrics";
 
 const CARD_SPRING = { type: "spring", stiffness: 340, damping: 32 } as const;
 
@@ -75,9 +80,17 @@ export function Frame({ view, title, children }: { view: View; title?: string; c
         transition={CARD_SPRING}
       >
         <Card className="relative h-full w-full overflow-hidden">
-          <div className="absolute inset-0" style={{ zoom: z }}>
-            {lookTab ? <NameTag /> : <Activity view={view} />}
+          <div className="absolute inset-x-0 top-0" style={{ zoom: z, bottom: ex.soundH }}>
+            {lookTab ? <NameTag /> : view === "module" && ex.soundH > 0 ? null : <Activity view={view} />}
           </div>
+          {/* Büyük adada ses ayarları Nook'un altında (yandaki kart pencereden taşar) */}
+          {ex.soundH > 0 && (
+            <div className="absolute inset-x-0 bottom-0 p-2" style={{ height: ex.soundH }}>
+              <div className="rounded-[22px] bg-black/60 p-3" style={{ zoom: z, height: (ex.soundH - 16) / z }}>
+                <SoundBody />
+              </div>
+            </div>
+          )}
         </Card>
       </motion.div>
 
@@ -147,18 +160,32 @@ function HeaderNav({ title }: { title?: string }) {
   );
 }
 
-/** Ana sayfa profili: Hepsi · İş · Oyun · Eğlence */
+/** Ana sayfa profili: Hepsi · İş · Oyun · Eğlence · kendi profillerin; + yeni profil */
 function ProfilePills() {
   const profile = useNook((s) => s.settings.homeProfile);
+  const custom = useNook((s) => s.settings.profiles);
+  const add = () => {
+    const s = useNook.getState();
+    const list = userProfiles(s.settings.profiles);
+    const p = newProfile(list);
+    s.updateSettings({ profiles: [...list, p], homeProfile: p.id });
+    // Yeni profile hangi bölümlerin gireceği seçilsin
+    s.setHomeEdit(true);
+  };
   return (
     <div className="ml-2 flex items-center gap-0.5 rounded-full bg-white/[0.04] p-[2px]">
-      {PROFILES.map((p) => {
+      {userProfiles(custom).length < MAX_PROFILES && (
+        <button onClick={add} title={tt("Yeni profil")} className="order-last flex h-[18px] w-[18px] items-center justify-center rounded-full text-label-3 hover:bg-white/[0.08] hover:text-label">
+          <Plus size={10} strokeWidth={2.8} />
+        </button>
+      )}
+      {allProfiles(custom).map((p) => {
         const on = p.id === profile;
         return (
           <button
             key={p.id}
             onClick={() => useNook.getState().updateSettings({ homeProfile: p.id })}
-            className={`relative rounded-full px-2 py-[2px] text-[10px] font-medium transition-colors ${on ? "" : "text-label-3 hover:text-label-2"}`}
+            className={`relative max-w-[80px] truncate rounded-full px-2 py-[2px] text-[10px] font-medium transition-colors ${on ? "" : "text-label-3 hover:text-label-2"}`}
             style={on ? { color: tintText(p.color) } : undefined}
           >
             {on && <motion.span layoutId="hdr-profile" className="absolute inset-0 rounded-full" style={{ background: tintBg(p.color, 20) }} transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
@@ -232,9 +259,44 @@ function StatusBar() {
         </span>
       )}
       <span className="text-label-2">{now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
+      <LiveBadge />
+      <SoundToggle />
       <MoveHandle />
       <BigToggle />
     </div>
+  );
+}
+
+/** Yayın maskesi açıkken kırmızı CANLI rozeti; tıklayınca maske bu yayın için kapanır */
+function LiveBadge() {
+  const live = useNook(isLive);
+  const source = useNook((s) => s.liveAuto.source);
+  if (!live) return null;
+  return (
+    <button
+      onClick={() => useNook.getState().setLive(null, false)}
+      title={tt("Yayın maskesi açık{0} · tıkla: kapat", source ? ` (${source})` : "")}
+      className="-my-1 flex items-center gap-1 rounded-full px-2 py-[2px] text-[9.5px] font-bold tracking-wider"
+      style={{ background: tintBg(ACCENT.red, 22), color: tintText(ACCENT.red) }}
+    >
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: ACCENT.red }} />
+      {tt("CANLI")}
+    </button>
+  );
+}
+
+/** Ses kartını (adanın yanındaki, büyük adada Nook'un altındaki) aç / kapat */
+function SoundToggle() {
+  const on = useNook((s) => s.settings.soundCard);
+  return (
+    <button
+      onClick={() => useNook.getState().updateSettings({ soundCard: !on })}
+      title={on ? tt("Ses kartını kapat") : tt("Ses kartını aç")}
+      className="-my-1 flex h-[22px] w-[22px] items-center justify-center rounded-full transition-colors hover:bg-white/[0.08]"
+      style={{ color: on ? tintText(ACCENT.pink) : "var(--color-label-3)", background: on ? tintBg(ACCENT.pink, 14) : undefined }}
+    >
+      {on ? <Volume2 size={11} strokeWidth={2.4} /> : <VolumeX size={11} strokeWidth={2.4} />}
+    </button>
   );
 }
 
@@ -313,6 +375,7 @@ function Activity({ view }: { view: View }) {
   const alarms = useNook((s) => s.alarms);
   const focus = useNook((s) => s.focus);
   const online = useNook((s) => s.online);
+  const { lyrics, key: lyricKey } = useLyrics();
   // Odak sayacı ve şarkının ilerlemesi canlı aksın
   const [now, setNow] = useState(Date.now());
   const live = !!focus || !!media?.playing;
@@ -342,7 +405,9 @@ function Activity({ view }: { view: View }) {
   }
   if (media?.playing) {
     const pos = Math.min(media.durationMs || Infinity, media.positionMs + (performance.now() - media.at));
-    items.push({ id: "music", icon: Music, title: media.title, sub: media.artist || tt("Çalıyor"), progress: media.durationMs ? pos / media.durationMs : undefined, color: ACCENT.pink });
+    // Sözler açıksa sanatçı yerine o anki satır
+    const line = lyrics?.kind === "synced" ? lyrics.lines[lineAt(lyrics.lines, pos + lyricOffset(lyricKey))]?.text : undefined;
+    items.push({ id: "music", icon: Music, title: media.title, sub: line || media.artist || tt("Çalıyor"), progress: media.durationMs ? pos / media.durationMs : undefined, color: ACCENT.pink });
   }
   const cam = privacy.camera[0];
   const mic = privacy.mic[0];

@@ -16,7 +16,7 @@ import { setInteractive } from "../../lib/bridge";
 import { FACE } from "../../lib/layout";
 import { spring } from "../../lib/motion";
 import { DEFAULT_LOOK, radii, roundBody, type BodyShape, type Look } from "../../lib/look";
-import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, SPAN, useBodyImage } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, lensOn, SPAN, useBodyImage } from "../../lib/nook3d";
 import { useNook, type Expression, type Status } from "../../store/nook";
 import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
@@ -55,6 +55,8 @@ const IMG_RES = 512;
 /** Bütün yüzün hareketleri. */
 const BODY: Record<Expression, TargetAndTransition> = {
   idle: { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 },
+  // Yayında: mikrofona konuşurken hafifçe sallanır
+  live: { x: 0, scaleX: 1, scaleY: 1, y: [0, -0.8, 0], rotate: [0, -3, 0, 3, 0], transition: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } },
   hungry: { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 },
   chewing: { x: 0, rotate: 0, scaleX: [1, 1.1, 0.96, 1.05, 1], scaleY: [1, 0.86, 1.04, 0.96, 1], y: 0, transition: { duration: 0.65 } },
   thinking: { x: 0, rotate: [0, -4, 0], y: [0, -0.8, 0], transition: { duration: 2.4, repeat: Infinity, ease: "easeInOut" } },
@@ -233,7 +235,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
   const solid = !!img && !isBox;
   /** Gözlük resmin içinde sabit: gözler camın dışına kaymasın diye az oynar */
-  const glassesOn = solid && wear.glasses !== "none";
+  const glassesOn = solid && lensOn(wear);
   // 3B gövdede gözler biçime göre yerleşir (kalpte yukarıda, üçgende aşağıda)
   const anchor = ANCHORS[wear.shape];
   const eyeY = solid ? -anchor.y * (FACE / 2) : 1.2;
@@ -372,7 +374,8 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
           <motion.div className="absolute inset-0" style={{ y: eyesY }}>
             <motion.div className="absolute inset-0" initial={false} animate={damp(EYE_OFFSET[expression] ?? { x: 0, y: 0 }, glassesOn ? 0.25 : 1)} transition={spring.eye}>
               <motion.div className="absolute inset-0" initial={false} animate={{ opacity: wave || hideEyes ? 0 : 1 }} transition={{ duration: 0.15 }}>
-                <Eye shape={left} shine={shineL} x={leftX} scaleX={leftSX} scaleY={scaleYL} />
+                {/* Göz bandı sol gözü örter */}
+                {!(solid && wear.glasses === "eyepatch") && <Eye shape={left} shine={shineL} x={leftX} scaleX={leftSX} scaleY={scaleYL} />}
                 <Eye shape={right} shine={shineR} x={rightX} scaleX={rightSX} scaleY={scaleYR} />
               </motion.div>
             </motion.div>

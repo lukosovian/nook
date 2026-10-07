@@ -53,11 +53,11 @@ export function Pirate() {
         </Layer>
         <PirateClock />
         {/* Dümenin başında, korsan şapkalı ve göz bantlı kaptan */}
-        <Actor x={1010} y={790} size={108} look={look({ shape: "egg" })} color="#FF3B4A" expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(12))} actKey={k} front={<><Tricorn /><EyePatch /></>} />
+        <Actor x={1010} y={712} size={104} look={look({ shape: "egg", head: "pirate", glasses: "eyepatch" })} color="#FF3B4A" expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(12))} actKey={k}  />
         <Wheel spin={beat.i === 0} k={k} />
         {/* Hazine sandığına kafa üstü dalmış, altın saçan */}
         <motion.div className="absolute" style={{ left: 650, top: 640, width: 0, height: 0 }} animate={{ rotate: [176, 184, 176] }} transition={{ duration: 0.8, repeat: Infinity }}>
-          <Actor x={0} y={8} size={96} look={look({ shape: "bean" })} color="#FFD21F" expression="happy" />
+          <Actor morph={beat.n[1]} morphDelay={600} x={0} y={8} size={96} look={look({ shape: "bean" })} color="#FFD21F" expression="happy" />
         </motion.div>
         <Chest />
         <Coins k={k} burst={beat.i === 1} />
@@ -73,27 +73,6 @@ export function Pirate() {
         <Actor x={1236} y={785} size={78} look={look({ shape: "cat" })} color="#9B7BFF" expression={beat.i === 3 ? "dizzy" : "focused"} move={{ animate: { rotate: [-8, 8, -8], x: [-4, 4, -4] }, transition: { duration: 1.6, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 3, { animate: { rotate: [0, 30, -28, 14, 0] }, transition: { duration: 1.8 } })} actKey={k} front={<WoodSword />} />
       </motion.div>
     </Stage>
-  );
-}
-
-function Tricorn() {
-  return (
-    <g>
-      <path d="M-6 0 Q 12 -16 30 0 Q 22 -3 12 -2 Q 2 -3 -6 0 Z" fill="#141418" />
-      <path d="M-6 0 Q 12 4 30 0 Q 12 -1 -6 0 Z" fill="#e0b84a" />
-      <circle cx="12" cy="-7" r="2.2" fill="#f1ead8" />
-      <circle cx="11.2" cy="-7.4" r="0.5" fill="#141418" />
-      <circle cx="12.8" cy="-7.4" r="0.5" fill="#141418" />
-    </g>
-  );
-}
-
-function EyePatch() {
-  return (
-    <g>
-      <path d="M0 3 L24 14" stroke="#141418" strokeWidth="0.9" />
-      <ellipse cx="8" cy="11" rx="3.6" ry="3.2" fill="#141418" />
-    </g>
   );
 }
 
@@ -232,9 +211,9 @@ export function Lab() {
 
       <LabClock />
       {/* Güvenlik gözlüklü, tüpten tüpe damlatan */}
-      <Actor x={540} y={690} size={100} look={look({ shape: "sphere" })} color="#F4F4F6" expression={beat.i === 0 ? "surprised" : "focused"} move={breathe(3)} act={on(beat, 0, hop(16))} actKey={k} front={<><Goggles /><Pipette k={k} change={beat.i === 0} /></>} />
+      <Actor x={540} y={690} size={100} look={look({ shape: "sphere", glasses: "goggles" })} color="#F4F4F6" expression={beat.i === 0 ? "surprised" : "focused"} move={breathe(3)} act={on(beat, 0, hop(16))} actKey={k} front={<><Pipette k={k} change={beat.i === 0} /></>} />
       {/* Deney patlamış: kurum, elektrik çarpmış diken diken tepe, boş bakış */}
-      <Actor x={860} y={800} size={100} look={look({ shape: "blob" })} color="#FF8A1F" expression="dizzy" move={{ animate: { x: [-1, 1, -1] }, transition: { duration: 0.12, repeat: Infinity } }} act={on(beat, 1, hop(14))} actKey={k} back={<Frizz />} front={<Soot />} />
+      <Actor morph={beat.n[1]} morphDelay={150} x={860} y={800} size={100} look={look({ shape: "blob" })} color="#FF8A1F" expression="dizzy" move={{ animate: { rotate: [-5, 5, -5], x: [-3, 3, -3] }, transition: { duration: 2.4, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 1, hop(14))} actKey={k} back={<Frizz />} front={<Soot />} />
       {beat.i === 1 && (
         <motion.span key={`pf${k}`} className="absolute rounded-full" style={{ left: 790, top: 600, width: 150, height: 150, background: "radial-gradient(circle, rgba(60,60,70,0.8), rgba(60,60,70,0))" }} initial={{ scale: 0.3, opacity: 1 }} animate={{ scale: 1.8, opacity: 0, y: -80 }} transition={{ duration: 1.6 }} />
       )}
@@ -250,16 +229,6 @@ export function Lab() {
       {/* Panoya tebeşirle formül yazan */}
       <Actor x={1480} y={800} size={100} look={look({ shape: "egg", glasses: "round" })} color="#9B7BFF" flip expression="focused" move={breathe(3.2)} act={on(beat, 3, { animate: { x: [0, -20, 10, 0] }, transition: { duration: 2.4 } })} actKey={k} front={<Chalk k={beat.i === 3 ? k : 0} />} />
     </Stage>
-  );
-}
-
-function Goggles() {
-  return (
-    <g>
-      <path d="M0 8 Q 12 4 24 8" stroke="#2b2b33" strokeWidth="1.6" fill="none" />
-      <rect x="2" y="6" width="9.4" height="8" rx="3.6" fill="rgba(180,255,210,0.35)" stroke="#ffd21f" strokeWidth="1.6" />
-      <rect x="12.6" y="6" width="9.4" height="8" rx="3.6" fill="rgba(180,255,210,0.35)" stroke="#ffd21f" strokeWidth="1.6" />
-    </g>
   );
 }
 
@@ -379,7 +348,7 @@ export function Lavender() {
       ))}
       {/* Lavanta buketiyle kelebek kovalayan */}
       <motion.div className="absolute inset-0" animate={{ x: [0, 220, 220, 0, 0] }} transition={{ duration: 14, times: [0, 0.4, 0.5, 0.9, 1], repeat: Infinity, ease: "easeInOut" }}>
-        <Actor x={300} y={830} size={92} look={look({ shape: "flower" })} color="#FFD21F" expression={beat.i === 1 ? "love" : "happy"} move={{ animate: { y: [0, -10, 0] }, transition: { duration: 0.6, repeat: Infinity } }} act={on(beat, 1, hop(30))} actKey={k} front={<Bouquet />} />
+        <Actor morph={beat.n[1]} morphDelay={500} x={300} y={830} size={92} look={look({ shape: "flower" })} color="#FFD21F" expression={beat.i === 1 ? "love" : "happy"} move={{ animate: { y: [0, -10, 0] }, transition: { duration: 0.6, repeat: Infinity } }} act={on(beat, 1, hop(30))} actKey={k} front={<Bouquet />} />
       </motion.div>
       {/* Korkuluğun şapkasına konmuş, etrafı izleyen */}
       <Actor x={700} y={372} size={70} look={look({ shape: "sphere", texture: "plush" })} color="#2FD4C0" flip={beat.i === 3} expression={beat.i === 3 ? "surprised" : "idle"} move={sway(3, 4)} act={on(beat, 3, hop(12))} actKey={k} />
@@ -506,7 +475,7 @@ export function Bunker() {
 
       <BunkerClock />
       {/* Askeri miğferli, dev açacakla fasulye konservesi açan */}
-      <Actor x={420} y={800} size={104} look={look({ shape: "sphere" })} color="#C9F23A" expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(16))} actKey={k} front={<><Helmet /><CanOpener k={k} pop={beat.i === 0} /></>} />
+      <Actor x={420} y={800} size={104} look={look({ shape: "sphere", head: "helmet" })} color="#C9F23A" expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(16))} actKey={k} front={<><CanOpener k={k} pop={beat.i === 0} /></>} />
       {/* Telsizin başında kulaklıkla mors dinleyen */}
       <Actor x={760} y={690} size={92} look={look({ shape: "egg", head: "headphones" })} color="#FF6A3D" expression={beat.i === 1 ? "surprised" : "focused"} move={breathe(3.4)} act={on(beat, 1, hop(12))} actKey={k} front={<><Hand x={-2} y={4} /><Hand x={28} y={20} /></>} />
       <div className="absolute flex gap-2" style={{ left: 700, top: 470 }}>
@@ -517,18 +486,8 @@ export function Bunker() {
       {/* Ranzanın üst katında bacaklarını sallandırıp çizgi roman okuyan */}
       <Actor x={1220} y={472} size={90} look={look({ shape: "bean", texture: "plush" })} color="#2B8CFF" expression={beat.i === 2 ? "giggle" : "happy"} move={breathe(3.6, 2)} act={on(beat, 2, { animate: { rotate: [0, -8, 8, 0] }, transition: { duration: 1.2 } })} actKey={k} back={<Legs />} front={<Comic />} />
       {/* Jeneratörün kolunu çevirip ışığı yanık tutan */}
-      <Actor x={1370} y={800} size={96} look={look({ shape: "cube", head: "cap" })} color="#FFD21F" flip expression={dim ? "dizzy" : "focused"} move={breathe(2.4)} front={<Crank stop={dim} />} />
+      <Actor morph={beat.n[3]} morphDelay={900} x={1370} y={800} size={96} look={look({ shape: "cube", head: "cap" })} color="#FFD21F" flip expression={dim ? "dizzy" : "focused"} move={breathe(2.4)} front={<Crank stop={dim} />} />
     </Stage>
-  );
-}
-
-function Helmet() {
-  return (
-    <g>
-      <path d="M-1 4 Q -1 -11 12 -11 Q 25 -11 25 4 Z" fill="#4a5a32" />
-      <path d="M-4 4 h32 v2 h-32 Z" fill="#3a4a26" />
-      <path d="M4 -6 q8 -4 16 0" stroke="#6b7a4a" strokeWidth="1" fill="none" />
-    </g>
   );
 }
 
@@ -634,7 +593,7 @@ export function Ferris() {
             <div key={i} className="absolute" style={{ left: 0, top: 0, width: 0, height: 0, transform: `rotate(${(i / gondolas) * 360}deg) translateY(${-R}px) rotate(${-(i / gondolas) * 360}deg)` }}>
               <motion.div className="absolute" style={{ left: 0, top: 0, width: 0, height: 0 }} animate={{ rotate: -360 }} transition={{ duration: SPIN, repeat: Infinity, ease: "linear" }}>
                 <motion.div className="absolute" style={{ left: -70, top: 0, width: 140, height: 130, originX: 0.5, originY: 0 }} animate={{ rotate: [-3, 3, -3] }} transition={{ duration: 3 + (i % 3), repeat: Infinity, ease: "easeInOut" }}>
-                  <Gondola color={colors[i % colors.length]}>{RIDERS[i]?.({ beat: beat.i, k })}</Gondola>
+                  <Gondola color={colors[i % colors.length]}>{RIDERS[i]?.({ beat: beat.i, k, n: beat.n })}</Gondola>
                 </motion.div>
               </motion.div>
             </div>
@@ -647,7 +606,7 @@ export function Ferris() {
   );
 }
 
-type Ride = (p: { beat: number; k: number }) => React.JSX.Element;
+type Ride = (p: { beat: number; k: number; n: number[] }) => React.JSX.Element;
 
 /** Kabinlerin yolcuları (kabin içi koordinat: 140×130, taban y≈112) */
 const RIDERS: Record<number, Ride> = {
@@ -659,7 +618,7 @@ const RIDERS: Record<number, Ride> = {
     </>
   ),
   // Dev pamuk şekeri yüzüne gözüne bulaştırarak yiyen
-  3: ({ beat, k }) => <Actor x={70} y={112} size={64} look={look({ shape: "cat" })} color="#2FD4C0" expression={beat === 1 ? "love" : "happy"} move={breathe(2.4)} act={beat === 1 ? hop(8) : null} actKey={k} front={<CottonCandy />} />,
+  3: ({ beat, k, n }) => <Actor morph={n[1]} morphDelay={600} x={70} y={112} size={64} look={look({ shape: "cat" })} color="#2FD4C0" expression={beat === 1 ? "love" : "happy"} move={breathe(2.4)} act={beat === 1 ? hop(8) : null} actKey={k} front={<CottonCandy />} />,
   // Yükseklikten korkmuş, gözlerini kapatıp tabana büzülmüş
   6: ({ beat, k }) => <Actor x={70} y={114} size={56} look={look({ shape: "egg" })} color="#9B7BFF" expression="shy" move={{ animate: { x: [-1, 1, -1], scaleY: [0.86, 0.9, 0.86] }, transition: { duration: 0.3, repeat: Infinity } }} act={beat === 2 ? { animate: { y: [0, -4, 0, -4, 0] }, transition: { duration: 0.8 } } : null} actKey={k} front={<><Hand x={8} y={11} /><Hand x={16} y={11} /></>} />,
   // Kabinin çatısında kollarını açıp rüzgârın tadını çıkaran
@@ -797,7 +756,7 @@ export function Sketchbook() {
 
       <SketchClock />
       {/* Bereli, dev kurşun kalemi sürükleyen karalamacı */}
-      <Actor x={700} y={600} size={96} look={look({ shape: "sphere" })} color="#F4F4F6" expression={beat.i === 0 ? "happy" : "focused"} move={{ animate: { x: [0, 8, 0], rotate: [-4, 4, -4] }, transition: { duration: 1.4, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 0, { animate: { rotate: [0, -10, -10, 0] }, transition: { duration: 2 } })} actKey={k} front={<><NavyBeret /><BigPencil blow={beat.i === 0} k={k} /></>} />
+      <Actor x={700} y={600} size={96} look={look({ shape: "sphere", head: "beret" })} color="#F4F4F6" expression={beat.i === 0 ? "happy" : "focused"} move={{ animate: { x: [0, 8, 0], rotate: [-4, 4, -4] }, transition: { duration: 1.4, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 0, { animate: { rotate: [0, -10, -10, 0] }, transition: { duration: 2 } })} actKey={k} front={<><BigPencil blow={beat.i === 0} k={k} /></>} />
       {/* Silgisinin üstüne abanıp ileri geri kayan silgi hamalı */}
       <motion.div className="absolute inset-0" animate={{ x: [0, 70, 0] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}>
         <Actor x={900} y={650} size={88} look={look({ shape: "bean" })} color="#FF6A3D" expression={beat.i === 1 ? "surprised" : "focused"} move={{ animate: { rotate: [12, 18, 12] }, transition: { duration: 0.6, repeat: Infinity } }} front={<Eraser />} />
@@ -808,7 +767,7 @@ export function Sketchbook() {
         ))}
       {/* Fırçayla hokkanın üstünden atlayan, yüzü mürekkep içinde */}
       <motion.div key={`vault${beat.i === 2 ? k : 0}`} className="absolute inset-0" animate={beat.i === 2 ? { x: [0, 110, 240, 240, 0], y: [0, -200, 0, 0, 0] } : { x: 0 }} transition={{ duration: 4, times: [0, 0.18, 0.36, 0.7, 1], ease: "easeInOut" }}>
-        <Actor x={1080} y={820} size={86} look={look({ shape: "cloud" })} color="#00B8FF" expression={beat.i === 2 ? "surprised" : "focused"} move={breathe(2.6)} front={<><InkSplat /><Brush /></>} />
+        <Actor morph={beat.n[2]} morphDelay={1400} x={1080} y={820} size={86} look={look({ shape: "cloud" })} color="#00B8FF" expression={beat.i === 2 ? "surprised" : "focused"} move={breathe(2.6)} front={<><InkSplat /><Brush /></>} />
       </motion.div>
       {/* Hamur silginin üstünde elmayla poz veren model */}
       <Actor x={190} y={770} size={90} look={look({ shape: "egg", neck: "bowtie" })} color="#FFE3A8" expression="focused" act={beat.i === 3 ? { animate: { rotate: [0, 12, -10, 4, 0] }, transition: { duration: 1.6 } } : null} actKey={k} front={<Apple />} />
@@ -817,15 +776,6 @@ export function Sketchbook() {
         <Actor x={1080} y={442} size={78} look={look({ shape: "triangle", glasses: "round" })} color="#16C47F" expression="focused" move={{ animate: { rotate: [-7, 7, -7] }, transition: { duration: 1.4, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 4, hop(10))} actKey={k} front={<><Hand x={-10} y={10} /><Hand x={34} y={10} /></>} />
       </motion.div>
     </Stage>
-  );
-}
-
-function NavyBeret() {
-  return (
-    <g>
-      <ellipse cx="9" cy="-2" rx="13" ry="5" fill="#1e2a5a" transform="rotate(-14 9 -2)" />
-      <circle cx="4" cy="-6.6" r="1.4" fill="#1e2a5a" />
-    </g>
   );
 }
 

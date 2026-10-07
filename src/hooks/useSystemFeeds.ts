@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { pauseFrames, setFrameRate } from "../lib/frameCap";
 import {
   applySettings,
+  clipboardClear,
   clipboardClearIf,
+  clipboardPrune,
   consumeSelfWrite,
   EVENTS,
   inspectPaths,
@@ -20,6 +22,9 @@ import {
   type StatsPayload,
   type SysEvent,
   type VolumePayload,
+  type ClipPayload,
+  type ClipImagePayload,
+  type ClipFilesPayload,
 } from "../lib/bridge";
 import { looksForeign, translateToUser } from "../lib/assist";
 import { localizeEvent } from "../lib/sysText";
@@ -27,7 +32,7 @@ import { note } from "../lib/log";
 import { detectSensitive, SENSITIVE_CLEAR_MS, SENSITIVE_LABEL } from "../lib/sensitive";
 import { fetchWeather } from "../lib/weather";
 import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
-import { isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
+import { isLive, isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
 import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
 
@@ -136,13 +141,53 @@ export function useIdleFeed() {
 }
 
 let secretTimer = 0;
+let autoClearTimer = 0;
 
-/** Rust pano izleyicisinden gelen metinleri havuza ekler (yalnızca ana ada). */
+/** "Kopyaladıktan X dk sonra panoyu boşalt" — her yeni kopyada süre baştan başlar */
+function scheduleAutoClear() {
+  const mins = useNook.getState().settings.clipAutoClear;
+  window.clearTimeout(autoClearTimer);
+  if (mins > 0) autoClearTimer = window.setTimeout(() => void clipboardClear(), mins * 60_000);
+}
+
+/** Bu uygulamadan kopyalananlar geçmişe girmez (Ayarlar › Pano) */
+function ignoredApp(app: string) {
+  if (!app) return false;
+  return useNook.getState().settings.clipIgnore.some((x) => x.trim().toLowerCase().replace(/\.exe$/, "") === app);
+}
+
+/** Geçmişte kalmayan pano görsellerini diskten sil */
+function pruneImages() {
+  const keep = useNook.getState().clips.flatMap((c) => (c.kind === "image" && c.path ? [c.path] : []));
+  void clipboardPrune(keep).catch(() => {});
+}
+
+/** Rust pano izleyicisinden gelen metin, görsel ve dosyaları havuza ekler (yalnızca ana ada). */
 export function useClipboardFeed() {
   useEffect(() => {
     if (!isPrimary) return;
-    return subscribe<string>(EVENTS.clipboard, (text) => {
+    const offImage = subscribe<ClipImagePayload>(EVENTS.clipboardImage, (c) => {
+      scheduleAutoClear();
+      if (ignoredApp(c.app)) return;
+      useNook.getState().pushClipImage(c.path, c.width, c.height, c.app);
+      pruneImages();
+    });
+    const offFiles = subscribe<ClipFilesPayload>(EVENTS.clipboardFiles, (c) => {
+      scheduleAutoClear();
+      if (ignoredApp(c.app) || !c.paths.length) return;
+      useNook.getState().pushClipFiles(c.paths, c.app);
+    });
+    // Ekran kilitlenince pano boşalır (geçmiş kalır)
+    const offLock = subscribe<boolean>(EVENTS.locked, (locked) => {
+      if (locked && useNook.getState().settings.clipClearOnLock) void clipboardClear();
+    });
+    const offText = subscribe<ClipPayload>(EVENTS.clipboard, ({ text, app }) => {
       if (consumeSelfWrite(text)) return;
+      scheduleAutoClear();
+      if (ignoredApp(app)) {
+        note(`pano: ${app} yok sayıldı`);
+        return;
+      }
       const s = useNook.getState();
       // Hassas veri: geçmişe girmez, çevrilmez, uyarılır ve bir dakika sonra panodan silinir
       const secret = s.settings.sensitiveGuard ? detectSensitive(text) : null;
@@ -158,7 +203,8 @@ export function useClipboardFeed() {
         }, SENSITIVE_CLEAR_MS);
         return;
       }
-      s.pushClip(text);
+      s.pushClip(text, app);
+      pruneImages();
       // Yabancı dilde metin → Türkçesi kartta ve Pano'da
       const foreign = looksForeign(text);
       note(`pano: ${text.length} karakter, yabancı=${foreign}, çeviri ayarı=${s.settings.translate}`);
@@ -174,6 +220,12 @@ export function useClipboardFeed() {
         })
         .catch((e) => console.warn("[nook] çeviri", e));
     });
+    return () => {
+      offImage();
+      offFiles();
+      offLock();
+      offText();
+    };
   }, []);
 }
 
@@ -186,17 +238,53 @@ export function useMediaFeed() {
   }, []);
 }
 
+/** Uzun süre yüksek kalan yük için uyarılar: eşik, ne kadar sürmeli, uyarıdan sonra ne kadar susmalı */
+const CPU_HIGH = 90;
+const CPU_FOR = 120_000;
+const MEM_HIGH = 92;
+const MEM_FOR = 60_000;
+const ALERT_QUIET = 30 * 60_000;
+/** C: diskinde boş yer bunun altına inince günde bir kez */
+const DISK_LOW = 0.08;
+
 export function useStatsFeed() {
-  useEffect(
-    () =>
-      subscribe<StatsPayload>(EVENTS.stats, (s) => {
-        const st = useNook.getState();
-        st.setStats(s);
-        // Pilde / enerji tasarrufunda animasyonlar 30 karede
-        setFrameRate(s.saver && st.settings.powerSaver ? 30 : 60);
-      }),
-    [],
-  );
+  useEffect(() => {
+    let cpuSince = 0;
+    let memSince = 0;
+    let cpuWarned = 0;
+    let memWarned = 0;
+    let diskDay = "";
+    return subscribe<StatsPayload>(EVENTS.stats, (s) => {
+      const st = useNook.getState();
+      st.setStats(s);
+      // Pilde / enerji tasarrufunda animasyonlar 30 karede
+      setFrameRate(s.saver && st.settings.powerSaver ? 30 : 60);
+      if (!isPrimary || !st.settings.sysAlerts) return;
+      const now = Date.now();
+      // Oyundayken yük yüksek olur — o sırada uyarma
+      const quiet = st.fullscreen;
+      cpuSince = s.cpu >= CPU_HIGH ? cpuSince || now : 0;
+      if (cpuSince && now - cpuSince >= CPU_FOR && now - cpuWarned > ALERT_QUIET && !quiet) {
+        cpuWarned = now;
+        st.pushToast({ kind: "alert", title: tt("İşlemci uzun süredir %{0}", Math.round(s.cpu)), detail: tt("Sistem sekmesinde ne olduğuna bak"), ms: 6000 });
+        playAntic("hot");
+      }
+      const memPct = s.memTotal ? (s.memUsed / s.memTotal) * 100 : 0;
+      memSince = memPct >= MEM_HIGH ? memSince || now : 0;
+      if (memSince && now - memSince >= MEM_FOR && now - memWarned > ALERT_QUIET && !quiet) {
+        memWarned = now;
+        st.pushToast({ kind: "alert", title: tt("Bellek dolmak üzere · %{0}", Math.round(memPct)), detail: tt("Kullanmadığın birkaç uygulamayı kapat"), ms: 6000 });
+        playAntic("dizzy");
+      }
+      const today = new Date().toDateString();
+      if (s.diskTotal && diskDay !== today && (s.diskTotal - s.diskUsed) / s.diskTotal < DISK_LOW && !quiet) {
+        diskDay = today;
+        const free = (s.diskTotal - s.diskUsed) / 1024 ** 3;
+        st.pushToast({ kind: "alert", title: tt("C: diski doluyor"), detail: tt("{0} GB boş kaldı", free.toFixed(1).replace(".", ",")), ms: 6000 });
+        playAntic("surprised");
+      }
+    });
+  }, []);
 }
 
 /** Lukonnect: mouse, kulaklık, vantilatör. */
@@ -318,6 +406,79 @@ export function useIslandPosFeed() {
   }, []);
 }
 
+let shelfHold = 0;
+
+/** Raf kısa süre açık kalsın (bırakılacak yer); imleç gelince üzerine gelme açık tutar */
+function openShelf(ms: number) {
+  const st = useNook.getState();
+  st.setTab("shelf");
+  st.setHold("shelf-drop", true);
+  window.clearTimeout(shelfHold);
+  shelfHold = window.setTimeout(() => useNook.getState().setHold("shelf-drop", false), ms);
+}
+
+/**
+ * Raf: dosya sürüklerken fare sallanınca açılır; Ctrl+Alt+S Gezgin'de seçili dosyaları ekler.
+ * Yalnızca imlecin olduğu ekrandaki adaya gelir.
+ */
+export function useShelfFeed() {
+  useEffect(() => {
+    const offShake = subscribe(EVENTS.shelfShake, () => {
+      openShelf(6000);
+      playAntic("surprised");
+    });
+    const offAdd = subscribe<string[]>(EVENTS.shelfAdd, async (paths) => {
+      const files = paths.length ? await inspectPaths(paths).catch(() => []) : [];
+      const st = useNook.getState();
+      if (!files.length) {
+        openShelf(2500);
+        st.pushToast({ kind: "shelf", title: tt("Gezgin'de seçili dosya yok"), detail: tt("Dosyaları seç, sonra kısayola bas"), ms: 3500 });
+        return;
+      }
+      st.addFiles(files);
+      st.setMood("happy");
+      window.setTimeout(() => useNook.getState().mood === "happy" && useNook.getState().setMood("idle"), 900);
+      st.pushToast({ kind: "shelf", title: tt("{0} öğe rafta", files.length), detail: files.map((f) => f.name).join(", "), ms: 3500 });
+    });
+    return () => {
+      offShake();
+      offAdd();
+      window.clearTimeout(shelfHold);
+    };
+  }, []);
+}
+
+/**
+ * Yayın maskesi: Rust ekran paylaşımı / OBS algılar; kısayol (Ctrl+Alt+L) elle açıp kapatır.
+ * Algılama değişince elle verilen karar sıfırlanır (bir sonraki yayında yine kendiliğinden açılır).
+ */
+export function useLiveFeed() {
+  useEffect(() => {
+    const offAuto = subscribe<{ on: boolean; source: string }>(EVENTS.share, (a) => {
+      const st = useNook.getState();
+      const was = isLive(st);
+      st.setLive(a, null);
+      const now = isLive(useNook.getState());
+      if (!isPrimary || now === was) return;
+      st.pushToast(
+        now
+          ? { kind: "live", title: tt("Canlı yayındayız"), detail: tt("{0} · Not, Pano, Bildirimler gizlendi", a.source || tt("Ekran paylaşımı")), ms: 4500 }
+          : { kind: "live", title: tt("Yayın bitti"), detail: tt("Gizlenen bölümler yeniden açık"), ms: 3000 },
+      );
+    });
+    const offToggle = subscribe(EVENTS.shareToggle, () => {
+      const st = useNook.getState();
+      const next = !isLive(st);
+      st.setLive(null, next);
+      if (isPrimary) st.pushToast({ kind: "live", title: next ? tt("Yayın maskesi açık") : tt("Yayın maskesi kapalı"), detail: next ? tt("Not, Pano, Bildirimler gizlendi") : tt("Her şey yeniden görünür"), ms: 3000 });
+    });
+    return () => {
+      offAuto();
+      offToggle();
+    };
+  }, []);
+}
+
 /** Genel kısayol → hızlı arama. */
 export function useSearchFeed() {
   useEffect(() => subscribe(EVENTS.search, () => useNook.getState().setSearching(true)), []);
@@ -361,6 +522,8 @@ const native = (s: Settings) => ({
   voiceShortcut: s.voiceShortcut,
   shieldShortcut: s.shieldShortcut,
   shieldLock: s.lockEnabled && !!s.lockHash,
+  shieldMuteMic: s.shieldMuteMic ?? true,
+  shieldMuteCalls: s.shieldMuteCalls ?? true,
   autoScreenshots: s.autoScreenshots,
   hideInFullscreen: s.hideInFullscreen,
   gameIntro: s.gameIntro,
@@ -368,6 +531,13 @@ const native = (s: Settings) => ({
   islandPos: s.islandPos ?? null,
   uiScale: s.uiScale ?? 1,
   quitLabel: tt("Nook'tan çık"),
+  shelfShake: s.shelfShake ?? true,
+  shelfShortcut: s.shelfShortcut ?? "",
+  plainPasteShortcut: s.plainPasteShortcut ?? "",
+  outputShortcut: s.outputShortcut ?? "",
+  outputCycle: s.outputCycle ?? [],
+  headphoneDrop: s.headphoneDrop ?? 0,
+  liveShortcut: s.liveShortcut ?? "",
 });
 
 /** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). Gizliyken kare çizilmez. */
@@ -513,10 +683,19 @@ export function useSettingsSync() {
 export function useShelfRevalidation() {
   useEffect(() => {
     if (!isPrimary) return;
-    const { shelf, revalidateShelf } = useNook.getState();
-    if (!shelf.length) return;
-    inspectPaths(shelf.map((i) => i.path))
-      .then(revalidateShelf)
-      .catch(() => {});
+    const { shelf, revalidateShelf, clips } = useNook.getState();
+    if (shelf.length)
+      inspectPaths(shelf.map((i) => i.path))
+        .then(revalidateShelf)
+        .catch(() => {});
+    // Pano görselleri de: silinmişler geçmişten çıkar, kalanlar önizlenebilsin
+    const images = clips.filter((c) => c.kind === "image" && c.path);
+    if (images.length)
+      inspectPaths(images.map((c) => c.path!))
+        .then((alive) => {
+          const ok = new Set(alive.map((m) => m.path));
+          for (const c of images) if (!ok.has(c.path!)) useNook.getState().removeClip(c.id);
+        })
+        .catch(() => {});
   }, []);
 }

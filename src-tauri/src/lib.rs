@@ -6,6 +6,7 @@ mod brightness;
 mod buddy;
 mod clipboard;
 mod commands;
+mod disks;
 mod downloads;
 mod focus;
 mod fullscreen;
@@ -18,6 +19,7 @@ mod net;
 mod notify;
 mod privacy;
 mod quick;
+mod share;
 mod shell;
 mod shield;
 mod shortcut;
@@ -75,13 +77,30 @@ pub fn run() {
             commands::set_hit_rect,
             commands::set_interactive,
             commands::release_focus,
+            commands::set_gate,
             commands::apply_settings,
             commands::list_monitors,
             commands::set_window_size,
             commands::island_drag,
             clipboard::clipboard_clear_if,
+            clipboard::clipboard_clear,
+            clipboard::clipboard_write_image,
+            clipboard::clipboard_write_files,
+            clipboard::clipboard_prune,
+            shell::open_with,
+            shell::save_text,
+            shell::fetch_text,
+            disks::system_disks,
+            disks::disk_health,
+            disks::disk_eject,
+            disks::local_ip,
+            disks::speed_test,
+            quick::quick_input,
+            mixer::mixer_output,
             shield::shield_off,
             shield::shield_on,
+            shield::shield_state,
+            shield::shield_set,
             shield::system_uptime,
             argus::side_card,
             buddy::perch_start,
@@ -150,6 +169,7 @@ pub fn run() {
             lukonnect::spawn(handle.clone());
             notify::spawn(handle.clone());
             net::spawn(handle.clone());
+            share::spawn(handle.clone());
             brightness::spawn(handle);
 
             island.show()?;
@@ -163,6 +183,12 @@ pub fn run() {
                 WindowEvent::Moved(_) | WindowEvent::ScaleFactorChanged { .. } => {
                     if let (Ok(pos), Ok(scale)) = (win.outer_position(), win.scale_factor()) {
                         shared.set_geometry(win.label(), pos, scale);
+                    }
+                    // Ana ada taşınınca yanındaki ses kartı da gelsin
+                    if win.label() == window::ISLAND {
+                        if let Some(w) = win.app_handle().get_webview_window(window::ISLAND) {
+                            argus::follow_sound(&w);
+                        }
                     }
                 }
                 WindowEvent::Destroyed => shared.unregister(win.label()),

@@ -70,7 +70,7 @@ export function Arcade() {
 
       <ArcadeClock />
       {/* Parmak uçlarında joystick sallayan */}
-      <Actor x={290} y={642} size={92} look={look({ shape: "bean", head: "headphones" })} color="#FF3EA5" expression={beat.i === 0 ? "surprised" : "focused"} move={{ animate: { y: [0, -8, 0] }, transition: { duration: 0.35, repeat: Infinity } }} act={on(beat, 0, hop(30))} actKey={k} front={<Joystick />} z={2} />
+      <Actor morph={beat.n[0]} morphDelay={300} x={290} y={642} size={92} look={look({ shape: "bean", head: "headphones" })} color="#FF3EA5" expression={beat.i === 0 ? "surprised" : "focused"} move={{ animate: { y: [0, -7, 0], scaleY: [1, 1.04, 0.97] }, transition: { duration: 0.45, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 0, hop(30))} actKey={k} front={<Joystick />} z={2} />
       {/* Makinenin üstüne abanmış, skoru izleyen */}
       <Actor x={680} y={548} size={96} look={look({ shape: "sphere" })} color="#00B8FF" flip expression={beat.i === 1 ? "love" : "focused"} move={{ animate: { rotate: [8, 12, 8] }, transition: { duration: 1.4, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 1, hop(16))} actKey={k} front={<><Hand x={-6} y={22} /><Hand x={30} y={22} /></>} z={2} />
       {beat.i === 1 && (
@@ -177,7 +177,7 @@ export function Ocean() {
       </motion.div>
       {/* İstiridyenin incileriyle oynayan */}
       <Clam open={beat.i === 2} k={k} />
-      <Actor x={1010} y={810} size={92} look={look({ shape: "flower" })} color="#FF5C8A" flip expression={beat.i === 2 ? "love" : "happy"} move={breathe(3)} act={on(beat, 2, hop(14))} actKey={k} front={<Pearl />} />
+      <Actor morph={beat.n[2]} morphDelay={800} x={1010} y={810} size={92} look={look({ shape: "flower" })} color="#FF5C8A" flip expression={beat.i === 2 ? "love" : "happy"} move={breathe(3)} act={on(beat, 2, hop(14))} actKey={k} front={<Pearl />} />
       {/* Kartondan köpekbalığı yüzgeciyle korkutmaya çalışan yaramaz */}
       <motion.div key={`sh${beat.i === 3 ? k : 0}`} className="absolute inset-0" animate={beat.i === 3 ? { x: [0, -380, -380, 0] } : { x: 0 }} transition={{ duration: 4, times: [0, 0.3, 0.6, 1], ease: "easeInOut" }}>
         <Actor x={1300} y={700} size={86} look={look({ shape: "blob" })} color="#8A8F99" flip expression={beat.i === 3 ? "giggle" : "suspicious"} move={{ animate: { y: [0, -10, 0] }, transition: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }} back={<SharkFin />} front={<Hand x={-3} y={14} />} />
@@ -331,15 +331,15 @@ export function Greenhouse() {
       {/* Sulama kabıyla sukulentleri sulayan */}
       <Actor x={540} y={790} size={96} look={look({ shape: "sphere", head: "sprout" })} color="#16C47F" flip expression="happy" move={breathe(3)} act={on(beat, 0, { animate: { rotate: [0, -10, -10, 0] }, transition: { duration: 2.4 } })} actKey={k} front={<WateringCan pour={beat.i === 0} k={k} />} />
       {/* Hasır şapkalı, bahçe makaslı */}
-      <Actor x={720} y={800} size={104} look={look({ shape: "egg" })} color="#FFD21F" expression={beat.i === 1 ? "surprised" : "focused"} move={sway(3.4, 2)} act={on(beat, 1, hop(12))} actKey={k} front={<><StrawHat /><Shears k={beat.i === 1 ? k : 0} /></>} />
+      <Actor x={720} y={800} size={104} look={look({ shape: "egg", head: "straw" })} color="#FFD21F" expression={beat.i === 1 ? "surprised" : "focused"} move={sway(3.4, 2)} act={on(beat, 1, hop(12))} actKey={k} front={<><Shears k={beat.i === 1 ? k : 0} /></>} />
       {/* Saksıya oturup bitki gibi güneşe uzanan */}
-      <Actor x={1040} y={742} size={90} look={look({ shape: "flower", head: "flower" })} color="#FF9EC4" expression={beat.i === 2 ? "love" : "sleepy"} move={{ animate: { scaleY: [1, 1.08, 1], rotate: [8, 12, 8] }, transition: { duration: 5, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 2, { animate: { y: [0, -30, -30, 0] }, transition: { duration: 2.6, times: [0, 0.3, 0.7, 1] } })} actKey={k} />
+      <Actor morph={beat.n[2]} morphDelay={900} x={1040} y={742} size={90} look={look({ shape: "flower", head: "flower" })} color="#FF9EC4" expression={beat.i === 2 ? "love" : "sleepy"} move={{ animate: { scaleY: [1, 1.08, 1], rotate: [8, 12, 8] }, transition: { duration: 5, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 2, { animate: { y: [0, -30, -30, 0] }, transition: { duration: 2.6, times: [0, 0.3, 0.7, 1] } })} actKey={k} />
       <svg className="absolute overflow-visible" style={{ left: 980, top: 730 }} width="120" height="80">
         <path d="M0 0 h120 l-14 70 h-92 Z" fill="#c8693a" />
         <rect x="-6" y="-8" width="132" height="18" rx="4" fill="#d97a48" />
       </svg>
       {/* Toprakla oynarken yüzü gözü çamur olan */}
-      <Actor x={1340} y={800} size={94} look={look({ shape: "bear" })} color="#FFE3A8" expression={beat.i === 3 ? "giggle" : "happy"} move={{ animate: { rotate: [-3, 3, -3] }, transition: { duration: 1.2, repeat: Infinity } }} act={on(beat, 3, hop(14))} actKey={k} front={<Mud />} />
+      <Actor morph={beat.n[3]} morphDelay={500} x={1340} y={800} size={94} look={look({ shape: "bear" })} color="#FFE3A8" expression={beat.i === 3 ? "giggle" : "happy"} move={{ animate: { rotate: [-3, 3, -3] }, transition: { duration: 1.2, repeat: Infinity } }} act={on(beat, 3, hop(14))} actKey={k} front={<Mud />} />
       {beat.i === 3 &&
         Array.from({ length: 8 }, (_, i) => (
           <motion.span key={`d${i}${k}`} className="absolute rounded-full bg-[#5a3a22]" style={{ left: 1360, top: 780, width: 8 + (i % 3) * 4, height: 8 + (i % 3) * 4 }} animate={{ x: Math.cos(i * 0.8 + 3.6) * 120, y: [0, -80 - (i % 3) * 30, 20], opacity: [1, 1, 0] }} transition={{ duration: 1.1, delay: 0.3 }} />
@@ -363,19 +363,6 @@ function WateringCan({ pour, k }: { pour: boolean; k: number }) {
         [0, 1, 2, 3].map((i) => (
           <motion.circle key={`${k}${i}`} cx={44 + i} cy={14} r="0.8" fill="#8fd8ff" animate={{ y: [0, 14], opacity: [1, 0] }} transition={{ duration: 0.6, repeat: 3, delay: 0.5 + i * 0.15 }} />
         ))}
-    </g>
-  );
-}
-
-function StrawHat() {
-  return (
-    <g>
-      <ellipse cx="12" cy="-1" rx="19" ry="4.4" fill="#e8c46a" />
-      <path d="M4 -1 Q 4 -11 12 -11 Q 20 -11 20 -1 Z" fill="#f0d27a" />
-      <path d="M4.2 -3 h15.6 v2 h-15.6 Z" fill="#c0392b" />
-      {[-4, 0, 4, 8, 12, 16, 20, 24, 28].map((x) => (
-        <line key={x} x1={x} y1={-2} x2={x + 1.4} y2={1.6} stroke="#c9a24a" strokeWidth="0.4" />
-      ))}
     </g>
   );
 }
@@ -481,11 +468,11 @@ export function Train() {
         {/* Battaniyesine sarınmış, koltukta kıvrılıp uyuyan */}
         <Actor x={220} y={714} size={100} look={look({ shape: "cloud" })} color="#9B7BFF" expression="sleepy" move={breathe(4.5, 2)} act={on(beat, 2, { animate: { rotate: [0, 8, 0] }, transition: { duration: 2 } })} actKey={k} front={<Blanket />} />
         {/* Cama yapışmış, geçen lambaları izleyen */}
-        <Actor x={455} y={712} size={92} look={look({ shape: "sphere" })} color="#FFD21F" flip expression={beat.i === 0 ? "surprised" : "happy"} move={{ animate: { x: [0, -3, 0] }, transition: { duration: 1.15, repeat: Infinity } }} act={on(beat, 0, hop(12))} actKey={k} front={<><Hand x={28} y={8} /><Hand x={29} y={16} /></>} />
+        <Actor morph={beat.n[0]} morphDelay={200} x={455} y={712} size={92} look={look({ shape: "sphere" })} color="#FFD21F" flip expression={beat.i === 0 ? "surprised" : "happy"} move={{ animate: { x: [0, -3, 0] }, transition: { duration: 1.15, repeat: Infinity } }} act={on(beat, 0, hop(12))} actKey={k} front={<><Hand x={28} y={8} /><Hand x={29} y={16} /></>} />
         {/* Çay bardağını sallantıda devirmemek için iki eliyle tutan */}
         <Actor x={1110} y={712} size={96} look={look({ shape: "bean", neck: "bowtie" })} color="#2FD4C0" expression={beat.i === 3 ? "surprised" : "focused"} move={breathe(3)} act={on(beat, 3, { animate: { x: [0, -10, 8, -4, 0], rotate: [0, -6, 6, 0] }, transition: { duration: 1.2 } })} actKey={k} front={<TeaGlass slosh={beat.i === 3} k={k} />} />
         {/* Koridordaki kondüktör */}
-        <Actor x={1440} y={830} size={108} look={look({ shape: "egg" })} color="#F4F4F6" flip expression={beat.i === 1 ? "happy" : "idle"} move={breathe(3.2)} act={on(beat, 1, hop(10))} actKey={k} front={<><ConductorCap /><TicketPunch k={beat.i === 1 ? k : 0} /></>} />
+        <Actor x={1440} y={830} size={108} look={look({ shape: "egg", head: "conductor" })} color="#F4F4F6" flip expression={beat.i === 1 ? "happy" : "idle"} move={breathe(3.2)} act={on(beat, 1, hop(10))} actKey={k} front={<><TicketPunch k={beat.i === 1 ? k : 0} /></>} />
       </motion.div>
     </Stage>
   );
@@ -513,17 +500,6 @@ function TeaGlass({ slosh, k }: { slosh: boolean; k: number }) {
       <motion.path key={k} d="M8.8 17 Q 7.6 20 9 22 Q 7.6 25 9 27 h6 q1.4 -2 0 -5 q1.4 -2 0.2 -5 Z" fill="#c0391b" style={{ transformOrigin: "12px 22px" }} animate={slosh ? { rotate: [0, -14, 12, -6, 0] } : { rotate: [-3, 3, -3] }} transition={slosh ? { duration: 1.2 } : { duration: 0.9, repeat: Infinity }} />
       <Hand x={7} y={22} />
       <Hand x={17} y={22} />
-    </g>
-  );
-}
-
-function ConductorCap() {
-  return (
-    <g>
-      <path d="M2 -2 Q 2 -10 12 -10 Q 22 -10 22 -2 Z" fill="#1e3a8a" />
-      <rect x="2" y="-3.6" width="20" height="2.4" fill="#e0b84a" />
-      <path d="M1 -1.2 Q 12 3 23 -1.2 L23 0.4 Q 12 4 1 0.4 Z" fill="#111" />
-      <circle cx="12" cy="-6" r="1.4" fill="#e0b84a" />
     </g>
   );
 }
@@ -583,7 +559,7 @@ export function Cinema() {
       <Actor x={1000} y={beat.i === 2 ? 600 : 640} size={88} look={look({ shape: "cat" })} color="#FF8A1F" expression={beat.i === 2 ? "surprised" : "focused"} move={{ animate: { y: [0, -6, 0] }, transition: { duration: 2, repeat: Infinity, ease: "easeInOut" } }} front={<><Hand x={0} y={22} /><Hand x={24} y={22} /></>} />
       <Layer>{[360, 600, 840, 1080, 1320].map((x) => seat(x, 700))}</Layer>
       {/* Mısır kovasına gömülmüş, 3D gözlüklü */}
-      <Actor x={360} y={720} size={100} look={look({ shape: "sphere" })} color="#2B8CFF" expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(14))} actKey={k} front={<Popcorn k={beat.i === 0 ? k : 0} />} />
+      <Actor morph={beat.n[0]} morphDelay={300} x={360} y={720} size={100} look={look({ shape: "sphere" })} color="#2B8CFF" expression={beat.i === 0 ? "happy" : "focused"} move={breathe(3)} act={on(beat, 0, hop(14))} actKey={k} front={<Popcorn k={beat.i === 0 ? k : 0} />} />
       {/* Pipetle içeceğini hüpürdeten */}
       <Actor x={600} y={720} size={96} look={look({ shape: "bean" })} color="#16C47F" expression="focused" move={breathe(3.4)} act={on(beat, 1, { animate: { scaleX: [1, 0.92, 1.04, 1], scaleY: [1, 1.06, 0.97, 1] }, transition: { duration: 1 } })} actKey={k} front={<Soda k={beat.i === 1 ? k : 0} />} />
       {/* Seans başlamadan uyuyakalan */}
@@ -693,10 +669,10 @@ export function Western() {
         <Actor x={190} y={760} size={100} look={look({ shape: "bear", head: "bowler" })} color="#B5651D" expression="sleepy" move={breathe(4, 2)} back={<RockingChair />} />
       </motion.div>
       {/* Yarım kapının arkasından merakla bakan */}
-      <Actor x={500} y={beat.i === 2 ? 622 : 652} size={92} look={look({ shape: "sphere" })} color="#FF5C8A" expression={beat.i === 2 ? "surprised" : "suspicious"} move={{ animate: { x: [-6, 6, -6] }, transition: { duration: 3, repeat: Infinity, ease: "easeInOut" } }} />
+      <Actor morph={beat.n[2]} morphDelay={0} x={500} y={beat.i === 2 ? 622 : 652} size={92} look={look({ shape: "sphere" })} color="#FF5C8A" expression={beat.i === 2 ? "surprised" : "suspicious"} move={{ animate: { x: [-6, 6, -6] }, transition: { duration: 3, repeat: Infinity, ease: "easeInOut" } }} />
       <SaloonDoors swing={beat.i === 2} k={k} />
       {/* Düello pozisyonunda kovboy */}
-      <Actor x={860} y={830} size={110} look={look({ shape: "egg" })} color="#FFE3A8" expression={beat.i === 0 ? "happy" : "focused"} move={{ animate: { x: [0, 2, 0] }, transition: { duration: 2, repeat: Infinity } }} act={on(beat, 0, { animate: { y: [0, -6, 0] }, transition: { duration: 0.6 } })} actKey={k} front={<><CowboyHat /><WaterPistol draw={beat.i === 0} k={k} /></>} />
+      <Actor x={860} y={830} size={110} look={look({ shape: "egg", head: "cowboy" })} color="#FFE3A8" expression={beat.i === 0 ? "happy" : "focused"} move={{ animate: { x: [0, 2, 0] }, transition: { duration: 2, repeat: Infinity } }} act={on(beat, 0, { animate: { y: [0, -6, 0] }, transition: { duration: 0.6 } })} actKey={k} front={<><WaterPistol draw={beat.i === 0} k={k} /></>} />
       {/* Başında tüyle çitin üstünden sarkan yaramaz */}
       <Actor x={1340} y={beat.i === 3 ? 660 : 700} size={88} look={look({ shape: "star" })} color="#8FE03A" expression={beat.i === 3 ? "giggle" : "suspicious"} move={sway(2.4, 4)} act={on(beat, 3, hop(20))} actKey={k} back={<Feather />} front={<><Hand x={0} y={22} /><Hand x={24} y={22} /></>} />
       <Layer>
@@ -735,16 +711,6 @@ function SaloonDoors({ swing, k }: { swing: boolean; k: number }) {
         />
       ))}
     </>
-  );
-}
-
-function CowboyHat() {
-  return (
-    <g>
-      <path d="M-8 -1 Q 12 6 32 -1 Q 28 3 12 4 Q -4 3 -8 -1 Z" fill="#7a4a22" />
-      <path d="M3 0 Q 2 -12 8 -12 Q 12 -9 16 -12 Q 22 -12 21 0 Z" fill="#8a5a2a" />
-      <rect x="3" y="-3" width="18" height="2" fill="#3a1a0a" />
-    </g>
   );
 }
 

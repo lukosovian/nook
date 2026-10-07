@@ -5,6 +5,8 @@
  *  - Actor: sahnede bir Nook. Eşyaları "yüz biriminde" çizilir: yüzün merkezi (12,12), yarıçapı 12;
  *    alt kenar y=24. Eller beyaz toplar (H), mascot/Props ile aynı dil.
  *  - useBeat: birkaç saniyede bir sahnede bir olay seçer (odun atılır, çalı hışırdar…).
+ *  - Karakterler kendiliğinden değişmez: sahnenin bir olayı (iksir dökülür, deney patlar…) olunca
+ *    o olayın Nook'u başka bir gövdeye/renge dönüşür (Actor `morph`, useBeat `n`).
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
@@ -32,22 +34,17 @@ function randomBody() {
 }
 
 /**
- * Sahnedeki karakterler sürekli değişir: rol (eşyalar, hareketler) aynı kalır, Nook başkası olur.
- * Her oyuncu kendi zamanında (9–22 sn) değişir ki hepsi birden dönüşmesin.
+ * Oyuncunun gövdesi: kalkan her açıldığında rastgele; sonra yalnızca `morph` değişince (sahnenin bir
+ * olayında, olayın can alıcı anına denk gelsin diye `delay` ms sonra) başka bir Nook'a dönüşür.
+ * Rol (eşyalar, hareketler) aynı kalır.
  */
-function useCastBody() {
+function useCastBody(morph: number | undefined, delay: number) {
   const [body, setBody] = useState(randomBody);
   useEffect(() => {
-    let t = 0;
-    const next = () => {
-      t = window.setTimeout(() => {
-        setBody(randomBody());
-        next();
-      }, rnd(9000, 22000));
-    };
-    next();
+    if (!morph) return;
+    const t = window.setTimeout(() => setBody(randomBody()), delay);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [morph, delay]);
   return body;
 }
 
@@ -119,6 +116,8 @@ export function Actor({
   actKey,
   z,
   opacity,
+  morph,
+  morphDelay = 700,
 }: {
   x: number;
   y: number;
@@ -135,9 +134,13 @@ export function Actor({
   actKey?: number;
   z?: number;
   opacity?: number;
+  /** Değişince oyuncu başka bir Nook'a dönüşür (sahnenin bir olayı: useBeat `n`) */
+  morph?: number;
+  /** Dönüşüm olayın başından kaç ms sonra */
+  morphDelay?: number;
 }) {
   // Rol aynı, oyuncu değişir: gövde/doku/göz/renk rastgele, aksesuarlar sahnenin
-  const body = useCastBody();
+  const body = useCastBody(morph, morphDelay);
   const cast: Look = { ...lk, shape: body.shape, texture: body.texture, eyes: body.eyes };
   const id = `${body.shape}-${body.texture}-${body.eyes}-${body.color}`;
   const box = { left: -size / 2, top: -size / 2, width: size * 2, height: size * 2 };
@@ -161,7 +164,7 @@ export function Actor({
                 exit={{ scale: 0.2, opacity: 0, rotate: 25, transition: { duration: 0.25 } }}
                 transition={{ type: "spring", stiffness: 320, damping: 16 }}
               >
-                <NookFigure look={cast} color={body.color} size={size} expression={expression} />
+                <NookFigure look={cast} color={body.color} size={size} expression={expression} alive />
               </motion.div>
             </AnimatePresence>
             <Poof k={id} />
@@ -195,39 +198,41 @@ function Poof({ k }: { k: string }) {
   );
 }
 
-/** Hafif nefes alma / sallanma */
+/** Hafif nefes alma: yükselirken incelir (hacim korunur), iner ve hafifçe yayılır */
 export const breathe = (d = 3.2, amp = 3): { animate: TargetAndTransition; transition: Transition } => ({
-  animate: { y: [0, -amp, 0], scaleY: [1, 1.025, 1] },
+  animate: { y: [0, -amp, 0], scaleY: [1, 1.03, 1], scaleX: [1, 0.985, 1] },
   transition: { duration: d, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 },
 });
 export const sway = (d = 2.6, deg = 4): { animate: TargetAndTransition; transition: Transition } => ({
   animate: { rotate: [-deg, deg, -deg] },
   transition: { duration: d, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 },
 });
+/** Zıplama: önce çömelir (hazırlık), uzayarak kalkar, yere basınca ezilir, küçük bir sekme */
 export const hop = (h = 26): { animate: TargetAndTransition; transition: Transition } => ({
-  animate: { y: [0, -h, 0, -h * 0.35, 0] },
-  transition: { duration: 0.9, ease: "easeOut" },
+  animate: { y: [0, 3, -h, 0, -h * 0.3, 0], scaleY: [1, 0.86, 1.1, 0.88, 1.03, 1], scaleX: [1, 1.1, 0.94, 1.1, 0.98, 1] },
+  transition: { duration: 1, times: [0, 0.14, 0.42, 0.66, 0.82, 1], ease: "easeInOut" },
 });
 
 /**
  * Sahnenin olay zamanlayıcısı: `count` olaydan birini 4,5–8,5 sn'de bir seçer (aynısı arka arkaya
- * gelmez). `k` her olayda artar — animasyonları baştan oynatmak için anahtar.
+ * gelmez). `k` her olayda artar — animasyonları baştan oynatmak için anahtar. `n[i]`: i. olay kaç kez
+ * oldu (o olayın Nook'unu dönüştürmek için Actor `morph`).
  */
 export function useBeat(count: number) {
-  const [beat, setBeat] = useState({ i: -1, k: 0 });
+  const [beat, setBeat] = useState<{ i: number; k: number; n: number[] }>(() => ({ i: -1, k: 0, n: Array(count).fill(0) }));
   useEffect(() => {
     let t = 0;
     const next = (prev: number) => {
       t = window.setTimeout(() => {
         let i = Math.floor(Math.random() * count);
         if (i === prev && count > 1) i = (i + 1) % count;
-        setBeat((b) => ({ i, k: b.k + 1 }));
+        setBeat((b) => ({ i, k: b.k + 1, n: b.n.map((v, j) => (j === i ? v + 1 : v)) }));
         next(i);
       }, rnd(4500, 8500));
     };
     // İlk olay biraz erken gelsin
     t = window.setTimeout(() => {
-      setBeat((b) => ({ i: 0, k: b.k + 1 }));
+      setBeat((b) => ({ i: 0, k: b.k + 1, n: b.n.map((v, j) => (j === 0 ? v + 1 : v)) }));
       next(0);
     }, 2200);
     return () => window.clearTimeout(t);

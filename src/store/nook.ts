@@ -15,6 +15,7 @@ import { nextFire, type Alarm } from "../lib/alarm";
 import type { ToolNote } from "../lib/aiTools";
 import type { Weather } from "../lib/weather";
 import type { Look } from "../lib/look";
+import type { SceneMode } from "../components/shield/catalog";
 import { detectColor } from "../lib/format";
 import { lang as initialLang } from "../lib/i18n";
 
@@ -79,7 +80,9 @@ export type Expression =
   /** Pomodoro sürerken masasında çalışır */
   | "focused"
   /** Odak bekçisi: cama vurup saati gösterir */
-  | "knock";
+  | "knock"
+  /** Canlı yayın / ekran paylaşımı: elinde mikrofon, yanında "Canlı" tabelası */
+  | "live";
 
 /** Sohbet mesajı (kalıcı) */
 export interface ChatItem {
@@ -120,6 +123,7 @@ export type Tab =
   | "notes"
   | "archive"
   | "calendar"
+  | "year"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -163,6 +167,32 @@ export interface DayStats {
   water: number;
 }
 
+/** Bir yılın birikmiş özeti (yıl özeti kartı). Süreler dakika. */
+export interface YearStats {
+  active: number;
+  music: number;
+  focus: number;
+  pomodoros: number;
+  game: number;
+  notifs: number;
+  care: number;
+  water: number;
+  /** Nook'la oynanan mini oyun sayısı */
+  plays: number;
+  /** Nook'a yedirilen dosya */
+  feeds: number;
+  /** Çalmaya başlayan şarkı */
+  songs: number;
+  /** Saat başına bilgisayar başında geçen dakika (0–23) */
+  hours: number[];
+  /** Bilgisayar başında olunan günler */
+  days: string[];
+  /** Sanatçı başına dinlenen dakika (en çok 60 sanatçı) */
+  artists: Record<string, number>;
+}
+
+export const emptyYear = (): YearStats => ({ active: 0, music: 0, focus: 0, pomodoros: 0, game: 0, notifs: 0, care: 0, water: 0, plays: 0, feeds: 0, songs: 0, hours: Array(24).fill(0), days: [], artists: {} });
+
 export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0, water: 0 };
 
 /** Yerel tarih anahtarı: 2026-10-02 */
@@ -177,16 +207,58 @@ export interface NowPlaying extends MediaPayload {
 export interface ShelfItem extends FileMeta {
   id: string;
   addedAt: number;
+  /** Sabitlenen öğe "Temizle"de ve bırakınca kaldırılmaz */
+  pinned?: boolean;
 }
 
 export interface ClipItem {
   id: string;
+  /** Metin; görselde "1920×1080", dosyalarda adlar */
   text: string;
   /** Metin bir renkse normalize edilmiş hali */
   color: string | null;
   at: number;
   /** Yabancı dildeyse Türkçesi */
   translation?: string;
+  /** Yoksa metin */
+  kind?: "text" | "image" | "files";
+  /** Görsel: önbellekteki PNG */
+  path?: string;
+  /** Dosyalar */
+  paths?: string[];
+  /** Sabitlenen kayıt silinmez, listenin başında durur */
+  pinned?: boolean;
+  /** Kopyalayan uygulama */
+  app?: string;
+}
+
+/** Karalama defterinin bir sekmesi */
+export interface Pad {
+  id: string;
+  title: string;
+  text: string;
+  /** Son düzenleme (ms) — "dokunulmazsa temizle" buna bakar */
+  at: number;
+}
+
+/** Kronometre: çalışıyorsa başlangıcı, duraklatılmışsa birikmiş süre */
+export interface Stopwatch {
+  startedAt: number | null;
+  acc: number;
+  laps: number[];
+}
+
+/** Abone olunan takvimden (Google/Outlook .ics) gelen etkinlik — salt okunur */
+export interface ExtEvent {
+  id: string;
+  day: string;
+  /** "14:30"; boşsa gün boyu */
+  time: string;
+  title: string;
+  /** Başlangıç / bitiş (ms) */
+  start: number;
+  end: number;
+  allDay: boolean;
 }
 
 export interface Settings extends NativeSettings {
@@ -276,9 +348,49 @@ export interface Settings extends NativeSettings {
   soundCard: boolean;
   /** Kalkan mikrofonu kapatıp açarken rozet ve klik sesi */
   shieldMicFx: boolean;
+  /** Kalkan sahnesi: karışık, sırayla ya da hep aynısı */
+  shieldSceneMode: SceneMode;
+  /** Karışık / sırayla modunda gelen sahneler (boşsa hepsi) */
+  shieldScenes: string[];
+  /** "Hep aynısı" modunda gelen sahne */
+  shieldScene: string;
+  /** Sırayla modunda sıradaki sahnenin yeri */
+  shieldSceneNext: number;
+  /** Panoda bu uygulamalardan kopyalananlar geçmişe girmez (exe adı, küçük harf) */
+  clipIgnore: string[];
+  /** Kopyaladıktan bu kadar dakika sonra pano boşalır (0 = kapalı) */
+  clipAutoClear: number;
+  /** Ekran kilitlenince panoyu boşalt */
+  clipClearOnLock: boolean;
+  /** Ekrandan alınan renk hangi biçimde kopyalansın */
+  colorFormat: "hex" | "rgb" | "hsl";
+  /** HEX'i # olmadan kopyala */
+  colorNoHash: boolean;
+  /** Raftan dışarı bırakılan öğe raftan kalksın (sabitlenenler kalır) */
+  shelfRemoveAfterDrop: boolean;
+  /** Ses karıştırıcıda gizlenen / sabitlenen uygulamalar (anahtar) */
+  mixerHidden: string[];
+  mixerPinned: string[];
+  /** Takvim abonelikleri (.ics adresleri) */
+  calFeeds: string[];
+  /** Kapalı adada sıradaki etkinliğe geri sayım */
+  calCountdown: boolean;
+  /** Abone takvimdeki etkinliklerden kaç dakika önce haber versin (-1 = vermesin) */
+  calRemindExt: number;
+  /** Uzun süre yüksek işlemci/bellek, dolan disk için uyarı */
+  sysAlerts: boolean;
+  /** Karalama sekmesi bu kadar gün dokunulmazsa kendini temizler (0 = asla) */
+  padClear: number;
+  /** Çalan şarkının sözleri (lrclib.net'ten) */
+  lyrics: boolean;
+  /** Ekran paylaşımı / yayın algılanınca hassas bölümleri gizle */
+  liveMask: boolean;
+  /** Ana sayfa profilleri ("Hepsi" hariç); yoksa varsayılanlar (lib/profiles) */
+  profiles?: import("../lib/profiles").ProfileDef[];
 }
 
-export type HomeProfile = "all" | "work" | "game" | "fun";
+/** "all" ya da kullanıcının profillerinden birinin kimliği (lib/profiles) */
+export type HomeProfile = string;
 
 /** Takvim etkinliği; hatırlatması tek seferlik bir alarm olarak kurulur */
 export interface CalEvent {
@@ -357,6 +469,34 @@ export const DEFAULT_SETTINGS: Settings = {
   homeProfile: "all",
   soundCard: true,
   shieldMicFx: true,
+  shieldMuteMic: true,
+  shieldMuteCalls: true,
+  shieldSceneMode: "random",
+  shieldScenes: [],
+  shieldScene: "campfire",
+  shieldSceneNext: 0,
+  clipIgnore: ["keepass", "keepassxc", "1password", "bitwarden", "lastpass", "dashlane"],
+  clipAutoClear: 0,
+  clipClearOnLock: false,
+  plainPasteShortcut: "Ctrl+Alt+V",
+  colorFormat: "hex",
+  colorNoHash: false,
+  shelfShake: true,
+  shelfShortcut: "Ctrl+Alt+S",
+  shelfRemoveAfterDrop: false,
+  outputShortcut: "",
+  outputCycle: [],
+  headphoneDrop: 0,
+  mixerHidden: [],
+  mixerPinned: [],
+  calFeeds: [],
+  calCountdown: true,
+  calRemindExt: 10,
+  sysAlerts: true,
+  padClear: 0,
+  lyrics: false,
+  liveMask: true,
+  liveShortcut: "Ctrl+Alt+L",
 };
 
 export interface Osd {
@@ -376,7 +516,10 @@ export interface Toast extends SysEvent {
 }
 
 const MAX_SHELF = 24;
-const MAX_CLIPS = 24;
+/** Sabitlenmemiş kayıtların sınırı (sabitlenenler ayrıca, en fazla 30) */
+const MAX_CLIPS = 30;
+const MAX_PINNED = 30;
+const MAX_PADS = 8;
 const MAX_NOTIFS = 30;
 const HISTORY = 40;
 
@@ -393,8 +536,16 @@ interface NookState {
   tab: Tab;
   shelf: ShelfItem[];
   clips: ClipItem[];
-  /** Uçucu not — kalıcı değil */
+  /** Açık karalama sekmesinin metni (pads içindekinin kopyası) */
   note: string;
+  pads: Pad[];
+  padId: string;
+  stopwatch: Stopwatch | null;
+  /** Abone takvimlerin etkinlikleri ve son eşitleme */
+  extEvents: ExtEvent[];
+  extSyncedAt: number;
+  /** Bu oturumdaki ağ trafiği (bayt) */
+  netTotals: { down: number; up: number };
   media: NowPlaying | null;
   stats: StatsPayload | null;
   devices: DevicesPayload | null;
@@ -469,10 +620,27 @@ interface NookState {
   outing: Outing | null;
   /** Odak bekçisi uyarıyor: hangi site */
   guard: { site: string } | null;
+  /** Açılış kilidi: bilgisayar açıldı, parola adada yazılana kadar Nook kapalı */
+  gate: boolean;
   /** Balıkta tutulanlar (toplam) */
   catches: { stars: number; trash: number };
   /** Takvim etkinlikleri */
   events: CalEvent[];
+  /** Yıl yıl özet ("2026") */
+  year: Record<string, YearStats>;
+  /** Yıl özeti kendiliğinden en son hangi yıl gösterildi */
+  yearShown: string;
+  /** Algılanan ekran paylaşımı / yayın */
+  liveAuto: { on: boolean; source: string };
+  /** Elle açılıp kapatıldıysa (kısayol, CANLI rozeti); null = algılamaya bak */
+  liveManual: boolean | null;
+  setLive: (auto: { on: boolean; source: string } | null, manual?: boolean | null) => void;
+  /** Yıl özetine ekle (gün sayaçları dışındakiler: oyun, yedirme, şarkı) */
+  yearAdd: (patch: Partial<Pick<YearStats, "plays" | "feeds" | "songs">>) => void;
+  setYearShown: (y: string) => void;
+  /** Ana sayfa düzenleniyor (sırala, gizle, profile bölüm seç) */
+  homeEdit: boolean;
+  setHomeEdit: (on: boolean) => void;
 
   setMood: (mood: Mood) => void;
   setAntic: (antic: Antic | null) => void;
@@ -487,10 +655,23 @@ interface NookState {
   revalidateShelf: (alive: FileMeta[]) => void;
   removeShelf: (id: string) => void;
   clearShelf: () => void;
-  pushClip: (text: string) => void;
+  pushClip: (text: string, app?: string) => void;
+  pushClipImage: (path: string, width: number, height: number, app?: string) => void;
+  pushClipFiles: (paths: string[], app?: string) => void;
+  pinClip: (id: string, pinned: boolean) => void;
+  editClip: (id: string, text: string) => void;
   removeClip: (id: string) => void;
   clearClips: () => void;
+  pinShelf: (id: string, pinned: boolean) => void;
   setNote: (note: string) => void;
+  setPad: (id: string) => void;
+  addPad: () => void;
+  removePad: (id: string) => void;
+  renamePad: (id: string, title: string) => void;
+  /** Uzun süre dokunulmayan sekmeleri boşalt */
+  expirePads: (days: number) => void;
+  setStopwatch: (sw: Stopwatch | null) => void;
+  setExtEvents: (events: ExtEvent[]) => void;
   setMedia: (media: MediaPayload | null) => void;
   /** Kontrol tuşuna basınca Rust'u beklemeden arayüzü güncelle */
   setPlaying: (playing: boolean) => void;
@@ -549,6 +730,7 @@ interface NookState {
   setLastOffer: (at: number) => void;
   setOuting: (outing: Outing | null) => void;
   setGuard: (guard: NookState["guard"]) => void;
+  setGate: (gate: boolean) => void;
   addCatch: (kind: "stars" | "trash") => void;
   patchClip: (id: string, patch: Partial<ClipItem>) => void;
   addEvent: (e: Omit<CalEvent, "id" | "alarmId">) => void;
@@ -572,6 +754,12 @@ export const useNook = create<NookState>()(
       shelf: [],
       clips: [],
       note: "",
+      pads: [{ id: "pad-1", title: "Not 1", text: "", at: Date.now() }],
+      padId: "pad-1",
+      stopwatch: null,
+      extEvents: [],
+      extSyncedAt: 0,
+      netTotals: { down: 0, up: 0 },
       media: null,
       stats: null,
       devices: null,
@@ -618,8 +806,25 @@ export const useNook = create<NookState>()(
       lastOffer: 0,
       outing: null,
       guard: null,
+      gate: false,
       catches: { stars: 0, trash: 0 },
       events: [],
+      year: {},
+      yearShown: "",
+      liveAuto: { on: false, source: "" },
+      liveManual: null,
+      setLive: (auto, manual) =>
+        set((s) => ({ liveAuto: auto ?? s.liveAuto, liveManual: manual === undefined ? s.liveManual : manual })),
+      yearAdd: (patch) =>
+        set((s) => {
+          const y = String(new Date().getFullYear());
+          const cur = { ...emptyYear(), ...s.year[y] };
+          for (const [k, v] of Object.entries(patch) as [keyof typeof patch, number][]) cur[k] += v;
+          return { year: { ...s.year, [y]: cur } };
+        }),
+      setYearShown: (yearShown) => set({ yearShown }),
+      homeEdit: false,
+      setHomeEdit: (homeEdit) => set({ homeEdit }),
 
       setMood: (mood) => set({ mood }),
       setAntic: (antic) => set({ antic }),
@@ -635,7 +840,14 @@ export const useNook = create<NookState>()(
         set((s) => {
           const incoming = new Set(files.map((f) => f.path));
           const fresh = files.map((f) => ({ ...f, id: crypto.randomUUID(), addedAt: Date.now() }));
-          return { shelf: [...fresh, ...s.shelf.filter((i) => !incoming.has(i.path))].slice(0, MAX_SHELF) };
+          const all: ShelfItem[] = [...fresh, ...s.shelf.filter((i) => !incoming.has(i.path))];
+          // Sığmazsa en eski sabitlenmemiş öğeler çıkar
+          while (all.length > MAX_SHELF) {
+            const last = all.map((i) => !i.pinned).lastIndexOf(true);
+            if (last < 0) break;
+            all.splice(last, 1);
+          }
+          return { shelf: all };
         }),
       revalidateShelf: (alive) =>
         set((s) => {
@@ -648,25 +860,75 @@ export const useNook = create<NookState>()(
           };
         }),
       removeShelf: (id) => set((s) => ({ shelf: s.shelf.filter((i) => i.id !== id) })),
-      clearShelf: () => set({ shelf: [] }),
+      clearShelf: () => set((s) => ({ shelf: s.shelf.filter((i) => i.pinned) })),
+      pinShelf: (id, pinned) => set((s) => ({ shelf: s.shelf.map((i) => (i.id === id ? { ...i, pinned } : i)) })),
 
-      pushClip: (text) =>
+      pushClip: (text, app) =>
+        set((s) => {
+          // Aynı metin yeniden kopyalanınca başa gelir; sabitliyse sabit kalır
+          const old = s.clips.find((c) => (c.kind ?? "text") === "text" && c.text === text);
+          const item: ClipItem = { id: crypto.randomUUID(), text, color: detectColor(text), at: Date.now(), app, pinned: old?.pinned, translation: old?.translation };
+          return { clips: trimClips([item, ...s.clips.filter((c) => c !== old)]) };
+        }),
+      pushClipImage: (path, width, height, app) =>
         set((s) => ({
-          clips: [
-            { id: crypto.randomUUID(), text, color: detectColor(text), at: Date.now() },
-            ...s.clips.filter((c) => c.text !== text),
-          ].slice(0, MAX_CLIPS),
+          clips: trimClips([{ id: crypto.randomUUID(), kind: "image", text: `${width}×${height}`, color: null, at: Date.now(), path, app }, ...s.clips]),
         })),
+      pushClipFiles: (paths, app) =>
+        set((s) => {
+          const key = paths.join("\n");
+          const old = s.clips.find((c) => c.kind === "files" && (c.paths ?? []).join("\n") === key);
+          const names = paths.map((p) => p.split(/[\\/]/).pop() ?? p).join(", ");
+          return { clips: trimClips([{ id: crypto.randomUUID(), kind: "files", text: names, color: null, at: Date.now(), paths, app, pinned: old?.pinned }, ...s.clips.filter((c) => c !== old)]) };
+        }),
+      pinClip: (id, pinned) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, pinned } : c)) })),
+      editClip: (id, text) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, text, color: detectColor(text), translation: undefined } : c)) })),
       removeClip: (id) => set((s) => ({ clips: s.clips.filter((c) => c.id !== id) })),
-      clearClips: () => set({ clips: [] }),
+      clearClips: () => set((s) => ({ clips: s.clips.filter((c) => c.pinned) })),
 
-      setNote: (note) => set({ note }),
+      setNote: (note) => set((s) => ({ note, pads: s.pads.map((p) => (p.id === s.padId ? { ...p, text: note, at: Date.now() } : p)) })),
+      setPad: (id) => set((s) => ({ padId: id, note: s.pads.find((p) => p.id === id)?.text ?? "" })),
+      addPad: () =>
+        set((s) => {
+          if (s.pads.length >= MAX_PADS) return {};
+          let n = s.pads.length + 1;
+          while (s.pads.some((p) => p.title === `Not ${n}`)) n++;
+          const pad: Pad = { id: crypto.randomUUID(), title: `Not ${n}`, text: "", at: Date.now() };
+          return { pads: [...s.pads, pad], padId: pad.id, note: "" };
+        }),
+      removePad: (id) =>
+        set((s) => {
+          const left = s.pads.filter((p) => p.id !== id);
+          const pads = left.length ? left : [{ id: crypto.randomUUID(), title: "Not 1", text: "", at: Date.now() }];
+          const padId = s.padId === id ? pads[Math.max(0, s.pads.findIndex((p) => p.id === id) - 1)]?.id ?? pads[0].id : s.padId;
+          return { pads, padId, note: pads.find((p) => p.id === padId)?.text ?? "" };
+        }),
+      renamePad: (id, title) => set((s) => ({ pads: s.pads.map((p) => (p.id === id ? { ...p, title: title.trim() || p.title } : p)) })),
+      expirePads: (days) =>
+        set((s) => {
+          if (!days) return {};
+          const limit = Date.now() - days * 86_400_000;
+          if (!s.pads.some((p) => p.text && p.at < limit)) return {};
+          const pads = s.pads.map((p) => (p.text && p.at < limit ? { ...p, text: "" } : p));
+          return { pads, note: pads.find((p) => p.id === s.padId)?.text ?? "" };
+        }),
+      setStopwatch: (stopwatch) => set({ stopwatch }),
+      setExtEvents: (extEvents) => set({ extEvents, extSyncedAt: Date.now() }),
 
       setMedia: (m) =>
         set((s) => {
           if (!m) return { media: null };
           const sameTrack = s.media?.trackKey === m.trackKey;
+          // Yeni bir şarkı çalmaya başladı: yıl özetine say
+          let year = s.year;
+          if (!sameTrack && m.playing && m.title) {
+            const y = String(new Date().getFullYear());
+            const yr = { ...emptyYear(), ...s.year[y] };
+            yr.songs += 1;
+            year = { ...s.year, [y]: yr };
+          }
           return {
+            year,
             media: { ...m, artwork: m.artwork ?? (sameTrack ? s.media!.artwork : null), at: performance.now() },
           };
         }),
@@ -683,6 +945,8 @@ export const useNook = create<NookState>()(
           stats,
           cpuHistory: push(s.cpuHistory, stats.cpu),
           netHistory: push(s.netHistory, stats.netDown),
+          // Saniyede bir gelir: hız × 1 sn ≈ o saniyede geçen bayt
+          netTotals: { down: s.netTotals.down + stats.netDown, up: s.netTotals.up + stats.netUp },
         })),
       setDevices: (devices) => set({ devices }),
       setOsd: (osd) => set({ osd }),
@@ -702,6 +966,7 @@ export const useNook = create<NookState>()(
             affection: Math.max(0, Math.min(100, s.affection + delta)),
             lastCare: delta > 0 ? Date.now() : s.lastCare,
             days: delta > 0 ? { ...s.days, [key]: { ...EMPTY_DAY, ...s.days[key], care: (s.days[key]?.care ?? 0) + 1 } } : s.days,
+            year: delta > 0 ? { ...s.year, [key.slice(0, 4)]: { ...emptyYear(), ...s.year[key.slice(0, 4)], care: (s.year[key.slice(0, 4)]?.care ?? 0) + 1 } } : s.year,
           };
         }),
       setGrabbed: (grabbed) => set({ grabbed }),
@@ -760,9 +1025,32 @@ export const useNook = create<NookState>()(
           for (const [k, v] of Object.entries(patch) as [keyof DayStats, number][]) cur[k] += v;
           // Yalnızca son 30 gün tutulur
           const keep = Object.keys(s.days).filter((k) => k !== key).sort().slice(-29);
-          return { days: { ...Object.fromEntries(keep.map((k) => [k, s.days[k]])), [key]: cur } };
+          // Yıl özeti: aynı sayaçlar + saat dağılımı, günler, sanatçılar
+          const y = key.slice(0, 4);
+          const yr = { ...emptyYear(), ...s.year[y] };
+          yr.hours = [...yr.hours];
+          for (const k of ["active", "music", "focus", "pomodoros", "game", "notifs", "care", "water"] as const) yr[k] += patch[k] ?? 0;
+          if (patch.active) {
+            yr.hours[new Date().getHours()] += patch.active;
+            if (!yr.days.includes(key)) yr.days = [...yr.days, key];
+          }
+          const artist = patch.music && s.media?.playing ? s.media.artist.trim() : "";
+          if (artist) {
+            const a = { ...yr.artists, [artist]: (yr.artists[artist] ?? 0) + patch.music! };
+            // Çok sanatçı birikmesin: en az dinlenenler düşer
+            const top = Object.entries(a).sort((p, q) => q[1] - p[1]).slice(0, 60);
+            yr.artists = Object.fromEntries(top);
+          }
+          return { days: { ...Object.fromEntries(keep.map((k) => [k, s.days[k]])), [key]: cur }, year: { ...s.year, [y]: yr } };
         }),
-      setScore: (game, score) => set((s) => ((s.scores[game] ?? 0) >= score ? {} : { scores: { ...s.scores, [game]: score } })),
+      setScore: (game, score) =>
+        set((s) => {
+          // Her biten oyun yıl özetine de sayılır
+          const y = String(new Date().getFullYear());
+          const yr = { ...emptyYear(), ...s.year[y] };
+          yr.plays += 1;
+          return { year: { ...s.year, [y]: yr }, ...((s.scores[game] ?? 0) >= score ? {} : { scores: { ...s.scores, [game]: score } }) };
+        }),
       setOnline: (online) => set({ online }),
       setPinned: (pinned) => set({ pinned }),
       setListening: (listening) => set({ listening }),
@@ -776,6 +1064,7 @@ export const useNook = create<NookState>()(
       setLastOffer: (lastOffer) => set({ lastOffer }),
       setOuting: (outing) => set({ outing }),
       setGuard: (guard) => set({ guard }),
+      setGate: (gate) => set({ gate }),
       addCatch: (kind) => set((s) => ({ catches: { ...s.catches, [kind]: s.catches[kind] + 1 } })),
       patchClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       addEvent: (e) =>
@@ -833,6 +1122,13 @@ export const useNook = create<NookState>()(
         toured: s.toured,
         catches: s.catches,
         events: s.events,
+        pads: s.pads,
+        padId: s.padId,
+        stopwatch: s.stopwatch,
+        extEvents: s.extEvents,
+        extSyncedAt: s.extSyncedAt,
+        year: s.year,
+        yearShown: s.yearShown,
         // Kalkan ekranı (ayrı pencere) son hava durumunu gösterebilsin
         weather: s.weather,
       }),
@@ -847,11 +1143,24 @@ export const useNook = create<NookState>()(
         if (settings.askShortcut === "Ctrl+Shift+X" || settings.askShortcut === "Ctrl+Shift+E") settings.askShortcut = DEFAULT_SETTINGS.askShortcut;
         // Kalkanın ilk varsayılanı (Ctrl+Shift+X) de sık tutuluyordu
         if (settings.shieldShortcut === "Ctrl+Shift+X") settings.shieldShortcut = DEFAULT_SETTINGS.shieldShortcut;
-        return { ...current, ...p, settings };
+        // Silinmiş profil seçili kalmasın
+        if (settings.profiles && settings.homeProfile !== "all" && !settings.profiles.some((x) => x.id === settings.homeProfile)) settings.homeProfile = "all";
+        // Açık sekmenin metni (note kaydedilmez, sekmeden gelir)
+        const pads = p.pads?.length ? p.pads : current.pads;
+        const padId = pads.some((x) => x.id === p.padId) ? p.padId! : pads[0].id;
+        const note = pads.find((x) => x.id === padId)?.text ?? "";
+        return { ...current, ...p, settings, pads, padId, note };
       },
     },
   ),
 );
+
+/** Sabitlenenler önde; sabitlenmemişler en yeni MAX_CLIPS kadar */
+function trimClips(list: ClipItem[]): ClipItem[] {
+  const pinned = list.filter((c) => c.pinned).slice(0, MAX_PINNED);
+  const rest = list.filter((c) => !c.pinned).slice(0, MAX_CLIPS);
+  return [...pinned, ...rest];
+}
 
 /** Etkinliğin hatırlatma anı (ms); hatırlatma yoksa null. Gün boyu etkinlik sabah 09:00 sayılır. */
 export function remindAt(e: Pick<CalEvent, "day" | "time" | "remind">): number | null {
@@ -874,6 +1183,9 @@ export const SULK_BELOW = 25;
  */
 export const isSleeping = (s: Pick<NookState, "asleep" | "media">) => s.asleep && !s.media?.playing;
 
+/** Yayın maskesi açık mı: elle açıldı/kapandıysa o, yoksa algılama (ayar açıksa) */
+export const isLive = (s: Pick<NookState, "liveAuto" | "liveManual" | "settings">) => s.liveManual ?? (s.settings.liveMask && s.liveAuto.on);
+
 /** Pomodoro'nun çalışma fazı sürüyor (duraklatılmamış) */
 export const isWorking = (s: Pick<NookState, "focus">) => !!s.focus && s.focus.phase === "work" && s.focus.endsAt !== null;
 
@@ -889,6 +1201,8 @@ export function expressionOf(s: NookState): Expression {
     return (s.osd.dir ?? 0) < 0 ? "volDown" : "volUp";
   }
   if (s.antic) return s.antic;
+  // Yayındayken mikrofonuyla durur
+  if (isLive(s)) return "live";
   // Ararken büyüteçle bakar
   if (s.searching) return "magnify";
   if (s.busy.length) return "thinking";
@@ -907,7 +1221,7 @@ export function expressionOf(s: NookState): Expression {
   return "idle";
 }
 
-const ERROR_KINDS = new Set(["battery-low", "device-low", "unplugged", "offline"]);
+const ERROR_KINDS = new Set(["battery-low", "device-low", "unplugged", "offline", "alert"]);
 const SUCCESS_KINDS = new Set(["charging", "download", "screenshot", "headset-charging", "usb-in", "online", "bt-in", "focus"]);
 
 /** Rozet/parıltı rengi: olay kartı › kızgınlık › süren iş › yeni yemek yemiş › yok */

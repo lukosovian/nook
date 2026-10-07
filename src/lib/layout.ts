@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "guard";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "guard" | "gate";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -21,6 +21,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   reminder: { width: 440, height: 66, radius: 26 },
   /** Odak bekçisi: Nook cama vurup saati gösterir */
   guard: { width: 500, height: 78, radius: 28 },
+  /** Açılış kilidi: parola adada yazılır */
+  gate: { width: 420, height: 78, radius: 28 },
   /** "Nook nedir?" tanıtımı: ada ekrana yayılır */
   tour: { width: 900, height: 520, radius: 40 },
   /** Günün özeti: ada büyür, solda kocaman Nook, sağda kartlar */
@@ -91,6 +93,8 @@ export interface Expanded {
   /** Ana sayfada Nook'un merkezi ve "şu an" listesinin başı (kahraman kartının solundan) */
   homeNookX: number;
   homeListX: number;
+  /** Büyük adada kahraman kartının altındaki ses kutusunun yüksekliği (0 = yok) */
+  soundH: number;
   views: Record<View, { hero: Box; content: Box }>;
 }
 
@@ -100,7 +104,7 @@ export const BIG_MAX = { width: 1360, height: 820 };
 export const BIG_WINDOW = { width: 4000, height: 3000 };
 
 /** Açık adanın ölçüleri; `big` verilirse ada o boyuta yayılır, kartlar ve Nook orantılı büyür */
-export function expandedLayout(big: { width: number; height: number } | null = null): Expanded {
+export function expandedLayout(big: { width: number; height: number } | null = null, sound = false): Expanded {
   const width = big?.width ?? ISLAND.expanded.width;
   const height = big?.height ?? ISLAND.expanded.height;
   const k = big ? Math.min(width / ISLAND.expanded.width, height / ISLAND.expanded.height) : 1;
@@ -115,15 +119,18 @@ export function expandedLayout(big: { width: number; height: number } | null = n
   const heroScale = big ? Math.min(7, 2.9 * k * 0.85) : 2.9;
   const homeHero = Math.round(width * (big ? 0.42 : 0.46));
   const nookX = big ? Math.round(homeHero * 0.3) : FACE * heroScale * 0.84;
+  const zoom = big ? Math.min(1.7, Math.max(1, Math.round(k * 0.62 * 100) / 100)) : 1;
   return {
     width,
     height,
     homeNookX: nookX,
+    // Ses kartı ayrı pencere yerine kahraman kartının altında (adanın boyu kadar, yakınlaştırmayla)
+    soundH: big && sound ? Math.round(ISLAND.expanded.height * zoom) : 0,
     // Nook'un sağ eli de sığsın
     homeListX: nookX + FACE * heroScale * (big ? 1.05 : 0.76),
     radius: big ? 44 : ISLAND.expanded.radius,
     header,
-    zoom: big ? Math.min(1.7, Math.max(1, Math.round(k * 0.62 * 100) / 100)) : 1,
+    zoom,
     heroScale,
     views: {
       home: box(homeHero),
@@ -145,8 +152,11 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
       const h = ex.views[v].hero;
       const s = ex.heroScale;
       return v === "home"
-        ? center(h.x + ex.homeNookX, h.y + h.h / 2 - 4, s)
-        : center(h.x + h.w / 2, h.y + (24 * s) / 2.6 + (FACE * s) / 2, s);
+        ? center(h.x + ex.homeNookX, h.y + (h.h - ex.soundH) / 2 - 4, s)
+        : ex.soundH
+          ? // Büyük adada altta ses kutusu: Nook üstteki boşluğun ortasında
+            center(h.x + h.w / 2, h.y + (h.h - ex.soundH) / 2, s)
+          : center(h.x + h.w / 2, h.y + (24 * s) / 2.6 + (FACE * s) / 2, s);
     }
     case "brief":
     case "notes":
@@ -163,6 +173,7 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
     case "reminder":
       return center(36, height / 2 + 2, 1.45);
     case "guard":
+    case "gate":
       return center(44, height / 2 + 3, 1.75);
     default:
       return center(width / 2, height / 2, 1);

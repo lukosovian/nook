@@ -66,6 +66,8 @@ export function eyesFor(expression: Expression, style: EyeStyle): [EyeShape, Eye
 /** [sol, sağ] göz. */
 export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
   idle: [OPEN, OPEN],
+  // Yayında: mikrofona konuşurken gülen gözler
+  live: [arch(5, 3.2), arch(5, 3.2)],
   sleepy: [SHUT, SHUT],
   // Kutu olunca yukarı, gelen dosyaya bakan kocaman gözler
   hungry: [pill(4.4, 8.8), pill(4.4, 8.8)],

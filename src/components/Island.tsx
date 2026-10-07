@@ -19,11 +19,13 @@ import { Nook, STATUS_COLOR } from "./mascot/Nook";
 import { MiniPlayer } from "./media/MiniPlayer";
 import { AlarmView } from "./overlays/AlarmView";
 import { GuardView } from "./overlays/GuardView";
+import { GateView } from "./overlays/GateView";
 import { Dangle } from "./outings/Dangle";
 import { Fishing } from "./outings/Fishing";
 import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { FocusMini } from "./overlays/FocusMini";
+import { EventMini, StopwatchMini, useEventSoon } from "./overlays/TimeMini";
 import { ListenMini } from "./overlays/ListenMini";
 import { MoveFx } from "./overlays/MoveFx";
 import { moveTarget } from "../lib/moveFx";
@@ -126,6 +128,8 @@ export function Island() {
   const detached = useNook((s) => (s.settings.islandPos?.fy ?? 0) > 0);
   const downloading = useNook((s) => s.downloads.length > 0);
   const focusing = useNook((s) => !!s.focus);
+  const timing = useNook((s) => !!s.stopwatch);
+  const eventSoon = useEventSoon();
   const listening = useNook((s) => s.listening);
   const intro = useNook((s) => s.intro);
   const outing = useNook((s) => s.outing);
@@ -169,14 +173,16 @@ export function Island() {
   const playing = !!media?.playing;
   // Görünüm düzenlenirken dans etmesin: seçilen gözler görünsün
   const lookTab = useNook((s) => s.tab === "look");
-  // Kapalı adada solda/sağda yer isteyenler: dinleme > indirme > odak > müzik
+  // Kapalı adada solda/sağda yer isteyenler: dinleme > indirme > odak > etkinlik > kronometre > müzik
   const collapsed = mode === "collapsed";
   const miniListen = collapsed && listening;
   const miniDownload = collapsed && downloading && !miniListen;
   const miniFocus = collapsed && focusing && !miniListen && !miniDownload;
-  const miniPlayer = collapsed && playing && !miniListen && !miniDownload && !miniFocus;
+  const miniEvent = collapsed && eventSoon.soon && (!playing || eventSoon.urgent) && !miniListen && !miniDownload && !miniFocus;
+  const miniWatch = collapsed && timing && !miniListen && !miniDownload && !miniFocus && !miniEvent;
+  const miniPlayer = collapsed && playing && !miniListen && !miniDownload && !miniFocus && !miniEvent && !miniWatch;
   const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail));
-  const width = miniPlayer || miniDownload || miniFocus || miniListen ? MEDIA_COLLAPSED_WIDTH : mode === "toast" ? toastWidth : shape.width;
+  const width = miniPlayer || miniDownload || miniFocus || miniListen || miniEvent || miniWatch ? MEDIA_COLLAPSED_WIDTH : mode === "toast" ? toastWidth : shape.width;
   const transition = mode === "feeding" ? spring.stretch : spring.island;
   const view = useNook((s) => (s.tab === "home" ? "home" : "module"));
   const tourStep = useNook((s) => s.tourStep);
@@ -261,9 +267,11 @@ export function Island() {
           <AnimatePresence>{miniPlayer && <MiniPlayer key="mini" media={media!} />}</AnimatePresence>
           <AnimatePresence>{miniDownload && <DownloadMini key="dl" />}</AnimatePresence>
           <AnimatePresence>{miniFocus && <FocusMini key="focus" />}</AnimatePresence>
+          <AnimatePresence>{miniEvent && <EventMini key="event" />}</AnimatePresence>
+          <AnimatePresence>{miniWatch && <StopwatchMini key="watch" />}</AnimatePresence>
           <AnimatePresence>{miniListen && <ListenMini key="listen" />}</AnimatePresence>
           <PrivacyDots mode={mode} />
-          <ContextMenu bounds={ref} />
+          <ContextMenu bounds={ref} refreshOnly={mode === "gate"} />
 
           <AnimatePresence>
             {mode === "osd" && <OsdView key="osd" />}
@@ -271,6 +279,7 @@ export function Island() {
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
             {mode === "guard" && <GuardView key="guard" />}
+            {mode === "gate" && <GateView key="gate" />}
           </AnimatePresence>
         </motion.div>
         {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}

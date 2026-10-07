@@ -139,6 +139,18 @@ float acc(vec3 p){
   if(uGlasses==3){ d=min(d,sdTorus(p-eR,vec2(.3,.045)));
      vec3 c=eR+vec3(.2,-.24,0.);
      for(int i=ZERO;i<6;i++){ float t=float(i)/6.; vec3 a=c+vec3(.12*t+.1*sin(t*5.),-.5*t,-.25*t); vec3 b=c+vec3(.12*(t+.17)+.1*sin((t+.17)*5.),-.5*(t+.17),-.25*(t+.17)); d=min(d,sdCaps(p,a,b,.022)); } }
+  // göz bandı: sol gözün üstünde yuvarlak bant, ipi başın üstünden ve yanından geçer
+  if(uGlasses==5){ vec3 q=p-eL-vec3(0.,0.,.03);
+     d=min(d,sdEll(q,vec3(.25,.22,.07)));
+     d=min(d,sdCaps(p,eL+vec3(.18,.16,0.),vec3(.5,.86,.34),.03));
+     d=min(d,sdCaps(p,vec3(.5,.86,.34),vec3(.62,.98,-.2),.03));
+     d=min(d,sdCaps(p,eL+vec3(-.2,.02,-.04),vec3(-.88,.12,.06),.03)); }
+  // koruyucu gözlük: kalın yuvarlak çerçeveler, köprü ve başı saran lastik
+  if(uGlasses==6){
+     d=min(d,sdTorus(p-eL,vec2(R,.075))); d=min(d,sdTorus(p-eR,vec2(R,.075)));
+     d=min(d,sdCaps(p,vec3(-inner+.02,uEye.x,uEye.z),vec3(inner-.02,uEye.x,uEye.z),.05));
+     vec3 q=p-vec3(0.,uEye.x,0.); float band=length(vec2(length(q.xz)-.97,q.y))-.055;
+     band=max(band,-(q.z-.1)); d=min(d,band); }
   // başlıklar
   if(uHat==1){ vec3 q=p-vec3(.1,.86,-.02); q.xy=rot(.26)*q.xy;
      float b=sdEll(q,vec3(.98,.3,.88)); b=smin(b,sdEll(q-vec3(0.,.1,0.),vec3(.66,.34,.62)),.2);
@@ -173,12 +185,26 @@ float acc(vec3 p){
      wing=max(wing,-(length(w.xy-vec2(.38,-.15))-.07));
      b=min(b,ext(wing,w.z,.022,.015));
      d=min(d,b); }
+  if(uHat==15){ // kovboy şapkasının bandı
+     vec3 q=p-vec3(.02,.8,-.04); q.xy=rot(.1)*q.xy;
+     d=min(d,sdCylY(q-vec3(0.,.1,0.),.53,.055,.02)); }
+  if(uHat==16){ // korsan şapkası: kubbe ve üç yandan kalkık siper
+     vec3 q=p-vec3(0.,.8,-.02); q.xy=rot(.06)*q.xy;
+     float a=atan(q.z,q.x); float up=.5+.5*cos(3.*(a-1.5708));
+     vec3 bq=q; bq.y-=.42*up*smoothstep(.3,.95,length(q.xz));
+     float brim=sdEll(bq,vec3(1.08,.12,.98))*.6;
+     float crown=sdEll(q-vec3(0.,.2,-.04),vec3(.66,.44,.62)); crown=max(crown,-(q.y+.02));
+     d=min(d,smin(brim,crown,.06)); }
+  if(uHat==18){ // kondüktör kepinin siperi
+     vec3 q=p-vec3(0.,.78,-.04); q.yz=rot(-.25)*q.yz;
+     float v=sdEll(q-vec3(0.,.02,.52),vec3(.5,.035,.3)); v=max(v,-(q.z-.3)); d=min(d,v); }
   // boyun
   if(uNeck==1){ vec3 q=p-vec3(0.,-.92,.42); vec3 r=q; r.x=abs(r.x); r.xy=rot(-.08)*r.xy;
      float w=sdEll(r-vec3(.22,0.,0.),vec3(.25,.16+.06*clamp(r.x*2.,0.,1.),.1)); w=smin(w,sdSph(q,.085),.04); d=min(d,w); }
   return d;
 }
-/** Renkli aksesuarlar: x uzaklık, y malzeme (2 şapka rengi, 3 beyaz, 4 sarı, 5 yeşil, 6 kahve, 7 kırmızı, 8 mor) */
+/** Renkli aksesuarlar: x uzaklık, y malzeme (2 şapka rengi, 3 beyaz, 4 sarı, 5 yeşil, 6 kahve, 7 kırmızı, 8 mor,
+    9 hasır, 10 haki, 11 lacivert) */
 vec2 accC(vec3 p){
   vec2 r=vec2(1e3,0.);
   if(uHat==7){ // şapka (kep): kubbe + öne siper
@@ -219,6 +245,54 @@ vec2 accC(vec3 p){
      vec3 q=p-vec3(.04,.76,-.04); q.xy=rot(.16)*q.xy;
      float band=max(sdCylY(q-vec3(0.,.12,0.),.45,.06,.02),-sdCylY(q-vec3(0.,.12,0.),.36,.2,.0));
      if(band<r.x) r=vec2(band,8.); }
+  if(uHat==15){ // kovboy şapkası (kahverengi): yanları kalkık geniş siper, ortası çukur tepe
+     vec3 q=p-vec3(.02,.8,-.04); q.xy=rot(.1)*q.xy;
+     vec3 bq=q; bq.y-=.2*bq.x*bq.x;
+     float brim=sdEll(bq,vec3(1.2,.085,.92))*.75;
+     float crown=sdEll(q-vec3(0.,.3,0.),vec3(.52,.46,.48)); crown=max(crown,-(q.y-.02));
+     crown=max(crown,-sdEll(q-vec3(0.,.78,0.),vec3(.1,.18,.36)));
+     float h=smin(brim,crown,.05);
+     if(h<r.x) r=vec2(h,6.); }
+  if(uHat==16){ // korsan şapkasının beyaz kafatası
+     vec3 q=p-vec3(0.,.8,-.02); q.xy=rot(.06)*q.xy;
+     float sk=sdCylZ(q-vec3(0.,.22,.54),.11,.03,.02);
+     sk=min(sk,sdCaps(q,vec3(-.13,.06,.55),vec3(.13,.14,.55),.025));
+     sk=min(sk,sdCaps(q,vec3(.13,.06,.55),vec3(-.13,.14,.55),.025));
+     if(sk<r.x) r=vec2(sk,3.); }
+  if(uHat==17){ // hasır şapka: hafif sarkık geniş siper, yuvarlak tepe, kırmızı bant
+     vec3 q=p-vec3(0.,.8,-.04); q.xy=rot(.08)*q.xy;
+     vec3 bq=q; bq.y+=.07*dot(q.xz,q.xz);
+     float brim=sdEll(bq,vec3(1.18,.045,1.02))*.85;
+     float crown=sdCylY(q-vec3(0.,.24,0.),.5,.24,.16);
+     float h=smin(brim,crown,.04);
+     if(h<r.x) r=vec2(h,9.);
+     float band=sdCylY(q-vec3(0.,.1,0.),.52,.065,.02);
+     if(band<r.x) r=vec2(band,7.); }
+  if(uHat==18){ // kondüktör kepi: lacivert gövde, düz tepe, sarı şerit ve rozet
+     vec3 q=p-vec3(0.,.78,-.04); q.xy=rot(.05)*q.xy;
+     float c=sdCylY(q-vec3(0.,.18,0.),.56,.19,.05);
+     c=smin(c,sdEll(q-vec3(0.,.38,-.02),vec3(.66,.08,.62)),.06);
+     if(c<r.x) r=vec2(c,11.);
+     float g=sdCylY(q-vec3(0.,.07,0.),.575,.045,.01);
+     g=min(g,sdSph(q-vec3(0.,.2,.56),.07));
+     if(g<r.x) r=vec2(g,4.); }
+  if(uHat==19){ // asker miğferi (haki): başın üstünü örten kubbe, kenarında dudak
+     vec3 q=p-vec3(0.,.1,-.04);
+     float h=sdSph(q,1.07); h=max(h,-(q.y-.34));
+     h=min(h,length(vec2(length(q.xz)-1.04,q.y-.34))-.05);
+     if(h<r.x) r=vec2(h,10.); }
+  if(uHat==20){ // baret (sarı): kubbe, ortasında sırt, öne uzayan siper
+     vec3 q=p-vec3(0.,.8,-.04); q.xy=rot(.06)*q.xy;
+     float dome=sdEll(q,vec3(.68,.5,.66)); dome=max(dome,-q.y);
+     dome=smin(dome,sdCaps(q,vec3(0.,.44,-.5),vec3(0.,.5,.4),.07),.06);
+     float brim=sdEll(q-vec3(0.,.01,.14),vec3(.8,.04,.84));
+     float h=smin(dome,brim,.04);
+     if(h<r.x) r=vec2(h,4.); }
+  if(uNeck==2){ // atkı (kırmızı): boynu saran kalın halka ve önden sarkan uç
+     vec3 q=p-vec3(0.,-.74,.06);
+     float sc=length(vec2(length(q.xz*vec2(1.,.92))-.72,q.y*1.15))-.17;
+     sc=smin(sc,sdEll(q-vec3(.3,-.36,.66),vec3(.15,.34,.07)),.07);
+     if(sc<r.x) r=vec2(sc,7.); }
   return r;
 }
 vec2 map(vec3 p){
@@ -244,13 +318,16 @@ vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
   bool colored = id<.5 || id>1.5;
   if(colored){
     vec3 base = id<.5 ? uColor : id<2.5 ? uAcc : id<3.5 ? vec3(.97,.96,.94) : id<4.5 ? vec3(1.,.8,.12) : id<5.5 ? vec3(.42,.8,.2)
-              : id<6.5 ? vec3(.36,.22,.1) : id<7.5 ? vec3(.92,.12,.1) : vec3(.55,.22,.95);
+              : id<6.5 ? vec3(.36,.22,.1) : id<7.5 ? vec3(.92,.12,.1) : id<8.5 ? vec3(.55,.22,.95)
+              : id<9.5 ? vec3(.93,.76,.42) : id<10.5 ? vec3(.33,.4,.2) : vec3(.1,.15,.36);
     // aksesuarlar vinil gibi parlar; şapka gövde peluşsa o da peluş
     float fur = id<.5 || id<2.5 ? uFur : 0.;
     vec3 deep=base*base*vec3(.62,.58,.7);
     vec3 col=mix(deep,base,wrap*sh);
     col+=base*.12*(.5+.5*n.y);
     col*=mix(.6,1.,o);
+    // hasır örgü
+    if(id>8.5 && id<9.5){ col*=.86+.14*step(.5,fract(atan(p.z,p.x)*9.))*step(.5,fract(p.y*14.+atan(p.z,p.x)*4.)); return col+rim*base*.1; }
     if(id<.5 && uTex==2){
       // mat kil: parlama yok, ince toprak dokusu, yumuşak ışık
       col=mix(deep,base,(wrap*.85+.15)*sh)*mix(.6,1.,o);

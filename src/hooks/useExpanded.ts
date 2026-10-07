@@ -6,5 +6,6 @@ import { useNook } from "../store/nook";
 export function useExpanded() {
   const w = useNook((s) => s.big?.width ?? 0);
   const h = useNook((s) => s.big?.height ?? 0);
-  return useMemo(() => expandedLayout(w ? { width: w, height: h } : null), [w, h]);
+  const sound = useNook((s) => s.settings.soundCard);
+  return useMemo(() => expandedLayout(w ? { width: w, height: h } : null, sound), [w, h, sound]);
 }

@@ -46,7 +46,41 @@ export function Props({ expression, sleepStyle }: { expression: Expression; slee
       {expression === "sneeze" && <SneezePuff key="sneeze" />}
       {expression === "focused" && <Desk key="desk" />}
       {expression === "knock" && <Knock key="knock" />}
+      {expression === "live" && <LiveMic key="live" />}
     </AnimatePresence>
+  );
+}
+
+/** Yayında: sol elinde mikrofon ağzına yakın, sağ üstte yanıp sönen "CANLI" tabelası */
+function LiveMic() {
+  return (
+    <motion.div className="pointer-events-none absolute" style={{ left: 0, top: 0, width: 24, height: 24 }} {...pop}>
+      {/* Mikrofon: koyu sap, gri ızgaralı baş */}
+      <motion.div
+        className="absolute"
+        style={{ left: 1, top: 11, width: 8, height: 12, originX: 0.5, originY: 1 }}
+        animate={{ rotate: [-24, -18, -24] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <span className="absolute" style={{ left: 2.6, top: 4.5, width: 2.6, height: 7.5, borderRadius: 1.2, background: "linear-gradient(90deg, #1b1b1f, #3a3a42 60%, #1b1b1f)" }} />
+        <span
+          className="absolute rounded-full"
+          style={{ left: 0.9, top: 0, width: 6, height: 6, background: "radial-gradient(circle at 35% 30%, #f4f4f8 0%, #9a9aa6 55%, #55555e 100%)", boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.35)" }}
+        />
+        <span className="absolute" style={{ left: 1.6, top: 2.6, width: 4.6, height: 0.5, background: "rgba(0,0,0,0.25)" }} />
+        <PropHand x={3.9} y={9.5} rotate={15} />
+      </motion.div>
+      {/* CANLI tabelası */}
+      <motion.div
+        className="absolute flex items-center rounded-[1.6px]"
+        style={{ left: 17, top: -3.5, height: 4.6, paddingLeft: 1, paddingRight: 1.4, gap: 0.8, background: "#e5243b", boxShadow: "0 0.6px 1.4px rgba(0,0,0,0.5)" }}
+        animate={{ rotate: [6, 3, 6], y: [0, -0.4, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <motion.span className="rounded-full" style={{ width: 1.4, height: 1.4, background: "#fff" }} animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1, repeat: Infinity }} />
+        <span style={{ fontSize: 2.9, lineHeight: 1, fontWeight: 800, color: "#fff", letterSpacing: 0.1 }}>CANLI</span>
+      </motion.div>
+    </motion.div>
   );
 }
 

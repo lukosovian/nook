@@ -4,7 +4,7 @@
  * kalkan parola sorarak açılır.
  */
 import { useEffect } from "react";
-import { isPrimary, shieldOn, subscribe, systemUptime } from "./bridge";
+import { isPrimary, releaseFocus, setGate, subscribe, systemUptime } from "./bridge";
 import { useNook } from "../store/nook";
 import { micClick } from "./clickSound";
 import { tt } from "./i18n";
@@ -30,24 +30,51 @@ export async function checkPassword(password: string, stored: string) {
 const BOOT_WINDOW_SEC = 10 * 60;
 const BOOT_KEY = "nook-lock-boot";
 
+/** Açılış kilidi sürüyor (sayfa yenilense de kilit kalksın diye oturumda tutulur) */
+const GATE_KEY = "nook-gate";
+
 /**
- * Açılış kilidi: Nook bilgisayarla birlikte başladıysa kalkanı parola sorarak aç. Aynı açılışta bir
- * kez (Nook güncellenip yeniden başlarsa tekrar kilitlemez).
+ * Açılış kilidi: Nook bilgisayarla birlikte başladıysa ada parola sorar; yazılana kadar Nook'un
+ * hiçbir bölümü açılmaz (diğer adalar ve yan kartlar da kapalı). Tam ekran kalkan açılmaz — açılışta
+ * ağır sahneler ve ses aygıtı hazır olmadan kalkan bilgisayarı kilitliyordu. Aynı açılışta bir kez
+ * (Nook güncellenip yeniden başlarsa tekrar kilitlemez). Günün karşılaması parola yazılınca gelir.
  */
 export async function bootLock() {
   const s = useNook.getState().settings;
   if (!s.lockEnabled || !s.lockHash || !s.lockOnBoot) return;
-  const up = await systemUptime().catch(() => Infinity);
-  if (up > BOOT_WINDOW_SEC) return;
-  // Açılış anı (dakikaya yuvarlı): aynıysa bu açılışta zaten kilitlendi
-  const boot = String(Math.round((Date.now() / 1000 - up) / 60));
+  let pending = false;
   try {
-    if (localStorage.getItem(BOOT_KEY) === boot) return;
-    localStorage.setItem(BOOT_KEY, boot);
+    pending = sessionStorage.getItem(GATE_KEY) === "1";
   } catch {
-    // depolama yoksa yine de kilitle
+    // önemsiz
   }
-  await shieldOn(true);
+  if (!pending) {
+    const up = await systemUptime().catch(() => Infinity);
+    if (up > BOOT_WINDOW_SEC) return;
+    // Açılış anı (dakikaya yuvarlı): aynıysa bu açılışta zaten kilitlendi
+    const boot = String(Math.round((Date.now() / 1000 - up) / 60));
+    try {
+      if (localStorage.getItem(BOOT_KEY) === boot) return;
+      localStorage.setItem(BOOT_KEY, boot);
+      sessionStorage.setItem(GATE_KEY, "1");
+    } catch {
+      // depolama yoksa yine de kilitle
+    }
+  }
+  useNook.getState().setGate(true);
+  await setGate(true).catch(() => undefined);
+}
+
+/** Doğru parola yazıldı: Nook açılır */
+export function openGate() {
+  try {
+    sessionStorage.removeItem(GATE_KEY);
+  } catch {
+    // önemsiz
+  }
+  useNook.getState().setGate(false);
+  void setGate(false).catch(() => undefined);
+  void releaseFocus().catch(() => undefined);
 }
 
 /**

@@ -30,6 +30,8 @@ pub struct Stats {
     battery: Option<Battery>,
     /// Pille çalışıyor ya da Windows enerji tasarrufu açık — animasyonlar yavaşlasın
     saver: bool,
+    /// Ekran kartı (3B motoru) kullanımı (%); ölçülemiyorsa yok
+    gpu: Option<f32>,
 }
 
 #[derive(Clone, Copy, Serialize, PartialEq)]
@@ -57,6 +59,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
         .name("nook-system".into())
         .spawn(move || {
             let mut cpu = imp::CpuMeter::default();
+            let mut gpu = imp::GpuMeter::new();
+            let mut gpu_now: Option<f32> = None;
+            let mut tick: u64 = 0;
+            let mut locked_prev = false;
             let mut net = imp::NetMeter::default();
             let mut battery_prev = imp::battery();
             let mut drives_prev = imp::removable_drives();
@@ -67,6 +73,11 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 thread::sleep(POLL);
 
                 // --- İstatistikler
+                tick += 1;
+                // GPU sayaçları pahalı: iki saniyede bir
+                if tick % 2 == 0 {
+                    gpu_now = gpu.as_mut().and_then(|g| g.sample());
+                }
                 let (mem_used, mem_total) = imp::memory();
                 let (net_down, net_up) = net.sample();
                 let (disk_used, disk_total) = imp::disk();
@@ -78,8 +89,15 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 }
                 let _ = app.emit(
                     "nook://stats",
-                    Stats { cpu: cpu_now, mem_used, mem_total, net_down, net_up, disk_used, disk_total, battery, saver: imp::power_saver() },
+                    Stats { cpu: cpu_now, mem_used, mem_total, net_down, net_up, disk_used, disk_total, battery, saver: imp::power_saver(), gpu: gpu_now },
                 );
+
+                // --- Ekran kilitlendi / açıldı (pano temizliği)
+                let locked = imp::screen_locked();
+                if locked != locked_prev {
+                    locked_prev = locked;
+                    let _ = app.emit("nook://locked", locked);
+                }
 
                 // --- Pil olayları
                 if let (Some(b), Some(p)) = (battery, battery_prev) {
@@ -289,6 +307,83 @@ mod imp {
         Some((down, up))
     }
 
+    /// Oturum kilitli mi (Win+L, uyku sonrası kilit ekranı). UAC penceresi kilit sayılmaz.
+    pub fn screen_locked() -> bool {
+        use windows_sys::Win32::System::RemoteDesktop::{
+            WTSFreeMemory, WTSQuerySessionInformationW, WTSSessionInfoEx, WTSINFOEXW, WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION,
+        };
+        const WTS_SESSIONSTATE_LOCK: i32 = 0;
+        unsafe {
+            let mut buf: *mut u16 = std::ptr::null_mut();
+            let mut bytes = 0u32;
+            if WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSSessionInfoEx, &mut buf, &mut bytes) == 0 || buf.is_null() {
+                return false;
+            }
+            let info = &*(buf as *const WTSINFOEXW);
+            let locked = info.Level == 1 && info.Data.WTSInfoExLevel1.SessionFlags == WTS_SESSIONSTATE_LOCK;
+            WTSFreeMemory(buf as _);
+            locked
+        }
+    }
+
+    /// GPU 3B motorlarının kullanımı (Görev Yöneticisi'nin "GPU" sütunuyla aynı sayaç)
+    pub struct GpuMeter {
+        query: isize,
+        counter: isize,
+    }
+
+    impl GpuMeter {
+        pub fn new() -> Option<Self> {
+            use windows_sys::Win32::System::Performance::{PdhAddEnglishCounterW, PdhCollectQueryData, PdhOpenQueryW};
+            unsafe {
+                let mut query = 0isize;
+                if PdhOpenQueryW(std::ptr::null(), 0, &mut query as *mut isize as _) != 0 {
+                    return None;
+                }
+                let path = wide(r"\GPU Engine(*engtype_3D)\Utilization Percentage");
+                let mut counter = 0isize;
+                if PdhAddEnglishCounterW(query as _, path.as_ptr(), 0, &mut counter as *mut isize as _) != 0 {
+                    return None;
+                }
+                PdhCollectQueryData(query as _);
+                Some(Self { query, counter })
+            }
+        }
+
+        pub fn sample(&mut self) -> Option<f32> {
+            use windows_sys::Win32::System::Performance::{PdhCollectQueryData, PdhGetFormattedCounterArrayW, PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE};
+            const PDH_MORE_DATA: u32 = 0x800007D2;
+            unsafe {
+                if PdhCollectQueryData(self.query as _) != 0 {
+                    return None;
+                }
+                let (mut size, mut count) = (0u32, 0u32);
+                let r = PdhGetFormattedCounterArrayW(self.counter as _, PDH_FMT_DOUBLE, &mut size, &mut count, std::ptr::null_mut());
+                if r != PDH_MORE_DATA || size == 0 {
+                    return Some(0.0);
+                }
+                let mut buf = vec![0u8; size as usize];
+                let items = buf.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W;
+                if PdhGetFormattedCounterArrayW(self.counter as _, PDH_FMT_DOUBLE, &mut size, &mut count, items) != 0 {
+                    return None;
+                }
+                // Aynı motoru kullanan süreçlerin toplamı = motorun doluluğu; en dolu motor gösterilir
+                let mut engines: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+                for it in std::slice::from_raw_parts(items, count as usize) {
+                    let mut n = 0;
+                    while *it.szName.add(n) != 0 {
+                        n += 1;
+                    }
+                    let name = String::from_utf16_lossy(std::slice::from_raw_parts(it.szName, n));
+                    // "pid_1234_luid_0x..._phys_0_eng_0_engtype_3D" → "0x..._phys_0_eng_0_engtype_3D"
+                    let engine = name.split_once("_luid_").map(|(_, r)| r.to_string()).unwrap_or(name);
+                    *engines.entry(engine).or_default() += it.FmtValue.Anonymous.doubleValue;
+                }
+                Some(engines.values().cloned().fold(0.0, f64::max).clamp(0.0, 100.0) as f32)
+            }
+        }
+    }
+
     /// Takılı çıkarılabilir sürücüler, "E: KINGSTON" biçiminde.
     pub fn removable_drives() -> HashSet<String> {
         let mask = unsafe { GetLogicalDrives() };
@@ -358,5 +453,17 @@ mod imp {
     }
     pub fn removable_drives() -> HashSet<String> {
         HashSet::new()
+    }
+    pub fn screen_locked() -> bool {
+        false
+    }
+    pub struct GpuMeter;
+    impl GpuMeter {
+        pub fn new() -> Option<Self> {
+            None
+        }
+        pub fn sample(&mut self) -> Option<f32> {
+            None
+        }
     }
 }

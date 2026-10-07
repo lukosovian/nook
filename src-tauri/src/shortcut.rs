@@ -2,6 +2,9 @@
 //!  - Hızlı arama (varsayılan Ctrl+Shift+Space)
 //!  - Ekrana sor (Ctrl+Shift+A): ekran görüntüsü alınır, sohbet açılır, görüntü soruya eklenir
 //!  - Sesli komut (Ctrl+Shift+D, basılı tut): bırakınca kayıt Gemini'ye gider
+//!  - Rafa ekle (Ctrl+Alt+S): Gezgin'de seçili dosyalar rafa düşer
+//!  - Düz metin yapıştır (Ctrl+Alt+V): panodaki biçim atılır, metin yapıştırılır
+//!  - Ses çıkışı (isteğe bağlı): seçili çıkışlar arasında sırayla geçer
 
 use std::sync::{Arc, Mutex};
 
@@ -11,7 +14,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use crate::focus;
 use crate::imaging;
-use crate::state::Shared;
+use crate::state::{Settings, Shared};
 use crate::tracker::cursor_position;
 use crate::voice;
 use crate::window::{self, ISLAND};
@@ -25,6 +28,10 @@ enum Role {
     Ask,
     Voice,
     Shield,
+    Shelf,
+    PlainPaste,
+    Output,
+    Live,
 }
 
 #[derive(Clone, Serialize)]
@@ -35,9 +42,19 @@ enum VoiceEvent {
     Error { message: String },
 }
 
-pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str, shield: &str) -> Result<(), String> {
+pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let mut registered = REGISTERED.lock().unwrap();
-    let wanted: Vec<String> = [search, ask, voice_key, shield].iter().map(|s| s.to_string()).collect();
+    let list = [
+        (settings.shortcut.as_str(), Role::Search),
+        (settings.ask_shortcut.as_str(), Role::Ask),
+        (settings.voice_shortcut.as_str(), Role::Voice),
+        (settings.shield_shortcut.as_str(), Role::Shield),
+        (settings.shelf_shortcut.as_str(), Role::Shelf),
+        (settings.plain_paste_shortcut.as_str(), Role::PlainPaste),
+        (settings.output_shortcut.as_str(), Role::Output),
+        (settings.live_shortcut.as_str(), Role::Live),
+    ];
+    let wanted: Vec<String> = list.iter().map(|(s, _)| s.to_string()).collect();
     if *registered == wanted {
         return Ok(());
     }
@@ -46,10 +63,18 @@ pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str, shiel
     registered.clear();
 
     let mut errors = Vec::new();
-    for (accel, role) in [(search, Role::Search), (ask, Role::Ask), (voice_key, Role::Voice), (shield, Role::Shield)] {
+    let mut seen: Vec<String> = Vec::new();
+    for (accel, role) in list {
         if accel.trim().is_empty() {
             continue;
         }
+        // Aynı kısayol iki işe verildiyse yalnızca ilki çalışır
+        let norm = accel.to_lowercase().replace(' ', "");
+        if seen.contains(&norm) {
+            errors.push(format!("{accel}: başka bir işte kullanılıyor"));
+            continue;
+        }
+        seen.push(norm);
         let res = gs.on_shortcut(accel, move |app, _shortcut, event| match (role, event.state()) {
             (Role::Search, ShortcutState::Pressed) => {
                 if let Some(label) = open_island(app) {
@@ -64,6 +89,13 @@ pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str, shiel
             }
             (Role::Voice, ShortcutState::Released) => finish_voice(app),
             (Role::Shield, ShortcutState::Pressed) => crate::shield::toggle(app),
+            (Role::Shelf, ShortcutState::Pressed) => shelf_add(app),
+            // Tuşlar bırakılınca: basılı Alt/Shift yapıştırmaya karışmasın
+            (Role::PlainPaste, ShortcutState::Released) => crate::clipboard::paste_plain(),
+            (Role::Output, ShortcutState::Pressed) => crate::quick::cycle_output(app),
+            (Role::Live, ShortcutState::Pressed) => {
+                let _ = app.emit("nook://share-toggle", ());
+            }
             _ => {}
         });
         if let Err(e) = res {
@@ -80,7 +112,7 @@ pub fn register(app: &AppHandle, search: &str, ask: &str, voice_key: &str, shiel
 }
 
 /// İmlecin olduğu ekrandaki adanın etiketi; yoksa ana ada.
-fn target(app: &AppHandle) -> String {
+pub(crate) fn target(app: &AppHandle) -> String {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let monitors = app.available_monitors().unwrap_or_default();
     // Etiketleri önce kopyala: monitor_of aynı kilidi tekrar alır.
@@ -129,5 +161,15 @@ fn finish_voice(app: &AppHandle) {
             Err(message) => VoiceEvent::Error { message },
         };
         let _ = app.emit_to(label.as_str(), "nook://voice", ev);
+    });
+}
+
+/// Gezgin'de seçili dosyaları rafa ekle; seçim yoksa rafı aç
+fn shelf_add(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let paths = crate::shell::explorer_selection();
+        crate::log::write("info", &format!("rafa ekle: {} öğe", paths.len()));
+        let _ = app.emit_to(target(&app).as_str(), "nook://shelf-add", paths);
     });
 }

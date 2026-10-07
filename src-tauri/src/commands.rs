@@ -33,6 +33,12 @@ pub fn set_interactive(window: WebviewWindow, on: bool, shared: State<'_, Arc<Sh
     }
 }
 
+/// Açılış kilidi (parola adada soruluyor): açıkken diğer adalar ve yan kartlar etkileşime kapanır
+#[tauri::command]
+pub fn set_gate(on: bool, shared: State<'_, Arc<Shared>>) {
+    shared.gated.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Ada kapanınca (not yazdıktan sonra vb.) klavye odağını önceki uygulamaya geri ver.
 #[tauri::command]
 pub fn release_focus(shared: State<'_, Arc<Shared>>) {
@@ -46,7 +52,7 @@ pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_
     window::set_zoom(&app, settings.ui_scale);
     window::set_quit_label(&settings.quit_label);
     window::apply_monitor_mode(&app, &settings);
-    shortcut::register(&app, &settings.shortcut, &settings.ask_shortcut, &settings.voice_shortcut, &settings.shield_shortcut)
+    shortcut::register(&app, &settings)
 }
 
 /// Adayı sürüklemeye başla (üst çubuktaki tutamaçtan). Windows'un kendi taşıma döngüsü çalışır;

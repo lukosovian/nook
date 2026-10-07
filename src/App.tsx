@@ -12,6 +12,8 @@ import { useAntics } from "./hooks/useAntics";
 import { useCursorFeed } from "./hooks/useCursorFeed";
 import { useFeeding } from "./hooks/useFeeding";
 import { useFocusGuard, useOutings } from "./hooks/useOutings";
+import { useCalendarFeed, useExtReminders } from "./hooks/useCalendarFeed";
+import { useYearEnd } from "./components/panels/YearPanel";
 import {
   useAskScreenFeed,
   useDayTracker,
@@ -41,6 +43,8 @@ import {
   useSearchFeed,
   useIslandPosFeed,
   useSettingsSync,
+  useShelfFeed,
+  useLiveFeed,
   useShelfRevalidation,
   useStatsFeed,
   useStorageSync,
@@ -76,6 +80,11 @@ export default function App() {
   useAntics();
   useAlarms();
   useShelfRevalidation();
+  useShelfFeed();
+  useLiveFeed();
+  useCalendarFeed();
+  useExtReminders();
+  useYearEnd();
   useFocusTimer();
   useDayTracker();
   useNotificationFeed();

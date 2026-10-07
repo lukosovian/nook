@@ -6,10 +6,10 @@ import type { ShelfItem } from "../store/nook";
 let fallbackIcon: Promise<string> | undefined;
 
 /** Raftaki dosyayı native (OLE) sürükleme ile Discord'a, klasöre, tarayıcıya taşı. */
-export async function dragOut(item: ShelfItem) {
+export async function dragOut(item: ShelfItem, onDropped?: () => void) {
   if (!inTauri) return;
   const icon = item.isImage ? item.path : await (fallbackIcon ??= dragIconPath());
-  await startDrag({ item: [item.path], icon, mode: "copy" });
+  await startDrag({ item: [item.path], icon, mode: "copy" }, (e) => e.result === "Dropped" && onDropped?.());
 }
 
 /** Herhangi bir yolu (çıkarılmış arşiv dosyası, klasör) native sürükleme ile taşı */

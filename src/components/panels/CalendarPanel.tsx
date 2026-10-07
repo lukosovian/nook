@@ -1,13 +1,15 @@
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, BellOff, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { Bell, BellOff, ChevronLeft, ChevronRight, Link2, Plus, X } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { spring } from "../../lib/motion";
-import { dayKey, remindAt, useNook, type CalEvent } from "../../store/nook";
+import { dayKey, remindAt, useNook, type CalEvent, type ExtEvent } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt, locale } from "../../lib/i18n";
 
 const COLOR = ACCENT.blue;
+/** Abone takvimden (Google/Outlook) gelenler */
+const EXT = ACCENT.purple;
 
 /** Hatırlatma seçenekleri (dakika önce; -1 = yok). Tıkladıkça sıradakine geçer. */
 const REMIND: { min: number; label: string }[] = [
@@ -36,6 +38,7 @@ function parseTime(v: string): string | null {
  */
 export function CalendarPanel() {
   const events = useNook((s) => s.events);
+  const ext = useNook((s) => s.extEvents);
   const today = dayKey();
   const [day, setDay] = useState(today);
   const [month, setMonth] = useState(() => {
@@ -44,7 +47,9 @@ export function CalendarPanel() {
   });
 
   const busyDays = useMemo(() => new Set(events.map((e) => e.day)), [events]);
+  const extDays = useMemo(() => new Set(ext.map((e) => e.day)), [ext]);
   const list = events.filter((e) => e.day === day);
+  const extList = ext.filter((e) => e.day === day);
 
   // Pazartesiyle başlayan 6 haftalık ızgara
   const cells = useMemo(() => {
@@ -107,7 +112,12 @@ export function CalendarPanel() {
                 >
                   {c.getDate()}
                 </span>
-                {busyDays.has(k) && <span className="absolute bottom-[1px] h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(COLOR, 40) : COLOR }} />}
+                {(busyDays.has(k) || extDays.has(k)) && (
+                  <span className="absolute bottom-[1px] flex gap-[2px]">
+                    {busyDays.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(COLOR, 40) : COLOR }} />}
+                    {extDays.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(EXT, 40) : EXT }} />}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -120,7 +130,7 @@ export function CalendarPanel() {
           {dayLabel}
           {day === today && <span className="ml-1.5 text-[10px] font-normal normal-case" style={{ color: tintText(COLOR) }}>{tt("bugün")}</span>}
         </p>
-        <DayList list={list} />
+        <DayList list={list} ext={extList} />
       </div>
     </div>
     <AddRow day={day} />
@@ -128,13 +138,27 @@ export function CalendarPanel() {
   );
 }
 
-function DayList({ list }: { list: CalEvent[] }) {
+function DayList({ list, ext }: { list: CalEvent[]; ext: ExtEvent[] }) {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("calendar", scroller);
   const alarms = useNook((s) => s.alarms);
   return (
     <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-      {!list.length && <p className="pt-4 text-center text-[11px] text-label-3">{tt("Bu gün boş")}</p>}
+      {!list.length && !ext.length && <p className="pt-4 text-center text-[11px] text-label-3">{tt("Bu gün boş")}</p>}
+      {ext.map((e) => (
+        <div
+          key={e.id}
+          className="flex h-8 items-center gap-2 rounded-full border pl-2.5 pr-2"
+          style={{ background: tintBg(EXT, 9), borderColor: tintBg(EXT, 26) }}
+          title={tt("Abone takvimden · {0}", e.allDay ? tt("gün boyu") : `${e.time}–${new Date(e.end).toTimeString().slice(0, 5)}`)}
+        >
+          <span className="w-9 shrink-0 font-display text-[12.5px] font-medium tabular-nums" style={{ color: tintText(EXT) }}>
+            {e.time || tt("Gün")}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-label">{e.title}</span>
+          <Link2 size={10} strokeWidth={2.4} className="shrink-0" style={{ color: tintText(EXT) }} />
+        </div>
+      ))}
       <AnimatePresence initial={false}>
         {list.map((e) => {
           // Hatırlatma kurulu ve henüz çalmadı mı

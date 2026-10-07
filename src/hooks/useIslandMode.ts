@@ -8,6 +8,8 @@ type State = ReturnType<typeof useNook.getState>;
 export function islandModeOf(s: State): IslandMode {
   if (s.intro) return "intro";
   if (s.ringing) return "alarm";
+  // Açılış kilidi: parola yazılana kadar ada yalnızca parola kutusu
+  if (s.gate && isPrimary) return "gate";
   // Odak bekçisi: yasaklı siteden çıkana (ya da izin verene) kadar durur
   if (s.guard && isPrimary) return "guard";
   if (s.tour && isPrimary) return "tour";

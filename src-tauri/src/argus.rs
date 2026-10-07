@@ -918,13 +918,64 @@ pub const SOUND: &str = "sound-card";
 pub const SOUND_W: f64 = 300.0;
 pub const SOUND_H: f64 = 300.0;
 
+/// Ses kartının son yeri (adaya göre): sol konum, sağ konum, üst; görünür mü, sağda mı
+#[derive(Clone, Copy)]
+struct SoundAt {
+    x: f64,
+    alt_x: f64,
+    y: f64,
+    visible: bool,
+    right: bool,
+}
+static SOUND_AT: std::sync::Mutex<Option<SoundAt>> = std::sync::Mutex::new(None);
+
+/// Ses kartını adanın soluna koyar; ekranın solunda yer yoksa (ada sola taşındıysa) sağına.
+/// `alt_x`: sağdaki konum. Kart sağdaysa true döner.
 #[tauri::command]
-pub async fn side_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
-    let r = card_inner(&window, SOUND, SOUND_W, SOUND_H, true, show, x, y);
+pub async fn side_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64, alt_x: f64) -> Result<bool, String> {
+    if !show {
+        if let Some(s) = SOUND_AT.lock().unwrap().as_mut() {
+            s.visible = false;
+        }
+        return Ok(false);
+    }
+    let right = sound_side(&window, x, alt_x);
+    let r = card_inner(&window, SOUND, SOUND_W, SOUND_H, true, true, if right { alt_x } else { x }, y);
     if let Err(e) = &r {
         crate::log::write("warn", &format!("ses kartı: {e}"));
     }
-    r
+    *SOUND_AT.lock().unwrap() = Some(SoundAt { x, alt_x, y, visible: true, right });
+    r.map(|_| right)
+}
+
+/// Sol konumda kart ekranın (adanın ekranının) dışına taşıyorsa sağ taraf
+fn sound_side(window: &tauri::WebviewWindow, x: f64, alt_x: f64) -> bool {
+    let (Ok(pos), Ok(scale), Ok(Some(mon))) = (window.outer_position(), window.scale_factor(), window.current_monitor()) else { return false };
+    let k = scale * crate::window::zoom();
+    let left = pos.x as f64 + x * k;
+    let fits_left = left >= mon.position().x as f64 - 1.0;
+    let right_edge = pos.x as f64 + (alt_x + SOUND_W) * k;
+    let fits_right = right_edge <= (mon.position().x + mon.size().width as i32) as f64 + 1.0;
+    !fits_left && fits_right
+}
+
+/// Ada taşınırken (sürükleme) görünür ses kartı onunla birlikte gider; taraf değişirse sayfalara haber verir
+pub fn follow_sound(window: &tauri::WebviewWindow) {
+    let Some(at) = *SOUND_AT.lock().unwrap() else { return };
+    if !at.visible {
+        return;
+    }
+    let right = sound_side(window, at.x, at.alt_x);
+    let _ = card_inner(window, SOUND, SOUND_W, SOUND_H, true, true, if right { at.alt_x } else { at.x }, at.y);
+    if right != at.right {
+        if let Some(s) = SOUND_AT.lock().unwrap().as_mut() {
+            s.right = right;
+        }
+        use tauri::Emitter;
+        let app = window.app_handle();
+        let _ = app.emit_to(window.label(), "nook://sound-side", right);
+        let _ = app.emit_to(SOUND, "nook://sound-side", right);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

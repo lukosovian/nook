@@ -13,9 +13,9 @@ export const SPAN = 3.2;
 
 const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2, triangle: 3, flower: 4, bean: 5, blob: 6, pumpkin: 7, ghost: 8, cube: 9, egg: 10, star: 11, cat: 12, bear: 13 };
 const TEX_ID: Record<Look["texture"], number> = { smooth: 0, plush: 1, matte: 2, jelly: 3, metal: 4, spots: 5 };
-const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11, witch: 12, horns: 13, bat: 14 };
-const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4 };
-const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1 };
+const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11, witch: 12, horns: 13, bat: 14, cowboy: 15, pirate: 16, straw: 17, conductor: 18, helmet: 19, hardhat: 20 };
+const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4, eyepatch: 5, goggles: 6 };
+const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1, scarf: 2 };
 
 /** Gözlerin yeri (birim; yüz yarıçapı 1): y yukarı +, gap merkezden yana, z yüzün önü (gözlük için) */
 export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number }> = {
@@ -35,8 +35,10 @@ export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number 
   bear: { y: -0.12, gap: 0.33, z: 0.74 },
 };
 
+/** Gözler camın ardında mı (küçülür, az oynar); göz bandı cam değil — tek göz kapanır */
+export const lensOn = (look: Look) => look.glasses !== "none" && look.glasses !== "eyepatch";
 /** Gözlük takılınca iki cam arasında köprüye yer kalsın diye gözler biraz açılır */
-export const eyeGap = (look: Look) => (look.glasses === "none" ? ANCHORS[look.shape].gap : Math.max(ANCHORS[look.shape].gap, 0.38));
+export const eyeGap = (look: Look) => (!lensOn(look) ? ANCHORS[look.shape].gap : Math.max(ANCHORS[look.shape].gap, 0.38));
 /** Gözlük camının ardında gözler küçülür */
 export const EYE_SCALE_GLASSES = 0.6;
 

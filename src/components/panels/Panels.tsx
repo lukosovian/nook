@@ -5,8 +5,8 @@ import { animate, AnimatePresence, motion, PresenceContext, useMotionValue } fro
 import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { easeOut } from "../../lib/motion";
-import { dayKey, useNook, type HomeProfile, type Tab } from "../../store/nook";
-import { PROFILES } from "../../lib/profiles";
+import { dayKey, isLive, useNook, type Tab } from "../../store/nook";
+import { allProfiles, userProfiles, type ProfileDef } from "../../lib/profiles";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
 import { CalendarPanel } from "./CalendarPanel";
@@ -36,6 +36,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { LookPanel } from "./LookPanel";
 import { ShelfPanel } from "./ShelfPanel";
 import { StatsPanel } from "./StatsPanel";
+import { YearPanel } from "./YearPanel";
 import { tt, locale } from "../../lib/i18n";
 
 type Module = Exclude<Tab, "home">;
@@ -59,6 +60,7 @@ const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "report", label: tt("Karne"), color: ACCENT.teal },
   { id: "look", label: tt("Görünüm"), color: ACCENT.pink },
   { id: "notes", label: tt("Yama notları"), color: ACCENT.orange },
+  { id: "year", label: tt("Yıl özeti"), color: ACCENT.yellow },
 ];
 
 /** Lukonnect bu bilgisayarda hiç yoksa (ör. arkadaşının bilgisayarı) Cihazlar bölümü gizlenir. */
@@ -86,6 +88,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   argus: ArgusPanel,
   look: LookPanel,
   settings: SettingsPanel,
+  year: YearPanel,
 };
 
 const TITLE = {
@@ -154,12 +157,41 @@ export function Panels() {
               sonradan beliren her şey — önizlemeler, konfeti, kartlar — animasyonsuz son hâline atlıyordu. */}
           <PresenceContext.Provider value={null}>
             <Boundary resetKey={tab}>
-              <Active />
+              <LiveVeil tab={tab}>
+                <Active />
+              </LiveVeil>
             </Boundary>
           </PresenceContext.Provider>
         </motion.div>
       </AnimatePresence>
     </Frame>
+  );
+}
+
+/** Yayındayken içeriği ekranda okunmasın diye buzlanan bölümler */
+const LIVE_HIDDEN = new Set<Tab>(["note", "clip", "notify", "chat", "calendar"]);
+
+/** Yayın maskesi: hassas bölüm buzlu camın arkasında; "Bu sefer göster" ile o an açılır */
+function LiveVeil({ tab, children }: { tab: Tab; children: React.ReactNode }) {
+  const live = useNook(isLive);
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => setReveal(false), [tab, live]);
+  if (!live || !LIVE_HIDDEN.has(tab) || reveal) return <>{children}</>;
+  return (
+    <div className="relative h-full min-h-0">
+      <div className="pointer-events-none h-full select-none" style={{ filter: "blur(14px) saturate(0.6)", opacity: 0.55 }} aria-hidden>
+        {children}
+      </div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
+        <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: tintBg(ACCENT.red, 20), color: tintText(ACCENT.red) }}>
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: ACCENT.red }} />
+          {tt("Canlı yayında gizli")}
+        </span>
+        <button onClick={() => setReveal(true)} className="rounded-full bg-white/[0.06] px-2.5 py-[3px] text-[10.5px] text-label-2 hover:bg-white/[0.12] hover:text-label">
+          {tt("Bu sefer göster")}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -191,9 +223,10 @@ function ordered(order: string[]) {
   return [...MODULES].sort((a, b) => (pos.get(a.id) ?? 1000 + MODULES.indexOf(a)) - (pos.get(b.id) ?? 1000 + MODULES.indexOf(b)));
 }
 
-function byProfile<T extends { id: Tab }>(list: T[], profile: HomeProfile) {
-  const p = PROFILES.find((x) => x.id === profile);
-  if (!p || !p.ids.length) return list;
+function byProfile<T extends { id: Tab }>(list: T[], p: ProfileDef | undefined) {
+  if (!p || p.id === "all") return list;
+  // Boş "yalnızca" profil: hiçbir bölüm seçilmemiş, hepsi görünsün (boş ekran kalmasın)
+  if (!p.ids.length) return list;
   const front = p.ids.flatMap((id) => list.filter((m) => m.id === id));
   return p.only ? front : [...front, ...list.filter((m) => !p.ids.includes(m.id))];
 }
@@ -210,8 +243,18 @@ function ModuleGrid() {
   const order = useNook((s) => s.settings.homeOrder);
   const hidden = useNook((s) => s.settings.homeHidden);
   const profile = useNook((s) => s.settings.homeProfile);
+  const profiles = useNook((s) => s.settings.profiles);
+  const active = allProfiles(profiles).find((p) => p.id === profile);
+  // Bir profil seçiliyken düzenleme o profilin bölümlerini seçer; "Hepsi"de ana sayfadan gizler
+  const forProfile = active && active.id !== "all" ? active : null;
+  const editing = useNook((s) => s.homeEdit);
+  const setEditing = (f: (e: boolean) => boolean) => useNook.getState().setHomeEdit(f(useNook.getState().homeEdit));
   // Geliştirmede ?edit ile düzenleme kipi açık başlar (önizleme)
-  const [editing, setEditing] = useState(() => import.meta.env.DEV && new URLSearchParams(location.search).has("edit"));
+  useEffect(() => {
+    if (import.meta.env.DEV && new URLSearchParams(location.search).has("edit")) useNook.getState().setHomeEdit(true);
+    // Ana sayfadan çıkınca düzenleme biter
+    return () => useNook.getState().setHomeEdit(false);
+  }, []);
   // Sürüklerken sıra yerelde tutulur, bırakınca kaydedilir
   const [draft, setDraft] = useState<string[] | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -223,13 +266,21 @@ function ModuleGrid() {
 
   const available = ordered(draft ?? order).filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo));
   // Düzenlerken profil uygulanmaz: bütün sıra görünür
-  const modules = editing ? available : byProfile(available.filter((m) => !hidden.includes(m.id)), profile);
+  const modules = editing ? available : byProfile(available.filter((m) => !hidden.includes(m.id)), active);
 
   const toggleHidden = (id: string) => {
     const s = useNook.getState();
+    if (forProfile) {
+      // Profil: bölüm profile girer / çıkar
+      const ids = forProfile.ids.includes(id as Tab) ? forProfile.ids.filter((x) => x !== id) : [...forProfile.ids, id as Tab];
+      s.updateSettings({ profiles: userProfiles(s.settings.profiles).map((p) => (p.id === forProfile.id ? { ...p, ids } : p)) });
+      return;
+    }
     const list = s.settings.homeHidden;
     s.updateSettings({ homeHidden: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] });
   };
+  /** Düzenlerken soluk görünen: profilde değil ya da ana sayfadan gizli */
+  const isOff = (id: string) => (forProfile ? !forProfile.ids.includes(id as Tab) : hidden.includes(id));
 
   /** İmlecin kaydırılan içerikteki yeri */
   const local = (clientX: number, clientY: number) => {
@@ -349,7 +400,7 @@ function ModuleGrid() {
       {modules.map((m, i) => {
         const st = sub[m.id];
         const state: ChipState = st?.state ?? "idle";
-        const off = hidden.includes(m.id);
+        const off = isOff(m.id);
         const lifted = m.id === dragId;
         return (
           <motion.div
@@ -391,7 +442,7 @@ function ModuleGrid() {
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => toggleHidden(m.id)}
-                    title={off ? tt("Ana sayfada göster") : tt("Ana sayfada gizle")}
+                    title={forProfile ? (off ? tt("Bu profile ekle") : tt("Bu profilden çıkar")) : off ? tt("Ana sayfada göster") : tt("Ana sayfada gizle")}
                     className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white/[0.08] text-label-2 hover:bg-white/[0.16] hover:text-label"
                   >
                     {off ? <EyeOff size={11} strokeWidth={2.4} /> : <Eye size={11} strokeWidth={2.4} />}
@@ -414,7 +465,8 @@ function ModuleGrid() {
         {editing ? <Check size={12} strokeWidth={2.6} /> : <SlidersHorizontal size={11} strokeWidth={2.4} />}
         {editing ? tt("Bitti") : tt("Düzenle")}
       </motion.button>
-      {editing && <p className="col-span-2 -mt-0.5 px-2 text-center text-[10px] text-label-3">{tt("Sürükleyip sırala · göz simgesiyle gizle")}</p>}
+      {editing && !forProfile && <p className="col-span-2 -mt-0.5 px-2 text-center text-[10px] text-label-3">{tt("Sürükleyip sırala · göz simgesiyle gizle")}</p>}
+      {editing && forProfile && <ProfileEditor key={forProfile.id} profile={forProfile} />}
 
       {/* Elde tutulan çip */}
       {ghost && (
@@ -426,10 +478,53 @@ function ModuleGrid() {
           transition={{ type: "spring", stiffness: 500, damping: 26 }}
         >
           <div className="h-full w-full rounded-full shadow-[0_10px_24px_-8px_rgba(0,0,0,0.9)]">
-            <Chip m={ghost} st={sub[ghost.id]} state={sub[ghost.id]?.state ?? "idle"} dim={hidden.includes(ghost.id)} editing delay={0} />
+            <Chip m={ghost} st={sub[ghost.id]} state={sub[ghost.id]?.state ?? "idle"} dim={isOff(ghost.id)} editing delay={0} />
           </div>
         </motion.div>
       )}
+    </div>
+  );
+}
+
+/** Düzenleme kipinde seçili profil: adı, "yalnızca bunlar" ya da "öne çıkar", silme */
+function ProfileEditor({ profile }: { profile: ProfileDef }) {
+  const [confirm, setConfirm] = useState(false);
+  const save = (patch: Partial<ProfileDef>) => {
+    const s = useNook.getState();
+    s.updateSettings({ profiles: userProfiles(s.settings.profiles).map((p) => (p.id === profile.id ? { ...p, ...patch } : p)) });
+  };
+  const remove = () => {
+    if (!confirm) return setConfirm(true);
+    const s = useNook.getState();
+    s.updateSettings({ profiles: userProfiles(s.settings.profiles).filter((p) => p.id !== profile.id), homeProfile: "all" });
+    s.setHomeEdit(false);
+  };
+  return (
+    <div className="col-span-2 flex items-center gap-1.5 rounded-[14px] border px-2.5 py-1.5" title={tt("Göz simgesiyle bölümü bu profile ekle ya da çıkar")} style={{ background: tintBg(profile.color, 8), borderColor: tintBg(profile.color, 28) }}>
+      <input
+        defaultValue={profile.label}
+        maxLength={14}
+        spellCheck={false}
+        onBlur={(e) => e.target.value.trim() && save({ label: e.target.value.trim() })}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        title={tt("Profilin adı")}
+        className="h-6 min-w-0 flex-1 rounded-full bg-black/30 px-2.5 text-[11px] font-medium outline-none focus:bg-black/50"
+        style={{ color: tintText(profile.color) }}
+      />
+      <button
+        onClick={() => save({ only: !profile.only })}
+        title={tt("Seçilmeyen bölümler gizlensin mi, yoksa arkada mı dursun")}
+        className="shrink-0 whitespace-nowrap rounded-full bg-black/30 px-2 py-[3px] text-[10px] font-medium text-label-2 hover:text-label"
+      >
+        {profile.only ? tt("Yalnızca seçilenler") : tt("Seçilenler önde")}
+      </button>
+      <button
+        onClick={remove}
+        onMouseLeave={() => setConfirm(false)}
+        className="shrink-0 whitespace-nowrap rounded-full border border-red/30 bg-red/[0.07] px-2 py-[3px] text-[10px] font-medium text-red/90 hover:bg-red/15"
+      >
+        {confirm ? tt("Emin misin? Sil") : tt("Profili sil")}
+      </button>
     </div>
   );
 }
@@ -534,6 +629,7 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
   const active = useNook((s) => s.days[dayKey()]?.active ?? 0);
   const argusSnap = useArgus((s) => s.snap);
   const events = useNook((s) => s.events);
+  const live = useNook(isLive);
   const newToday = todayEpisodes(argusSnap);
   const watchingList = watching(argusSnap);
   // Pomodoro ve alarm yakınlığı canlı aksın
@@ -554,14 +650,14 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
     media: { text: media ? (media.playing ? media.title : tt("Duraklatıldı")) : tt("Sessiz"), state: media?.playing ? "active" : media ? "idle" : "empty" },
     shelf: { text: shelf ? tt("{0} öğe", shelf) : tt("Boş"), state: shelf ? "idle" : "empty" },
     clip: { text: clips ? tt("{0} kayıt", clips) : tt("Boş"), state: clips ? "idle" : "empty" },
-    note: { text: note ? note.split("\n")[0] : tt("Boş"), state: note ? "idle" : "empty" },
+    note: { text: live && note ? tt("Gizli") : note ? note.split("\n")[0] : tt("Boş"), state: note ? "idle" : "empty" },
     calendar: (() => {
       const today = dayKey();
       const upcoming = events.filter((e) => e.day > today || (e.day === today && (!e.time || e.time >= clockNow)));
       const first = upcoming[0];
       if (!first) return { text: tt("Boş"), state: "empty" as const };
       const when = first.day === today ? first.time || tt("Bugün") : new Date(first.day + "T00:00").toLocaleDateString(locale(), { day: "numeric", month: "short" });
-      return { text: `${when} · ${first.title}`, state: first.day === today ? ("active" as const) : ("idle" as const) };
+      return { text: live ? `${when} · ${tt("Gizli")}` : `${when} · ${first.title}`, state: first.day === today ? ("active" as const) : ("idle" as const) };
     })(),
     alarm: {
       text: next ? `${clock(next)}${next.label ? ` · ${next.label}` : ""}` : tt("Kurulu değil"),

@@ -52,7 +52,30 @@ export const EVENTS = {
   perchMove: "nook://perch-move",
   perchHop: "nook://perch-hop",
   perchLeave: "nook://perch-leave",
+  clipboardImage: "nook://clipboard-image",
+  clipboardFiles: "nook://clipboard-files",
+  locked: "nook://locked",
+  shelfShake: "nook://shelf-shake",
+  shelfAdd: "nook://shelf-add",
+  share: "nook://share",
+  shareToggle: "nook://share-toggle",
 } as const;
+
+/** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
+export interface ClipPayload {
+  text: string;
+  app: string;
+}
+export interface ClipImagePayload {
+  path: string;
+  width: number;
+  height: number;
+  app: string;
+}
+export interface ClipFilesPayload {
+  paths: string[];
+  app: string;
+}
 
 /** Windows bildirim merkezine düşen bir bildirim (Discord, WhatsApp, Mail…). */
 export interface NotificationPayload {
@@ -99,6 +122,8 @@ export interface StatsPayload {
   battery: { percent: number; charging: boolean } | null;
   /** Pille çalışıyor ya da Windows enerji tasarrufu açık */
   saver: boolean;
+  /** Ekran kartı kullanımı (%); ölçülemiyorsa yok */
+  gpu?: number | null;
 }
 
 export type SysEventKind =
@@ -133,7 +158,12 @@ export type SysEventKind =
   | "argus"
   | "welcome"
   | "fish"
-  | "guard";
+  | "guard"
+  | "alert"
+  | "calendar"
+  | "clip"
+  | "shelf"
+  | "live";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {
@@ -158,6 +188,8 @@ export interface QuickState {
   volume: number | null;
   /** Ses çıkış cihazları */
   outputs: AudioOutput[];
+  /** Mikrofonlar */
+  inputs?: AudioOutput[];
 }
 export interface AudioOutput {
   id: string;
@@ -174,6 +206,9 @@ export const quickState = () =>
       Promise.resolve<QuickState>({ wifi: null, bluetooth: null, dark: true, muted: false, micMuted: false, volume: 0.45, outputs: [
         { id: "a", name: tt("Hoparlör (Realtek Audio)"), default: true, headphone: false },
         { id: "b", name: tt("Kulaklık (HyperX Cloud)"), default: false, headphone: true },
+      ], inputs: [
+        { id: "m1", name: tt("Mikrofon (Realtek Audio)"), default: true, headphone: false },
+        { id: "m2", name: tt("Kulaklık mikrofonu (HyperX Cloud)"), default: false, headphone: true },
       ] });
 export const quickSet = (key: QuickKey, on: boolean) => (inTauri ? invoke<void>("quick_set", { key, on }) : Promise.resolve());
 /** Alarm sesi (Windows Alarm01–10). `preview`: tek sefer dinlet. */
@@ -185,6 +220,8 @@ export const alarmRing = (on: boolean, sound = 1, preview = false) =>
 
 /** Varsayılan ses çıkışını değiştir */
 export const quickOutput = (id: string) => (inTauri ? invoke<void>("quick_output", { id }) : Promise.resolve());
+/** Varsayılan mikrofonu değiştir */
+export const quickInput = (id: string) => (inTauri ? invoke<void>("quick_input", { id }) : Promise.resolve());
 /** Ana ses seviyesi (0–1) */
 /** Uygulama bazlı ses (Windows Ses Karıştırıcısı gibi) */
 export interface AppVolume {
@@ -194,9 +231,22 @@ export interface AppVolume {
   volume: number;
   muted: boolean;
   active: boolean;
+  /** Uygulamaya özel çıkış cihazı (yoksa varsayılan) */
+  output?: string | null;
 }
-export const mixerList = () => (inTauri ? invoke<AppVolume[]>("mixer_list") : Promise.resolve([] as AppVolume[]));
+export const mixerList = () =>
+  inTauri
+    ? invoke<AppVolume[]>("mixer_list")
+    : // Tarayıcı önizlemesi
+      Promise.resolve<AppVolume[]>([
+        { key: "spotify", name: "Spotify", path: null, volume: 0.8, muted: false, active: true, output: null },
+        { key: "discord", name: "Discord", path: null, volume: 0.6, muted: false, active: true, output: "b" },
+        { key: "chrome", name: "Chrome", path: null, volume: 1, muted: true, active: false, output: null },
+        { key: "system", name: "Sistem sesleri", path: null, volume: 0.5, muted: false, active: false, output: null },
+      ]);
 export const mixerSet = (key: string, volume?: number, muted?: boolean) => (inTauri ? invoke<void>("mixer_set", { key, volume, muted }) : Promise.resolve());
+/** Uygulamayı bir çıkışa yönlendir; id null → Windows'un varsayılanı */
+export const mixerOutput = (key: string, id: string | null) => (inTauri ? invoke<void>("mixer_output", { key, id }) : Promise.resolve());
 
 export const quickVolume = (value: number) => (inTauri ? invoke<void>("quick_volume", { value }) : Promise.resolve());
 /** Ekran parlaklığı 0–100 (dizüstü paneli WMI, harici monitörler DDC/CI); desteklenmiyorsa null */
@@ -239,6 +289,10 @@ export interface NativeSettings {
   shieldShortcut: string;
   /** Parola kilidi: kalkan yalnızca parolayla kalkar */
   shieldLock: boolean;
+  /** Kalkan açılınca mikrofonu sustur */
+  shieldMuteMic: boolean;
+  /** Kalkan açılınca görüşmedeki uygulamanın sesini kapat */
+  shieldMuteCalls: boolean;
   autoScreenshots: boolean;
   hideInFullscreen: boolean;
   /** Oyun açılınca ada gizlenmeden önce kısa özet */
@@ -251,6 +305,20 @@ export interface NativeSettings {
   uiScale: number;
   /** Tepsi menüsündeki "çık" yazısı (seçili dilde) */
   quitLabel?: string;
+  /** Dosya sürüklerken fareyi sallayınca raf açılır */
+  shelfShake: boolean;
+  /** Gezgin'de seçili dosyaları rafa ekle */
+  shelfShortcut: string;
+  /** Panodakini düz metin olarak yapıştır */
+  plainPasteShortcut: string;
+  /** Ses çıkışları arasında dön (boş = kapalı) */
+  outputShortcut: string;
+  /** Kısayolun döndüğü çıkışlar (boşsa hepsi) */
+  outputCycle: string[];
+  /** Kulaklık çıkınca ses bu seviyeye iner (%; 0 = kapalı) */
+  headphoneDrop: number;
+  /** Yayın maskesini elle aç / kapat */
+  liveShortcut: string;
 }
 
 /** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */
@@ -292,14 +360,72 @@ export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promis
 /** Adayı sürüklemeye başla (sol tuş basılıyken çağrılmalı) */
 /** Hassas veri: pano hâlâ bu metni tutuyorsa temizle */
 export const clipboardClearIf = (text: string) => (inTauri ? invoke<boolean>("clipboard_clear_if", { text }) : Promise.resolve(false));
+/** Panoyu boşalt (geçmiş kalır) */
+export const clipboardClear = () => (inTauri ? invoke<boolean>("clipboard_clear") : Promise.resolve(false));
+/** Geçmişteki görseli / dosyaları yeniden panoya koy */
+export const clipboardWriteImage = (path: string) => (inTauri ? invoke<void>("clipboard_write_image", { path }) : Promise.resolve());
+export const clipboardWriteFiles = (paths: string[]) => (inTauri ? invoke<void>("clipboard_write_files", { paths }) : Promise.resolve());
+/** Geçmişte kalmayan görsel dosyalarını sil */
+export const clipboardPrune = (keep: string[]) => (inTauri ? invoke<void>("clipboard_prune", { keep }) : Promise.resolve());
+/** "Birlikte aç" penceresi */
+export const openWith = (path: string) => (inTauri ? invoke<void>("open_with", { path }) : Promise.resolve());
+/** Metni dosyaya yaz (yol kayıt penceresinden) */
+export const saveText = (path: string, text: string) => invoke<void>("save_text", { path, text });
+/** https adresinden metin indir (takvim aboneliği) */
+export const fetchText = (url: string) => (inTauri ? invoke<string>("fetch_text", { url }) : fetch(url).then((r) => r.text()));
+
+/** Bilgisayardaki birimler (C:, D:, USB) */
+export interface DiskVolume {
+  root: string;
+  label: string;
+  used: number;
+  total: number;
+  removable: boolean;
+}
+/** Fiziksel disk ve sağlığı */
+export interface PhysicalDisk {
+  name: string;
+  health: "healthy" | "warning" | "unhealthy" | "unknown";
+  media: string;
+  size: number;
+}
+export const systemDisks = () =>
+  inTauri
+    ? invoke<DiskVolume[]>("system_disks")
+    : Promise.resolve<DiskVolume[]>([
+        { root: "C:\\", label: "Windows", used: 380e9, total: 512e9, removable: false },
+        { root: "D:\\", label: "Oyunlar", used: 1.2e12, total: 2e12, removable: false },
+        { root: "E:\\", label: "KINGSTON", used: 9e9, total: 32e9, removable: true },
+      ]);
+export const diskHealth = () =>
+  inTauri
+    ? invoke<PhysicalDisk[]>("disk_health")
+    : Promise.resolve<PhysicalDisk[]>([
+        { name: "Samsung SSD 980 PRO", health: "healthy", media: "SSD", size: 1e12 },
+        { name: "WDC WD20EZAZ", health: "healthy", media: "HDD", size: 2e12 },
+      ]);
+export const diskEject = (root: string) => (inTauri ? invoke<void>("disk_eject", { root }) : Promise.resolve());
+export const localIp = () => (inTauri ? invoke<string | null>("local_ip") : Promise.resolve("192.168.1.24"));
+/** İndirme hızı (Mbit/s) */
+export const speedTest = () => (inTauri ? invoke<number>("speed_test") : new Promise<number>((r) => setTimeout(() => r(184.6), 1500)));
 /** Gizlilik kalkanını kapat (kalkanın kendisinden: Esc, çift tık) */
 export const shieldOff = () => (inTauri ? invoke<void>("shield_off") : Promise.resolve());
 /** Kalkanı aç; ask: parola kutusu hemen görünsün (açılış kilidi) */
+/** Kalkandaki mikrofon / hoparlör düğmeleri: kalkanca kapalı mı, görüşme var mı */
+export interface ShieldMute {
+  mic: boolean;
+  call: boolean;
+  callAvail: boolean;
+}
+export const shieldState = () => (inTauri ? invoke<ShieldMute>("shield_state") : Promise.resolve<ShieldMute>({ mic: true, call: true, callAvail: true }));
+export const shieldSet = (kind: "mic" | "call", muted: boolean) => (inTauri ? invoke<ShieldMute>("shield_set", { kind, muted }) : Promise.resolve<ShieldMute | null>(null));
+/** Açılış kilidi: açıkken yalnızca ana ada etkileşimli */
+export const setGate = (on: boolean) => (inTauri ? invoke<void>("set_gate", { on }) : Promise.resolve());
 export const shieldOn = (ask: boolean) => (inTauri ? invoke<void>("shield_on", { ask }) : Promise.resolve());
 /** Bilgisayar ne kadar süredir açık (sn) */
 export const systemUptime = () => (inTauri ? invoke<number>("system_uptime") : Promise.resolve(99_999));
 /** Adanın solundaki ses kartı penceresi (x, y: bu pencereye göre mantıksal konum) */
-export const sideCard = (show: boolean, x: number, y: number) => invoke<void>("side_card", { show, x, y });
+export const sideCard = (show: boolean, x: number, y: number, altX: number) => invoke<boolean>("side_card", { show, x, y, altX });
 /** Öndeki pencerenin başlık çubuğuna tün (uygun pencere yoksa false) */
 export const perchStart = () => (inTauri ? invoke<boolean>("perch_start") : Promise.resolve(false));
 export const perchStop = () => (inTauri ? invoke<void>("perch_stop") : Promise.resolve());
@@ -491,7 +617,7 @@ if (!inTauri && typeof window !== "undefined") {
   window.addEventListener("keydown", () => (lastInput = Date.now()));
   document.addEventListener("copy", () => {
     const text = document.getSelection()?.toString().trim();
-    if (text) webEmit(EVENTS.clipboard, text);
+    if (text) webEmit<ClipPayload>(EVENTS.clipboard, { text, app: "" });
   });
   window.setInterval(() => {
     const now = Date.now() - lastInput > WEB_SLEEP_MS;

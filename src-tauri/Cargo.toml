@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.40"
+version = "0.2.42"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -61,6 +61,16 @@ windows-sys = { version = "0.59", features = [
   "Win32_Media_Audio",
   "Win32_Devices_Bluetooth",
   "Win32_Devices_Display",
+  # Pano: dosya listesi (CF_HDROP) yazma
+  "Win32_System_Memory",
+  # Oturum kilitli mi
+  "Win32_System_RemoteDesktop",
+  # GPU kullanımı (performans sayaçları)
+  "Win32_System_Performance",
+  # USB diski güvenle çıkarma
+  "Win32_System_IO",
+  "Win32_System_Ioctl",
+  "Win32_Security",
 ] }
 # "Şu an çalan" (GSMTC) — Tauri zaten bu sürümü derliyor
 windows = { version = "0.62", features = [
@@ -85,6 +95,9 @@ windows = { version = "0.62", features = [
   "Win32_Graphics_Gdi",
   # İnternet bağlantısı durumu
   "Networking_Connectivity",
+  # Uygulama başına ses çıkışı (AudioPolicyConfig), Gezgin'de seçili dosyalar
+  "Win32_System_WinRT",
+  "Win32_System_Ole",
 ] }
 
 # Küçük, hızlı release binary'si

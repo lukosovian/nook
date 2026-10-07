@@ -57,6 +57,7 @@ export function useFeeding() {
         ]);
         addFiles(files);
         useNook.getState().care(4);
+        useNook.getState().yearAdd({ feeds: files.length });
         setTab("shelf");
         setMood("happy");
         later(HAPPY_MS, () => mood() === "happy" && setMood("idle"));
