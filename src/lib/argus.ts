@@ -381,6 +381,12 @@ function announceNews() {
 }
 
 const TICK_MS = 5000;
+/**
+ * Video tam ekrandayken Nook'un penceresi örtülür ve WebView2 zamanlayıcıları dakikada bire kadar
+ * yavaşlatır; her tıkta sabit 5 sn eklemek 26 dk'yı 5 dk gösteriyordu. Tıklar arası gerçek süre
+ * eklenir; uykudan dönüş gibi uzun boşluklar bu kadarla sınırlanır.
+ */
+const MAX_STEP_MS = 90_000;
 /** Kullanıcının kendi kuralı: dizi/film 15 dk izlendiyse o güne yazılır (yüzdeye bakılmaz) */
 const MIN_WATCH_MS = 15 * 60_000;
 /** Durdurulunca hemen "bitti" sayılır — yalnızca yüklenme/reklam gibi anlık takılmalar için kısa pay */
@@ -445,6 +451,7 @@ export function useArgusDetect() {
     let cur: { key: string; sug: ArgusSuggestion; duration: number; idleSince: number | null } | null = null;
     let lastText = "";
     let lastMatch: ArgusSuggestion | null = null;
+    let lastTick = Date.now();
 
     const played = (key: string) => store.ms[key] ?? 0;
 
@@ -482,6 +489,9 @@ export function useArgusDetect() {
     };
 
     const t = window.setInterval(() => {
+      const now = Date.now();
+      const step = Math.min(Math.max(0, now - lastTick), MAX_STEP_MS);
+      lastTick = now;
       const s = useNook.getState();
       const snap = useArgus.getState().snap;
       if (!s.settings.argusDetect || !snap) return;
@@ -504,7 +514,7 @@ ${m.artist}`;
           finish();
           cur = { key, sug, duration: m.durationMs || 0, idleSince: null };
         }
-        store.ms[key] = played(key) + TICK_MS;
+        store.ms[key] = played(key) + step;
         savePlayed(store);
         cur.idleSince = null;
         if (m.durationMs) cur.duration = m.durationMs;

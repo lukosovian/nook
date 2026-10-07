@@ -59,7 +59,8 @@ export type DemoId =
   | "scenepick"
   | "lively"
   | "newwear"
-  | "report";
+  | "report"
+  | "watchtime";
 
 export interface NoteItem {
   title: string;
@@ -76,6 +77,18 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.44",
+    date: tt("8 Ekim 2026"),
+    headline: tt("Argus süresi doğru sayılıyor"),
+    items: [
+      {
+        title: tt("İzleme süresi tam ekranda da doğru"),
+        text: tt("Video tam ekrandayken Nook izlediğin süreyi eksik sayıyordu (26 dk izleyince 5 dk görünüyordu). Artık gerçekte geçen süre sayılır; 15 dk dolunca \"bitti mi?\" sorusu zamanında gelir."),
+        demo: "watchtime",
+      },
+    ],
+  },
   {
     version: "0.2.43",
     date: tt("8 Ekim 2026"),

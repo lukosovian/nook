@@ -665,7 +665,43 @@ function ReportDemo() {
   );
 }
 
+/** Argus sayacı: video tam ekranda oynarken de izlenen dakika videoyla aynı hızda ilerler */
+function WatchTimeDemo() {
+  const face = useFace();
+  const n = useTick(140);
+  const min = n % 34;
+  const shown = Math.min(min, 26);
+  const done = min >= 26;
+  return (
+    <Stage bg="radial-gradient(120% 100% at 50% 0%, #241a14 0%, #0f0c0a 75%)">
+      {/* Tam ekran video */}
+      <div className="absolute inset-x-4 bottom-3 top-3 overflow-hidden rounded-[10px] bg-black">
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #3a2a55 0%, #1c3550 55%, #12222f 100%)", opacity: 0.8 }} />
+        <span className="absolute left-2.5 top-2 flex items-center gap-1.5 text-[9.5px] text-white/70">
+          Lanterns · S1 B8
+          <span className="rounded-[4px] bg-white/10 px-1 text-[8.5px] text-white/60">{tt("Tam ekran")}</span>
+        </span>
+        <div className="absolute inset-x-2.5 bottom-2 flex items-center gap-2 text-[8.5px] tabular-nums text-white/70">
+          <span>{tt("{0}:00", shown)}</span>
+          <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/15">
+            <motion.div className="h-full rounded-full bg-white/80" animate={{ width: `${(shown / 45) * 100}%` }} transition={{ duration: 0.14, ease: "linear" }} />
+          </div>
+          <span>45:00</span>
+        </div>
+        {/* Nook'un sayacı: videoyla aynı dakika */}
+        <div className="absolute left-1/2 top-[38%] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-black/70 py-1 pl-1 pr-3">
+          <NookFigure look={face.look} color={face.color} size={22} expression={done ? "happy" : "idle"} />
+          <span className="whitespace-nowrap text-[11px] font-medium tabular-nums" style={{ color: tintText(done ? ACCENT.green : ACCENT.orange) }}>
+            {done ? tt("{0} dk · bitti mi?", shown) : tt("{0} dk izlendi", shown)}
+          </span>
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS2 = {
+  watchtime: WatchTimeDemo,
   report: ReportDemo,
   scenepick: ScenePickDemo,
   lively: LivelyDemo,
