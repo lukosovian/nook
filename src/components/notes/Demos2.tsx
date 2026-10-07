@@ -621,7 +621,52 @@ function NewWearDemo() {
   );
 }
 
+/** Karne: hafta hafta not değişir; harf ölçeğinde yeri parlar, dökümdeki çubuklar dolar */
+function ReportDemo() {
+  const face = useFace();
+  const n = useTick(2200);
+  const weeks = [
+    { letter: "C", pts: 54, color: ACCENT.yellow, parts: [0.45, 0.4, 0.7, 0.6] },
+    { letter: "B", pts: 71, color: ACCENT.teal, parts: [0.7, 0.6, 0.8, 0.7] },
+    { letter: "A", pts: 88, color: ACCENT.green, parts: [0.95, 0.85, 0.9, 0.8] },
+  ];
+  const w = weeks[n % weeks.length];
+  const labels = [tt("Odak"), "Pomodoro", tt("İlgi"), tt("Keyif")];
+  const bars = [ACCENT.red, ACCENT.orange, ACCENT.pink, ACCENT.yellow];
+  return (
+    <Stage>
+      <div className="absolute bottom-3 left-4 top-3 flex w-[92px] flex-col items-center justify-center gap-1">
+        <NookFigure look={face.look} color={face.color} size={30} expression={w.letter === "A" ? "happy" : "idle"} />
+        <AnimatePresence mode="popLayout">
+          <motion.span key={w.letter} className="font-display text-[30px] font-semibold leading-none" style={{ color: tintText(w.color) }} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 380, damping: 18 }}>
+            {w.letter}
+          </motion.span>
+        </AnimatePresence>
+        <span className="text-[9px] tabular-nums text-label-3">{w.pts} / 100</span>
+        <div className="flex gap-[2px]">
+          {["A", "B", "C", "D", "E"].map((l) => (
+            <span key={l} className="rounded-[4px] px-1 text-[8.5px] font-semibold" style={l === w.letter ? { background: tintBg(w.color, 30), color: tintText(w.color) } : { background: "rgb(255 255 255 / 0.06)", color: "var(--color-label-3)" }}>
+              {l}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="absolute bottom-3 left-[118px] right-14 top-4 flex flex-col justify-center gap-2">
+        {labels.map((l, i) => (
+          <div key={l}>
+            <span className="text-[9.5px] text-label-2">{l}</span>
+            <div className="mt-[2px] h-[5px] overflow-hidden rounded-full bg-white/[0.08]">
+              <motion.div className="h-full rounded-full" style={{ background: bars[i] }} animate={{ width: `${w.parts[i] * 100}%` }} transition={{ duration: 0.6, delay: i * 0.08 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS2 = {
+  report: ReportDemo,
   scenepick: ScenePickDemo,
   lively: LivelyDemo,
   newwear: NewWearDemo,

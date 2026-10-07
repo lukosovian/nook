@@ -37,6 +37,7 @@ import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
 import { Brief } from "./brief/Brief";
 import { PatchNotes } from "./notes/PatchNotes";
+import { Report } from "./report/Report";
 import { SearchPanel } from "./search/SearchPanel";
 import { STEPS, Tour } from "./tour/Tour";
 
@@ -240,6 +241,7 @@ export function Island() {
             {mode === "tour" && <Tour key="tour" />}
             {mode === "brief" && <Brief key="brief" />}
             {mode === "notes" && <PatchNotes key="notes" />}
+            {mode === "report" && <Report key="report" />}
           </AnimatePresence>
 
           {/* Nook'un arkasındaki parıltı: yalnızca durum varken, durumun renginde */}

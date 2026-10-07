@@ -58,7 +58,8 @@ export type DemoId =
   | "teamsmic"
   | "scenepick"
   | "lively"
-  | "newwear";
+  | "newwear"
+  | "report";
 
 export interface NoteItem {
   title: string;
@@ -75,6 +76,18 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.43",
+    date: tt("8 Ekim 2026"),
+    headline: tt("Karne büyüdü"),
+    items: [
+      {
+        title: tt("Yeni karne"),
+        text: tt("Karne artık büyük adada açılır. Harf notunun yanında hangi puanın hangi harf olduğu, notun parça parça nasıl çıktığı ve en kolay puanın nereden geleceği yazar. Günlük grafikte odak süresi ayrı görünür; ekran, odak, Pomodoro, su, müzik, oyun ve Nook'la ilgilenme geçen haftayla kıyaslanır."),
+        demo: "report",
+      },
+    ],
+  },
   {
     version: "0.2.42",
     date: tt("7 Ekim 2026"),
@@ -533,6 +546,7 @@ export async function openNotes(version?: string) {
   window.clearTimeout(shrinkTimer);
   s.setSearching(false);
   if (s.brief) s.setBrief(false);
+  if (s.report) s.setReport(false);
   // Bir kez görülen not bir daha kendiliğinden açılmaz
   s.setNotesSeen(latestNote().version);
   await setWindowSize(TOUR_WINDOW.width, TOUR_WINDOW.height).catch(() => undefined);
@@ -573,6 +587,6 @@ export function closeNotes() {
   window.clearTimeout(shrinkTimer);
   shrinkTimer = window.setTimeout(() => {
     const st = useNook.getState();
-    if (!st.brief && !st.tour && !st.notes && !st.big) void setWindowSize().catch(() => undefined);
+    if (!st.brief && !st.tour && !st.notes && !st.report && !st.big) void setWindowSize().catch(() => undefined);
   }, SHRINK_AFTER_MS);
 }

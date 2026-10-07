@@ -18,6 +18,7 @@ export function islandModeOf(s: State): IslandMode {
   // Günün özeti: üzerine gelinse de büyük kalır
   if (s.brief && isPrimary) return "brief";
   if (s.notes && isPrimary) return "notes";
+  if (s.report && isPrimary) return "report";
   // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
   if (s.reminder) return "reminder";
   if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";

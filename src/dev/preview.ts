@@ -138,11 +138,14 @@ export function applyPreview(mode: string) {
     ],
     scores: { catch: 17, simon: 6 },
     days: Object.fromEntries(
-      Array.from({ length: 7 }, (_, i) => {
+      // İki hafta: karne geçen haftayla kıyaslar
+      Array.from({ length: 14 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        return [key, { music: 60 + i * 9, focus: [45, 90, 20, 75, 0, 110, 60][i], pomodoros: [2, 4, 1, 3, 0, 4, 2][i], game: [30, 0, 120, 0, 200, 15, 40][i], active: [260, 410, 180, 380, 90, 450, 300][i], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, water: [3, 5, 2, 4, 6, 1, 4][i] }];
+        const j = i % 7;
+        const k = i < 7 ? 1 : 0.7;
+        return [key, { music: 60 + j * 9, focus: Math.round([45, 90, 20, 75, 0, 110, 60][j] * k), pomodoros: Math.round([2, 4, 1, 3, 0, 4, 2][j] * k), game: [30, 0, 120, 0, 200, 15, 40][j], active: [260, 410, 180, 380, 90, 450, 300][j], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, water: [3, 5, 2, 4, 6, 1, 4][j] }];
       }),
     ),
     weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() },
@@ -257,6 +260,9 @@ export function applyPreview(mode: string) {
         ],
       },
     });
+  } else if (mode === "report") {
+    useNook.setState({ media: null });
+    void import("../lib/report").then((m) => m.openReport());
   } else if (mode === "notes") {
     // ?v=0.2.26 → o sürümün notu
     useNook.setState({ media: null });

@@ -151,7 +151,8 @@ function LyricsView({ media }: { media: NowPlaying }) {
     const el = box.current?.querySelector<HTMLElement>(`[data-l="${idx}"]`);
     const b = box.current;
     if (!el || !b) return;
-    const top = b.scrollTop + el.getBoundingClientRect().top - b.getBoundingClientRect().top - b.clientHeight / 2 + el.offsetHeight / 2;
+    // offsetTop/clientHeight: panel CSS zoom'la ölçeklendiğinden getBoundingClientRect ile karıştırılmaz
+    const top = el.offsetTop - b.clientHeight / 2 + el.offsetHeight / 2;
     b.scrollTo({ top, behavior: placed.current ? "smooth" : "auto" });
     placed.current = true;
   }, [idx]);
@@ -181,7 +182,9 @@ function LyricsView({ media }: { media: NowPlaying }) {
   const off = lyricOffset(key);
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px] bg-well">
-      <div ref={box} className="no-scrollbar h-full overflow-y-auto px-3 py-[38%]" style={{ maskImage: "linear-gradient(transparent, black 30%, black 70%, transparent)" }}>
+      <div ref={box} className="no-scrollbar relative h-full overflow-y-auto px-3" style={{ maskImage: "linear-gradient(transparent, black 30%, black 70%, transparent)" }}>
+        {/* Boşluk kutunun yüksekliğine göre: yüzde padding genişliğe göre hesaplanıp kutuyu taşırıyordu */}
+        <div aria-hidden className="h-1/2" />
         {lines!.map((l, k) => (
           <p
             key={k}
@@ -198,6 +201,7 @@ function LyricsView({ media }: { media: NowPlaying }) {
             {l.text || "♪"}
           </p>
         ))}
+        <div aria-hidden className="h-1/2" />
       </div>
       <div className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/60 px-1 py-[1px] text-[9.5px] tabular-nums text-label-3">
         <button onClick={() => shiftLyrics(key, -500)} title={tt("Sözler geç kalıyor: geri al")} className="rounded-full px-1 hover:text-label">−0,5</button>

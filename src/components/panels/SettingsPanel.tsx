@@ -485,9 +485,16 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
     };
   }, [scroller]);
 
-  // Seçili sekme şeritte görünür kalsın
+  // Seçili sekme şeritte görünür kalsın. scrollIntoView dikey kaydırıcıya da dokunup sekme
+  // tıklamasıyla başlayan yumuşak kaymayı kesiyordu; yalnızca şerit yatayda kaydırılır.
   useEffect(() => {
-    strip.current?.querySelector<HTMLElement>(`[data-i="${current}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const s = strip.current;
+    const b = s?.querySelector<HTMLElement>(`[data-i="${current}"]`);
+    if (!s || !b) return;
+    const sr = s.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    if (br.left < sr.left) s.scrollLeft += br.left - sr.left - 8;
+    else if (br.right > sr.right) s.scrollLeft += br.right - sr.right + 8;
   }, [current]);
 
   const go = (i: number) => {

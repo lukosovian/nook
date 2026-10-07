@@ -610,6 +610,8 @@ interface NookState {
   brief: boolean;
   /** Yama notları büyük adada açık */
   notes: boolean;
+  /** Karne büyük adada açık */
+  report: boolean;
   /** Adaya bırakılan arşiv (açmadan içine bakılır) */
   archive: { path: string; kind: string; entries: import("../lib/bridge").ArchiveEntry[] } | null;
   /** Kendiliğinden gösterilen son yama notunun sürümü (bir kez görülen bir daha açılmaz) */
@@ -724,6 +726,7 @@ interface NookState {
   setPendingTab: (tab: Tab | null) => void;
   setBrief: (brief: boolean) => void;
   setNotes: (notes: boolean) => void;
+  setReport: (report: boolean) => void;
   setArchive: (archive: NookState["archive"]) => void;
   setNotesSeen: (version: string) => void;
   setSummaryDay: (day: string) => void;
@@ -801,6 +804,7 @@ export const useNook = create<NookState>()(
       summaryDay: "",
       brief: false,
       notes: false,
+      report: false,
       archive: null,
       notesSeen: "",
       lastOffer: 0,
@@ -1059,6 +1063,7 @@ export const useNook = create<NookState>()(
       setSummaryDay: (summaryDay) => set({ summaryDay }),
       setBrief: (brief) => set({ brief }),
       setNotes: (notes) => set({ notes }),
+      setReport: (report) => set({ report }),
       setArchive: (archive) => set({ archive }),
       setNotesSeen: (notesSeen) => set({ notesSeen }),
       setLastOffer: (lastOffer) => set({ lastOffer }),

@@ -18,7 +18,7 @@ import { AppsPanel } from "./AppsPanel";
 import { FocusPanel } from "./FocusPanel";
 import { NotifyPanel } from "./NotifyPanel";
 import { PlayPanel } from "./PlayPanel";
-import { ReportPanel } from "./ReportPanel";
+import { openReport } from "../../lib/report";
 import { openBrief } from "../../lib/brief";
 import { latestNote, openNotes } from "../../lib/notes";
 import { CHIP_NOOKS, ek, useNookName } from "../../lib/look";
@@ -78,7 +78,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   apps: AppsPanel,
   notify: NotifyPanel,
   play: PlayPanel,
-  report: ReportPanel,
+  report: ReportRedirect,
   today: TodayRedirect,
   notes: NotesRedirect,
   archive: ArchivePanel,
@@ -200,6 +200,15 @@ function TodayRedirect() {
   useLayoutEffect(() => {
     useNook.getState().setTab("home");
     void openBrief();
+  }, []);
+  return <></>;
+}
+
+/** Karne de büyük adada açılır */
+function ReportRedirect() {
+  useLayoutEffect(() => {
+    useNook.getState().setTab("home");
+    void openReport();
   }, []);
   return <></>;
 }

@@ -37,6 +37,6 @@ export function endTour() {
   if (!useNook.getState().notesSeen) useNook.getState().setNotesSeen(latestNote().version);
   window.clearTimeout(shrinkTimer);
   shrinkTimer = window.setTimeout(() => {
-    if (!useNook.getState().tour && !useNook.getState().brief && !useNook.getState().notes) void setWindowSize().catch(() => undefined);
+    if (!useNook.getState().tour && !useNook.getState().brief && !useNook.getState().notes && !useNook.getState().report) void setWindowSize().catch(() => undefined);
   }, SHRINK_AFTER_MS);
 }

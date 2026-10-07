@@ -321,7 +321,7 @@ export function useDailySummaryOpen() {
     const tryOpen = () => {
       const s = useNook.getState();
       // İlk kurulumda tanıtım var; oyun/alarm sırasında araya girme — ilk üzerine gelişte açılır
-      if (done || s.intro || s.gate || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes) return;
+      if (done || s.intro || s.gate || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes || s.report) return;
       // Güncellemeden sonra önce yama notları; kapanınca sıra özete gelir
       if (notesDue()) {
         void openNotes();
