@@ -4,6 +4,8 @@ mod argus;
 mod audio;
 mod brightness;
 mod buddy;
+mod claude;
+pub mod claude_hook;
 mod clipboard;
 mod commands;
 mod disks;
@@ -138,6 +140,10 @@ pub fn run() {
             voice::voice_stop,
             net::online_state,
             log::log_line,
+            claude::claude_decide,
+            claude::claude_setup,
+            claude::claude_connect,
+            claude::claude_disconnect,
         ])
         .setup(|app| {
             let island = app
@@ -167,6 +173,7 @@ pub fn run() {
             downloads::spawn(handle.clone());
             audio::spawn(handle.clone());
             lukonnect::spawn(handle.clone());
+            claude::spawn(handle.clone());
             notify::spawn(handle.clone());
             net::spawn(handle.clone());
             share::spawn(handle.clone());

@@ -21,6 +21,8 @@ export function islandModeOf(s: State): IslandMode {
   if (s.report && isPrimary) return "report";
   // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
   if (s.reminder) return "reminder";
+  // Claude Code izin istiyor: cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
+  if (s.claudeCard && isPrimary) return "claude";
   if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";
   if (s.toasts.length) return "toast";
   if (s.osd) return "osd";

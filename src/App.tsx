@@ -5,6 +5,7 @@ import { figureRes } from "./components/mascot/Figure";
 import { Island } from "./components/Island";
 import { useUpdateCheck } from "./lib/update";
 import { useArgusDetect, useArgusFeed } from "./lib/argus";
+import { useClaudeFeed } from "./lib/claude";
 import { useAlarms } from "./hooks/useAlarms";
 import { bootLock, useShieldMicFeed } from "./lib/lock";
 import { isPrimary } from "./lib/bridge";
@@ -64,6 +65,7 @@ export default function App() {
   useMediaFeed();
   useStatsFeed();
   useDevicesFeed();
+  useClaudeFeed();
   useFullscreenFeed();
   usePrivacyFeed();
   useDownloadsFeed();

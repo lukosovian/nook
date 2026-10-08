@@ -60,7 +60,9 @@ export type DemoId =
   | "lively"
   | "newwear"
   | "report"
-  | "watchtime";
+  | "watchtime"
+  | "claudeask"
+  | "claudeplan";
 
 export interface NoteItem {
   title: string;
@@ -77,6 +79,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.45",
+    date: tt("8 Ekim 2026"),
+    headline: tt("Claude Code adada"),
+    items: [
+      {
+        title: tt("Claude Code'u adadan yönet"),
+        text: tt("Ana sayfadaki Claude çipinden Claude Code'u bir kez bağla: oturumların hangi projede ne yaptığını (komut, dosya düzenleme) canlı görürsün. Başka bir penceredeyken izin isterse ada kart açar; İzin ver, Her zaman, Reddet ya da terminalde cevapla. Soru sorarsa seçenekler adada çıkar, iş bitince ada haber verir. Bilgisayarında Claude Code yoksa çip görünmez."),
+        demo: "claudeask",
+      },
+      {
+        title: tt("Claude plan limiti"),
+        text: tt("5 saatlik ve haftalık Claude limitinin ne kadar dolduğu ve ne zaman sıfırlanacağı Claude bölümünde görünür (Pro ve Max). %80'e gelince ve dolunca ada bir kez uyarır."),
+        demo: "claudeplan",
+      },
+    ],
+  },
   {
     version: "0.2.44",
     date: tt("8 Ekim 2026"),

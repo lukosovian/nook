@@ -37,6 +37,8 @@ import { LookPanel } from "./LookPanel";
 import { ShelfPanel } from "./ShelfPanel";
 import { StatsPanel } from "./StatsPanel";
 import { YearPanel } from "./YearPanel";
+import { ClaudePanel } from "./ClaudePanel";
+import { CLAUDE_COLOR, planShort, useClaude } from "../../lib/claude";
 import { tt, locale } from "../../lib/i18n";
 
 type Module = Exclude<Tab, "home">;
@@ -45,6 +47,7 @@ const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "today", label: tt("Bugün"), color: ACCENT.yellow },
   { id: "media", label: tt("Medya"), color: ACCENT.pink },
   { id: "argus", label: "Argus", color: ARGUS_BLUE },
+  { id: "claude", label: "Claude", color: CLAUDE_COLOR },
   { id: "focus", label: "Pomodoro", color: ACCENT.red },
   { id: "shelf", label: tt("Raf"), color: ACCENT.teal },
   { id: "clip", label: tt("Pano"), color: ACCENT.purple },
@@ -89,6 +92,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   look: LookPanel,
   settings: SettingsPanel,
   year: YearPanel,
+  claude: ClaudePanel,
 };
 
 const TITLE = {
@@ -100,6 +104,7 @@ const TITLE = {
   archive: tt("Arşivin içi"),
   report: tt("Haftalık karne"),
   argus: "Argus",
+  claude: "Claude Code",
 } as Record<Module, string>;
 
 /**
@@ -169,7 +174,7 @@ export function Panels() {
 }
 
 /** Yayındayken içeriği ekranda okunmasın diye buzlanan bölümler */
-const LIVE_HIDDEN = new Set<Tab>(["note", "clip", "notify", "chat", "calendar"]);
+const LIVE_HIDDEN = new Set<Tab>(["note", "clip", "notify", "chat", "calendar", "claude"]);
 
 /** Yayın maskesi: hassas bölüm buzlu camın arkasında; "Bu sefer göster" ile o an açılır */
 function LiveVeil({ tab, children }: { tab: Tab; children: React.ReactNode }) {
@@ -248,6 +253,8 @@ function ModuleGrid() {
   const lukonnect = useNook((s) => hasLukonnect(s.devices));
   const sub = useModuleStatus();
   const argus = useArgus((s) => !!s.snap);
+  // Claude Code olmayan bilgisayarda gizli
+  const claude = useClaude((s) => !!s.setup?.present);
   const promo = useNook((s) => s.settings.argusPromo);
   const order = useNook((s) => s.settings.homeOrder);
   const hidden = useNook((s) => s.settings.homeHidden);
@@ -273,7 +280,7 @@ function ModuleGrid() {
   const gy = useMotionValue(0);
   const drag = useRef<{ id: string; dx: number; dy: number; slots: { x: number; y: number }[]; px: number; py: number; raf: number } | null>(null);
 
-  const available = ordered(draft ?? order).filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo));
+  const available = ordered(draft ?? order).filter((m) => (m.id !== "devices" || lukonnect) && (m.id !== "argus" || argus || promo) && (m.id !== "claude" || claude));
   // Düzenlerken profil uygulanmaz: bütün sıra görünür
   const modules = editing ? available : byProfile(available.filter((m) => !hidden.includes(m.id)), active);
 
@@ -639,6 +646,10 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
   const argusSnap = useArgus((s) => s.snap);
   const events = useNook((s) => s.events);
   const live = useNook(isLive);
+  const claudeSessions = useClaude((s) => s.sessions);
+  const claudeAsks = useClaude((s) => s.asks.length);
+  const claudePlan = useClaude((s) => s.plan);
+  const claudeHooked = useClaude((s) => !!s.setup?.hooked);
   const newToday = todayEpisodes(argusSnap);
   const watchingList = watching(argusSnap);
   // Pomodoro ve alarm yakınlığı canlı aksın
@@ -693,6 +704,14 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
             : tt("Ne izlesem?"),
       state: newToday.length ? "active" : "idle",
     },
+    claude: (() => {
+      const list = Object.values(claudeSessions).sort((a, b) => b.updatedAt - a.updatedAt);
+      const working = list.find((s) => s.state === "working");
+      if (!claudeHooked) return { text: tt("Bağla"), state: "empty" as const };
+      if (claudeAsks) return { text: tt("Onay bekliyor"), state: "alert" as const };
+      if (working) return { text: live ? tt("Çalışıyor") : `${working.project} · ${working.action}`, state: "active" as const };
+      return { text: planShort(claudePlan, now) ?? (list.length ? tt("{0} oturum", list.length) : tt("Hazır")), state: "idle" as const };
+    })(),
     today: { text: new Date().toLocaleDateString(locale(), { day: "numeric", month: "long", weekday: "short" }) },
   };
 }

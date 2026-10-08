@@ -124,6 +124,7 @@ export type Tab =
   | "archive"
   | "calendar"
   | "year"
+  | "claude"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -569,6 +570,8 @@ interface NookState {
   intro: boolean;
   /** Kalıcı hatırlatma (su): kullanıcı cevaplayana kadar adada durur */
   reminder: { kind: "water"; phase: "due" | "drinking" } | null;
+  /** Claude Code izin/soru kartı adada (bkz. lib/claude) */
+  claudeCard: boolean;
   /** Açık adanın "tam ekran" hâli: ada ekrana yayılır (boyutu pencere büyüyünce ölçülür) */
   big: { width: number; height: number } | null;
   /** "Nook nedir?" tanıtımı açık */
@@ -694,6 +697,7 @@ interface NookState {
   setTour: (tour: boolean) => void;
   setBig: (big: NookState["big"]) => void;
   setReminder: (reminder: NookState["reminder"]) => void;
+  setClaudeCard: (claudeCard: boolean) => void;
   setTourStep: (tourStep: number) => void;
   setBusy: (key: string, on: boolean) => void;
   setHold: (key: string, on: boolean) => void;
@@ -782,6 +786,7 @@ export const useNook = create<NookState>()(
       tour: false,
       big: null,
       reminder: null,
+      claudeCard: false,
       tourStep: 0,
       toured: false,
       busy: [],
@@ -979,6 +984,7 @@ export const useNook = create<NookState>()(
       setTourStep: (tourStep) => set({ tourStep }),
       setBig: (big) => set({ big }),
       setReminder: (reminder) => set({ reminder }),
+      setClaudeCard: (claudeCard) => set({ claudeCard }),
       addAlarm: ({ at, ...a }) =>
         set((s) => ({
           alarms: [...s.alarms, { ...a, id: crypto.randomUUID(), enabled: true, next: at ?? nextFire(a) }].sort(

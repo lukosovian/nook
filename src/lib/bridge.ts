@@ -59,6 +59,9 @@ export const EVENTS = {
   shelfAdd: "nook://shelf-add",
   share: "nook://share",
   shareToggle: "nook://share-toggle",
+  claude: "nook://claude",
+  claudeResolved: "nook://claude-resolved",
+  claudePlan: "nook://claude-plan",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -109,6 +112,22 @@ export const fileIcon = (path: string, size = 48) => (inTauri ? invoke<string | 
 export const captureScreen = () => (inTauri ? invoke<string>("capture_screen") : Promise.reject(new Error(tt("yalnızca uygulamada"))));
 export const voiceStart = () => (inTauri ? invoke<boolean>("voice_start") : Promise.resolve(false));
 export const voiceStop = () => (inTauri ? invoke<string | null>("voice_stop") : Promise.resolve(null));
+/** Claude Code kurulumu (bkz. src-tauri/src/claude.rs) */
+export interface ClaudeSetup {
+  /** Bu bilgisayarda Claude Code var mı */
+  present: boolean;
+  /** Nook'un hook'ları kurulu mu */
+  hooked: boolean;
+  /** Hook'lar başka bir nook.exe'yi gösteriyor */
+  stale: boolean;
+  statusline: "nook" | "other" | "none";
+}
+const WEB_CLAUDE: ClaudeSetup = { present: true, hooked: typeof location === "undefined" || !location.search.includes("unhooked"), stale: false, statusline: "nook" };
+export const claudeSetup = () => (inTauri ? invoke<ClaudeSetup>("claude_setup") : Promise.resolve(WEB_CLAUDE));
+/** Yedeğin yolunu döner (settings.json yoksa null) */
+export const claudeConnect = () => (inTauri ? invoke<string | null>("claude_connect") : Promise.resolve(null));
+export const claudeDisconnect = () => (inTauri ? invoke<string | null>("claude_disconnect") : Promise.resolve(null));
+export const claudeDecide = (id: number, decision: string) => (inTauri ? invoke<void>("claude_decide", { id, decision }) : Promise.resolve());
 export const onlineState = () => (inTauri ? invoke<boolean>("online_state") : Promise.resolve(navigator.onLine));
 
 export interface StatsPayload {
@@ -163,7 +182,8 @@ export type SysEventKind =
   | "calendar"
   | "clip"
   | "shelf"
-  | "live";
+  | "live"
+  | "claude";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {

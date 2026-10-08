@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.44"
+version = "0.2.45"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -16,7 +16,7 @@ tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-drag = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 base64 = "0.22"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
@@ -71,6 +71,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_IO",
   "Win32_System_Ioctl",
   "Win32_Security",
+  # Claude Code köprüsü: named pipe
+  "Win32_System_Pipes",
 ] }
 # "Şu an çalan" (GSMTC) — Tauri zaten bu sürümü derliyor
 windows = { version = "0.62", features = [

@@ -700,7 +700,133 @@ function WatchTimeDemo() {
   );
 }
 
+/** Claude Code: izin isteği adaya gelir, "İzin ver"e basılır, iş bitince haber gelir */
+function ClaudeAskDemo() {
+  const face = useFace();
+  const n = useTick(1100);
+  const phase = n % 6; // 0 kapalı · 1-3 kart · 4-5 bitti
+  const card = phase >= 1 && phase <= 3;
+  const done = phase >= 4;
+  const C = "#D97757";
+  return (
+    <Stage bg="radial-gradient(120% 100% at 50% 0%, #2a1c16 0%, #0f0c0a 75%)">
+      {/* Kullanıcı başka bir pencerede: izin terminalde değil adada sorulur */}
+      <div className="absolute inset-x-7 bottom-5 top-[104px] rounded-[10px] border border-white/[0.06] bg-white/[0.03] p-2 text-[8.5px] text-white/35">
+        <div className="mb-1.5 flex gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
+          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
+        </div>
+        {tt("Başka bir pencerede çalışıyorsun…")}
+      </div>
+      <div className="absolute inset-x-3 bottom-2 top-9 rounded-[10px] border border-white/[0.07]" />
+      <div className="absolute left-1/2 top-9 -translate-x-1/2">
+        <motion.div
+          className="flex items-center overflow-hidden bg-black"
+          animate={{ width: card ? 236 : done ? 214 : 84, height: card ? 50 : done ? 38 : 24 }}
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+          style={{ borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}
+        >
+          <span className="ml-2 flex shrink-0">
+            <NookFigure look={face.look} color={face.color} size={card ? 26 : 18} expression={done ? "happy" : card ? "surprised" : "idle"} />
+          </span>
+          <AnimatePresence mode="wait">
+            {card && (
+              <motion.div key="card" className="ml-2 flex min-w-0 flex-1 items-center gap-1.5 pr-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="text-[8px] font-medium" style={{ color: tintText(C) }}>Claude · Nook</p>
+                  <p className="truncate text-[9.5px] font-medium text-white">{tt("Komut çalıştırmak istiyor")}</p>
+                  <p className="truncate font-mono text-[8px] text-white/55">npm run build</p>
+                </div>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px]" style={{ background: tintBg(ACCENT.red, 14), color: tintText(ACCENT.red) }}>
+                  ×
+                </span>
+                <motion.span
+                  className="flex h-6 items-center gap-1 rounded-full border px-2 text-[9px] font-medium"
+                  animate={{ scale: phase === 3 ? [1, 0.88, 1] : 1 }}
+                  style={{ background: tintBg(ACCENT.green, phase === 3 ? 40 : 24), borderColor: tintBg(ACCENT.green, 60), color: tintText(ACCENT.green) }}
+                >
+                  <Check size={9} /> {tt("İzin ver")}
+                </motion.span>
+              </motion.div>
+            )}
+            {done && (
+              <motion.div key="done" className="ml-2 min-w-0 flex-1 pr-3 leading-tight" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <p className="truncate text-[9.5px] font-medium" style={{ color: tintText(C) }}>
+                  {tt("Claude bitirdi · Nook · 4 dk")}
+                </p>
+                <p className="truncate text-[8px] text-white/55">{tt("Derleme tamam, kurulum dosyası hazır.")}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+      {/* İmleç "İzin ver"e gider */}
+      <motion.span
+        className="absolute text-white"
+        initial={false}
+        animate={phase >= 2 && phase <= 3 ? { left: "71%", top: 66, opacity: 1 } : { left: "60%", top: 130, opacity: phase === 1 ? 1 : 0 }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+      >
+        <MousePointer2 size={13} fill="white" />
+      </motion.span>
+    </Stage>
+  );
+}
+
+/** Plan limiti: 5 saatlik ve haftalık çubuk dolar, %80'de ada bir kez uyarır */
+function ClaudePlanDemo() {
+  const n = useTick(160);
+  const t = n % 60;
+  const five = Math.min(92, 18 + t * 1.4);
+  const week = Math.min(70, 41 + t * 0.45);
+  const color = (p: number) => (p < 50 ? ACCENT.green : p < 80 ? ACCENT.orange : ACCENT.red);
+  const warn = five >= 80;
+  return (
+    <Stage>
+      <div className="absolute inset-x-3 bottom-2 top-9 rounded-[10px] border border-white/[0.07]" />
+      <div className="absolute left-1/2 top-9 -translate-x-1/2">
+        <motion.div
+          className="flex items-center gap-2 overflow-hidden bg-black px-3"
+          animate={{ width: warn ? 214 : 84, height: warn ? 38 : 24 }}
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+          style={{ borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}
+        >
+          {warn && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 leading-tight">
+              <p className="truncate text-[9.5px] font-medium" style={{ color: tintText("#D97757") }}>
+                {tt("Claude 5 saatlik limitin %{0}", 80)}
+              </p>
+              <p className="truncate text-[8px] text-white/55">{tt("Sıfırlanma: {0}", tt("1 sa 12 dk sonra"))}</p>
+            </motion.div>
+          )}
+        </motion.div>
+      </div>
+      <div className="absolute inset-x-6 bottom-3 grid grid-cols-2 gap-2">
+        {[
+          { label: tt("5 saat"), p: five, reset: tt("{0} sa {1} dk", 1, 12) },
+          { label: tt("Hafta"), p: week, reset: "Paz 09:44" },
+        ].map((g) => (
+          <div key={g.label} className="rounded-[10px] border px-2 py-1" style={{ background: tintBg(color(g.p), 8), borderColor: tintBg(color(g.p), 24) }}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[9px] text-white/60">{g.label}</span>
+              <span className="text-[13px] font-medium tabular-nums" style={{ color: tintText(color(g.p)) }}>
+                %{Math.round(g.p)}
+              </span>
+            </div>
+            <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full" style={{ width: `${g.p}%`, background: color(g.p), boxShadow: `0 0 6px ${color(g.p)}` }} />
+            </div>
+            <p className="mt-0.5 truncate text-[8px] text-white/40">{tt("Sıfırlanma {0}", g.reset)}</p>
+          </div>
+        ))}
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS2 = {
+  claudeask: ClaudeAskDemo,
+  claudeplan: ClaudePlanDemo,
   watchtime: WatchTimeDemo,
   report: ReportDemo,
   scenepick: ScenePickDemo,

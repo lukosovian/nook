@@ -6,8 +6,9 @@
 import { MotionGlobalConfig } from "motion/react";
 import { dayKey, useNook, type Tab } from "../store/nook";
 import { useArgus, type ArgusItem } from "../lib/argus";
+import { useClaude, type ClaudeAsk } from "../lib/claude";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings", "year"];
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings", "year", "claude"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -40,12 +41,34 @@ function demoArgus() {
   });
 }
 
+function demoClaude(mode: string, params: URLSearchParams) {
+  const now = Date.now();
+  const base = { cwd: "", reply: "", startedAt: now - 3600_000, turnAt: now - 240_000, files: [] as string[], edits: 0, commands: 0 };
+  const ask: ClaudeAsk | null =
+    mode === "claudeask"
+      ? { askId: 1, session: "a", project: "Nook", tool: "Bash", title: "Komut çalıştırmak istiyor", detail: "npm run tauri build -- --bundles nsis", questions: null, canAlways: true, at: now }
+      : mode === "claudeq"
+        ? { askId: 2, session: "a", project: "Nook", tool: "AskUserQuestion", title: "Sana soruyor", detail: "", canAlways: false, at: now, questions: [{ question: "Kartın rengi ne olsun?", multiSelect: false, options: [{ label: "Turuncu" }, { label: "Mor" }, { label: "Yeşil" }] }] }
+        : null;
+  useClaude.setState({
+    setup: { present: true, hooked: !params.has("unhooked"), stale: false, statusline: "nook" },
+    plan: { fiveHour: { usedPct: 37, resetsAt: now + 2 * 3600_000 + 14 * 60_000 }, sevenDay: { usedPct: 62, resetsAt: now + 3 * 86_400_000 }, updatedAt: now - 60_000 },
+    asks: ask ? [ask] : [],
+    sessions: {
+      a: { ...base, id: "a", project: "Nook", cwd: "C:/Users/OEM/Desktop/Nook", state: ask ? "waiting" : "working", action: ask ? "Onay bekliyor · npm run tauri build" : "Düzenliyor · ClaudePanel.tsx", prompt: "Claude Code entegrasyonunu ekle", updatedAt: now - 20_000, edits: 12, commands: 5, files: ["ClaudePanel.tsx", "claude.rs", "Panels.tsx"] },
+      b: { ...base, id: "b", project: "argus", cwd: "C:/Users/OEM/Desktop/Argus", state: "done", action: "Bitti", prompt: "Takvimdeki boş günleri gizle", reply: "Boş günler artık takvimde görünmüyor; filtre ayarlara da eklendi.", updatedAt: now - 9 * 60_000, edits: 3, commands: 2, files: ["calendar.js"] },
+    },
+  });
+  if (ask) useNook.setState({ claudeCard: true });
+}
+
 const DEMO_NOTE = "# Hafta\n- [x] Market: **süt**, ekmek\n- [ ] Pazartesi sunum provası\n> `npm run build` unutma";
 
 export function applyPreview(mode: string) {
   const params0 = new URLSearchParams(location.search);
   const tr = (new URLSearchParams(location.search).get("lang") ?? "tr") === "tr";
   if (!new URLSearchParams(location.search).has("noargus")) demoArgus();
+  demoClaude(mode, new URLSearchParams(location.search));
   document.documentElement.style.background = "#3a4a5c";
   // Ekran görüntüsü animasyonun ortasında çekilmesin
   if (new URLSearchParams(location.search).has("still")) {
@@ -293,6 +316,11 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, gate: true, notesSeen: "999", settings: { ...useNook.getState().settings, lockHash: "a:b" } });
   } else if (mode === "reminder" || mode === "drinking") {
     useNook.setState({ media: null, reminder: { kind: "water", phase: mode === "drinking" ? "drinking" : "due" }, antic: mode === "drinking" ? "drink" : null });
+  } else if (mode === "homeq") {
+    // Müziksiz ana sayfa (çipler)
+    useNook.setState({ media: null, hovered: true, tab: "home" });
+  } else if (mode === "claudeask" || mode === "claudeq") {
+    useNook.setState({ media: null });
   } else if (mode === "ringing") {
     useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: tr ? "Toplantı" : "Meeting", repeat: "once", enabled: false, next: null } });
   } else if (mode === "feeding") {

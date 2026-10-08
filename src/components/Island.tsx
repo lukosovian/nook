@@ -33,6 +33,7 @@ import { birthMotion, Intro, INTRO_ANTIC, introKind, introMs } from "./overlays/
 import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
 import { ReminderView } from "./overlays/ReminderView";
+import { ClaudeView } from "./overlays/ClaudeView";
 import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
 import { Brief } from "./brief/Brief";
@@ -280,6 +281,7 @@ export function Island() {
             {mode === "toast" && <ToastView key="toast" />}
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
+            {mode === "claude" && <ClaudeView key="claude" />}
             {mode === "guard" && <GuardView key="guard" />}
             {mode === "gate" && <GateView key="gate" />}
           </AnimatePresence>
