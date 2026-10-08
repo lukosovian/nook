@@ -114,6 +114,12 @@ export function tt(source: string, ...args: unknown[]): string {
 /** Türkçede mi (ünlü uyumlu ekler, "%7" gibi yazımlar yalnızca Türkçede) */
 export const isTurkish = lang === "tr";
 
+/** Ondalık sayı seçili dilin biçiminde: "9,4" / "9.4" */
+export const dec = (n: number, digits = 1) => n.toLocaleString(locale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+/** Yüzde yazımı: "%37" (Türkçe), "37 %" (es, de, fr), "37%" (diğerleri) */
+export const pct = (n: number) => (isTurkish ? `%${n}` : lang === "es" || lang === "de" || lang === "fr" ? `${n} %` : `${n}%`);
+
 /** Dil değişti: ayar kaydedilir, bütün Nook pencereleri yeniden yüklenir */
 export function onLangChange(next: Lang) {
   if (next === lang) return;

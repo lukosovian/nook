@@ -19,7 +19,7 @@ import { SKY_LABEL } from "../../lib/weather";
 import { modelsFor } from "../../hooks/useGemini";
 import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, Card, MiniNook, tintBg, tintText } from "../ui/primitives";
-import { tt, locale } from "../../lib/i18n";
+import { pct as fmtPct, tt, locale } from "../../lib/i18n";
 
 const LINE_KEY = "nook-today-line";
 
@@ -355,7 +355,7 @@ function useTiles(): TileData[] {
     },
     { label: tt("Gece"), value: night ? tt("{0} bildirim geldi", night) : tt("Sessizdi"), color: ACCENT.purple, eyes: night ? "open" : "closed", open: "notify" },
   ];
-  if (devs.length) tiles.push({ label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => `%${d.pct}`).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open", open: "devices" });
+  if (devs.length) tiles.push({ label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => fmtPct(d.pct)).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open", open: "devices" });
   tiles.push({
     label: tt("Hafta sonu"),
     value: wd === 0 || wd === 6 ? tt("Keyfini çıkar") : wd === 5 ? tt("Yarın başlıyor") : tt("{0} gün kaldı", 6 - wd),

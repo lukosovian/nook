@@ -62,7 +62,8 @@ export type DemoId =
   | "report"
   | "watchtime"
   | "claudeask"
-  | "claudeplan";
+  | "claudeplan"
+  | "langs";
 
 export interface NoteItem {
   title: string;
@@ -79,6 +80,18 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.46",
+    date: tt("8 Ekim 2026"),
+    headline: tt("Bütün diller güncel"),
+    items: [
+      {
+        title: tt("Yeni özellikler 9 dilde"),
+        text: tt("Son sürümlerde gelen her şey (Claude Code, kalkan sahneleri, karne, yıl özeti, pano, şarkı sözleri…) artık İngilizce, İspanyolca, Portekizce, Almanca, Fransızca, Rusça, Çince ve Japonca da. Yüzdeler ve ondalık sayılar da seçtiğin dilin yazımıyla görünür."),
+        demo: "langs",
+      },
+    ],
+  },
   {
     version: "0.2.45",
     date: tt("8 Ekim 2026"),

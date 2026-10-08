@@ -5,7 +5,7 @@ import { diskEject, diskHealth, localIp, speedTest, systemDisks, systemUptime, t
 import { formatSize } from "../../lib/format";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
-import { tt } from "../../lib/i18n";
+import { dec, pct as fmtPct, tt } from "../../lib/i18n";
 
 /** CPU, GPU, bellek, pil; ağ grafiği ve ayrıntıları; bütün diskler. Rust saniyede bir günceller. */
 export function StatsPanel() {
@@ -21,10 +21,10 @@ export function StatsPanel() {
   return (
     <div ref={scroller} className="-mr-1.5 h-full space-y-2.5 overflow-y-auto pr-1.5">
       <div className="space-y-2">
-        <Row label={tt("İşlemci")} pct={stats.cpu} value={`%${Math.round(stats.cpu)}`} />
-        {stats.gpu != null && <Row label={tt("Ekran kartı")} pct={stats.gpu} value={`%${Math.round(stats.gpu)}`} />}
+        <Row label={tt("İşlemci")} pct={stats.cpu} value={fmtPct(Math.round(stats.cpu))} />
+        {stats.gpu != null && <Row label={tt("Ekran kartı")} pct={stats.gpu} value={fmtPct(Math.round(stats.gpu))} />}
         <Row label={tt("Bellek")} pct={memPct} value={`${gb(stats.memUsed)} / ${gb(stats.memTotal)} GB`} />
-        {b && <Row label={tt("Pil")} pct={100 - b.percent} value={`%${b.percent}${b.charging ? tt(" · şarjda") : ""}`} color={b.charging ? ACCENT.green : levelColor(b.percent)} />}
+        {b && <Row label={tt("Pil")} pct={100 - b.percent} value={`${fmtPct(b.percent)}${b.charging ? tt(" · şarjda") : ""}`} color={b.charging ? ACCENT.green : levelColor(b.percent)} />}
       </div>
 
       <Network down={stats.netDown} up={stats.netUp} history={netHistory} />
@@ -35,7 +35,7 @@ export function StatsPanel() {
 }
 
 /** Bayt → "9,4" (GB, Türkçe ondalık) */
-const gb = (bytes: number, digits = 1) => (bytes / 1024 ** 3).toFixed(digits).replace(".", ",");
+const gb = (bytes: number, digits = 1) => dec(bytes / 1024 ** 3, digits);
 const rate = (bps: number) => (bps < 1024 ? `${bps} B/s` : `${formatSize(bps)}/s`);
 
 function Row({ label, pct, value, color }: { label: string; pct: number; value: string; color?: string }) {
@@ -102,7 +102,7 @@ function Network({ down, up, history }: { down: number; up: number; history: num
             title={test.error ?? tt("Cloudflare'den ~25 MB indirir")}
           >
             <Gauge size={10} strokeWidth={2.6} />
-            {test.busy ? tt("Ölçülüyor…") : test.mbps != null ? `${test.mbps.toFixed(test.mbps < 10 ? 1 : 0).replace(".", ",")} Mbit/s` : test.error ? tt("Olmadı") : tt("Hız testi")}
+            {test.busy ? tt("Ölçülüyor…") : test.mbps != null ? `${dec(test.mbps, test.mbps < 10 ? 1 : 0)} Mbit/s` : test.error ? tt("Olmadı") : tt("Hız testi")}
           </button>
         </div>
       </div>

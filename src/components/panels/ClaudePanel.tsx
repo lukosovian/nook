@@ -5,7 +5,7 @@ import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { ago, answer, CLAUDE_COLOR, connect, disconnect, effectivePct, planColor, refreshSetup, resetLabel, useClaude, type ClaudeAsk, type ClaudeSession, type PlanWindow } from "../../lib/claude";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, tintBg, tintText } from "../ui/primitives";
-import { tt } from "../../lib/i18n";
+import { pct as fmtPct, tt } from "../../lib/i18n";
 
 const STATE_COLOR: Record<ClaudeSession["state"], string> = {
   working: CLAUDE_COLOR,
@@ -81,7 +81,7 @@ function Gauge({ label, w, weekly, now }: { label: string; w?: PlanWindow; weekl
       <div className="flex items-baseline justify-between">
         <span className="text-[11px] font-medium text-label-2">{label}</span>
         <span className="font-display text-[16px] font-medium tabular-nums leading-none" style={{ color: tintText(color) }}>
-          {pct == null ? "—" : `%${Math.round(pct)}`}
+          {pct == null ? "—" : fmtPct(Math.round(pct))}
         </span>
       </div>
       <Bar pct={pct ?? 0} color={color} className="mt-1" />

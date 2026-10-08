@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, levelColor, MiniNook, tintText } from "../ui/primitives";
-import { tt } from "../../lib/i18n";
+import { pct as fmtPct, tt } from "../../lib/i18n";
 
 /** Lukonnect'ten okunan cihazlar — Grok Bot'taki renkli ajan çipleri gibi. Nook yalnızca okur. */
 export function DevicesPanel() {
@@ -56,7 +56,7 @@ function DeviceRow({ name, percent, color, detail }: { name: string; percent: nu
         <div className="flex items-baseline justify-between">
           <span className="text-[12px] font-medium text-label">{name}</span>
           <span className="font-display text-[14px] font-medium tabular-nums" style={{ color: tintText(color) }}>
-            {percent === null ? "—" : `%${percent}`}
+            {percent === null ? "—" : fmtPct(percent)}
           </span>
         </div>
         <p className="truncate text-[10px] text-label-3">{detail}</p>

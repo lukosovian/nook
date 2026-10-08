@@ -31,7 +31,7 @@ import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 import { Props } from "../mascot/Props";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
-import { tt } from "../../lib/i18n";
+import { pct as fmtPct, tt } from "../../lib/i18n";
 
 function useTick(ms: number) {
   const [n, setN] = useState(1);
@@ -810,7 +810,7 @@ function ClaudePlanDemo() {
             <div className="flex items-baseline justify-between">
               <span className="text-[9px] text-white/60">{g.label}</span>
               <span className="text-[13px] font-medium tabular-nums" style={{ color: tintText(color(g.p)) }}>
-                %{Math.round(g.p)}
+                {fmtPct(Math.round(g.p))}
               </span>
             </div>
             <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-white/10">
@@ -824,7 +824,72 @@ function ClaudePlanDemo() {
   );
 }
 
+/** Diller: aynı izin kartı ve plan göstergesi dil dil döner; yüzde de o dilin yazımıyla */
+const LANG_DEMO = [
+  { flag: "Türkçe", ask: "Komut çalıştırmak istiyor", allow: "İzin ver", week: "Hafta", pct: "%62" },
+  { flag: "English", ask: "Wants to run a command", allow: "Allow", week: "Week", pct: "62%" },
+  { flag: "Español", ask: "Quiere ejecutar un comando", allow: "Permitir", week: "Semana", pct: "62 %" },
+  { flag: "Português", ask: "Quer executar um comando", allow: "Permitir", week: "Semana", pct: "62%" },
+  { flag: "Deutsch", ask: "Möchte einen Befehl ausführen", allow: "Erlauben", week: "Woche", pct: "62 %" },
+  { flag: "Français", ask: "Veut exécuter une commande", allow: "Autoriser", week: "Semaine", pct: "62 %" },
+  { flag: "Русский", ask: "Хочет выполнить команду", allow: "Разрешить", week: "Неделя", pct: "62%" },
+  { flag: "简体中文", ask: "想运行一个命令", allow: "允许", week: "本周", pct: "62%" },
+  { flag: "日本語", ask: "コマンドを実行したい", allow: "許可", week: "週", pct: "62%" },
+];
+
+function LangsDemo() {
+  const face = useFace();
+  const n = useTick(1300);
+  const l = LANG_DEMO[n % LANG_DEMO.length];
+  return (
+    <Stage>
+      <div className="absolute inset-x-3 bottom-2 top-9 rounded-[10px] border border-white/[0.07]" />
+      <div className="absolute left-1/2 top-9 -translate-x-1/2">
+        <div className="flex h-[50px] w-[236px] items-center bg-black" style={{ borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
+          <span className="ml-2 flex shrink-0">
+            <NookFigure look={face.look} color={face.color} size={26} expression="happy" />
+          </span>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={l.flag}
+              className="ml-2 flex min-w-0 flex-1 items-center gap-1.5 pr-2"
+              initial={{ opacity: 0, y: 6, filter: "blur(3px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -6, filter: "blur(3px)" }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="text-[8px] font-medium" style={{ color: tintText("#D97757") }}>Claude · Nook</p>
+                <p className="truncate text-[9.5px] font-medium text-white">{l.ask}</p>
+              </div>
+              <span className="flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-[9px] font-medium" style={{ background: tintBg(ACCENT.green, 24), borderColor: tintBg(ACCENT.green, 60), color: tintText(ACCENT.green) }}>
+                <Check size={9} /> {l.allow}
+              </span>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+      <div className="absolute inset-x-6 bottom-4 flex items-center gap-2">
+        <AnimatePresence mode="wait">
+          <motion.span key={l.flag} className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.18 }}>
+            {l.flag}
+          </motion.span>
+        </AnimatePresence>
+        <div className="flex flex-1 items-center rounded-[10px] border px-2 py-1" style={{ background: tintBg(ACCENT.orange, 8), borderColor: tintBg(ACCENT.orange, 24) }}>
+          <AnimatePresence mode="wait">
+            <motion.div key={l.flag} className="flex flex-1 items-center justify-between" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              <span className="text-[9px] text-white/60">{l.week}</span>
+              <span className="text-[13px] font-medium tabular-nums" style={{ color: tintText(ACCENT.orange) }}>{l.pct}</span>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS2 = {
+  langs: LangsDemo,
   claudeask: ClaudeAskDemo,
   claudeplan: ClaudePlanDemo,
   watchtime: WatchTimeDemo,

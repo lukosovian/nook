@@ -34,7 +34,7 @@ import { fetchWeather } from "../lib/weather";
 import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isLive, isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
 import { playAntic } from "./useAntics";
-import { tt } from "../lib/i18n";
+import { dec, tt } from "../lib/i18n";
 
 /** "12 dakikadır", "1 saat 20 dakikadır", "3 saattir" — ve ek almadan: "12 dakika", "3 saat" */
 function awayText(mins: number) {
@@ -280,7 +280,7 @@ export function useStatsFeed() {
       if (s.diskTotal && diskDay !== today && (s.diskTotal - s.diskUsed) / s.diskTotal < DISK_LOW && !quiet) {
         diskDay = today;
         const free = (s.diskTotal - s.diskUsed) / 1024 ** 3;
-        st.pushToast({ kind: "alert", title: tt("C: diski doluyor"), detail: tt("{0} GB boş kaldı", free.toFixed(1).replace(".", ",")), ms: 6000 });
+        st.pushToast({ kind: "alert", title: tt("C: diski doluyor"), detail: tt("{0} GB boş kaldı", dec(free)), ms: 6000 });
         playAntic("surprised");
       }
     });

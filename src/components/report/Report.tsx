@@ -12,7 +12,7 @@ import { easeOut } from "../../lib/motion";
 import { closeReport } from "../../lib/report";
 import { dayKey, EMPTY_DAY, useNook, type DayStats } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
-import { tt, locale } from "../../lib/i18n";
+import { dec, tt, locale } from "../../lib/i18n";
 
 const enter = (i: number) => ({
   initial: { opacity: 0, y: 10, filter: "blur(3px)" },
@@ -22,7 +22,10 @@ const enter = (i: number) => ({
 
 const hm = (min: number) => (min >= 60 ? tt("{0} sa", Math.floor(min / 60)) + (min % 60 ? tt(" {0} dk", Math.round(min % 60)) : "") : tt("{0} dk", Math.round(min)));
 /** Dar kutucuklar için: "6,2 sa" */
-const short = (min: number) => (min >= 60 ? tt("{0} sa", (min / 60).toFixed(1).replace(".", ",").replace(",0", "")) : tt("{0} dk", Math.round(min)));
+const short = (min: number) => {
+  const h = Math.round(min / 6) / 10;
+  return min >= 60 ? tt("{0} sa", dec(h, h % 1 ? 1 : 0)) : tt("{0} dk", Math.round(min));
+};
 
 type Day = { date: Date; stats: DayStats };
 

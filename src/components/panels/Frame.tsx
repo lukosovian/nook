@@ -45,7 +45,7 @@ import { SKY_LABEL, type Sky } from "../../lib/weather";
 import { isLive, isSleeping, SULK_BELOW, useNook } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { ek, useNookName } from "../../lib/look";
-import { tt, locale } from "../../lib/i18n";
+import { pct as fmtPct, tt, locale } from "../../lib/i18n";
 import { allProfiles, MAX_PROFILES, newProfile, userProfiles } from "../../lib/profiles";
 import { SoundBody } from "../SoundCard";
 import { lineAt, lyricOffset, useLyrics } from "../../lib/lyrics";
@@ -416,7 +416,7 @@ function Activity({ view }: { view: View }) {
     ["mouse", tt("Mouse"), devices?.mouse?.percent],
     ["headset", tt("Kulaklık"), devices?.headset?.percent],
   ] as const) {
-    if (p != null && p <= 20) items.push({ id: `low-${key}`, icon: BatteryLow, title: label, sub: tt("Pil azalıyor"), value: `%${p}`, progress: p / 100, color: ACCENT.red });
+    if (p != null && p <= 20) items.push({ id: `low-${key}`, icon: BatteryLow, title: label, sub: tt("Pil azalıyor"), value: fmtPct(p), progress: p / 100, color: ACCENT.red });
   }
   const nextAlarm = alarms.filter((a) => a.enabled && a.next).sort((a, b) => a.next! - b.next!)[0];
   if (nextAlarm) {
