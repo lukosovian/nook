@@ -395,6 +395,10 @@ export interface Settings extends NativeSettings {
   lyrics: boolean;
   /** Ekran paylaşımı / yayın algılanınca hassas bölümleri gizle */
   liveMask: boolean;
+  /** Arayüz sesleri: ada açılıp kapanırken, olay kartı gelince, Nook sevinince (lib/sfx) */
+  uiSounds: boolean;
+  /** Arayüz seslerinin yüksekliği (0–1) */
+  uiVolume: number;
   /** Ana sayfa profilleri ("Hepsi" hariç); yoksa varsayılanlar (lib/profiles) */
   profiles?: import("../lib/profiles").ProfileDef[];
 }
@@ -509,6 +513,8 @@ export const DEFAULT_SETTINGS: Settings = {
   liveShortcut: "Ctrl+Alt+L",
   humShortcut: "Ctrl+Alt+M",
   humAuto: false,
+  uiSounds: true,
+  uiVolume: 0.6,
 };
 
 export interface Osd {

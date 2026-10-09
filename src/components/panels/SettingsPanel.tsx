@@ -17,6 +17,7 @@ import { MOVE_KINDS } from "../../lib/moveFx";
 import { IntroPreview, MovePreview } from "./EffectPreview";
 import { LangDropdown } from "../ui/LangPicker";
 import { tt } from "../../lib/i18n";
+import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
@@ -497,16 +498,17 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
     };
   }, [scroller]);
 
-  // Seçili sekme şeritte görünür kalsın. scrollIntoView dikey kaydırıcıya da dokunup sekme
-  // tıklamasıyla başlayan yumuşak kaymayı kesiyordu; yalnızca şerit yatayda kaydırılır.
+  // Seçili sekme şeridin ortasında dursun ki iki yanındaki (önceki/sonraki) sekmeler görünsün ve
+  // tıklanabilsin; uçlarda şerit kendiliğinden sınıra dayanır. scrollIntoView dikey kaydırıcıya da
+  // dokunup sekme tıklamasıyla başlayan yumuşak kaymayı kesiyordu; yalnızca şerit yatayda kaydırılır.
   useEffect(() => {
     const s = strip.current;
     const b = s?.querySelector<HTMLElement>(`[data-i="${current}"]`);
     if (!s || !b) return;
     const sr = s.getBoundingClientRect();
     const br = b.getBoundingClientRect();
-    if (br.left < sr.left) s.scrollLeft += br.left - sr.left - 8;
-    else if (br.right > sr.right) s.scrollLeft += br.right - sr.right + 8;
+    const delta = br.left + br.width / 2 - (sr.left + sr.width / 2);
+    if (Math.abs(delta) > 2) s.scrollBy({ left: delta, behavior: "smooth" });
   }, [current]);
 
   const go = (i: number) => {
@@ -736,7 +738,17 @@ const HEADPHONE_DROP: { id: number; label: string }[] = [
 ];
 
 /** Ses: kulaklık çıkınca kısma, çıkışlar arasında kısayolla dönme */
+const UI_VOLUME: { id: number; label: string }[] = [
+  { id: 0.3, label: tt("Kısık") },
+  { id: 0.6, label: tt("Orta") },
+  { id: 1, label: tt("Yüksek") },
+];
+
+/** Önizle düğmesi her basışta başka bir sesi çalar */
+const SFX_DEMO: Sfx[] = ["open", "success", "attention", "happy", "pop", "found", "close"];
+
 function SoundSection() {
+  const demo = useRef(0);
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const [outputs, setOutputs] = useState<AudioOutput[]>([]);
@@ -744,6 +756,17 @@ function SoundSection() {
   const cycle = s.outputCycle;
   return (
     <Section title={tt("Ses")}>
+      <Row label={tt("Nook'un sesleri (açılınca, bildirim gelince, sevinince)")}>
+        <Toggle on={s.uiSounds} onChange={(v) => { update({ uiSounds: v }); if (v) playSfx("happy", true); }} color={ACCENT.pink} />
+      </Row>
+      {s.uiSounds && (
+        <Row label={tt("Seslerin yüksekliği")}>
+          <div className="flex items-center gap-1.5">
+            <PreviewButton color={ACCENT.pink} onClick={() => playSfx(SFX_DEMO[demo.current++ % SFX_DEMO.length], true)} />
+            <Segmented id="ui-volume" options={UI_VOLUME} value={s.uiVolume} onChange={(v) => { update({ uiVolume: v }); window.setTimeout(() => playSfx("pop", true), 30); }} color={ACCENT.pink} />
+          </div>
+        </Row>
+      )}
       <Row label={tt("Şarkı sözleri (lrclib.net)")}>
         <Toggle on={s.lyrics} onChange={(v) => update({ lyrics: v })} color={ACCENT.pink} />
       </Row>

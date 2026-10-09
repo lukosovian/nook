@@ -10,6 +10,7 @@ import { useAlarms } from "./hooks/useAlarms";
 import { useHum } from "./hooks/useHum";
 import { bootLock, useShieldMicFeed } from "./lib/lock";
 import { isPrimary } from "./lib/bridge";
+import { startSfx } from "./lib/sfx";
 import { useAntics } from "./hooks/useAntics";
 import { useCursorFeed } from "./hooks/useCursorFeed";
 import { useFeeding } from "./hooks/useFeeding";
@@ -59,6 +60,8 @@ export default function App() {
   useEffect(() => {
     if (isPrimary) void bootLock();
   }, []);
+  // Arayüz sesleri
+  useEffect(() => startSfx(), []);
   useStorageSync();
   useCursorFeed();
   useIdleFeed();

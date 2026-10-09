@@ -67,7 +67,9 @@ export type DemoId =
   | "hum"
   | "humlog"
   | "alarmedit"
-  | "alarmwait";
+  | "alarmwait"
+  | "sounds"
+  | "settabs";
 
 export interface NoteItem {
   title: string;
@@ -84,6 +86,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.48",
+    date: tt("9 Ekim 2026"),
+    headline: tt("Nook artık ses çıkarıyor"),
+    items: [
+      {
+        title: tt("Nook'un sesleri"),
+        text: tt("Ada açılıp kapanırken, bildirim gelince, şarj ya da indirme bitince, su ve mola hatırlatmalarında, Hum şarkıyı bulunca, Nook yemek yiyip sevinince kısa ve yumuşak sesler çıkar. Ayarlar › Ses'ten kapatabilir, Kısık / Orta / Yüksek seçebilirsin. Oyunda, tam ekranda ve Hum dinlerken susar; Windows bildirimleri zaten kendi sesini çaldığı için onlarda ses yok."),
+        demo: "sounds",
+      },
+      {
+        title: tt("Ayarlarda sekmeler ortada"),
+        text: tt("Ayarlarda aşağı ya da yukarı kaydırdıkça üstteki şeritte seçili sekme ortada durur; öncesi ve sonrası hep görünür, bir sonrakine tek tıkla geçersin."),
+        demo: "settabs",
+      },
+    ],
+  },
   {
     version: "0.2.47",
     date: tt("9 Ekim 2026"),
