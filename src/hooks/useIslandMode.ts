@@ -13,6 +13,8 @@ export function islandModeOf(s: State): IslandMode {
   // Odak bekçisi: yasaklı siteden çıkana (ya da izin verene) kadar durur
   if (s.guard && isPrimary) return "guard";
   if (s.tour && isPrimary) return "tour";
+  // Hum dinlerken ve sonucu gösterirken: üstüne gelinse de açılmaz (düğmelere basılabilsin)
+  if (s.hum && isPrimary) return "hum";
   if (s.mood === "hungry" || s.mood === "chewing") return "feeding";
   if (s.searching) return "search";
   // Günün özeti: üzerine gelinse de büyük kalır

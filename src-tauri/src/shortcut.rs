@@ -5,6 +5,7 @@
 //!  - Rafa ekle (Ctrl+Alt+S): Gezgin'de seçili dosyalar rafa düşer
 //!  - Düz metin yapıştır (Ctrl+Alt+V): panodaki biçim atılır, metin yapıştırılır
 //!  - Ses çıkışı (isteğe bağlı): seçili çıkışlar arasında sırayla geçer
+//!  - Hum (Ctrl+Alt+M): bilgisayarda çalan şarkıyı bul
 
 use std::sync::{Arc, Mutex};
 
@@ -32,6 +33,7 @@ enum Role {
     PlainPaste,
     Output,
     Live,
+    Hum,
 }
 
 #[derive(Clone, Serialize)]
@@ -53,6 +55,7 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         (settings.plain_paste_shortcut.as_str(), Role::PlainPaste),
         (settings.output_shortcut.as_str(), Role::Output),
         (settings.live_shortcut.as_str(), Role::Live),
+        (settings.hum_shortcut.as_str(), Role::Hum),
     ];
     let wanted: Vec<String> = list.iter().map(|(s, _)| s.to_string()).collect();
     if *registered == wanted {
@@ -95,6 +98,9 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             (Role::Output, ShortcutState::Pressed) => crate::quick::cycle_output(app),
             (Role::Live, ShortcutState::Pressed) => {
                 let _ = app.emit("nook://share-toggle", ());
+            }
+            (Role::Hum, ShortcutState::Pressed) => {
+                let _ = app.emit("nook://hum-toggle", ());
             }
             _ => {}
         });

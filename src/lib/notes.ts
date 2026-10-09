@@ -63,7 +63,11 @@ export type DemoId =
   | "watchtime"
   | "claudeask"
   | "claudeplan"
-  | "langs";
+  | "langs"
+  | "hum"
+  | "humlog"
+  | "alarmedit"
+  | "alarmwait";
 
 export interface NoteItem {
   title: string;
@@ -80,6 +84,33 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.47",
+    date: tt("9 Ekim 2026"),
+    headline: tt("Hum: çalan şarkıyı bul"),
+    items: [
+      {
+        title: tt("Hum"),
+        text: tt("Video, dizi ya da filmde çalan şarkıyı bulur. Ctrl+Alt+M'ye bas (ya da sağdaki Hum çipine dokun): Nook DJ kulaklığını takıp dinlemeye başlar, ada sesle birlikte dalgalanır. Şarkının adı, sanatçısı, albümü ve kapağı gelir; Spotify ya da YouTube'da tek tıkla açarsın. Mikrofon değil, bilgisayarın kendi sesi dinlenir."),
+        demo: "hum",
+      },
+      {
+        title: tt("Otomatik Hum ve geçmiş"),
+        text: tt("Ayarlardan Otomatik Hum'u açarsan Nook ada kapalıyken de arkada dinler, bulduğu şarkıları kaydeder. Bulunan her şarkı Hum çipindeki geçmişte durur. Oyundayken ve görüşmedeyken dinlemez; sesin kendisi gönderilmez, yalnızca parmak izi."),
+        demo: "humlog",
+      },
+      {
+        title: tt("Alarmı düzenle"),
+        text: tt("Kurulu bir alarmın saatine ya da adına tıkla, değiştir, Kaydet'e bas. Artık silip yeniden kurmak yok."),
+        demo: "alarmedit",
+      },
+      {
+        title: tt("Alarm sen kapatana kadar bekler"),
+        text: tt("Oyundayken çalan alarm kaçmaz: oyundan çıktığında adada seni bekler, sen kapatana kadar durur (ses 3 dakika sonra susar). O sırada gelen bildirimler de kaybolmaz, alarmı kapatınca sırayla gelir."),
+        demo: "alarmwait",
+      },
+    ],
+  },
   {
     version: "0.2.46",
     date: tt("8 Ekim 2026"),

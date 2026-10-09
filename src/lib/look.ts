@@ -322,6 +322,7 @@ export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
   look: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "bow" } },
   year: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "star", eyes: "sparkle", head: "bow" } },
   claude: { color: "#D97757", look: { ...DEFAULT_LOOK, shape: "cube", texture: "matte", eyes: "bead", head: "hardhat" } },
+  hum: { color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "blob", eyes: "calm", head: "headphones", glasses: "shades" } },
 };
 
 /** Tanıtımın ilk sayfasındaki çipler: her birinde başka bir Nook */

@@ -122,6 +122,28 @@ const POSES: Partial<Record<Expression, [Pose, Pose]>> = {
   ],
   // Cama vurma: saat ve vuran el eşyayla birlikte çizilir
   knock: [HIDE, HIDE],
+  // Hum (DJ): eller ritim tutar; kulaklığa bastırırken sağ el kulakta; plak çizerken eller plakla birlikte çizilir
+  djNod: [
+    show({ x: 0.5, y: [4, 2, 4], rotate: [10, 0, 10], transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" } }),
+    show({ x: -0.5, y: [2, 4, 2], rotate: [0, -10, 0], transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" } }),
+  ],
+  djSway: [
+    show({ x: [-1, 1, -1], y: [3, 1, 3], rotate: [20, -10, 20], transition: { duration: 1.3, repeat: Infinity, ease: "easeInOut" } }),
+    show({ x: [-1, 1, -1], y: [1, 3, 1], rotate: [10, -20, 10], transition: { duration: 1.3, repeat: Infinity, ease: "easeInOut" } }),
+  ],
+  djBounce: [
+    show({ x: -1, y: [-4, -9, -4], rotate: 35, transition: { duration: 0.48, repeat: Infinity, ease: "easeOut" } }),
+    show({ x: 1, y: [-9, -4, -9], rotate: -35, transition: { duration: 0.48, repeat: Infinity, ease: "easeOut" } }),
+  ],
+  djEar: [
+    show({ x: 1, y: [5, 3.5, 5], rotate: 15, transition: { duration: 0.6, repeat: Infinity, ease: "easeInOut" } }),
+    show({ x: -0.6, y: -3, rotate: -65 }),
+  ],
+  djScratch: [HIDE, HIDE],
+  djSpin: [
+    show({ x: [0, 0, -2, -2], y: [3, 3, -4, 3], rotate: [0, 0, 40, 0], transition: { duration: 2.6, repeat: Infinity, times: [0, 0.6, 0.75, 1] } }),
+    show({ x: [0, 0, 2, 2], y: [3, 3, -4, 3], rotate: [0, 0, -40, 0], transition: { duration: 2.6, repeat: Infinity, times: [0, 0.6, 0.75, 1] } }),
+  ],
   // Alarm: iki el havada sallanır
   alarm: [
     show({ x: -2, y: [-6, -9, -6], rotate: [25, 45, 25], transition: { duration: 0.3, repeat: Infinity } }),

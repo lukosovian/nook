@@ -8,7 +8,7 @@ import { dayKey, useNook, type Tab } from "../store/nook";
 import { useArgus, type ArgusItem } from "../lib/argus";
 import { useClaude, type ClaudeAsk } from "../lib/claude";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings", "year", "claude"];
+const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings", "year", "claude", "hum"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -293,6 +293,17 @@ export function applyPreview(mode: string) {
   } else if (mode === "tour") {
     useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
   } else if (TABS.includes(mode as Tab)) {
+    if (mode === "hum" && !useNook.getState().hums.length) {
+      const at = Date.now();
+      useNook.setState({
+        hums: [
+          { id: "a", key: "a", title: "Never Gonna Give You Up", artist: "Rick Astley", album: "Whenever You Need Somebody", cover: ART, at: at - 4 * 60_000, auto: false },
+          { id: "b", key: "b", title: "Bir Derdim Var", artist: "mor ve ötesi", album: "Dünya Yalan Söylüyor", cover: ART, at: at - 52 * 60_000, auto: true },
+          { id: "c", key: "c", title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", cover: null, at: at - 26 * 3_600_000, auto: true },
+          { id: "d", key: "d", title: "Gülpembe", artist: "Barış Manço", album: "Sahibinden İhtiyaçtan", cover: ART, at: at - 4 * 86_400_000, auto: false },
+        ],
+      });
+    }
     useNook.setState({ hovered: true, tab: mode as Tab });
     // ?big → tam ekran
     if (params.has("big")) window.setTimeout(() => void import("../lib/big").then((m) => m.enterBig()), 100);
@@ -333,6 +344,14 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000, left: 0, total: 25 * 60_000, round: 1 } });
   } else if (mode === "watchmini" || mode === "eventmini") {
     useNook.setState({ media: null });
+  } else if (mode === "humlisten" || mode === "humfound" || mode === "hummiss") {
+    // ?move=0–5 → dinlerkenki hareket
+    const move = Number(params.get("move") ?? 0);
+    const track = { key: "1", title: "Never Gonna Give You Up", artist: "Rick Astley", album: "Whenever You Need Somebody", released: "1987", cover: ART };
+    useNook.setState({
+      media: null,
+      hum: mode === "humlisten" ? { phase: "listening", move } : mode === "humfound" ? { phase: "found", move, track } : { phase: params.get("phase") === "silent" ? "silent" : "none", move },
+    });
   } else if (mode === "listen") {
     useNook.setState({ media: null, listening: true });
   } else if (mode === "notifytoast") {

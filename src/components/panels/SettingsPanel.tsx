@@ -161,6 +161,18 @@ export function SettingsPanel() {
 
       <CalendarSection />
 
+      <Section title="Hum">
+        <Row label={tt("Çalan şarkıyı bul")}>
+          <ShortcutInput value={s.humShortcut} onChange={(v) => update({ humShortcut: v })} clearable />
+        </Row>
+        <Row label={tt("Otomatik Hum: arkada dinle, bulduklarını kaydet")}>
+          <Toggle on={s.humAuto} onChange={(v) => update({ humAuto: v })} color={ACCENT.purple} />
+        </Row>
+        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+          {tt("Mikrofon değil, bilgisayarın kendi sesi dinlenir. Sesin kendisi gönderilmez, yalnızca şarkıyı tanımaya yeten parmak izi Shazam'a gider. Otomatik Hum oyundayken ve görüşmedeyken dinlemez.")}
+        </p>
+      </Section>
+
       <Section title={tt("Yayın")}>
         <Row label={tt("Ekran paylaşınca / yayında hassas bölümleri gizle")}>
           <Toggle on={s.liveMask} onChange={(v) => update({ liveMask: v })} color={ACCENT.red} />

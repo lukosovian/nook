@@ -92,6 +92,9 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 if next > 0 && now_ms >= next && rung_for != next {
                     rung_for = next;
                     let _ = app.emit("nook://alarm-due", next);
+                    // Oyunda görünmedi denince nedenini görebilmek için: öndeki tam ekran ne, ada gizli mi
+                    let fg = imp::fullscreen_monitor(&shared).and_then(|d| d.1).map(|(_, e)| pretty(&e));
+                    crate::log::write("info", &format!("alarm vakti: tam ekran={fg:?}, gizli ada={}", hidden.len()));
                 }
                 let guard = shared.guard.load(Ordering::Relaxed);
                 let enabled = settings.hide_in_fullscreen && !alarm && !guard;

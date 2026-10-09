@@ -9,6 +9,7 @@ import { dayKey, isLive, useNook, type Tab } from "../../store/nook";
 import { allProfiles, userProfiles, type ProfileDef } from "../../lib/profiles";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
+import { HumPanel } from "./HumPanel";
 import { CalendarPanel } from "./CalendarPanel";
 import { ArgusPanel } from "./ArgusPanel";
 import { ArchivePanel } from "./ArchivePanel";
@@ -46,6 +47,7 @@ type Module = Exclude<Tab, "home">;
 const MODULES: { id: Module; label: string; color: string }[] = [
   { id: "today", label: tt("Bugün"), color: ACCENT.yellow },
   { id: "media", label: tt("Medya"), color: ACCENT.pink },
+  { id: "hum", label: "Hum", color: ACCENT.purple },
   { id: "argus", label: "Argus", color: ARGUS_BLUE },
   { id: "claude", label: "Claude", color: CLAUDE_COLOR },
   { id: "focus", label: "Pomodoro", color: ACCENT.red },
@@ -93,6 +95,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   settings: SettingsPanel,
   year: YearPanel,
   claude: ClaudePanel,
+  hum: HumPanel,
 };
 
 const TITLE = {
@@ -650,6 +653,9 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
   const claudeAsks = useClaude((s) => s.asks.length);
   const claudePlan = useClaude((s) => s.plan);
   const claudeHooked = useClaude((s) => !!s.setup?.hooked);
+  const lastHum = useNook((s) => s.hums[0]);
+  const humListening = useNook((s) => s.hum?.phase === "listening");
+  const humAuto = useNook((s) => s.settings.humAuto);
   const newToday = todayEpisodes(argusSnap);
   const watchingList = watching(argusSnap);
   // Pomodoro ve alarm yakınlığı canlı aksın
@@ -713,5 +719,9 @@ function useModuleStatus(): Partial<Record<Module, Status>> {
       return { text: planShort(claudePlan, now) ?? (list.length ? tt("{0} oturum", list.length) : tt("Hazır")), state: "idle" as const };
     })(),
     today: { text: new Date().toLocaleDateString(locale(), { day: "numeric", month: "long", weekday: "short" }) },
+    hum: {
+      text: humListening ? tt("Dinliyor…") : lastHum ? `${lastHum.artist} · ${lastHum.title}` : humAuto ? tt("Arkada dinliyor") : tt("Çalan şarkıyı bul"),
+      state: humListening ? "active" : lastHum || humAuto ? "idle" : "empty",
+    },
   };
 }

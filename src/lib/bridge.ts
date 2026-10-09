@@ -62,6 +62,9 @@ export const EVENTS = {
   claude: "nook://claude",
   claudeResolved: "nook://claude-resolved",
   claudePlan: "nook://claude-plan",
+  humToggle: "nook://hum-toggle",
+  humLevel: "nook://hum-level",
+  humFound: "nook://hum-found",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -339,6 +342,10 @@ export interface NativeSettings {
   headphoneDrop: number;
   /** Yayın maskesini elle aç / kapat */
   liveShortcut: string;
+  /** Hum: çalan şarkıyı bul */
+  humShortcut: string;
+  /** Otomatik Hum: arkada dinler, bulduklarını kaydeder */
+  humAuto: boolean;
 }
 
 /** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */

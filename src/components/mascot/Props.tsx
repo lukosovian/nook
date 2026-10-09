@@ -47,7 +47,72 @@ export function Props({ expression, sleepStyle }: { expression: Expression; slee
       {expression === "focused" && <Desk key="desk" />}
       {expression === "knock" && <Knock key="knock" />}
       {expression === "live" && <LiveMic key="live" />}
+      {expression === "djScratch" && <Turntable key="deck" />}
+      {expression === "djEar" && <SoundArcs key="arcs" />}
     </AnimatePresence>
+  );
+}
+
+/** Hum, plak çizme: yüzün altında dönen plak; sağ el plağı ileri geri çizer, sol el ayarda */
+function Turntable() {
+  return (
+    <motion.div className="pointer-events-none absolute" style={{ left: 0, top: 0, width: 24, height: 24 }} {...pop}>
+      {/* Pikap gövdesi: perspektifte basık bir kutu */}
+      <div
+        className="absolute rounded-[2px]"
+        style={{ left: -3, top: 19.5, width: 30, height: 6.5, background: "linear-gradient(180deg, #3a3a44, #18181d)", boxShadow: "0 1.5px 2px rgba(0,0,0,0.6), inset 0 0.5px 0 rgba(255,255,255,0.18)" }}
+      />
+      {/* Plak: oluklu siyah disk, ortada renkli etiket — dönüşü etiketten belli */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          left: -0.5,
+          top: 18.6,
+          width: 17,
+          height: 5.6,
+          background: "repeating-radial-gradient(circle, #121214 0 0.7px, #26262b 0.7px 1.3px)",
+          boxShadow: "0 0 0 0.4px rgba(255,255,255,0.12)",
+        }}
+        animate={{ x: [0, 0.6, -0.6, 0] }}
+        transition={{ duration: 0.42, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <motion.span
+          className="absolute rounded-full"
+          style={{ left: 6, top: 1.4, width: 5, height: 2.8, background: "conic-gradient(#ff5c8a 0 25%, #ffd21f 0 50%, #ff5c8a 0 75%, #ffd21f 0)" }}
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+        />
+      </motion.div>
+      {/* Ayar düğmeleri */}
+      {[19.5, 22.5].map((x) => (
+        <span key={x} className="absolute rounded-full" style={{ left: x, top: 20.6, width: 1.8, height: 1.8, background: "#8fe03a", boxShadow: "0 0 2px #8fe03a" }} />
+      ))}
+      {/* Sağ el plakta ileri geri (çizik), sol el ayarda tıklar */}
+      <motion.div className="absolute" style={{ left: 0, top: 0 }} animate={{ x: [-2, 2.5, -2] }} transition={{ duration: 0.42, repeat: Infinity, ease: "easeInOut" }}>
+        <PropHand x={6} y={19.8} rotate={-15} />
+      </motion.div>
+      <motion.div className="absolute" style={{ left: 0, top: 0 }} animate={{ y: [0, 0.8, 0] }} transition={{ duration: 0.84, repeat: Infinity, ease: "easeInOut" }}>
+        <PropHand x={21} y={19.6} rotate={15} />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** Hum, kulaklığa bastırma: kulağın yanından dışarı yayılan ses halkaları */
+function SoundArcs() {
+  return (
+    <motion.div className="pointer-events-none absolute" style={{ left: 0, top: 0, width: 24, height: 24 }} {...pop}>
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full"
+          style={{ left: 22, top: 4, width: 8, height: 12, borderRight: "1.2px solid rgba(125,211,252,0.9)", borderLeft: "1.2px solid transparent" }}
+          initial={{ opacity: 0, x: 0, scale: 0.6 }}
+          animate={{ opacity: [0, 0.9, 0], x: [0, 4], scale: [0.6, 1.15] }}
+          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.4, ease: "easeOut" }}
+        />
+      ))}
+    </motion.div>
   );
 }
 

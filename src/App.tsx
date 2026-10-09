@@ -7,6 +7,7 @@ import { useUpdateCheck } from "./lib/update";
 import { useArgusDetect, useArgusFeed } from "./lib/argus";
 import { useClaudeFeed } from "./lib/claude";
 import { useAlarms } from "./hooks/useAlarms";
+import { useHum } from "./hooks/useHum";
 import { bootLock, useShieldMicFeed } from "./lib/lock";
 import { isPrimary } from "./lib/bridge";
 import { useAntics } from "./hooks/useAntics";
@@ -81,6 +82,7 @@ export default function App() {
   useFeeding();
   useAntics();
   useAlarms();
+  useHum();
   useShelfRevalidation();
   useShelfFeed();
   useLiveFeed();

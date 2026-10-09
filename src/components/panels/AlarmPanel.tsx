@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { AlarmClock, Bell, BellOff, ChevronDown, ChevronUp, Repeat2, X } from "lucide-react";
-import { clock, pad, REPEAT_LABEL, until, type Repeat } from "../../lib/alarm";
+import { AlarmClock, Bell, BellOff, Check, ChevronDown, ChevronUp, Pencil, Repeat2, X } from "lucide-react";
+import { clock, pad, REPEAT_LABEL, until, type Alarm, type Repeat } from "../../lib/alarm";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText, Toggle } from "../ui/primitives";
@@ -11,7 +11,7 @@ import { tt } from "../../lib/i18n";
 const QUICK = [5, 10, 25, 60];
 const REPEATS = Object.keys(REPEAT_LABEL) as Repeat[];
 
-/** Alarm kur: saat seçici + isim + tekrar; hızlı "+N dk"; kurulu alarmlar listesi. */
+/** Alarm kur: saat seçici + isim + tekrar; hızlı "+N dk"; kurulu alarmlar listesi (satıra tıklayınca düzenlenir). */
 export function AlarmPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("alarm", scroller);
@@ -26,9 +26,32 @@ export function AlarmPanel() {
   const [repeat, setRepeat] = useState<Repeat>("once");
   // Ayarlarda ses "Sessiz" ise yeni alarmlar da sessiz başlar
   const [silent, setSilent] = useState(() => useNook.getState().settings.alarmSound === 0);
+  // Düzenlenen alarm: üstteki seçici onun değerleriyle dolar, "Kur" → "Kaydet"
+  const [editing, setEditing] = useState<string | null>(null);
 
+  // Düzenlenen alarm silindiyse (ya da tek seferlik olup çaldıysa) düzenleme biter
+  useEffect(() => {
+    if (editing && !alarms.some((a) => a.id === editing)) setEditing(null);
+  }, [alarms, editing]);
+
+  const edit = (a: Alarm) => {
+    if (editing === a.id) return cancel();
+    setEditing(a.id);
+    setHour(a.hour);
+    setMinute(a.minute);
+    setLabel(a.label);
+    setRepeat(a.repeat);
+    setSilent(!!a.silent);
+  };
+  const cancel = () => {
+    setEditing(null);
+    setLabel("");
+  };
   const add = () => {
-    addAlarm({ hour, minute, label: label.trim(), repeat, silent });
+    if (editing) {
+      useNook.getState().updateAlarm(editing, { hour, minute, label: label.trim(), repeat, silent });
+      setEditing(null);
+    } else addAlarm({ hour, minute, label: label.trim(), repeat, silent });
     setLabel("");
   };
   const quick = (min: number) => {
@@ -49,7 +72,7 @@ export function AlarmPanel() {
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
+            onKeyDown={(e) => (e.key === "Enter" ? add() : e.key === "Escape" && editing && cancel())}
             placeholder={tt("İsim (ör. Toplantı)")}
             spellCheck={false}
             className="h-7 w-full rounded-full bg-well px-3 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-well-hi"
@@ -72,14 +95,35 @@ export function AlarmPanel() {
           <BellToggle silent={silent} onChange={setSilent} />
           </div>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          transition={spring.pop}
-          onClick={add}
-          className="flex h-[62px] w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[14px] border text-[11px] font-medium"
-          style={{ background: tintBg(ACCENT.yellow, 16), borderColor: tintBg(ACCENT.yellow, 40), color: tintText(ACCENT.yellow) }}
-        >
-          <AlarmClock size={16} strokeWidth={2.4} />{tt("Kur")}</motion.button>
+        <div className="relative shrink-0">
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            transition={spring.pop}
+            onClick={add}
+            className="flex h-[62px] w-12 flex-col items-center justify-center gap-0.5 rounded-[14px] border text-[11px] font-medium"
+            style={{ background: tintBg(ACCENT.yellow, editing ? 26 : 16), borderColor: tintBg(ACCENT.yellow, editing ? 60 : 40), color: tintText(ACCENT.yellow) }}
+          >
+            {editing ? <Check size={16} strokeWidth={2.6} /> : <AlarmClock size={16} strokeWidth={2.4} />}
+            {editing ? tt("Kaydet") : tt("Kur")}
+          </motion.button>
+          {/* Düzenlemeden vazgeç */}
+          <AnimatePresence>
+            {editing && (
+              <motion.button
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={spring.pop}
+                onClick={cancel}
+                title={tt("Vazgeç")}
+                aria-label={tt("Vazgeç")}
+                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-well-hi text-label-2 hover:text-label"
+              >
+                <X size={9} strokeWidth={3} />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       <div className="flex shrink-0 gap-1">
@@ -107,18 +151,22 @@ export function AlarmPanel() {
               transition={spring.pop}
               className="flex h-9 items-center gap-2 rounded-full border pl-1 pr-1.5"
               style={{
-                background: a.enabled ? tintBg(ACCENT.yellow, 9) : "rgb(255 255 255 / 0.03)",
-                borderColor: a.enabled ? tintBg(ACCENT.yellow, 26) : "rgb(255 255 255 / 0.05)",
+                background: editing === a.id ? tintBg(ACCENT.yellow, 18) : a.enabled ? tintBg(ACCENT.yellow, 9) : "rgb(255 255 255 / 0.03)",
+                borderColor: editing === a.id ? tintBg(ACCENT.yellow, 60) : a.enabled ? tintBg(ACCENT.yellow, 26) : "rgb(255 255 255 / 0.05)",
               }}
             >
-              <MiniNook color={a.enabled ? ACCENT.yellow : "#5a5a62"} size={26} eyes={a.enabled ? "open" : "closed"} />
-              <span className="font-display text-[15px] font-medium tabular-nums" style={{ color: a.enabled ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}>
-                {clock(a)}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-label-3">
-                <span className="text-label-2">{a.label || REPEAT_LABEL[a.repeat]}</span>
-                {a.enabled && a.next ? ` · ${until(a.next, now)}` : ""}
-              </span>
+              {/* Saate/isme tıklayınca üstteki seçicide düzenlenir */}
+              <button onClick={() => edit(a)} title={tt("Düzenle")} className="group flex min-w-0 flex-1 items-center gap-2 text-left">
+                <MiniNook color={a.enabled ? ACCENT.yellow : "#5a5a62"} size={26} eyes={a.enabled ? "open" : "closed"} />
+                <span className="font-display text-[15px] font-medium tabular-nums" style={{ color: a.enabled ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}>
+                  {clock(a)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-label-3">
+                  <span className="text-label-2">{a.label || REPEAT_LABEL[a.repeat]}</span>
+                  {a.enabled && a.next ? ` · ${until(a.next, now)}` : ""}
+                </span>
+                <Pencil size={10} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-opacity ${editing === a.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
+              </button>
               <BellToggle silent={!!a.silent} small onChange={(v) => useNook.getState().setAlarmSilent(a.id, v)} />
               <Toggle on={a.enabled} onChange={(v) => useNook.getState().toggleAlarm(a.id, v)} color={ACCENT.yellow} />
               <button

@@ -34,6 +34,7 @@ import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
 import { ReminderView } from "./overlays/ReminderView";
 import { ClaudeView } from "./overlays/ClaudeView";
+import { HumView, HumWave } from "./overlays/HumView";
 import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
 import { Brief } from "./brief/Brief";
@@ -126,6 +127,9 @@ export function Island() {
   const media = useNook((s) => s.media);
   const settings = useNook((s) => s.settings);
   const fullscreen = useNook((s) => s.fullscreen);
+  // Hum dinlerken ve sonucu gösterirken Nook DJ kulaklığı takar
+  const humming = useNook((s) => !!s.hum && isPrimary);
+  const humListening = useNook((s) => s.hum?.phase === "listening" && isPrimary);
   // Üst kenardan ayrı bir yere taşındıysa ada çentik değil, dört köşesi yuvarlak bir hap
   const detached = useNook((s) => (s.settings.islandPos?.fy ?? 0) > 0);
   const downloading = useNook((s) => s.downloads.length > 0);
@@ -219,6 +223,9 @@ export function Island() {
         initial={{ scale: 0.4, opacity: 0 }}
         animate={fullscreen ? jelly(mood, true) : move ? moveTarget(move) : jelly(mood, false)}
       >
+        {/* Hum dinlerken adanın kenarında sese duyarlı dalga (adanın arkasında) */}
+        <div className="relative">
+        <AnimatePresence>{humListening && <HumWave key="humwave" island={ref} detached={detached} />}</AnimatePresence>
         {/* Ekrana yapışık çentik: saf siyah, üst köşeler düz, yalnızca alt köşeler yuvarlak (taşınınca hepsi) */}
         <motion.div
           ref={ref}
@@ -258,7 +265,7 @@ export function Island() {
                 status={status}
                 grooving={playing && !(mode === "expanded" && lookTab)}
                 color={normalizeColor(settings.faceColor)}
-                look={normalizeLook(settings.look)}
+                look={humming ? { ...normalizeLook(settings.look), head: "headphones" } : normalizeLook(settings.look)}
                 bounds={ref}
               />
               </motion.div>
@@ -282,10 +289,12 @@ export function Island() {
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
             {mode === "claude" && <ClaudeView key="claude" />}
+            {mode === "hum" && <HumView key="hum" />}
             {mode === "guard" && <GuardView key="guard" />}
             {mode === "gate" && <GateView key="gate" />}
           </AnimatePresence>
         </motion.div>
+        </div>
         {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}
         <AnimatePresence>
           {outing === "hang" && <Dangle key="hang" />}

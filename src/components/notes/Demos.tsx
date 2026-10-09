@@ -15,6 +15,7 @@ import { IntroPreview, MovePreview } from "../panels/EffectPreview";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 import { DEMOS2 } from "./Demos2";
+import { DEMOS3 } from "./Demos3";
 
 /** Her `ms`'de bir artan sayaç (sahneler kendini tekrarlasın) */
 function useTick(ms: number) {
@@ -810,6 +811,7 @@ function CvdDemo() {
 
 export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
   ...DEMOS2,
+  ...DEMOS3,
   lang: LangDemo,
   scale: ScaleDemo,
   cvd: CvdDemo,

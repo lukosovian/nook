@@ -117,6 +117,10 @@ pub struct Settings {
     pub headphone_drop: u8,
     /// Yayın maskesini elle aç / kapat
     pub live_shortcut: String,
+    /// Hum: çalan şarkıyı bul
+    pub hum_shortcut: String,
+    /// Otomatik Hum: arkada dinler, bulduğu şarkıları kaydeder
+    pub hum_auto: bool,
 }
 
 /// Adanın ekrandaki yeri, ekran boyuna oranla: fx üst-orta noktanın yatay yeri, fy üst kenarın
@@ -154,6 +158,8 @@ impl Default for Settings {
             output_cycle: Vec::new(),
             headphone_drop: 0,
             live_shortcut: "Ctrl+Alt+L".into(),
+            hum_shortcut: "Ctrl+Alt+M".into(),
+            hum_auto: false,
         }
     }
 }

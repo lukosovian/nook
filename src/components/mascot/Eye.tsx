@@ -81,6 +81,13 @@ export const EYES: Record<Expression, [EyeShape, EyeShape]> = {
   yawn: [SHUT, SHUT],
   wink: [OPEN, arch(5, 2.6)],
   hum: [arch(5, 2.6), arch(5, 2.6)],
+  // Hum dinlerken: gözler kapalı müziğe dalmış; kulaklığa bastırırken sıkıca kapalı; plak çizerken aşağıda, plağa bakar
+  djNod: [arch(5, 2.8), arch(5, 2.8)],
+  djSway: [arch(5, 2.6), arch(5, 2.6)],
+  djBounce: [arch(5, 3.2), arch(5, 3.2)],
+  djEar: [pill(5, 1.7, 1), pill(5, 1.7, 1)],
+  djScratch: [pill(3.8, 5.4, 0.6), pill(3.8, 5.4, 0.6)],
+  djSpin: [arch(5, 3.2), arch(5, 3.2)],
   hop: [OPEN, OPEN],
   wander: [OPEN, OPEN],
   nod: [pill(4, 2.4, 1), pill(4, 2.4, 1)],

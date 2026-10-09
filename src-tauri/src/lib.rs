@@ -12,6 +12,7 @@ mod disks;
 mod downloads;
 mod focus;
 mod fullscreen;
+mod hum;
 mod imaging;
 mod log;
 mod lukonnect;
@@ -138,6 +139,8 @@ pub fn run() {
             imaging::capture_screen,
             voice::voice_start,
             voice::voice_stop,
+            hum::hum_listen,
+            hum::hum_cancel,
             net::online_state,
             log::log_line,
             claude::claude_decide,
@@ -168,6 +171,7 @@ pub fn run() {
             media::spawn(handle.clone());
             system::spawn(handle.clone(), shared.clone());
             fullscreen::spawn(handle.clone(), shared.clone());
+            hum::spawn(handle.clone(), shared.clone());
             buddy::spawn(handle.clone(), shared);
             privacy::spawn(handle.clone());
             downloads::spawn(handle.clone());

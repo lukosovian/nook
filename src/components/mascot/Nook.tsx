@@ -141,6 +141,13 @@ const BODY: Record<Expression, TargetAndTransition> = {
   magnify: { x: 0, y: 0, rotate: [0, 4, -2, 0], transition: { duration: 2.6, repeat: Infinity, ease: "easeInOut" } },
   // Masada yazarken hafifçe ileri geri sallanır
   focused: { x: 0, rotate: 0, scaleX: 1, scaleY: 1, y: [0.4, 1, 0.4], transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" } },
+  // Hum dinlerken (DJ): ritimle kafa sallar, salınır, zıplar, kulaklığa eğilir, plağı çizer, arada döner
+  djNod: { x: 0, scaleX: 1, scaleY: 1, y: [0, 1.8, 0], rotate: [0, 5, 0], transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" } },
+  djSway: { scaleX: 1, scaleY: 1, x: [-2.2, 2.2, -2.2], y: [0, -0.8, 0, -0.8, 0], rotate: [-9, 9, -9], transition: { duration: 1.3, repeat: Infinity, ease: "easeInOut" } },
+  djBounce: { x: 0, rotate: 0, y: [0, -4, 0], scaleX: [1.06, 0.96, 1.06], scaleY: [0.93, 1.05, 0.93], transition: { duration: 0.48, repeat: Infinity, ease: "easeOut" } },
+  djEar: { x: 0, scaleX: 1, scaleY: 1, rotate: [11, 14, 11], y: [0, 1, 0], transition: { duration: 0.6, repeat: Infinity, ease: "easeInOut" } },
+  djScratch: { scaleX: 1, scaleY: 1, x: 0, y: [-1.5, -1, -1.5], rotate: [-3, 3, -3], transition: { duration: 0.42, repeat: Infinity, ease: "easeInOut" } },
+  djSpin: { x: 0, scaleX: 1, scaleY: 1, y: [0, -1.5, 0, -1.5, 0, -3, -3, 0], rotate: [0, -6, 0, 6, 0, 0, 360, 360], transition: { duration: 2.6, repeat: Infinity, times: [0, 0.12, 0.25, 0.37, 0.5, 0.6, 0.88, 1], ease: "easeInOut" } },
   // Cama yaklaşıp vurur: her vuruşta biraz öne gelir
   knock: {
     x: 0,
@@ -180,6 +187,12 @@ const FLOATER: Partial<Record<Expression, { char: string; className: string }>> 
   loud: { char: "!", className: "text-amber-300" },
   sneeze: { char: "!", className: "text-amber-200" },
   campfire: { char: "~", className: "text-orange-200/70" },
+  djNod: { char: "♪", className: "text-white/80" },
+  djSway: { char: "♫", className: "text-white/80" },
+  djBounce: { char: "♪", className: "text-pink-300" },
+  djEar: { char: "♫", className: "text-sky-300" },
+  djScratch: { char: "♪", className: "text-white/80" },
+  djSpin: { char: "♫", className: "text-amber-200" },
 };
 
 /** Bazı ifadelerde gözler bir yöne kayar (aşağı bakmak, yan bakmak). */
@@ -197,10 +210,11 @@ const EYE_OFFSET: Partial<Record<Expression, TargetAndTransition>> = {
   volUp: { x: 2.6, y: 0 },
   volDown: { x: 2.4, y: 0.6 },
   focused: { x: -0.8, y: 2.2 },
+  djScratch: { x: 0, y: 2.6 },
 };
 
 /** Gözleri kapalı/özel çizimli ifadeler — imleç takibi yok. */
-const NO_LOOK = new Set<Expression>(["focused", "knock", "lookAround", "sneeze", "spin", "read", "campfire", "note", "writing", "magnify", "hot", "volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
+const NO_LOOK = new Set<Expression>(["djNod", "djSway", "djBounce", "djEar", "djScratch", "djSpin", "focused", "knock", "lookAround", "sneeze", "spin", "read", "campfire", "note", "writing", "magnify", "hot", "volUp", "volDown", "loud", "muted", "sleepy", "chewing", "yawn", "stretch", "giggle", "hum", "love", "happy", "sulk", "dizzy", "thinking", "slap", "shy", "suspicious", "bored", "downloading", "drink"]);
 /** Kendiliğinden göz kırpan ifadeler. */
 const BLINKS = new Set<Expression>(["focused", "knock", "idle", "drowsy", "tired", "wander", "hop", "surprised", "hungry", "lookAround", "gum", "umbrella", "magnify", "read", "note", "writing"]);
 

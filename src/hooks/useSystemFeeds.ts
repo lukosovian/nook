@@ -33,6 +33,7 @@ import { detectSensitive, SENSITIVE_CLEAR_MS, SENSITIVE_LABEL } from "../lib/sen
 import { fetchWeather } from "../lib/weather";
 import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isLive, isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
+import { islandModeOf } from "./useIslandMode";
 import { playAntic } from "./useAntics";
 import { dec, tt } from "../lib/i18n";
 
@@ -318,13 +319,15 @@ export function useEventFeed() {
     [],
   );
 
-  // Kuyruğun başındaki kartı süre dolunca kaldır.
+  // Kuyruğun başındaki kartı süre dolunca kaldır. Süre yalnızca kart gerçekten ekrandayken işler:
+  // alarm çalarken, oyunda ada gizliyken ya da ada açıkken gelen bildirim beklemede kalır, sonra gösterilir.
   const head = useNook((s) => s.toasts[0]);
+  const showing = useNook((s) => !s.fullscreen && islandModeOf(s) === "toast");
   useEffect(() => {
-    if (!head) return;
+    if (!head || !showing) return;
     const t = window.setTimeout(() => useNook.getState().shiftToast(), head.ms ?? 3200);
     return () => window.clearTimeout(t);
-  }, [head?.id]);
+  }, [head?.id, showing]);
 }
 
 /** Yeni ekran görüntüsü → rafa düşer, Nook sevinir (yalnızca ana ada). */
@@ -538,6 +541,8 @@ const native = (s: Settings) => ({
   outputCycle: s.outputCycle ?? [],
   headphoneDrop: s.headphoneDrop ?? 0,
   liveShortcut: s.liveShortcut ?? "",
+  humShortcut: s.humShortcut ?? "",
+  humAuto: s.humAuto ?? false,
 });
 
 /** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). Gizliyken kare çizilmez. */

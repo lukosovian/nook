@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { alarmNext, alarmRing, isPrimary, subscribe } from "../lib/bridge";
+import { note } from "../lib/log";
 import { useNook } from "../store/nook";
 import { tt, locale } from "../lib/i18n";
 
-/** Alarm bu kadar çalınca (kimse dokunmazsa) kendiliğinden susar. */
+/** Alarm sesi bu kadar çalınca (kimse dokunmazsa) susar; ada ise kapatılana kadar alarmı gösterir. */
 const AUTO_STOP_MS = 3 * 60_000;
 /** Vakti bundan çok geçmiş alarm çalmaz, "kaçırıldı" diye bildirilir */
 const MISSED_AFTER_MS = 10 * 60_000;
@@ -42,10 +43,12 @@ export function useAlarms() {
       }
       s.fireAlarm(due.id);
       s.setRinging(due);
+      note(`alarm çaldı (${Math.round((now - due.next!) / 1000)} sn gecikme, ${document.visibilityState})`);
       // Sessiz alarm ya da "Sessiz" ses ayarı → yalnızca ada açılır
       void alarmRing(true, due.silent ? 0 : s.settings.alarmSound);
       window.clearTimeout(autoStop);
-      autoStop = window.setTimeout(() => stopAlarm(), AUTO_STOP_MS);
+      // Yalnızca ses kesilir: oyundan dönünce alarm hâlâ orada olsun (tam ekranda da üstte kalır)
+      autoStop = window.setTimeout(() => useNook.getState().ringing && void alarmRing(true, 0), AUTO_STOP_MS);
     };
     const t = window.setInterval(check, 1000);
     // Oyunda ada gizliyken sayfanın saati yavaşlar; vakti gelince Rust haber verir, beklemeden çal

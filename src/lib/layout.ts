@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -25,6 +25,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   gate: { width: 420, height: 78, radius: 28 },
   /** Claude Code izin/soru kartı: cevaplanana kadar durur */
   claude: { width: 600, height: 92, radius: 30 },
+  /** Hum: dinlerken ve bulunan şarkının kartı (kapak, ad, sanatçı) */
+  hum: { width: 470, height: 84, radius: 30 },
   /** "Nook nedir?" tanıtımı: ada ekrana yayılır */
   tour: { width: 900, height: 520, radius: 40 },
   /** Günün özeti: ada büyür, solda kocaman Nook, sağda kartlar */
@@ -179,6 +181,8 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
       return center(36, height / 2 + 2, 1.45);
     case "claude":
       return center(40, height / 2, 1.5);
+    case "hum":
+      return center(46, height / 2 + 2, 1.7);
     case "guard":
     case "gate":
       return center(44, height / 2 + 3, 1.75);

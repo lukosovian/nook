@@ -12,6 +12,7 @@ import type {
   SysEvent,
 } from "../lib/bridge";
 import { nextFire, type Alarm } from "../lib/alarm";
+import { DJ_MOVES, MAX_HUMS, type HumEntry, type HumState } from "../lib/hum";
 import type { ToolNote } from "../lib/aiTools";
 import type { Weather } from "../lib/weather";
 import type { Look } from "../lib/look";
@@ -82,7 +83,14 @@ export type Expression =
   /** Odak bekçisi: cama vurup saati gösterir */
   | "knock"
   /** Canlı yayın / ekran paylaşımı: elinde mikrofon, yanında "Canlı" tabelası */
-  | "live";
+  | "live"
+  /** Hum dinlerken (her seferinde biri): kafa sallar, salınır, zıplar, kulaklığa bastırır, plak çizer, döner */
+  | "djNod"
+  | "djSway"
+  | "djBounce"
+  | "djEar"
+  | "djScratch"
+  | "djSpin";
 
 /** Sohbet mesajı (kalıcı) */
 export interface ChatItem {
@@ -125,6 +133,7 @@ export type Tab =
   | "calendar"
   | "year"
   | "claude"
+  | "hum"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -498,6 +507,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lyrics: false,
   liveMask: true,
   liveShortcut: "Ctrl+Alt+L",
+  humShortcut: "Ctrl+Alt+M",
+  humAuto: false,
 };
 
 export interface Osd {
@@ -584,6 +595,10 @@ interface NookState {
   alarms: Alarm[];
   /** Şu an çalan alarm */
   ringing: Alarm | null;
+  /** Hum: bulunan şarkılar (yeniden eskiye) */
+  hums: HumEntry[];
+  /** Hum dinliyor ya da sonucu gösteriyor */
+  hum: HumState | null;
   chat: ChatItem[];
   /** Model cevap yazıyor */
   chatBusy: boolean;
@@ -703,6 +718,8 @@ interface NookState {
   setHold: (key: string, on: boolean) => void;
   addAlarm: (a: Omit<Alarm, "id" | "next" | "enabled"> & { at?: number }) => void;
   toggleAlarm: (id: string, enabled: boolean) => void;
+  /** Kurulu alarmı düzenle: saat/isim/tekrar/ses değişir, alarm açılıp yeniden kurulur */
+  updateAlarm: (id: string, a: Pick<Alarm, "hour" | "minute" | "label" | "repeat" | "silent">) => void;
   setAlarmSilent: (id: string, silent: boolean) => void;
   removeAlarm: (id: string) => void;
   /** Çalma anı geldi: tekrar eden alarm bir sonrakine kurulur, tek seferlik kapanır/silinir */
@@ -710,6 +727,10 @@ interface NookState {
   /** Uygulama kapalıyken kaçırılan alarmları sessizce ileri al */
   rescheduleAlarms: () => void;
   setRinging: (a: Alarm | null) => void;
+  setHum: (hum: HumState | null) => void;
+  /** Bulunan şarkıyı geçmişe ekle (aynı şarkı 10 dk içinde tekrar bulunduysa yalnızca öne alır) */
+  addHum: (e: Omit<HumEntry, "id" | "at">) => void;
+  removeHum: (id: string) => void;
   pushChat: (m: ChatItem) => void;
   patchChat: (id: string, patch: Partial<ChatItem>) => void;
   clearChat: () => void;
@@ -792,6 +813,8 @@ export const useNook = create<NookState>()(
       busy: [],
       alarms: [],
       ringing: null,
+      hums: [],
+      hum: null,
       chat: [],
       chatBusy: false,
       talking: false,
@@ -993,6 +1016,12 @@ export const useNook = create<NookState>()(
         })),
       toggleAlarm: (id, enabled) =>
         set((s) => ({ alarms: s.alarms.map((a) => (a.id === id ? { ...a, enabled, next: enabled ? nextFire(a) : null } : a)) })),
+      updateAlarm: (id, patch) =>
+        set((s) => ({
+          alarms: s.alarms
+            .map((a) => (a.id === id ? { ...a, ...patch, enabled: true, next: nextFire({ ...a, ...patch }) } : a))
+            .sort((x, y) => (x.next ?? Infinity) - (y.next ?? Infinity)),
+        })),
       removeAlarm: (id) => set((s) => ({ alarms: s.alarms.filter((a) => a.id !== id) })),
       setAlarmSilent: (id, silent) => set((s) => ({ alarms: s.alarms.map((a) => (a.id === id ? { ...a, silent } : a)) })),
       fireAlarm: (id) =>
@@ -1016,6 +1045,15 @@ export const useNook = create<NookState>()(
             ),
         })),
       setRinging: (ringing) => set({ ringing }),
+      setHum: (hum) => set({ hum }),
+      addHum: (e) =>
+        set((s) => {
+          const now = Date.now();
+          const recent = s.hums.find((h) => h.key === e.key && now - h.at < 10 * 60_000);
+          const entry = { ...e, id: recent?.id ?? crypto.randomUUID(), at: now, auto: recent ? recent.auto && e.auto : e.auto };
+          return { hums: [entry, ...s.hums.filter((h) => h !== recent)].slice(0, MAX_HUMS) };
+        }),
+      removeHum: (id) => set((s) => ({ hums: s.hums.filter((h) => h.id !== id) })),
       pushChat: (m) => set((s) => ({ chat: [...s.chat, m].slice(-60) })),
       patchChat: (id, patch) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
       clearChat: () => set({ chat: [] }),
@@ -1121,6 +1159,7 @@ export const useNook = create<NookState>()(
         lastCare: s.lastCare,
         notesSeen: s.notesSeen,
         alarms: s.alarms,
+        hums: s.hums,
         // Ekran görüntüleri büyük — kaydedilmez
         chat: s.chat.map(({ image: _image, ...m }) => m),
         focus: s.focus,
@@ -1154,6 +1193,11 @@ export const useNook = create<NookState>()(
         if (settings.askShortcut === "Ctrl+Shift+X" || settings.askShortcut === "Ctrl+Shift+E") settings.askShortcut = DEFAULT_SETTINGS.askShortcut;
         // Kalkanın ilk varsayılanı (Ctrl+Shift+X) de sık tutuluyordu
         if (settings.shieldShortcut === "Ctrl+Shift+X") settings.shieldShortcut = DEFAULT_SETTINGS.shieldShortcut;
+        // Hum (0.2.47) yeni: sıralanmış ana sayfada sona düşmesin, Medya'nın arkasına girsin
+        if (settings.homeOrder?.length && !settings.homeOrder.includes("hum")) {
+          const i = settings.homeOrder.indexOf("media");
+          settings.homeOrder = i < 0 ? [...settings.homeOrder, "hum"] : [...settings.homeOrder.slice(0, i + 1), "hum", ...settings.homeOrder.slice(i + 1)];
+        }
         // Silinmiş profil seçili kalmasın
         if (settings.profiles && settings.homeProfile !== "all" && !settings.profiles.some((x) => x.id === settings.homeProfile)) settings.homeProfile = "all";
         // Açık sekmenin metni (note kaydedilmez, sekmeden gelir)
@@ -1202,6 +1246,8 @@ export const isWorking = (s: Pick<NookState, "focus">) => !!s.focus && s.focus.p
 
 export function expressionOf(s: NookState): Expression {
   if (s.ringing) return "alarm";
+  // Hum dinlerken DJ; bulunca mırıldanır, bulamayınca bozulur
+  if (s.hum) return s.hum.phase === "listening" ? DJ_MOVES[s.hum.move] : s.hum.phase === "found" ? "hum" : "sulk";
   if (s.guard) return "knock";
   if (s.mood !== "idle") return s.mood;
   if (s.grabbed) return "surprised";
