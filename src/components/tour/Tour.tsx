@@ -9,6 +9,8 @@ import { useNook, type Antic } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { useArgus } from "../../lib/argus";
 import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, LookArt, ModulesArt, MoodArt } from "./TourArt";
+import { ClaudeArt, DayArt, HumArt, OutingsArt, ShieldArt } from "./TourArt2";
+import { useClaude } from "../../lib/claude";
 import { tt } from "../../lib/i18n";
 import { LangChips } from "../ui/LangPicker";
 
@@ -22,6 +24,8 @@ interface Step {
   /** Nook ortada kocaman (ilk ve son adım) */
   centered?: boolean;
   Art?: () => React.JSX.Element;
+  /** Yalnızca bu bilgisayarda Claude Code varsa gösterilir */
+  claude?: boolean;
 }
 
 export const STEPS: Step[] = [
@@ -41,7 +45,7 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Her şey bir çip uzağında"),
-    text: tt("Açılınca ana sayfada renkli çipler var. Her biri bir bölüm; tıkla, içine gir. Üstteki küçük ikonlarla ana sayfaya, sohbete, aramaya ve ayarlara geçersin."),
+    text: tt("Açılınca ana sayfada renkli çipler var; her biri bir bölüm, tıkla içine gir. Çipleri sürükleyip sıralar, istemediğini gizlersin; İş, Oyun gibi profiller kurarsın. Adayı da üstteki tutamaçtan tutup ekranda istediğin yere taşırsın."),
     color: ACCENT.purple,
     antic: "nod",
     Art: ModulesArt,
@@ -68,6 +72,20 @@ export const STEPS: Step[] = [
     Art: AiArt,
   },
   {
+    title: tt("Ekranını korurum"),
+    text: tt("Biri yanına gelince Ctrl+Alt+H'ye bas: ekranını uyuyan Nook'ların bir sahnesi kaplar (kamp ateşi, deniz altı, uzay ve 19 tane daha). Çalan müzik durur, mikrofonun kapanır; istersen parolayla kilitlerim. Kart numarası, IBAN ya da şifre kopyalarsan panoda tutmam."),
+    color: ACCENT.purple,
+    antic: "yawn",
+    Art: ShieldArt,
+  },
+  {
+    title: tt("Çalan şarkıyı bulurum"),
+    text: tt("Videoda, dizide çalan şarkıyı merak ettin mi? Ctrl+Alt+M'ye bas, DJ kulaklığımı takıp dinlerim; adını, sanatçısını ve kapağını getiririm. Mikrofonu değil, bilgisayarın kendi sesini dinlerim."),
+    color: ACCENT.pink,
+    antic: "hum",
+    Art: HumArt,
+  },
+  {
     title: tt("Sağlığına göz kulak olurum"),
     text: tt("Uzun süre ekrana bakınca göz molası, aralıklarla su hatırlatırım. Bunlar her zaman çalışır, odak modu açık olmasa da. Oyundayken ve tam ekranda susarım."),
     color: ACCENT.teal,
@@ -75,11 +93,25 @@ export const STEPS: Step[] = [
     Art: CareArt,
   },
   {
+    title: tt("Günün düzeni bende"),
+    text: tt("Takvime etkinlik ekle, yaklaşınca çentikte geri sayarım. Alarm, sen kapatana kadar bekler; oyundaysan çıkınca seni bulur. Pomodoro'dayken YouTube'a kaçarsan cama vurup kalan süreyi gösteririm."),
+    color: ACCENT.blue,
+    antic: "note",
+    Art: DayArt,
+  },
+  {
     title: tt("Benim de bir keyfim var"),
     text: tt("İlgilendikçe mutlu olurum, uzun süre unutursan küserim. Beni tutup fırlatabilir, dürtebilirsin. Şimdi dene: soldaki beni tut ve fırlat!"),
     color: ACCENT.orange,
     antic: "shy",
     Art: MoodArt,
+  },
+  {
+    title: tt("Ekranında dolaşırım"),
+    text: tt("Arada çentikten çıkarım: pencerenin tepesine tünerim, pencereyi sürüklersen sendelerim. Ekranın altında çalışırken ipimle sarkarım, fare yaklaşınca kaçarım. Bilgisayar boştaysa adanın kenarında balık tutarım."),
+    color: ACCENT.teal,
+    antic: "wander",
+    Art: OutingsArt,
   },
   {
     title: tt("Beni kendine göre giydir"),
@@ -100,6 +132,14 @@ export const STEPS: Step[] = [
     Art: ArgusArt,
   },
   {
+    title: tt("Claude Code adada"),
+    text: tt("Claude Code çalışırken oturumlarını adada izlersin. İzin isterse ya da soru sorarsa terminale dönmeden adadan cevaplarsın; iş bitince haber veririm. Plan limitinin ne kadar dolduğunu da gösteririm."),
+    color: "#D97757",
+    antic: "wink",
+    Art: ClaudeArt,
+    claude: true,
+  },
+  {
     title: tt("Hazırız!"),
     text: tt("Artık seninleyim. Bu tanıtımı istediğin zaman Ayarlar'daki \"Nook nedir?\" ile yeniden açabilirsin."),
     color: ACCENT.green,
@@ -108,14 +148,21 @@ export const STEPS: Step[] = [
   },
 ];
 
+/** Bu bilgisayarda gösterilecek adımlar: Claude Code yoksa onun adımı atlanır */
+export function useTourSteps() {
+  const hasClaude = useClaude((s) => !!s.setup?.present);
+  return hasClaude ? STEPS : STEPS.filter((s) => !s.claude);
+}
+
 /** "Nook nedir?" tanıtımı: ada ekrana yayılır; Nook solda anlatır, sağda canlandırmalı wireframe. */
 export function Tour() {
   const step = useNook((s) => s.tourStep);
   const setStep = useNook((s) => s.setTourStep);
   const hasArgus = useArgus((s) => !!s.snap);
-  const base = STEPS[step] ?? STEPS[0];
+  const steps = useTourSteps();
+  const base = steps[step] ?? steps[0];
   const cur = base.alt && !hasArgus ? { ...base, ...base.alt } : base;
-  const last = step === STEPS.length - 1;
+  const last = step === steps.length - 1;
 
   useEffect(() => {
     playAntic(base.antic);
@@ -186,7 +233,7 @@ export function Tour() {
                   className="relative mb-2 w-fit rounded-full border px-2 py-[2px] text-[10.5px] font-medium tabular-nums"
                   style={{ background: tintBg(cur.color, 14), borderColor: tintBg(cur.color, 36), color: tintText(cur.color) }}
                 >
-                  {step} / {STEPS.length - 2}
+                  {step} / {steps.length - 2}
                 </span>
                 <h2 className="relative font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-label">{cur.title}</h2>
                 <p className="relative mt-2 text-[12.5px] leading-[1.6] text-label-2">{cur.text}</p>
@@ -215,7 +262,7 @@ export function Tour() {
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          {STEPS.map((_, i) => (
+          {steps.map((_, i) => (
             <motion.button
               key={i}
               onClick={() => setStep(i)}

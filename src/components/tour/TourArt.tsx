@@ -21,6 +21,8 @@ import {
   Settings,
   Target,
   Heart,
+  Layers,
+  Move,
   type LucideIcon,
 } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
@@ -41,13 +43,15 @@ import { tt } from "../../lib/i18n";
 const LOOP = { repeat: Infinity, ease: "easeInOut" } as const;
 
 /** Sahte masaüstü: duvar kâğıdı, birkaç pencere silueti, görev çubuğu. Çentik üstte ortada. */
-function Screen({ height, children }: { height: number; children?: React.ReactNode }) {
+export function Screen({ height, bare, children }: { height: number; bare?: boolean; children?: React.ReactNode }) {
   return (
     <div
       className="relative w-full overflow-hidden rounded-[16px] border border-white/[0.08]"
       style={{ height, background: "radial-gradient(120% 100% at 15% 0%, #2a3a55 0%, #171c27 55%, #0f1117 100%)" }}
     >
       {/* Pencere siluetleri */}
+      {!bare && (
+      <>
       <div className="absolute left-[7%] top-[30%] h-[42%] w-[38%] rounded-[8px] border border-white/[0.06] bg-white/[0.035]">
         <div className="h-3 rounded-t-[8px] bg-white/[0.05]" />
         <div className="m-2 space-y-1.5">
@@ -59,6 +63,8 @@ function Screen({ height, children }: { height: number; children?: React.ReactNo
       <div className="absolute right-[8%] top-[38%] h-[36%] w-[30%] rounded-[8px] border border-white/[0.06] bg-white/[0.03]">
         <div className="h-3 rounded-t-[8px] bg-white/[0.05]" />
       </div>
+      </>
+      )}
       {/* Görev çubuğu */}
       <div className="absolute inset-x-0 bottom-0 flex h-[18px] items-center justify-center gap-1 bg-black/40">
         {[0, 1, 2, 3, 4].map((i) => (
@@ -71,7 +77,7 @@ function Screen({ height, children }: { height: number; children?: React.ReactNo
 }
 
 /** Çentik: üstte ortada saf siyah, yalnızca alt köşeleri yuvarlak. */
-function Notch({ animate, transition, children }: { animate: TargetAndTransition; transition: Transition; children?: React.ReactNode }) {
+export function Notch({ animate, transition, children }: { animate: TargetAndTransition; transition: Transition; children?: React.ReactNode }) {
   return (
     <motion.div
       className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 items-center justify-center overflow-hidden bg-black"
@@ -84,7 +90,7 @@ function Notch({ animate, transition, children }: { animate: TargetAndTransition
   );
 }
 
-function Tip({ icon: Icon, color, children }: { icon: LucideIcon; color: string; children: React.ReactNode }) {
+export function Tip({ icon: Icon, color, children }: { icon: LucideIcon; color: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[14px] border px-2.5 py-2" style={{ background: tintBg(color, 8), borderColor: tintBg(color, 22) }}>
       <MiniNook color={color} size={24} icon={Icon} />
@@ -138,18 +144,23 @@ export function HoverArt() {
 
 const MODULES: { label: string; desc: string; color: string }[] = [
   { label: tt("Bugün"), desc: tt("Hava, alarm, günün özeti"), color: ACCENT.yellow },
-  { label: tt("Medya"), desc: tt("Çalan müziği ve videoyu yönet"), color: ACCENT.pink },
+  { label: tt("Medya"), desc: tt("Çalan müzik, şarkı sözleri"), color: ACCENT.pink },
+  { label: "Hum", desc: tt("Çalan şarkıyı bul"), color: ACCENT.purple },
   { label: "Pomodoro", desc: tt("Odaklanma sayacı"), color: ACCENT.red },
   { label: tt("Raf"), desc: tt("Bana bıraktığın dosyalar"), color: ACCENT.teal },
   { label: tt("Pano"), desc: tt("Kopyaladıkların, çevirisi"), color: ACCENT.purple },
   { label: tt("Not"), desc: tt("Hızlı karalama"), color: ACCENT.orange },
   { label: tt("Alarm"), desc: tt("Alarm ve hatırlatıcı"), color: ACCENT.yellow },
+  { label: tt("Takvim"), desc: tt("Etkinlikler, geri sayım"), color: ACCENT.blue },
   { label: tt("Kısayollar"), desc: tt("Sık açtığın uygulamalar"), color: ACCENT.blue },
   { label: tt("Bildirimler"), desc: tt("Windows bildirimleri"), color: ACCENT.purple },
-  { label: tt("Kontrol"), desc: tt("Wi-Fi, ses, mikrofon"), color: ACCENT.green },
+  { label: tt("Kontrol"), desc: tt("Wi-Fi, uygulama bazlı ses"), color: ACCENT.green },
   { label: tt("Sistem"), desc: tt("İşlemci, bellek, ağ"), color: ACCENT.red },
   { label: tt("Oyun"), desc: tt("Benimle mini oyunlar"), color: ACCENT.pink },
   { label: tt("Karne"), desc: tt("Haftalık istatistik"), color: ACCENT.teal },
+  { label: tt("Görünüm"), desc: tt("Beni giydir"), color: ACCENT.pink },
+  { label: tt("Yama notları"), desc: tt("Yeni gelenler"), color: ACCENT.orange },
+  { label: tt("Yıl özeti"), desc: tt("Yılın nasıl geçti"), color: ACCENT.yellow },
 ];
 
 const NAV: { icon: LucideIcon; label: string }[] = [
@@ -171,7 +182,7 @@ export function ModulesArt() {
         ))}
         <span className="ml-auto text-[10.5px] text-label-3">{tt("sol üstteki ikonlar")}</span>
       </div>
-      <div className="grid flex-1 grid-cols-3 content-start gap-1.5">
+      <div className="grid grid-cols-3 content-start gap-1.5">
         {MODULES.map((m, i) => (
           <motion.div
             key={m.label}
@@ -190,6 +201,14 @@ export function ModulesArt() {
             </span>
           </motion.div>
         ))}
+      </div>
+      <div className="mt-auto flex gap-2">
+        <Tip icon={Hand} color={ACCENT.purple}>{tt("Çipleri")}{" "}<b className="font-medium text-label">{tt("sürükle, sırala, gizle")}</b>
+        </Tip>
+        <Tip icon={Layers} color={ACCENT.blue}>{tt("Profiller:")}{" "}<b className="font-medium text-label">{tt("İş, Oyun, Eğlence")}</b>
+        </Tip>
+        <Tip icon={Move} color={ACCENT.teal}>{tt("Adayı")}{" "}<b className="font-medium text-label">{tt("istediğin yere taşı")}</b>
+        </Tip>
       </div>
     </div>
   );
@@ -267,7 +286,7 @@ export function FeedArt() {
 
 // ---------------------------------------------------------------- Kısayollar
 
-function Keys({ combo, color }: { combo: string; color: string }) {
+export function Keys({ combo, color }: { combo: string; color: string }) {
   const parts = combo.replace("Space", tt("Boşluk")).split("+");
   return (
     <span className="flex shrink-0 items-center gap-1">
@@ -297,13 +316,15 @@ export function KeysArt() {
     { combo: s.shortcut, color: ACCENT.blue, title: tt("Hızlı arama"), text: tt("Uygulama aç, hesap yap (12*7), çevir (5 km kaç mil, 100 usd), emoji bul, web'de ara.") },
     { combo: s.askShortcut, color: ACCENT.purple, title: tt("Ekrana sor"), text: tt("Ekranın görüntüsünü alır, bana sorarsın: \"bu hata ne demek?\"") },
     { combo: s.voiceShortcut, color: ACCENT.orange, title: tt("Sesli komut"), text: tt("Basılı tut, konuş, bırak: \"yarın sekize alarm kur\".") },
+    { combo: s.humShortcut, color: ACCENT.pink, title: "Hum", text: tt("Videoda, dizide çalan şarkıyı bulurum.") },
+    { combo: s.shieldShortcut, color: ACCENT.teal, title: tt("Gizlilik kalkanı"), text: tt("Ekranını bir anda uyuyan Nook'larla örterim.") },
   ];
   return (
-    <div className="flex h-full flex-col justify-center gap-2.5">
-      {rows.map((r, i) => (
+    <div className="flex h-full flex-col justify-center gap-2">
+      {rows.filter((r) => r.combo).map((r, i) => (
         <motion.div
           key={r.title}
-          className="flex items-center gap-4 rounded-[16px] border px-4 py-3.5"
+          className="flex items-center gap-4 rounded-[16px] border px-4 py-2.5"
           style={{ background: tintBg(r.color, 7), borderColor: tintBg(r.color, 20) }}
           initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}

@@ -69,7 +69,8 @@ export type DemoId =
   | "alarmedit"
   | "alarmwait"
   | "sounds"
-  | "settabs";
+  | "settabs"
+  | "tournew";
 
 export interface NoteItem {
   title: string;
@@ -86,6 +87,18 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.49",
+    date: tt("9 Ekim 2026"),
+    headline: tt("Tanıtım yenilendi"),
+    items: [
+      {
+        title: tt("\"Nook nedir?\" yenilendi"),
+        text: tt("Tanıtıma yeni sayfalar geldi: gizlilik kalkanı (gerçek sahnelerle), Hum, günün düzeni (takvim, alarm, odak bekçisi), Nook'un ekranda dolaşması ve Claude Code (yalnızca bilgisayarında Claude Code varsa). Kısayollar sayfasında Hum ve kalkan da var; çipler sayfası sürükleme, profiller ve adayı taşımayı anlatıyor. Ayarlar › Nook nedir? ile açabilirsin."),
+        demo: "tournew",
+      },
+    ],
+  },
   {
     version: "0.2.48",
     date: tt("9 Ekim 2026"),

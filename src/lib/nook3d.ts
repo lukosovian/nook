@@ -115,8 +115,8 @@ function start() {
       return;
     }
     renderer = "pending";
-    const poll = () => (gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) ? finish() : window.setTimeout(poll, 40));
-    window.setTimeout(poll, 0);
+    const poll = () => (gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) ? finish() : later(poll, 40));
+    later(poll, 0);
   } catch (e) {
     console.warn("[nook] 3B çizici", e);
     renderer = null;
@@ -167,6 +167,15 @@ function makeRenderer(gl: WebGLRenderingContext, prog: WebGLProgram, canvas: HTM
 }
 
 const cache = new Map<string, string | null>();
+/**
+ * Çizim zamanlayıcısı. Yalnızca geliştirme: tanıtım videosu kare kare çekilirken sayfanın saati
+ * durdurulur (window.__vt); çizici gerçek saatle hazırlansın, Nook'lar boş kalmasın.
+ */
+const later = (fn: () => void, ms: number) => ((import.meta.env.DEV && (window as { __vt?: { realSetTimeout: typeof setTimeout } }).__vt?.realSetTimeout) || window.setTimeout)(fn, ms);
+
+/** Çizici hazırlanıyor ya da sırada çizilecek Nook var (video çekimi bunu bekler) */
+export const bodiesBusy = () => renderer === "pending" || pumping;
+
 /** Seçenekler, tanıtım, kostümler… bir oturumda yüzlerce görünüm olabilir; en az kullanılan silinir */
 const MAX_CACHE = 400;
 
@@ -229,13 +238,13 @@ function pump() {
   if (renderer === "pending") {
     // Çizici hazırlanırken sırayı beklet
     queue.unshift(job);
-    whenReady(() => window.setTimeout(pump, 16));
+    whenReady(() => later(pump, 16));
     return;
   }
   if (!cache.has(job.key)) bodyImage(job.look, job.color, job.size);
   waiting.get(job.key)?.forEach((fn) => fn());
   waiting.delete(job.key);
-  window.setTimeout(pump, 16);
+  later(pump, 16);
 }
 
 function request(look: Look, color: string, size: number, done?: () => void) {
@@ -248,7 +257,7 @@ function request(look: Look, color: string, size: number, done?: () => void) {
   if (!queue.some((j) => j.key === key)) queue.push({ key, look, color, size });
   if (!pumping) {
     pumping = true;
-    window.setTimeout(pump, 16);
+    later(pump, 16);
   }
 }
 
@@ -270,3 +279,6 @@ export function useBodyImageQueued(look: Look, color: string, size: number): str
   }, [key, has]); // eslint-disable-line react-hooks/exhaustive-deps
   return has ? touch(key) : null;
 }
+
+// Yalnızca geliştirme: video çekimi (dev/Reel) kare almadan önce Nook'ların çizilmesini bekler
+if (import.meta.env.DEV && typeof window !== "undefined") (window as { __nook3dBusy?: () => boolean }).__nook3dBusy = bodiesBusy;

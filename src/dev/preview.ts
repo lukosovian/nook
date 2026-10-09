@@ -214,6 +214,8 @@ export function applyPreview(mode: string) {
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
+  // Tanıtım videosu adayı kendisi sürer (dev/Reel): durum dondurulmaz
+  if (mode === "reel") return;
   // ?profile=work|game|fun → ana sayfa profili
   const profile = params.get("profile");
   if (profile) useNook.getState().updateSettings({ homeProfile: profile as never });

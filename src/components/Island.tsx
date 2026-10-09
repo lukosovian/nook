@@ -41,7 +41,7 @@ import { Brief } from "./brief/Brief";
 import { PatchNotes } from "./notes/PatchNotes";
 import { Report } from "./report/Report";
 import { SearchPanel } from "./search/SearchPanel";
-import { STEPS, Tour } from "./tour/Tour";
+import { Tour, useTourSteps } from "./tour/Tour";
 
 const SHADOW = "0 14px 34px -12px rgba(0,0,0,0.8)";
 
@@ -192,7 +192,8 @@ export function Island() {
   const transition = mode === "feeding" ? spring.stretch : spring.island;
   const view = useNook((s) => (s.tab === "home" ? "home" : "module"));
   const tourStep = useNook((s) => s.tourStep);
-  const pose = mode === "tour" ? tourPose(!!STEPS[tourStep]?.centered) : mascotPose(mode, width, view, ex);
+  const tourSteps = useTourSteps();
+  const pose = mode === "tour" ? tourPose(!!tourSteps[tourStep]?.centered) : mascotPose(mode, width, view, ex);
 
   const ref = useRef<HTMLDivElement>(null);
   useHitRect(ref);

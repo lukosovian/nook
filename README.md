@@ -25,17 +25,22 @@ Move the mouse to the black notch at the top center of your screen and the islan
 
 | | |
 |---|---|
-| 🎵 **Media** | Control whatever is playing (Spotify, YouTube, any player) with cover art and a progress bar |
+| 🎵 **Media** | Control whatever is playing (Spotify, YouTube, any player) with cover art, a progress bar and synced lyrics |
+| 🎧 **Hum** | `Ctrl+Alt+M` — find the song playing in a video or show. Nook puts on DJ headphones, listens to your computer's sound (not the mic) and brings back the title, artist and cover. Auto Hum keeps a history in the background |
+| 🤖 **Claude Code** | Watch your Claude Code sessions live, answer permission requests and questions right from the island, get a ping when it's done, and see how much of your plan limit is used (5 hours / week) |
 | 📥 **Shelf** | Drag a file onto Nook — it swallows it. Drag it back out anywhere later. Screenshots land here automatically |
 | 📋 **Clipboard** | History of copied text and colors; foreign text is translated into your language |
-| 📝 **Note · ⏰ Alarm** | Quick scratchpad and alarms that ring even on top of full-screen games |
+| 📝 **Note · ⏰ Alarm** | Quick scratchpad and alarms that ring even on top of full-screen games — and wait for you until you dismiss them |
+| 📅 **Calendar** | Events and reminders (subscribe to a Google / Outlook .ics link too); the notch counts down when one is near |
 | 🍅 **Pomodoro** | Focus timer with a **focus guard**: open YouTube or X while working and Nook knocks on the glass |
 | 🔎 **Quick search** | `Ctrl+Shift+Space` — open apps, calculate, convert units and currencies, find emoji, search the web |
 | 🎛️ **Controls** | Wi-Fi, Bluetooth, dark mode, mic, per-app volume, brightness |
 | 📊 **System · Report card** | CPU, memory, network, disk — and a weekly report card of your focus, music and breaks |
 | 🔔 **Notifications** | Windows notifications shown on the island (muted while you focus) |
+| 🗂️ **Profiles** | Drag chips to reorder or hide them, and keep separate home pages for Work, Games, Fun… Move the island anywhere on screen by its handle |
 | 🎮 **Games** | Five mini games to play with Nook |
 | ☀️ **Daily brief** | The first time you open it each day: weather, alarms, water, new episodes |
+| 🔊 **Sounds** | Soft little sounds when the island opens, a notification arrives or Nook is happy (Settings › Sound) |
 
 ### Nook, the mascot
 
@@ -64,7 +69,8 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 
 ### Privacy
 
-- **Privacy shield** — `Ctrl+Alt+H` covers every screen with sleeping Nooks until you press it again.
+- **Privacy shield** — `Ctrl+Alt+H` covers every screen with one of 22 living Nook scenes (campfire, under the sea, space station, night train…) until you press it again. Music pauses, your microphone is muted for the duration, and you can lock it with a password.
+- **Stream mask** — while you share your screen, sensitive sections are hidden.
 - **Sensitive data guard** — copy a card number, IBAN, API key or password and Nook keeps it out of history and clears the clipboard after 60 seconds.
 - Everything runs on your computer. The only things that go online are: AI requests you make with your own Gemini key, the weather (Open-Meteo, with a rough location from your IP if you don't set a city), currency rates in quick search, translation of copied foreign text (Gemini, or the free MyMemory service if you have no key — can be turned off), and update checks on GitHub.
 
@@ -96,6 +102,7 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 | `Ctrl+Shift+A` | Ask the screen |
 | `Ctrl+Shift+D` (hold) | Voice command |
 | `Ctrl+Alt+H` | Privacy shield |
+| `Ctrl+Alt+M` | Hum — find the playing song |
 
 All of them can be changed in Settings.
 
@@ -131,9 +138,11 @@ npm run dev             # just the UI in a browser, with previews:
 
 ## Türkçe
 
-**Nook**, Windows ekranının üst ortasındaki çentikte yaşayan, 3B maskotlu bir "Dynamic Island". Fareyi çentiğe götür, ada açılsın: müzik, dosya rafı, pano geçmişi, not, alarm, Pomodoro ve odak bekçisi, hızlı arama, kontrol merkezi, sistem bilgisi, bildirimler, mini oyunlar ve günün özeti hepsi bir arada.
+**Nook**, Windows ekranının üst ortasındaki çentikte yaşayan, 3B maskotlu bir "Dynamic Island". Fareyi çentiğe götür, ada açılsın: müzik ve şarkı sözleri, dosya rafı, pano geçmişi, not, alarm, takvim, Pomodoro ve odak bekçisi, hızlı arama, kontrol merkezi, sistem bilgisi, bildirimler, mini oyunlar ve günün özeti hepsi bir arada. Çipleri sürükleyip sıralar, İş / Oyun / Eğlence gibi profiller kurarsın.
 
-Nook'un keyfi vardır; ilgilenirsen sevinir, unutursan küser. Ara sıra dışarı da çıkar: pencerelerin üstüne tüner, adadan iple sarkar, sen yokken masaüstünde balık tutar. Gemini anahtarınla sohbet eder, ekranına bakar, sesli komutları anlar. Gizlilik kalkanı ve hassas veri koruyucusu her şeyi bilgisayarında tutar. 9 dil, arayüz boyutu ve renk körü paletleri var.
+**Hum** (`Ctrl+Alt+M`) videoda ya da dizide çalan şarkıyı bulur. **Claude Code** kullanıyorsan oturumlarını adada izler, izin isteklerini ve sorularını terminale dönmeden adadan cevaplarsın; plan limitinin ne kadar dolduğunu da görürsün.
+
+Nook'un keyfi vardır; ilgilenirsen sevinir, unutursan küser. Ara sıra dışarı da çıkar: pencerelerin üstüne tüner, adadan iple sarkar, sen yokken masaüstünde balık tutar. Gemini anahtarınla sohbet eder, ekranına bakar, sesli komutları anlar. Gizlilik kalkanı (`Ctrl+Alt+H`) ekranını 22 canlı Nook sahnesinden biriyle örter, mikrofonunu kapatır, istersen parolayla kilitlenir; hassas veri koruyucusu kopyaladığın şifreyi ve kart numarasını panoda tutmaz. Her şey bilgisayarında kalır. 9 dil, arayüz boyutu ve renk körü paletleri var.
 
 **Kurulum:** [**Nook-setup.exe**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe)'yi indirip çalıştır (her zaman en yeni sürüm). Windows "bilgisayarınız korundu" derse **Ek bilgi → Yine de çalıştır**. Nook kendini tanıtır, Windows'la açılır ve kendiliğinden güncellenir.
 

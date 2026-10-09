@@ -35,10 +35,12 @@ async function boot() {
   const Gallery = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "gallery" ? (await import("./dev/Gallery")).Gallery : null;
   const Poster = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "poster" ? (await import("./dev/Poster")).Poster : null;
   const Wardrobe = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "wardrobe" ? (await import("./dev/Wardrobe")).Wardrobe : null;
+  // Yalnızca geliştirme: ?preview=reel ile Instagram tanıtım videosu (dev/Reel)
+  const Reel = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "reel" ? (await import("./dev/Reel")).Reel : null;
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ColorVision />
-      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : <App />}
+      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : Reel ? <Reel /> : <App />}
     </StrictMode>,
   );
 }

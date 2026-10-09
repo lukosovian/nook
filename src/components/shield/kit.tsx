@@ -8,7 +8,7 @@
  *  - Karakterler kendiliğinden değişmez: sahnenin bir olayı (iksir dökülür, deney patlar…) olunca
  *    o olayın Nook'u başka bir gövdeye/renge dönüşür (Actor `morph`, useBeat `n`).
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
 import type { Look } from "../../lib/look";
 import { BODY_COLORS, DEFAULT_LOOK, EYE_STYLES, SHAPES, TEXTURES } from "../../lib/look";
@@ -48,15 +48,21 @@ function useCastBody(morph: number | undefined, delay: number) {
   return body;
 }
 
-/** Ekranı kaplayan sahne */
+/** Sahne pencere yerine bir kutuya sığsın (tanıtımdaki küçük ekran): kutunun ölçüleri */
+export const StageBox = createContext<{ w: number; h: number } | null>(null);
+
+/** Ekranı (ya da StageBox'ı) kaplayan sahne */
 export function Stage({ children, sky }: { children: ReactNode; sky: string }) {
-  const [k, setK] = useState(1);
+  const box = useContext(StageBox);
+  const [win, setK] = useState(1);
   useEffect(() => {
+    if (box) return;
     const fit = () => setK(Math.max(window.innerWidth / W, window.innerHeight / H));
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, []);
+  }, [box]);
+  const k = box ? Math.max(box.w / W, box.h / H) : win;
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: sky }}>
       <svg width="0" height="0" className="absolute">
