@@ -33,14 +33,30 @@ export interface ModelInfo {
 
 const headers = (key: string) => ({ "Content-Type": "application/json", "x-goog-api-key": key });
 
-/** Gemini hatası. `busy`: geçici yoğunluk/kota — tekrar denenebilir ya da başka modele geçilebilir. */
+/**
+ * Gemini hatası. `busy`: geçici yoğunluk/kota — tekrar denenebilir ya da başka modele geçilebilir.
+ * `quota`: kota doldu (ücretsiz anahtarda Pro'nun kotası çok düşük).
+ */
 export class GeminiError extends Error {
   constructor(
     message: string,
     readonly busy = false,
+    readonly quota = false,
   ) {
     super(message);
   }
+}
+
+/**
+ * Kullanıcıya gösterilecek hata metni: tarayıcının "Failed to fetch", "signal timed out" gibi
+ * İngilizce ham hataları yerine ne olduğunu söyleyen kısa bir cümle.
+ */
+export function aiErrorText(e: unknown): string {
+  if (e instanceof GeminiError) return e.message;
+  const err = e as Error;
+  if (err?.name === "TimeoutError") return tt("Gemini cevap vermedi; internetini kontrol et");
+  if (err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(err?.message ?? "")) return tt("İnternete bağlanamadım");
+  return err?.message || tt("Gemini hatası");
 }
 
 /** Google'dan hata mesajını okunur hale getir. */
@@ -55,10 +71,13 @@ async function apiError(r: Response): Promise<GeminiError> {
     // gövde JSON değil
   }
   if (r.status === 400 && /API key/i.test(message)) return new GeminiError(tt("API anahtarı geçersiz"));
+  if (r.status === 401 || r.status === 403 || status === "PERMISSION_DENIED")
+    return new GeminiError(tt("Bu anahtarla Gemini'ye izin yok; aistudio.google.com'dan yeni bir anahtar al"));
+  if (status === "FAILED_PRECONDITION" && /location|region|country/i.test(message)) return new GeminiError(tt("Gemini bu ülkede ücretsiz kullanılamıyor"));
   if (r.status === 503 || status === "UNAVAILABLE") return new GeminiError(tt("Gemini şu an çok yoğun"), true);
-  if (r.status === 429 || status === "RESOURCE_EXHAUSTED") return new GeminiError(tt("Gemini kotası doldu"), true);
+  if (r.status === 429 || status === "RESOURCE_EXHAUSTED") return new GeminiError(tt("Gemini kotası doldu"), true, true);
   if (r.status >= 500) return new GeminiError(tt("Gemini geçici bir hata verdi ({0})", r.status), true);
-  return new GeminiError(`${status}: ${message || r.statusText}`);
+  return new GeminiError(tt("Gemini hatası ({0})", message ? `${status}: ${message}` : status));
 }
 
 /**

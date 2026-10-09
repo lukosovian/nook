@@ -40,7 +40,7 @@ import { StatsPanel } from "./StatsPanel";
 import { YearPanel } from "./YearPanel";
 import { ClaudePanel } from "./ClaudePanel";
 import { CLAUDE_COLOR, planShort, useClaude } from "../../lib/claude";
-import { tt, locale } from "../../lib/i18n";
+import { isTurkish, tt, locale } from "../../lib/i18n";
 
 type Module = Exclude<Tab, "home">;
 
@@ -258,7 +258,8 @@ function ModuleGrid() {
   const argus = useArgus((s) => !!s.snap);
   // Claude Code olmayan bilgisayarda gizli
   const claude = useClaude((s) => !!s.setup?.present);
-  const promo = useNook((s) => s.settings.argusPromo);
+  // Argus yalnızca Türkçe: başka dilde kurulu değilse tanıtımı da gösterilmez
+  const promo = useNook((s) => s.settings.argusPromo) && isTurkish;
   const order = useNook((s) => s.settings.homeOrder);
   const hidden = useNook((s) => s.settings.homeHidden);
   const profile = useNook((s) => s.settings.homeProfile);

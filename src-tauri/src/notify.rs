@@ -3,6 +3,7 @@
 //! Hiçbir şeye yazmaz, bildirimleri silmez; Windows'un kendi bildirimi de yine gösterilir.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -13,6 +14,20 @@ use tauri::{AppHandle, Emitter};
 use crate::imaging;
 
 const POLL: Duration = Duration::from_millis(1500);
+
+/// Windows'un bildirim kaydı okunabiliyor mu: 0 = henüz bilinmiyor, 1 = evet, 2 = hayır.
+/// Panel "bildirim yok" ile "okuyamıyorum"u ayırabilsin diye.
+static STATUS: AtomicU8 = AtomicU8::new(0);
+
+/// Bildirim kaydı okunabiliyor mu (henüz denenmediyse null)
+#[tauri::command]
+pub fn notify_status() -> Option<bool> {
+    match STATUS.load(Ordering::Relaxed) {
+        1 => Some(true),
+        2 => Some(false),
+        _ => None,
+    }
+}
 
 /// Nook'un zaten kendisi gösterdiği ya da gürültü olan kaynaklar.
 const SKIP: &[&str] = &["ScreenSketch", "app.nook.island", "Windows.SystemToast.Share", "Windows.SystemToast.AutoPlay"];
@@ -37,23 +52,42 @@ pub fn spawn(app: AppHandle) {
     thread::Builder::new()
         .name("nook-notify".into())
         .spawn(move || {
-            let Some(path) = db_path() else { return };
+            let Some(path) = db_path() else {
+                STATUS.store(2, Ordering::Relaxed);
+                return;
+            };
             let mut last: Option<i64> = None;
             let mut conn: Option<Connection> = None;
+            // Kilit gibi geçici hatalarda hemen "okunamıyor" denmesin: art arda birkaç kez olursa
+            let mut fails = 0u32;
+            let fail = |fails: &mut u32| {
+                *fails += 1;
+                if *fails >= 3 {
+                    STATUS.store(2, Ordering::Relaxed);
+                }
+            };
             loop {
                 thread::sleep(POLL);
                 if conn.is_none() {
                     conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).ok();
                 }
-                let Some(c) = &conn else { continue };
+                let Some(c) = &conn else {
+                    fail(&mut fails);
+                    continue;
+                };
                 match poll(c, &mut last) {
                     Ok(items) => {
+                        fails = 0;
+                        STATUS.store(1, Ordering::Relaxed);
                         for n in items {
                             let _ = app.emit("nook://notification", n);
                         }
                     }
                     // Veritabanı kilitli/yeniden oluşturulmuş olabilir — bir sonraki turda yeniden aç
-                    Err(_) => conn = None,
+                    Err(_) => {
+                        fail(&mut fails);
+                        conn = None;
+                    }
                 }
             }
         })

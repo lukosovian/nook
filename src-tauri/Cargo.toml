@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.49"
+version = "0.2.50"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -102,7 +102,11 @@ windows = { version = "0.62", features = [
   # Uygulama başına ses çıkışı (AudioPolicyConfig), Gezgin'de seçili dosyalar
   "Win32_System_WinRT",
   "Win32_System_Ole",
+  # Parolayı unutunca Windows Hello (PIN, parmak izi, yüz) ile doğrulama
+  "Security_Credentials_UI",
 ] }
+# WinRT IAsyncOperation türü (Windows Hello doğrulamasını pencereye bağlarken adı gerekiyor)
+windows-future = "0.3"
 
 # Küçük, hızlı release binary'si
 [profile.release]

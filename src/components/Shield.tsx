@@ -11,7 +11,7 @@ import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { listen } from "@tauri-apps/api/event";
 import { Lock, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { inTauri, shieldOff, shieldSet, shieldState, windowLabel, type ShieldMute } from "../lib/bridge";
-import { checkPassword } from "../lib/lock";
+import { checkPassword, forgotPassword } from "../lib/lock";
 import { micClick } from "../lib/clickSound";
 import { useNook } from "../store/nook";
 import { ContextMenu } from "./overlays/ContextMenu";
@@ -187,6 +187,9 @@ function PasswordBox({ onIdle }: { onIdle: () => void }) {
   const hash = useNook((s) => s.settings.lockHash);
   const [value, setValue] = useState("");
   const [wrong, setWrong] = useState(false);
+  /** Bir kez yanlış yazıldı: "unuttun mu?" görünür */
+  const [tried, setTried] = useState(false);
+  const [helloMissing, setHelloMissing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const shake = useAnimationControls();
   const idle = useRef(0);
@@ -208,8 +211,15 @@ function PasswordBox({ onIdle }: { onIdle: () => void }) {
       return;
     }
     setWrong(true);
+    setTried(true);
     setValue("");
     void shake.start({ x: [0, -12, 11, -8, 6, -3, 0], transition: { duration: 0.42 } });
+  };
+  const forgot = async () => {
+    poke();
+    const r = await forgotPassword();
+    if (r === "ok") void shieldOff();
+    else if (r === "unavailable") setHelloMissing(true);
   };
 
   return (
@@ -254,6 +264,17 @@ function PasswordBox({ onIdle }: { onIdle: () => void }) {
           {tt("Aç")}
         </button>
       </motion.div>
+      {tried && (
+        <div className="mt-2.5 w-[300px] text-center text-[12px] leading-snug text-white/55">
+          {helloMissing ? (
+            tt("Windows Hello (PIN) kurulu değil. Windows Ayarlar › Hesaplar › Oturum açma seçenekleri'nden bir PIN ekleyip tekrar dene.")
+          ) : (
+            <button onClick={() => void forgot()} className="rounded-full px-2 py-0.5 underline-offset-2 transition-colors hover:text-white hover:underline">
+              {tt("Parolanı mı unuttun? Windows ile aç")}
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

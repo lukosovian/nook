@@ -101,8 +101,8 @@ pub struct Settings {
     pub island_pos: Option<IslandPos>,
     /// Arayüz ölçeği (0,8–1,5; 1 = %100)
     pub ui_scale: f64,
-    /// Tepsi menüsündeki "çık" yazısı (seçili dilde)
-    pub quit_label: String,
+    /// Tepsi menüsünün yazıları (seçili dilde)
+    pub tray_labels: TrayLabels,
     /// Dosya sürüklerken fareyi sallayınca raf açılır
     pub shelf_shake: bool,
     /// Gezgin'de seçili dosyaları rafa ekle
@@ -121,6 +121,18 @@ pub struct Settings {
     pub hum_shortcut: String,
     /// Otomatik Hum: arkada dinler, bulduğu şarkıları kaydeder
     pub hum_auto: bool,
+}
+
+/// Tepsi menüsündeki yazılar; boş olan Türkçe kalır (bkz. window::TRAY_ITEMS)
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TrayLabels {
+    pub open: String,
+    pub center: String,
+    pub tour: String,
+    pub quiet: String,
+    pub update: String,
+    pub quit: String,
 }
 
 /// Adanın ekrandaki yeri, ekran boyuna oranla: fx üst-orta noktanın yatay yeri, fy üst kenarın
@@ -150,10 +162,10 @@ impl Default for Settings {
             break_reminder_min: 120,
             island_pos: None,
             ui_scale: 1.0,
-            quit_label: String::new(),
+            tray_labels: TrayLabels::default(),
             shelf_shake: true,
             shelf_shortcut: "Ctrl+Alt+S".into(),
-            plain_paste_shortcut: "Ctrl+Alt+V".into(),
+            plain_paste_shortcut: String::new(),
             output_shortcut: String::new(),
             output_cycle: Vec::new(),
             headphone_drop: 0,

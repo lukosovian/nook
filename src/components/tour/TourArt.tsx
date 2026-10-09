@@ -23,6 +23,7 @@ import {
   Heart,
   Layers,
   Move,
+  TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
@@ -35,6 +36,7 @@ import { ACCENT, Bar, MiniNook, Segmented, tintBg, tintText, Toggle } from "../u
 import { MyNook, NookFigure } from "../mascot/Figure";
 import { SHOWCASE, TOUR_CHIPS } from "../../lib/look";
 import { endTour } from "../../lib/tour";
+import { conflicts, prettyKeys, useInstalledApps } from "../../lib/shortcuts";
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Shuffle } from "lucide-react";
@@ -319,12 +321,19 @@ export function KeysArt() {
     { combo: s.humShortcut, color: ACCENT.pink, title: "Hum", text: tt("Videoda, dizide çalan şarkıyı bulurum.") },
     { combo: s.shieldShortcut, color: ACCENT.teal, title: tt("Gizlilik kalkanı"), text: tt("Ekranını bir anda uyuyan Nook'larla örterim.") },
   ];
+  // Daha az kullanılanlar: küçük çipler
+  const extras = [
+    { combo: s.shelfShortcut, title: tt("Seçili dosyaları rafa ekle") },
+    { combo: s.liveShortcut, title: tt("Yayın maskesi") },
+    { combo: s.plainPasteShortcut, title: tt("Düz metin yapıştır") },
+  ].filter((x) => x.combo);
+  const clash = conflicts(s, useInstalledApps());
   return (
-    <div className="flex h-full flex-col justify-center gap-2">
+    <div className="flex h-full flex-col justify-center gap-1.5">
       {rows.filter((r) => r.combo).map((r, i) => (
         <motion.div
           key={r.title}
-          className="flex items-center gap-4 rounded-[16px] border px-4 py-2.5"
+          className="flex items-center gap-4 rounded-[16px] border px-4 py-[7px]"
           style={{ background: tintBg(r.color, 7), borderColor: tintBg(r.color, 20) }}
           initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}
@@ -341,7 +350,37 @@ export function KeysArt() {
           </div>
         </motion.div>
       ))}
-      <p className="px-1 text-[10.5px] text-label-3">{tt("Ekrana sor ve sesli komut için bir sonraki adımdaki Gemini anahtarı gerekir.")}</p>
+      {extras.length > 0 && (
+        <motion.div className="flex flex-wrap gap-1.5 px-0.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}>
+          {extras.map((x) => (
+            <span key={x.title} className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.035] py-[3px] pl-2.5 pr-1 text-[10.5px] text-label-2">
+              {x.title}
+              <kbd className="rounded-full bg-white/[0.08] px-1.5 py-[1px] font-sans text-[10px] font-medium text-label">{prettyKeys(x.combo)}</kbd>
+            </span>
+          ))}
+        </motion.div>
+      )}
+      {clash.length ? (
+        <button
+          onClick={() => {
+            endTour();
+            const st = useNook.getState();
+            st.setTab("settings");
+            st.setSettingsJump("Kısayollar");
+          }}
+          className="mx-0.5 flex items-center gap-1.5 rounded-[10px] px-2 py-1 text-left text-[10.5px] leading-snug transition-colors hover:bg-white/[0.04]"
+          style={{ color: tintText(ACCENT.orange) }}
+        >
+          <TriangleAlert size={11} strokeWidth={2.4} className="shrink-0" />
+          <span className="min-w-0 flex-1">
+            {tt("{0}: bu tuşlarla {1} çalışmaz.", prettyKeys(clash[0].combo), clash[0].with)}
+            {clash.length > 1 && " " + tt("{0} kısayol daha başka programlarla çakışıyor.", clash.length - 1)}{" "}
+            <b className="font-medium underline underline-offset-2">{tt("Değiştir")}</b>
+          </span>
+        </button>
+      ) : (
+        <p className="px-1 text-[10.5px] text-label-3">{tt("Ekrana sor ve sesli komut için bir sonraki adımdaki Gemini anahtarı gerekir.")}</p>
+      )}
     </div>
   );
 }
@@ -410,7 +449,7 @@ export function AiArt() {
         </SetupRow>
         <SetupRow n={3} title={tt("Sana nasıl seslenelim?")}>
           <div className="mt-1.5">
-            <TextInput value={s.userName} placeholder={tt("Adın")} onChange={(v) => update({ userName: v })} />
+            <TextInput wide value={s.userName} placeholder={tt("Adın")} onChange={(v) => update({ userName: v })} />
           </div>
         </SetupRow>
         <p className="text-[10.5px] text-label-3">{tt("Şimdi atlarsan sonra Ayarlar › Yapay zekâ'dan girebilirsin.")}</p>
@@ -731,7 +770,7 @@ export function DoneTips() {
     { color: ACCENT.blue, icon: MousePointer2, text: tt("Üst ortaya gel → açılırım") },
     { color: ACCENT.purple, icon: Settings, text: tt("Ayarlar › Nook nedir? → bu tanıtım") },
     { color: ACCENT.pink, icon: Shuffle, text: tt("Sağ tık › Görünüm → beni giydir") },
-    { color: ACCENT.gray, icon: ExternalLink, text: tt("Sağ alttaki tepsi simgesi → çıkış") },
+    { color: ACCENT.gray, icon: ExternalLink, text: tt("Sağ alttaki tepsi simgesi → kısa menü") },
   ];
   return (
     <div className="flex justify-center gap-2">

@@ -4,7 +4,7 @@
  * kalkan parola sorarak açılır.
  */
 import { useEffect } from "react";
-import { isPrimary, releaseFocus, setGate, subscribe, systemUptime } from "./bridge";
+import { isPrimary, releaseFocus, setGate, subscribe, systemUptime, verifyWindowsUser } from "./bridge";
 import { useNook } from "../store/nook";
 import { micClick } from "./clickSound";
 import { tt } from "./i18n";
@@ -24,6 +24,22 @@ export async function checkPassword(password: string, stored: string) {
   const [salt, want] = stored.split(":");
   if (!salt || !want) return false;
   return (await digest(salt, password)) === want;
+}
+
+/**
+ * Parolayı unutunca: Windows Hello (PIN, parmak izi, yüz) ile bilgisayarın sahibi olduğunu doğrula.
+ * Doğrulanırsa kilit parolasız açılır ve yeni parola için Ayarlar'a yönlendirilir.
+ * "unavailable": bu bilgisayarda Windows Hello kurulu değil.
+ */
+export async function forgotPassword(): Promise<"ok" | "cancel" | "unavailable"> {
+  try {
+    const ok = await verifyWindowsUser(tt("Nook parolanı unuttun: Windows ile doğrula"));
+    if (!ok) return "cancel";
+  } catch (e) {
+    return String(e).includes("unavailable") ? "unavailable" : "cancel";
+  }
+  useNook.getState().pushToast({ kind: "guard", title: tt("Windows ile açıldı"), detail: tt("Yeni parola: Ayarlar › Parola kilidi"), ms: 7000 });
+  return "ok";
 }
 
 /** Bilgisayar açıldıktan sonra Nook bu kadar içinde başladıysa "açılış" sayılır */

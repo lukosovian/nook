@@ -17,12 +17,13 @@ import {
   type VoicePayload,
 } from "../lib/bridge";
 import { transcribe } from "../lib/assist";
+import { aiErrorText } from "../lib/ai";
 import { note } from "../lib/log";
 import { sendChat } from "../lib/chat";
 import { openBrief } from "../lib/brief";
 import { notesDue, openNotes } from "../lib/notes";
 import { nextPhase, remaining } from "../lib/focus";
-import { dayKey, isSleeping, useNook } from "../store/nook";
+import { dayKey, isQuiet, isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
 
@@ -96,7 +97,7 @@ export function useDayTracker() {
       // Hatırlatma ekranda beklerken sayaç ilerlemez
       if (!s.reminder) waterMinutes += 1;
       const resting = !!s.focus && s.focus.phase !== "work";
-      const quiet = s.fullscreen || !!s.ringing || resting;
+      const quiet = s.fullscreen || !!s.ringing || resting || isQuiet(s);
       if (s.settings.eyeBreak && eye >= 20) {
         eye = 0;
         if (!quiet) {
@@ -104,7 +105,7 @@ export function useDayTracker() {
           playAntic("suspicious");
         }
       }
-      if (s.settings.waterEvery > 0 && waterMinutes >= s.settings.waterEvery && !s.reminder) {
+      if (s.settings.waterEvery > 0 && waterMinutes >= s.settings.waterEvery && !s.reminder && !isQuiet(s)) {
         waterMinutes = 0;
         s.setReminder({ kind: "water", phase: "due" });
         playAntic("surprised");
@@ -146,7 +147,7 @@ export async function handleVoiceAudio(audio: string | null) {
     }
     void sendChat(text, { voice: true });
   } catch (e) {
-    s.pushToast({ kind: "chat", title: tt("Sesli komut"), detail: (e as Error).message, ms: 5000 });
+    s.pushToast({ kind: "chat", title: tt("Sesli komut"), detail: aiErrorText(e), ms: 5000 });
   } finally {
     useNook.getState().setBusy("voice", false);
   }

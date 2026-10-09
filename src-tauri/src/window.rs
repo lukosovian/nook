@@ -8,12 +8,12 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 
-use crate::state::{MonitorMode, Settings, Shared};
+use crate::state::{MonitorMode, Settings, Shared, TrayLabels};
 
 pub const ISLAND: &str = "island";
 /// Ek ekranlardaki adaların etiket öneki ("island-1", "island-2"…)
@@ -291,27 +291,58 @@ pub fn relocate(app: &AppHandle, shared: Arc<Shared>, label: String, monitor: Mo
     });
 }
 
-static QUIT: std::sync::OnceLock<MenuItem<tauri::Wry>> = std::sync::OnceLock::new();
+/// Tepsi menüsünün öğeleri: (kimlik, Türkçe yazı). Yazılar ayarlarla seçili dile çevrilir.
+const TRAY_ITEMS: [(&str, &str); 6] = [
+    ("open", "Adayı aç"),
+    ("center", "Adayı ortala"),
+    ("tour", "Nook nedir?"),
+    ("quiet", "1 saat sessiz"),
+    ("update", "Güncellemeleri denetle"),
+    ("quit", "Nook'tan çık"),
+];
 
-/// Tepsi menüsündeki "çık" yazısı seçili dilde
-pub fn set_quit_label(text: &str) {
-    if let (Some(item), false) = (QUIT.get(), text.is_empty()) {
-        let _ = item.set_text(text);
+static TRAY_MENU: std::sync::OnceLock<Vec<MenuItem<tauri::Wry>>> = std::sync::OnceLock::new();
+
+/// Tepsi menüsünün yazıları seçili dilde ("1 saat sessiz" ↔ "Sessizliği bitir" de buradan)
+pub fn set_tray_labels(labels: &TrayLabels) {
+    let Some(items) = TRAY_MENU.get() else { return };
+    let texts = [&labels.open, &labels.center, &labels.tour, &labels.quiet, &labels.update, &labels.quit];
+    for (item, text) in items.iter().zip(texts) {
+        if !text.is_empty() {
+            let _ = item.set_text(text);
+        }
     }
 }
 
-/// Görev çubuğunda görünmediğimiz için tek çıkış yolu tepsi menüsü.
+/// Görev çubuğunda görünmediğimiz için tepsi simgesi: sol tık adayı açar, sağ tıkta kısa menü
+/// (adayı aç/ortala, tanıtım, bir saat sessizlik, güncelleme, çıkış). Ada ekranda kaybolduysa ya da
+/// tam ekranda gizli kaldıysa da buradan ulaşılır.
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let quit = MenuItem::with_id(app, "quit", "Nook'tan çık", true, None::<&str>)?;
-    let _ = QUIT.set(quit.clone());
-    let menu = Menu::with_items(app, &[&quit])?;
+    let mut items = Vec::new();
+    for (id, text) in TRAY_ITEMS {
+        items.push(MenuItem::with_id(app, id, text, true, None::<&str>)?);
+    }
+    let refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = items.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<tauri::Wry>).collect();
+    let menu = Menu::with_items(app, &refs)?;
+    let _ = TRAY_MENU.set(items);
 
     let mut tray = TrayIconBuilder::with_id("nook-tray")
         .tooltip("Nook")
         .menu(&menu)
-        .on_menu_event(|app, event| {
-            if event.id() == "quit" {
-                app.exit(0);
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                crate::shortcut::open_island(tray.app_handle());
+            }
+        })
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "quit" => app.exit(0),
+            "open" => {
+                crate::shortcut::open_island(app);
+            }
+            // Diğerleri arayüzde yapılır (ana ada)
+            id => {
+                let _ = app.emit_to(ISLAND, "nook://tray", id.to_string());
             }
         });
     if let Some(icon) = app.default_window_icon() {

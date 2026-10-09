@@ -70,7 +70,16 @@ export type DemoId =
   | "alarmwait"
   | "sounds"
   | "settabs"
-  | "tournew";
+  | "tournew"
+  | "tray"
+  | "quiet"
+  | "shortcuts"
+  | "hello"
+  | "translateask"
+  | "errors"
+  | "tourkeys"
+  | "flash"
+  | "fixes";
 
 export interface NoteItem {
   title: string;
@@ -87,6 +96,58 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.50",
+    date: tt("9 Ekim 2026"),
+    headline: tt("İlk kez kuranlar için düzeltmeler"),
+    items: [
+      {
+        title: tt("Tepsi simgesi artık bir menü"),
+        text: tt("Sağ alttaki Nook simgesine sol tıklayınca ada açılır. Sağ tıkta kısa bir menü var: adayı aç, adayı ortala, Nook nedir?, 1 saat sessiz, güncellemeleri denetle ve çıkış. Ada ekranda kaybolursa ya da tam ekranda gizli kalırsa buradan ulaşırsın."),
+        demo: "tray",
+      },
+      {
+        title: tt("1 saat sessiz"),
+        text: tt("Tepsi menüsünden bir saatliğine sustur: olay kartları, Windows bildirimleri, göz ve su hatırlatmaları, Nook'un sesleri gelmez. Alarmlar, takvim ve pil uyarısı yine çalar. Bitirmek için aynı yere bas."),
+        demo: "quiet",
+      },
+      {
+        title: tt("Bütün kısayollar tek yerde"),
+        text: tt("Ayarlar › Kısayollar'da Nook'un bütün kısayolları bir arada. Bir kısayol bu bilgisayardaki bir programın bilinen kısayolunu elinden alıyorsa (Word'de Özel Yapıştır, tarayıcıda sekme arama, VS Code, JetBrains) turuncu uyarı çıkar; aynı tuşları iki işe verirsen de söyler. Tanıtımın kısayol sayfası da uyarır. Düz metin yapıştırmanın yeni kurulumlarda kısayolu yok."),
+        demo: "shortcuts",
+      },
+      {
+        title: tt("Parolanı mı unuttun?"),
+        text: tt("Kalkan ya da açılış kilidinde bir kez yanlış parola yazınca \"Parolanı mı unuttun?\" çıkar. Windows Hello'yla (PIN, parmak izi, yüz) doğrularsan kilit açılır, Ayarlar'dan yeni parola koyarsın. Görev Yöneticisi'ne gerek kalmadı."),
+        demo: "hello",
+      },
+      {
+        title: tt("Çeviri için izin"),
+        text: tt("Gemini anahtarın yoksa kopyaladığın yabancı metin artık sormadan ücretsiz çeviri servisine (MyMemory) gitmez. Pano'da \"Çevireyim mi?\" çıkar: Çevir, Hep çevir ya da Hayır. Ayarlar › Bildirimler'den de değiştirebilirsin."),
+        demo: "translateask",
+      },
+      {
+        title: tt("Anlaşılır hata mesajları"),
+        text: tt("\"Failed to fetch\" gibi İngilizce hatalar yerine ne olduğunu söylerim: internet yoksa, anahtarın izni yoksa, Gemini bu ülkede kapalıysa. Hum ses çıkışını açamazsa \"Hoparlör ya da kulaklık bağlı mı?\" der, her hatada Tekrar dene düğmesi var. Bildirim kaydı okunamıyorsa \"Bildirim yok\" demem, söylerim."),
+        demo: "errors",
+      },
+      {
+        title: tt("Tanıtım klavyeyle"),
+        text: tt("Tanıtımda → ve Enter ileri, ← geri götürür, Esc kapatır. \"Tanıtımı geç\" düğmesi daha belirgin. Kalkan ve Hum sayfalarındaki kısayollar senin seçtiğin tuşlarla yazılır; kısayol sayfasında raf ve yayın maskesi de var."),
+        demo: "tourkeys",
+      },
+      {
+        title: tt("Pro'nun kotası dolunca Flash"),
+        text: tt("Ücretsiz Gemini anahtarında Pro modelin kotası çok düşük. Dolarsa cevabı Flash verir ve bundan sonra hep Flash'la konuşurum; Ayarlar › Yapay zekâ'dan geri alabilirsin. Model seçiminin altında hangisinin ne işe yaradığı yazıyor."),
+        demo: "flash",
+      },
+      {
+        title: tt("Küçük düzeltmeler"),
+        text: tt("Hava durumunda şehir adı seçtiğin dilde. Ayarlar'da kaydırınca üst şerit doğru bölümü gösterir, Hum'un da sekmesi var. Nook kaldırılınca Claude Code'daki Nook ayarlarını da siler. Argus yalnızca Türkçe olduğu için başka dillerde önerilmez; kurulum betiği de tekrar ne yapacağını doğru söyler. Güncelleme denetimi her dilde."),
+        demo: "fixes",
+      },
+    ],
+  },
   {
     version: "0.2.49",
     date: tt("9 Ekim 2026"),

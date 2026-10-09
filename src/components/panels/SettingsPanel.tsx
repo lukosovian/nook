@@ -16,9 +16,10 @@ import { INTRO_KINDS } from "../overlays/Intro";
 import { MOVE_KINDS } from "../../lib/moveFx";
 import { IntroPreview, MovePreview } from "./EffectPreview";
 import { LangDropdown } from "../ui/LangPicker";
-import { tt } from "../../lib/i18n";
+import { isTurkish, tt } from "../../lib/i18n";
 import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
+import { conflictOf, duplicateOf, SHORTCUTS, useInstalledApps } from "../../lib/shortcuts";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: tt("Ana") },
@@ -85,10 +86,21 @@ export function SettingsPanel() {
     if (!sec) return;
     const t = window.setTimeout(() => {
       const el = scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${sec}"]`);
-      if (el && scroller.current) scroller.current.scrollTop = el.offsetTop - 36;
+      if (el && scroller.current) scroller.current.scrollTop = topIn(el, scroller.current) - 36;
     }, 300);
     return () => window.clearTimeout(t);
   }, []);
+  // Başka bir yerden "Ayarlar › Kısayollar"a gönderildiyse o bölüme kaydır
+  const jump = useNook((st) => st.settingsJump);
+  useEffect(() => {
+    if (!jump) return;
+    const t = window.setTimeout(() => {
+      const el = scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${tt(jump)}"]`);
+      if (el && scroller.current) scroller.current.scrollTo({ top: topIn(el, scroller.current) - 36, behavior: "smooth" });
+      useNook.getState().setSettingsJump(null);
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [jump]);
   // Önizleme sahneleri: ilk oynatışta açılır, her basışta baştan oynar
   const [preview, setPreview] = useState({ move: 0, intro: 0 });
   const replay = (k: "move" | "intro") => setPreview((p) => ({ ...p, [k]: p[k] + 1 }));
@@ -118,6 +130,8 @@ export function SettingsPanel() {
           <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
         </Row>
       </Section>
+
+      <ShortcutsSection />
 
       <Section title={tt("Erişilebilirlik")}>
         <Row label={tt("Arayüz boyutu")}>
@@ -163,9 +177,6 @@ export function SettingsPanel() {
       <CalendarSection />
 
       <Section title="Hum">
-        <Row label={tt("Çalan şarkıyı bul")}>
-          <ShortcutInput value={s.humShortcut} onChange={(v) => update({ humShortcut: v })} clearable />
-        </Row>
         <Row label={tt("Otomatik Hum: arkada dinle, bulduklarını kaydet")}>
           <Toggle on={s.humAuto} onChange={(v) => update({ humAuto: v })} color={ACCENT.purple} />
         </Row>
@@ -177,9 +188,6 @@ export function SettingsPanel() {
       <Section title={tt("Yayın")}>
         <Row label={tt("Ekran paylaşınca / yayında hassas bölümleri gizle")}>
           <Toggle on={s.liveMask} onChange={(v) => update({ liveMask: v })} color={ACCENT.red} />
-        </Row>
-        <Row label={tt("Yayın maskesini elle aç / kapat")}>
-          <ShortcutInput value={s.liveShortcut} onChange={(v) => update({ liveShortcut: v })} clearable />
         </Row>
         <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
           {tt("Teams, Zoom, Meet ya da tarayıcıdan ekran paylaşınca, OBS açıkken Not, Pano, Bildirimler, Sohbet ve Takvim buzlanır; bildirim kartlarında içerik görünmez. Üstteki CANLI rozetine tıklayınca o yayın için kapanır.")}
@@ -203,15 +211,6 @@ export function SettingsPanel() {
         </Row>
         <Row label={tt("Pilde / tasarrufta yavaşla")}>
           <Toggle on={s.powerSaver} onChange={(v) => update({ powerSaver: v })} />
-        </Row>
-        <Row label={tt("Hızlı arama kısayolu")}>
-          <ShortcutInput value={s.shortcut} onChange={(v) => update({ shortcut: v })} />
-        </Row>
-        <Row label={tt("Ekrana sor kısayolu")}>
-          <ShortcutInput value={s.askShortcut} onChange={(v) => update({ askShortcut: v })} />
-        </Row>
-        <Row label={tt("Sesli komut (basılı tut)")}>
-          <ShortcutInput value={s.voiceShortcut} onChange={(v) => update({ voiceShortcut: v })} />
         </Row>
         <Row label={tt("Ada açılınca solunda ses kartı")}>
           <Toggle on={s.soundCard} onChange={(v) => update({ soundCard: v })} color={ACCENT.green} />
@@ -260,6 +259,14 @@ export function SettingsPanel() {
         <Row label={tt("Kopyalanan yabancı metni çevir")}>
           <Toggle on={s.translate} onChange={(v) => update({ translate: v })} />
         </Row>
+        {s.translate && !s.geminiKey.trim() && (
+          <>
+            <Row label={tt("Gemini anahtarı yokken MyMemory ile çevir")}>
+              <Toggle on={s.freeTranslate === true} onChange={(v) => update({ freeTranslate: v })} color={ACCENT.purple} />
+            </Row>
+            <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Açıksa kopyaladığın yabancı metin ücretsiz çeviri servisi MyMemory'ye gönderilir. Gemini anahtarı girersen çeviri Google'a gider.")}</p>
+          </>
+        )}
         <Row label={tt("Günün ilk açılışında özet")}>
           <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
         </Row>
@@ -344,6 +351,8 @@ function ArgusSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const snap = useArgus((st) => st.snap);
+  // Argus yalnızca Türkçe: başka dilde, kurulu değilse önerilmez
+  if (!snap && !isTurkish) return null;
   if (!snap)
     return (
       <Section title="Argus">
@@ -437,6 +446,7 @@ function PalettePreview() {
 /** Bölümler arası hızlı geçiş: üstte yapışık kalan ince sekme şeridi; kaydırdıkça bulunulan bölüm parlar */
 const INDEX: { label: string; title: string }[] = [
   { label: "Nook", title: "Nook" },
+  { label: tt("Kısayollar"), title: tt("Kısayollar") },
   { label: tt("Erişilebilirlik"), title: tt("Erişilebilirlik") },
   { label: tt("Molalar"), title: tt("Mola hatırlatıcıları") },
   { label: tt("Bekçi"), title: tt("Odak bekçisi") },
@@ -444,6 +454,7 @@ const INDEX: { label: string; title: string }[] = [
   { label: tt("Raf"), title: tt("Raf") },
   { label: tt("Ses"), title: tt("Ses") },
   { label: tt("Takvim"), title: tt("Takvim") },
+  { label: "Hum", title: "Hum" },
   { label: tt("Yayın"), title: tt("Yayın") },
   { label: tt("Kalkan"), title: tt("Gizlilik kalkanı") },
   { label: tt("Kilit"), title: tt("Parola kilidi") },
@@ -453,12 +464,26 @@ const INDEX: { label: string; title: string }[] = [
   { label: tt("Bildirimler"), title: tt("Bildirimler") },
 ];
 
+/**
+ * Bölümün kaydırılan kutunun içeriğindeki yeri. offsetTop en yakın konumlu ataya göredir; kaydırılan
+ * kutu konumlu olmadığından kutunun kendi yeri de içindeydi ve sekme bir önceki bölümde parlıyordu.
+ * (getBoundingClientRect kullanılmaz: ada açılırken ölçeklenir, yerler küçük çıkar.)
+ */
+function topIn(sec: HTMLElement, el: HTMLElement) {
+  if (sec.offsetParent === el) return sec.offsetTop;
+  if (sec.offsetParent === el.offsetParent) return sec.offsetTop - el.offsetTop - el.clientTop;
+  return sec.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+}
+
 function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement | null> }) {
   const [current, setCurrent] = useState(0);
   const strip = useRef<HTMLDivElement>(null);
   // Sekmeye tıklayınca kayma bitene kadar aradaki bölümler parlamasın: hedef sabit kalır
   const jumping = useRef<{ i: number; timer: number } | null>(null);
   const find = (title: string) => scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${title}"]`) ?? null;
+  // Bu bilgisayarda olmayan bölümün (ör. Argus) sekmesi de görünmesin
+  const [present, setPresent] = useState<boolean[]>(() => INDEX.map(() => true));
+  useEffect(() => setPresent(INDEX.map((it) => !!find(it.title))), []);
 
   useEffect(() => {
     const el = scroller.current;
@@ -475,7 +500,7 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
       let at = 0;
       INDEX.forEach((it, i) => {
         const sec = find(it.title);
-        if (sec && sec.offsetTop <= y) at = i;
+        if (sec && topIn(sec, el) <= y) at = i;
       });
       // En alta gelindiyse son bölüm
       if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) at = INDEX.length - 1;
@@ -516,7 +541,7 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
     const el = scroller.current;
     if (!sec || !el) return;
     setCurrent(i);
-    const top = Math.max(0, Math.min(sec.offsetTop - 36, el.scrollHeight - el.clientHeight));
+    const top = Math.max(0, Math.min(topIn(sec, el) - 36, el.scrollHeight - el.clientHeight));
     if (Math.abs(top - el.scrollTop) < 1) return;
     if (jumping.current) window.clearTimeout(jumping.current.timer);
     // Hiç scroll olayı gelmezse de kilit kalksın
@@ -527,7 +552,7 @@ function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement |
   return (
     <div className="sticky top-0 z-10 -mb-1 bg-[#1c1c1f] pb-2" style={{ boxShadow: "0 8px 10px -6px #1c1c1f" }}>
       <div ref={strip} className="no-scrollbar flex gap-1 overflow-x-auto">
-        {INDEX.map((it, i) => (
+        {INDEX.map((it, i) => present[i] && (
           <button
             key={it.label}
             data-i={i}
@@ -597,7 +622,8 @@ function Affection() {
   );
 }
 
-export function TextInput({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (v: string) => void }) {
+/** `wide`: kurulum akışındaki gibi sola yaslı, geniş kutu (Ayarlar satırlarında sağa yaslı, dar) */
+export function TextInput({ value, placeholder, onChange, wide }: { value: string; placeholder: string; onChange: (v: string) => void; wide?: boolean }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
   return (
@@ -608,7 +634,7 @@ export function TextInput({ value, placeholder, onChange }: { value: string; pla
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => draft !== value && onChange(draft.trim())}
       onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-      className="w-[130px] rounded-full bg-well px-2.5 py-0.5 text-right text-[11px] font-medium text-label outline-none placeholder:font-medium placeholder:text-label-3 focus:bg-well-hi"
+      className={`rounded-full bg-well text-[11px] font-medium text-label outline-none placeholder:font-medium placeholder:text-label-3 focus:bg-well-hi ${wide ? "w-[150px] px-2.5 py-0.5 text-left" : "w-[130px] px-2.5 py-0.5 text-right"}`}
     />
   );
 }
@@ -670,15 +696,44 @@ const PAD_CLEAR: { id: number; label: string }[] = [
   { id: 30, label: tt("1 ay") },
 ];
 
+/**
+ * Bütün genel kısayollar tek yerde. Başka bir programın bilinen kısayoluyla çakışan ya da Nook'ta
+ * iki işe birden verilmiş tuşlar turuncu uyarıyla görünür.
+ */
+function ShortcutsSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const apps = useInstalledApps();
+  return (
+    <Section title={tt("Kısayollar")}>
+      {SHORTCUTS.map((k) => {
+        const combo = s[k.key];
+        const dup = duplicateOf(s, k.key);
+        const clash = conflictOf(combo, apps);
+        return (
+          <div key={k.key}>
+            <Row label={k.label}>
+              <ShortcutInput value={combo} onChange={(v) => update({ [k.key]: v } as Partial<Settings>)} clearable={k.clearable} />
+            </Row>
+            {(dup || clash) && (
+              <p className="-mt-1 pb-1 text-[10px]" style={{ color: tintText(ACCENT.orange) }}>
+                {dup ? tt("Bu tuşlar \"{0}\" için de kullanılıyor; bu kısayol çalışmaz", dup.label) : tt("Bu tuşlarla {0} çalışmaz", clash)}
+              </p>
+            )}
+          </div>
+        );
+      })}
+      <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Kısayolu değiştirmek için tıkla, yeni tuşlara bas. Kaldırılabilenleri Sil tuşu kaldırır. Bu tuşlar her programda Nook'a gider.")}</p>
+    </Section>
+  );
+}
+
 /** Pano geçmişi, düz metin yapıştırma, renk biçimi, karalama defteri */
 function ClipSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   return (
     <Section title={tt("Pano ve notlar")}>
-      <Row label={tt("Düz metin olarak yapıştır")}>
-        <ShortcutInput value={s.plainPasteShortcut} onChange={(v) => update({ plainPasteShortcut: v })} clearable />
-      </Row>
       <Row label={tt("Kopyaladıktan sonra panoyu boşalt")}>
         <Segmented id="clip-clear" options={AUTO_CLEAR} value={s.clipAutoClear} onChange={(v) => update({ clipAutoClear: v })} color={ACCENT.purple} />
       </Row>
@@ -721,9 +776,6 @@ function ShelfSection() {
       </Row>
       <Row label={tt("Başka yere bırakılan öğe raftan kalksın")}>
         <Toggle on={s.shelfRemoveAfterDrop} onChange={(v) => update({ shelfRemoveAfterDrop: v })} />
-      </Row>
-      <Row label={tt("Gezgin'de seçili dosyaları rafa ekle")}>
-        <ShortcutInput value={s.shelfShortcut} onChange={(v) => update({ shelfShortcut: v })} clearable />
       </Row>
       <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Sabitlediğin öğeler (iğne) Temizle'de de, bırakınca da rafta kalır.")}</p>
     </Section>
@@ -772,9 +824,6 @@ function SoundSection() {
       </Row>
       <Row label={tt("Kulaklık çıkınca sesi kıs")}>
         <Segmented id="hp-drop" options={HEADPHONE_DROP} value={s.headphoneDrop} onChange={(v) => update({ headphoneDrop: v })} color={ACCENT.pink} />
-      </Row>
-      <Row label={tt("Ses çıkışını değiştir")}>
-        <ShortcutInput value={s.outputShortcut} onChange={(v) => update({ outputShortcut: v })} clearable />
       </Row>
       {s.outputShortcut && outputs.length > 1 && (
         <div className="py-1.5">
@@ -916,6 +965,13 @@ function AiSection() {
           />
         </Row>
       )}
+      {gemini.status === "ok" && (
+        <p className="-mt-1 pb-1 text-[10px] text-label-3">
+          {/pro/i.test(s.aiModel)
+            ? tt("Pro daha akıllı ama daha yavaş. Ücretsiz anahtarda kotası düşük; dolarsa kendiliğimden Flash'a geçerim.")
+            : tt("Flash hızlı ve ücretsiz kotası geniş. Daha zor sorular için Pro'yu seçebilirsin.")}
+        </p>
+      )}
       <Row label={tt("Adın")}>
         <TextInput value={s.userName} placeholder={tt("Nook sana nasıl hitap etsin?")} onChange={(v) => update({ userName: v })} />
       </Row>
@@ -1013,9 +1069,6 @@ function ShieldSection() {
   };
   return (
     <Section title={tt("Gizlilik kalkanı")}>
-      <Row label={tt("Kısayol")}>
-        <ShortcutInput value={s.shieldShortcut} onChange={(v) => update({ shieldShortcut: v })} />
-      </Row>
       <Row label={tt("Sahneler")}>
         <Segmented id="shield-mode" options={SCENE_MODES} value={s.shieldSceneMode ?? "random"} onChange={(v) => update({ shieldSceneMode: v, shieldSceneNext: 0 })} color={ACCENT.purple} />
       </Row>

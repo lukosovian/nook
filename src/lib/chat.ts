@@ -2,7 +2,7 @@
  * Sohbet yürütücüsü: mesajı Gemini'ye gönderir, cevabı akarken gösterir, model bir araç
  * kullanmak isterse çalıştırıp sonucu geri verir (en fazla birkaç tur).
  */
-import { GeminiError, inlinePart, pickFallbackModel, streamChat, type Content, type Part } from "./ai";
+import { aiErrorText, GeminiError, inlinePart, pickFallbackModel, streamChat, type Content, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
 import { functions, runTool, systemPrompt } from "./aiTools";
 import { useNook, type ChatItem } from "../store/nook";
@@ -100,12 +100,19 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
           }
           const fallback = pickFallbackModel(await modelsFor(key), model);
           if (!fallback) throw e;
+          // Pro'nun kotası dolduysa (ücretsiz anahtarda çok düşük) her soruda önce onu denemesin:
+          // seçili model kalıcı olarak yedeğe geçer, Ayarlar'dan geri alınabilir.
+          const quotaOut = e.quota && /pro/i.test(model) && model === useNook.getState().settings.aiModel;
+          if (quotaOut) useNook.getState().updateSettings({ aiModel: fallback });
           model = fallback;
           if (!fellBack) {
             fellBack = true;
             const item = useNook.getState().chat.find((m) => m.id === replyId);
             useNook.getState().patchChat(replyId, {
-              notes: [...(item?.notes ?? []), { icon: "error", text: tt("Pro meşguldü, {0} cevapladı", fallback) }],
+              notes: [
+                ...(item?.notes ?? []),
+                { icon: "error", text: quotaOut ? tt("Pro'nun kotası doldu; artık {0} ile konuşuyorum (Ayarlar › Yapay zekâ)", fallback) : tt("Pro meşguldü, {0} cevapladı", fallback) },
+              ],
             });
           }
         }
@@ -129,7 +136,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
     }
   } catch (e) {
     if ((e as Error).name !== "AbortError") {
-      reply = reply || tt("Bir sorun çıktı: {0}", (e as Error).message);
+      reply = reply || tt("Bir sorun çıktı: {0}", aiErrorText(e));
       useNook.getState().patchChat(replyId, { text: reply, error: true });
     }
   } finally {

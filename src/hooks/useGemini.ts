@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listModels, pickDefaultModel, type ModelInfo } from "../lib/ai";
+import { aiErrorText, listModels, pickDefaultModel, type ModelInfo } from "../lib/ai";
 import { useNook } from "../store/nook";
 
 export type GeminiState =
@@ -52,7 +52,7 @@ export function useGemini(): GeminiState {
         cache = { key, models };
         done(models);
       })
-      .catch((e) => alive && setState({ status: "error", error: (e as Error).message }));
+      .catch((e) => alive && setState({ status: "error", error: aiErrorText(e) }));
     return () => {
       alive = false;
     };

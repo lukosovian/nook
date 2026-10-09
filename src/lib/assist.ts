@@ -7,7 +7,7 @@ import { GeminiError, generateOnce, pickQuickModel, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
 import { note } from "./log";
 import { useNook } from "../store/nook";
-import { lang, LANG_NAME_TR, type Lang } from "./i18n";
+import { lang, LANG_NAME_TR, tt, type Lang } from "./i18n";
 
 /** Kotası dolan model bir süre denenmesin (her kopyalamada boşa istek gitmesin). */
 const resting = new Map<string, number>();
@@ -25,7 +25,7 @@ async function ask(parts: Part[], system: string, slowOk: boolean): Promise<stri
   const models = [...new Set([quickModel, slowOk ? s.aiModel : null].filter(Boolean) as string[])].filter(
     (m) => (resting.get(m) ?? 0) < Date.now(),
   );
-  let last: unknown = new GeminiError("Gemini modelleri şu an meşgul", true);
+  let last: unknown = new GeminiError(tt("Gemini modelleri şu an meşgul"), true);
   for (const model of models) {
     try {
       return await generateOnce(key, model, parts, system);
@@ -96,8 +96,21 @@ export function looksForeign(raw: string): boolean {
   return lang === "tr" && (/[äöüßéèêàâñœæøåčřšž]/i.test(t) || /^[A-Za-z][a-z]{3,}(\s+[A-Za-z][a-z]+){0,3}$/.test(t));
 }
 
-/** Seçili dildeki çevirisi; zaten o dildeyse ya da çevrilemezse null. */
-export async function translateToUser(text: string): Promise<string | null> {
+/**
+ * Çeviri nasıl yapılır: Gemini anahtarıyla, izin verilmiş ücretsiz servisle (MyMemory), izin
+ * henüz sorulmadıysa "ask", izin verilmediyse "off".
+ */
+export function translateMode(): "gemini" | "free" | "ask" | "off" {
+  const s = useNook.getState().settings;
+  if (s.geminiKey.trim()) return "gemini";
+  return s.freeTranslate === true ? "free" : s.freeTranslate === false ? "off" : "ask";
+}
+
+/**
+ * Seçili dildeki çevirisi; zaten o dildeyse ya da çevrilemezse null. `allowFree`: Gemini
+ * yoksa/olmazsa metin ücretsiz servise (MyMemory) gidebilir mi — kullanıcı izin vermedikçe gitmez.
+ */
+export async function translateToUser(text: string, allowFree = useNook.getState().settings.freeTranslate === true): Promise<string | null> {
   // Gemini (anahtar varsa); kota/ağ sorununda ücretsiz servise düş
   const out = await ask(
     [{ text }],
@@ -108,6 +121,7 @@ export async function translateToUser(text: string): Promise<string | null> {
   if (out !== undefined && out !== null) {
     return out && out !== "-" && out.toLocaleLowerCase("tr") !== text.toLocaleLowerCase("tr") ? out : null;
   }
+  if (!allowFree) return null;
   // Ücretsiz MyMemory (kaynak dili otomatik algılar)
   const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=autodetect|${lang === "zh" ? "zh-CN" : lang}`);
   const j = (await r.json()) as { responseData?: { translatedText?: string } };

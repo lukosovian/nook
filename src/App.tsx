@@ -7,6 +7,7 @@ import { useUpdateCheck } from "./lib/update";
 import { useArgusDetect, useArgusFeed } from "./lib/argus";
 import { useClaudeFeed } from "./lib/claude";
 import { useAlarms } from "./hooks/useAlarms";
+import { useTray } from "./hooks/useTray";
 import { useHum } from "./hooks/useHum";
 import { bootLock, useShieldMicFeed } from "./lib/lock";
 import { isPrimary } from "./lib/bridge";
@@ -80,6 +81,7 @@ export default function App() {
   useOsdFeed();
   useRelocateFeed();
   useSearchFeed();
+  useTray();
   useIslandPosFeed();
   useFocusRelease();
   useFeeding();

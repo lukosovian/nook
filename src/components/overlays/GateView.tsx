@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useAnimationControls } from "motion/react";
 import { Lock } from "lucide-react";
-import { checkPassword, openGate } from "../../lib/lock";
+import { checkPassword, forgotPassword, openGate } from "../../lib/lock";
 import { spring } from "../../lib/motion";
 import { playAntic } from "../../hooks/useAntics";
 import { useNook } from "../../store/nook";
@@ -18,6 +18,10 @@ export function GateView() {
   const hash = useNook((s) => s.settings.lockHash);
   const [v, setV] = useState("");
   const [wrong, setWrong] = useState(false);
+  /** Parolayı unutunca Windows Hello sonucu: yoksa söylenir */
+  const [helloMissing, setHelloMissing] = useState(false);
+  /** Bir kez yanlış yazıldı: "unuttun mu?" görünür kalsın */
+  const [tried, setTried] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const shake = useAnimationControls();
   useEffect(() => {
@@ -36,8 +40,17 @@ export function GateView() {
       return;
     }
     setWrong(true);
+    setTried(true);
     setV("");
     void shake.start({ x: [0, -7, 6, -4, 3, 0], transition: { duration: 0.36 } });
+  };
+  const forgot = async () => {
+    const r = await forgotPassword();
+    if (r === "ok") {
+      openGate();
+      useNook.getState().setTab("settings");
+      useNook.getState().setSettingsJump("Parola kilidi");
+    } else if (r === "unavailable") setHelloMissing(true);
   };
 
   return (
@@ -51,7 +64,12 @@ export function GateView() {
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-[14px] font-semibold leading-tight" style={{ color: tintText(COLOR) }}>
             <Lock size={12} strokeWidth={2.6} />
-            {tt("Nook kilitli")}
+            <span className="min-w-0 flex-1 truncate">{helloMissing ? tt("Windows Hello (PIN) kurulu değil") : tt("Nook kilitli")}</span>
+            {tried && !helloMissing && (
+              <button onClick={() => void forgot()} className="shrink-0 rounded-full px-1.5 text-[10.5px] font-medium text-label-3 underline-offset-2 hover:text-label hover:underline">
+                {tt("Parolanı mı unuttun?")}
+              </button>
+            )}
           </p>
           <motion.div animate={shake} className="mt-1.5 flex items-center gap-1.5">
             <input

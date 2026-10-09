@@ -10,6 +10,7 @@ import type {
   PrivacyPayload,
   StatsPayload,
   SysEvent,
+  SysEventKind,
 } from "../lib/bridge";
 import { nextFire, type Alarm } from "../lib/alarm";
 import { DJ_MOVES, MAX_HUMS, type HumEntry, type HumState } from "../lib/hum";
@@ -230,6 +231,8 @@ export interface ClipItem {
   at: number;
   /** Yabancı dildeyse Türkçesi */
   translation?: string;
+  /** Yabancı metin; çevirmek için ücretsiz servise gönderme izni bekleniyor */
+  askTranslate?: boolean;
   /** Yoksa metin */
   kind?: "text" | "image" | "files";
   /** Görsel: önbellekteki PNG */
@@ -295,6 +298,13 @@ export interface Settings extends NativeSettings {
   memories: string[];
   /** Kopyalanan yabancı metni Türkçeye çevir */
   translate: boolean;
+  /**
+   * Gemini anahtarı yokken ücretsiz çeviri servisi (MyMemory) kullanılsın mı. null: henüz
+   * sorulmadı — ilk yabancı metinde Pano'da izin istenir, metin izinsiz dışarı gönderilmez.
+   */
+  freeTranslate: boolean | null;
+  /** Tepsiden "1 saat sessiz": bu ana kadar (ms) kartlar, hatırlatmalar ve sesler susar; alarm ve takvim yine çalar */
+  quietUntil: number;
   /** Panoya kart, IBAN, anahtar, şifre kopyalanınca uyar ve bir dakika sonra sil */
   sensitiveGuard: boolean;
   /** Windows bildirimlerini adada göster */
@@ -446,6 +456,8 @@ export const DEFAULT_SETTINGS: Settings = {
   userName: "",
   memories: [],
   translate: true,
+  freeTranslate: null,
+  quietUntil: 0,
   notifications: true,
   focusMute: true,
   focusWork: 25,
@@ -492,7 +504,8 @@ export const DEFAULT_SETTINGS: Settings = {
   clipIgnore: ["keepass", "keepassxc", "1password", "bitwarden", "lastpass", "dashlane"],
   clipAutoClear: 0,
   clipClearOnLock: false,
-  plainPasteShortcut: "Ctrl+Alt+V",
+  // Varsayılan kapalı: Ctrl+Alt+V Word ve Excel'de Özel Yapıştır; isteyen Ayarlar › Kısayollar'dan açar
+  plainPasteShortcut: "",
   colorFormat: "hex",
   colorNoHash: false,
   shelfShake: true,
@@ -594,6 +607,8 @@ interface NookState {
   /** "Nook nedir?" tanıtımı açık */
   tour: boolean;
   tourStep: number;
+  /** Ayarlar açılınca bu bölüme kaydırılsın (ör. "Kısayollar"); kaydırınca boşalır */
+  settingsJump: string | null;
   /** Tanıtım bir kez görüldü (ilk açılışta kendiliğinden açılır) */
   toured: boolean;
   /** Süren arka plan işleri (hava durumu, çevrimiçi arama…) — Nook "düşünür" */
@@ -720,6 +735,7 @@ interface NookState {
   setReminder: (reminder: NookState["reminder"]) => void;
   setClaudeCard: (claudeCard: boolean) => void;
   setTourStep: (tourStep: number) => void;
+  setSettingsJump: (settingsJump: string | null) => void;
   setBusy: (key: string, on: boolean) => void;
   setHold: (key: string, on: boolean) => void;
   addAlarm: (a: Omit<Alarm, "id" | "next" | "enabled"> & { at?: number }) => void;
@@ -815,6 +831,7 @@ export const useNook = create<NookState>()(
       reminder: null,
       claudeCard: false,
       tourStep: 0,
+      settingsJump: null,
       toured: false,
       busy: [],
       alarms: [],
@@ -988,7 +1005,8 @@ export const useNook = create<NookState>()(
         })),
       setDevices: (devices) => set({ devices }),
       setOsd: (osd) => set({ osd }),
-      pushToast: (event) => set((s) => ({ toasts: [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) })),
+      pushToast: (event) =>
+        set((s) => (isQuiet(s) && !QUIET_ALLOWED.has(event.kind) ? {} : { toasts: [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) })),
       shiftToast: () => set((s) => ({ toasts: s.toasts.slice(1) })),
 
       updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
@@ -1011,6 +1029,7 @@ export const useNook = create<NookState>()(
       setIntro: (intro) => set({ intro }),
       setTour: (tour) => set(tour ? { tour, tourStep: 0 } : { tour, toured: true }),
       setTourStep: (tourStep) => set({ tourStep }),
+      setSettingsJump: (settingsJump) => set({ settingsJump }),
       setBig: (big) => set({ big }),
       setReminder: (reminder) => set({ reminder }),
       setClaudeCard: (claudeCard) => set({ claudeCard }),
@@ -1245,6 +1264,12 @@ export const SULK_BELOW = 25;
 export const isSleeping = (s: Pick<NookState, "asleep" | "media">) => s.asleep && !s.media?.playing;
 
 /** Yayın maskesi açık mı: elle açıldı/kapandıysa o, yoksa algılama (ayar açıksa) */
+/** Tepsiden "1 saat sessiz" açık mı */
+export const isQuiet = (s: Pick<NookState, "settings">) => (s.settings.quietUntil ?? 0) > Date.now();
+
+/** Sessizken bile gösterilen kartlar: takvim, pil bitiyor, hassas veri uyarısı, güncelleme */
+const QUIET_ALLOWED = new Set<SysEventKind>(["calendar", "battery-low", "sensitive", "update"]);
+
 export const isLive = (s: Pick<NookState, "liveAuto" | "liveManual" | "settings">) => s.liveManual ?? (s.settings.liveMask && s.liveAuto.on);
 
 /** Pomodoro'nun çalışma fazı sürüyor (duraklatılmamış) */

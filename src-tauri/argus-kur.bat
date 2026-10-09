@@ -33,15 +33,15 @@ winget install --id Git.Git -e --source winget --silent --accept-package-agreeme
 if errorlevel 1 goto :winget_failed
 
 echo.
-echo Git kuruldu. Bu degisikligin etkili olmasi icin bu pencereyi kapatip
-echo bu dosyayi BIR KEZ DAHA cift tiklaman gerekiyor - sadece bu seferlik.
+echo Git kuruldu. Bu degisikligin etkili olmasi icin bu pencereyi kapat, sonra
+echo Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine BIR KEZ DAHA bas - sadece bu seferlik.
 pause
 exit /b 0
 
 :winget_failed
 echo.
 echo Otomatik kurulum basarisiz oldu. Elle kurmak icin simdi acilan sayfadan devam et,
-echo kurulum bitince bu dosyayi tekrar calistir.
+echo kurulum bitince Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas.
 start "" "https://git-scm.com/download/win"
 pause
 exit /b 1
@@ -49,7 +49,7 @@ exit /b 1
 :install_declined
 echo.
 echo Tamam, bir sey kurulmadi. Git'i https://git-scm.com/download/win adresinden kurduktan
-echo sonra bu dosyayi tekrar cift tikla.
+echo sonra Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas.
 pause
 exit /b 1
 
@@ -57,7 +57,7 @@ exit /b 1
 echo Bu bilgisayarda otomatik kurulum araci da yok, elle kurman lazim - cok kolay.
 echo   1. Simdi acilan sayfada "64-bit Git for Windows Setup" yazan linke tikla
 echo   2. Inen dosyayi calistir, hepsine "Next"/"Ileri" diyerek gec (ayarlari degistirme)
-echo   3. Kurulum bitince bu pencereyi kapat, bu dosyayi tekrar cift tikla
+echo   3. Kurulum bitince bu pencereyi kapat, Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas
 start "" "https://git-scm.com/download/win"
 echo.
 pause
@@ -85,7 +85,7 @@ exit /b 0
 :clone_failed
 echo.
 echo Indirme sirasinda bir sorun oldu, yukaridaki mesaji kontrol et - genelde internet
-echo baglantisi sorunudur. Duzelince bu dosyayi tekrar calistir.
+echo baglantisi sorunudur. Duzelince Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas.
 pause
 exit /b 1
 

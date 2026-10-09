@@ -32,7 +32,7 @@ let announced = "";
 
 export async function checkUpdate(manual = false) {
   if (!inTauri) return;
-  if (manual) useUpdate.setState({ status: "Denetleniyor…" });
+  if (manual) useUpdate.setState({ status: tt("Denetleniyor…") });
   try {
     const u = await check();
     pending = u;

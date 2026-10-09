@@ -26,7 +26,7 @@ import {
   type ClipImagePayload,
   type ClipFilesPayload,
 } from "../lib/bridge";
-import { looksForeign, translateToUser } from "../lib/assist";
+import { looksForeign, translateMode, translateToUser } from "../lib/assist";
 import { localizeEvent } from "../lib/sysText";
 import { note } from "../lib/log";
 import { detectSensitive, SENSITIVE_CLEAR_MS, SENSITIVE_LABEL } from "../lib/sensitive";
@@ -35,7 +35,7 @@ import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isLive, isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
 import { islandModeOf } from "./useIslandMode";
 import { playAntic } from "./useAntics";
-import { dec, tt } from "../lib/i18n";
+import { dec, locale, tt } from "../lib/i18n";
 
 /** "12 dakikadır", "1 saat 20 dakikadır", "3 saattir" — ve ek almadan: "12 dakika", "3 saat" */
 function awayText(mins: number) {
@@ -142,6 +142,8 @@ export function useIdleFeed() {
 }
 
 let secretTimer = 0;
+/** Bu oturumda "çevirebilirim" kartı gösterildi mi (her yabancı kopyada tekrar çıkmasın) */
+let askedTranslate = false;
 let autoClearTimer = 0;
 
 /** "Kopyaladıktan X dk sonra panoyu boşalt" — her yeni kopyada süre baştan başlar */
@@ -210,6 +212,18 @@ export function useClipboardFeed() {
       const foreign = looksForeign(text);
       note(`pano: ${text.length} karakter, yabancı=${foreign}, çeviri ayarı=${s.settings.translate}`);
       if (!s.settings.translate || !foreign) return;
+      const mode = translateMode();
+      if (mode === "off") return;
+      if (mode === "ask") {
+        // Gemini anahtarı yok: metni izin almadan dışarı göndermeyiz; Pano'da sorulur
+        const clip = useNook.getState().clips.find((c) => c.text === text);
+        if (clip) useNook.getState().patchClip(clip.id, { askTranslate: true });
+        if (!askedTranslate) {
+          askedTranslate = true;
+          s.pushToast({ kind: "translate", title: tt("Bunu çevirebilirim"), detail: tt("Pano'da \"Çevir\"e bas"), ms: 5000 });
+        }
+        return;
+      }
       void translateToUser(text)
         .then((out) => {
           note(`çeviri: ${out ? `${out.length} karakter` : "yok"}`);
@@ -533,7 +547,14 @@ const native = (s: Settings) => ({
   breakReminderMin: s.breakReminderMin,
   islandPos: s.islandPos ?? null,
   uiScale: s.uiScale ?? 1,
-  quitLabel: tt("Nook'tan çık"),
+  trayLabels: {
+    open: tt("Adayı aç"),
+    center: tt("Adayı ortala"),
+    tour: tt("Nook nedir?"),
+    quiet: (s.quietUntil ?? 0) > Date.now() ? tt("Sessizliği bitir ({0})", new Date(s.quietUntil).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })) : tt("1 saat sessiz"),
+    update: tt("Güncellemeleri denetle"),
+    quit: tt("Nook'tan çık"),
+  },
   shelfShake: s.shelfShake ?? true,
   shelfShortcut: s.shelfShortcut ?? "",
   plainPasteShortcut: s.plainPasteShortcut ?? "",

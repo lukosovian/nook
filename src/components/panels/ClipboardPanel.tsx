@@ -9,6 +9,7 @@ import { spring } from "../../lib/motion";
 import { useNook, type ClipItem, type Settings } from "../../store/nook";
 import { ACCENT, EmptyState, TextButton, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
+import { translateToUser } from "../../lib/assist";
 
 /** "#3A7BFF" → Ayarlar'daki biçim: HEX (# ile/olmadan), rgb() ya da hsl() */
 export function formatColor(hex: string, fmt: Settings["colorFormat"], noHash: boolean): string {
@@ -213,7 +214,46 @@ function ClipRow({ clip: c, copied, onCopy, onEdit }: { clip: ClipItem; copied: 
           )}
         </button>
       )}
+      {c.askTranslate && !c.translation && <TranslateAsk clip={c} />}
     </motion.div>
+  );
+}
+
+/**
+ * Gemini anahtarı yokken yabancı metin: çevirmek için metnin ücretsiz servise (MyMemory) gitmesi
+ * gerekir — izin verilmeden gönderilmez. "Hep çevir" bir daha sormaz, "Hayır" bir daha önermez.
+ */
+function TranslateAsk({ clip: c }: { clip: ClipItem }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const run = async (always: boolean) => {
+    const st = useNook.getState();
+    if (always) st.updateSettings({ freeTranslate: true });
+    setBusy(true);
+    const out = await translateToUser(c.text, true).catch(() => null);
+    setBusy(false);
+    if (out) useNook.getState().patchClip(c.id, { translation: out, askTranslate: false });
+    else setFailed(true);
+  };
+  const never = () => {
+    const st = useNook.getState();
+    st.updateSettings({ freeTranslate: false });
+    for (const x of st.clips) if (x.askTranslate) st.patchClip(x.id, { askTranslate: false });
+  };
+  return (
+    <div className="flex h-7 items-center gap-1.5 border-t border-white/[0.05] pl-2.5 pr-1">
+      <Languages size={11} strokeWidth={2.4} className="shrink-0" style={{ color: ACCENT.purple }} />
+      <span className="min-w-0 flex-1 truncate text-[10.5px] text-label-3" title={tt("Gemini anahtarın olmadığı için metin ücretsiz çeviri servisi MyMemory'ye gönderilir")}>
+        {busy ? tt("Çeviriyorum…") : failed ? tt("Çeviremedim") : tt("Çevireyim mi? (MyMemory)")}
+      </span>
+      {!busy && (
+        <>
+          <TextButton onClick={() => void run(false)}>{tt("Çevir")}</TextButton>
+          <TextButton onClick={() => void run(true)}>{tt("Hep çevir")}</TextButton>
+          <TextButton tone="danger" onClick={never}>{tt("Hayır")}</TextButton>
+        </>
+      )}
+    </div>
   );
 }
 

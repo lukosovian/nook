@@ -32,6 +32,12 @@ pub fn pipe_name() -> String {
     format!(r"\\.\pipe\nook-claude-{user}")
 }
 
+/// Nook kaldırılıyor: Claude Code ayarlarından Nook'un hook'larını ve durum satırını sil (yedek alınır).
+pub fn uninstall() -> ! {
+    let _ = crate::claude::claude_disconnect();
+    std::process::exit(0);
+}
+
 pub fn run(mode: &str) -> ! {
     let mut raw = Vec::new();
     let _ = std::io::stdin().read_to_end(&mut raw);

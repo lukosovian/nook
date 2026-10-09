@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "nook"
-version = "0.2.49"
+version = "0.2.50"
 dependencies = [
  "base64 0.22.1",
  "crc32fast",
@@ -2530,6 +2530,7 @@ dependencies = [
  "webview2-com",
  "windows 0.62.2",
  "windows-core 0.62.2",
+ "windows-future",
  "windows-sys 0.59.0",
  "winreg 0.55.0",
  "wmi",

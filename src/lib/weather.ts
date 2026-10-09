@@ -1,4 +1,4 @@
-import { tt } from "./i18n";
+import { lang, tt } from "./i18n";
 /**
  * Hava durumu — Open-Meteo (ücretsiz, anahtar gerektirmez).
  * Konum: ayarlardaki şehir (Open-Meteo geocoding) ya da boşsa IP'den yaklaşık konum (ipwho.is).
@@ -50,7 +50,7 @@ async function json<T>(url: string): Promise<T> {
 async function locate(city: string): Promise<{ lat: number; lon: number; name: string }> {
   if (city.trim()) {
     const g = await json<{ results?: { latitude: number; longitude: number; name: string }[] }>(
-      `https://geocoding-api.open-meteo.com/v1/search?count=1&language=tr&name=${encodeURIComponent(city.trim())}`,
+      `https://geocoding-api.open-meteo.com/v1/search?count=1&language=${lang}&name=${encodeURIComponent(city.trim())}`,
     );
     const hit = g.results?.[0];
     if (!hit) throw new Error(tt("şehir bulunamadı"));

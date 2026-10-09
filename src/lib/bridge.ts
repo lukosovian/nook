@@ -65,6 +65,7 @@ export const EVENTS = {
   humToggle: "nook://hum-toggle",
   humLevel: "nook://hum-level",
   humFound: "nook://hum-found",
+  tray: "nook://tray",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -111,6 +112,10 @@ export interface GamePayload {
   peakMem: number;
 }
 
+/** Windows Hello (PIN, parmak izi, yüz) ile doğrula; Hello yoksa "unavailable" hatası */
+export const verifyWindowsUser = (message: string) => (inTauri ? invoke<boolean>("verify_windows_user", { message }) : Promise.resolve(true));
+/** Windows'un bildirim kaydı okunabiliyor mu (null: henüz denenmedi) */
+export const notifyStatus = () => (inTauri ? invoke<boolean | null>("notify_status") : Promise.resolve(true));
 export const fileIcon = (path: string, size = 48) => (inTauri ? invoke<string | null>("file_icon", { path, size }) : Promise.resolve(null));
 export const captureScreen = () => (inTauri ? invoke<string>("capture_screen") : Promise.reject(new Error(tt("yalnızca uygulamada"))));
 export const voiceStart = () => (inTauri ? invoke<boolean>("voice_start") : Promise.resolve(false));
@@ -326,8 +331,8 @@ export interface NativeSettings {
   islandPos: IslandPos | null;
   /** Arayüz ölçeği (0,8–1,5) */
   uiScale: number;
-  /** Tepsi menüsündeki "çık" yazısı (seçili dilde) */
-  quitLabel?: string;
+  /** Tepsi menüsünün yazıları (seçili dilde) */
+  trayLabels?: { open: string; center: string; tour: string; quiet: string; update: string; quit: string };
   /** Dosya sürüklerken fareyi sallayınca raf açılır */
   shelfShake: boolean;
   /** Gezgin'de seçili dosyaları rafa ekle */

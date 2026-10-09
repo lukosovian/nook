@@ -231,6 +231,11 @@ export function applyPreview(mode: string) {
     st.addEvent({ day: d(9), time: "", title: "Kira", remind: 0 });
   }
   // ?scroll=px → görünüm panelinin aşağısı
+  // ?askclip → Pano'daki ilk metin çeviri izni bekliyor (Gemini anahtarı yok)
+  if (params.has("askclip")) {
+    const c = useNook.getState().clips.find((x) => !x.color && (x.kind ?? "text") === "text");
+    if (c) useNook.getState().patchClip(c.id, { askTranslate: true, translation: undefined });
+  }
   if (params.get("scroll")) window.setInterval(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 500);
   // ?look=şekil,göz,gözlük,başlık,boyun,doku&color=… &name=…
   const q = new URLSearchParams(location.search);
@@ -352,7 +357,7 @@ export function applyPreview(mode: string) {
     const track = { key: "1", title: "Never Gonna Give You Up", artist: "Rick Astley", album: "Whenever You Need Somebody", released: "1987", cover: ART };
     useNook.setState({
       media: null,
-      hum: mode === "humlisten" ? { phase: "listening", move } : mode === "humfound" ? { phase: "found", move, track } : { phase: params.get("phase") === "silent" ? "silent" : "none", move },
+      hum: mode === "humlisten" ? { phase: "listening", move } : mode === "humfound" ? { phase: "found", move, track } : { phase: (["silent", "noDevice", "error"].includes(params.get("phase") ?? "") ? params.get("phase") : "none") as "none", move, message: params.get("msg") ?? undefined },
     });
   } else if (mode === "listen") {
     useNook.setState({ media: null, listening: true });

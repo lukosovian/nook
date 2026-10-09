@@ -72,7 +72,14 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 - **Privacy shield** — `Ctrl+Alt+H` covers every screen with one of 22 living Nook scenes (campfire, under the sea, space station, night train…) until you press it again. Music pauses, your microphone is muted for the duration, and you can lock it with a password.
 - **Stream mask** — while you share your screen, sensitive sections are hidden.
 - **Sensitive data guard** — copy a card number, IBAN, API key or password and Nook keeps it out of history and clears the clipboard after 60 seconds.
-- Everything runs on your computer. The only things that go online are: AI requests you make with your own Gemini key, the weather (Open-Meteo, with a rough location from your IP if you don't set a city), currency rates in quick search, translation of copied foreign text (Gemini, or the free MyMemory service if you have no key — can be turned off), and update checks on GitHub.
+- Everything runs on your computer. The only things that go online are:
+  - AI requests you make with your own Gemini key (Google)
+  - the weather (Open-Meteo), with a rough location from your IP via ipwho.is if you don't set a city
+  - currency rates in quick search (open.er-api.com)
+  - translation of copied foreign text: with your Gemini key, or — only if you allow it the first time — the free MyMemory service
+  - song lyrics for the playing track (lrclib.net; can be turned off in Settings › Sound)
+  - Hum: a short audio fingerprint of the playing song (never the sound itself) to Shazam
+  - update checks on GitHub
 
 ### Accessibility
 
@@ -92,7 +99,7 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 
 **Requirements:** Windows 10 or 11 (64-bit) with Microsoft Edge WebView2 (already included in Windows 11).
 
-**To quit:** right-click the Nook icon in the system tray (bottom right) › Quit Nook. **To uninstall:** Windows Settings › Apps.
+**Tray icon** (bottom right): left-click opens the island; right-click for a short menu — center the island, the tour, one hour of quiet, check for updates, quit. **To uninstall:** Windows Settings › Apps (Nook also removes its Claude Code hooks).
 
 ### Keyboard shortcuts
 
@@ -103,8 +110,10 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 | `Ctrl+Shift+D` (hold) | Voice command |
 | `Ctrl+Alt+H` | Privacy shield |
 | `Ctrl+Alt+M` | Hum — find the playing song |
+| `Ctrl+Alt+S` | Add the files selected in Explorer to the shelf |
+| `Ctrl+Alt+L` | Stream mask on / off |
 
-All of them can be changed in Settings.
+All of them are in Settings › Shortcuts, which also warns when a shortcut takes over a well-known one from another app (e.g. Word's Paste Special). Plain-text paste has no shortcut by default; you can give it one there.
 
 ### Get a Gemini key (free)
 
@@ -113,7 +122,7 @@ Go to [aistudio.google.com](https://aistudio.google.com), sign in with your Goog
 ### FAQ
 
 - **Does it slow down games?** No. When a game or video goes full screen, the island disappears completely and stops drawing.
-- **Where is my data?** In Nook's own folder on your computer (`%LOCALAPPDATA%pp.nook.island`). Your notes, clipboard, alarms and settings are never uploaded.
+- **Where is my data?** In Nook's own folder on your computer (`%LOCALAPPDATA%\app.nook.island`). Your notes, clipboard, alarms and settings are never uploaded.
 - **What's Argus?** Nook's sibling app for tracking shows and movies. If it's installed, Nook shows your next episodes and can mark what you watched. Nook works fine without it.
 
 ---

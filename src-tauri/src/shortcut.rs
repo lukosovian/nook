@@ -134,7 +134,7 @@ pub(crate) fn target(app: &AppHandle) -> String {
 }
 
 /// Adayı tıklanabilir ve odakta yap (yazı yazılabilsin); etiketini döner.
-fn open_island(app: &AppHandle) -> Option<String> {
+pub(crate) fn open_island(app: &AppHandle) -> Option<String> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     focus::remember(&shared);
     let label = target(app);

@@ -1,9 +1,10 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { useNook, type NotifItem } from "../../store/nook";
 import { ACCENT, EmptyState, MiniNook, TextButton, Toggle } from "../ui/primitives";
 import { tt, locale } from "../../lib/i18n";
+import { notifyStatus } from "../../lib/bridge";
 
 /** Son Windows bildirimleri (Discord, WhatsApp, Mail…). Odaktayken susturulanlar da burada birikir. */
 export function NotifyPanel() {
@@ -13,6 +14,9 @@ export function NotifyPanel() {
   const on = useNook((s) => s.settings.notifications);
   const update = useNook((s) => s.updateSettings);
   const clear = useNook((s) => s.clearNotifications);
+  // "Bildirim yok" ile "okuyamıyorum" ayrı görünsün
+  const [readable, setReadable] = useState<boolean | null>(null);
+  useEffect(() => void notifyStatus().then(setReadable).catch(() => undefined), []);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -25,8 +29,14 @@ export function NotifyPanel() {
       </div>
       {!items.length ? (
         <EmptyState
-          title={on ? tt("Bildirim yok") : tt("Bildirimler kapalı")}
-          hint={on ? tt("Discord, WhatsApp, Mail… bildirimleri burada birikir") : tt("Açınca Windows bildirimleri adada da görünür")}
+          title={!on ? tt("Bildirimler kapalı") : readable === false ? tt("Bildirimleri okuyamıyorum") : tt("Bildirim yok")}
+          hint={
+            !on
+              ? tt("Açınca Windows bildirimleri adada da görünür")
+              : readable === false
+                ? tt("Windows'un bildirim kaydına ulaşamadım. Ayarlar › Sistem › Bildirimler açık mı?")
+                : tt("Discord, WhatsApp, Mail… bildirimleri burada birikir")
+          }
           color={ACCENT.purple}
         />
       ) : (

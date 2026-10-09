@@ -29,6 +29,7 @@ mod shortcut;
 mod state;
 mod system;
 mod tracker;
+mod verify;
 mod voice;
 mod window;
 
@@ -78,6 +79,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::set_hit_rect,
+            notify::notify_status,
+            verify::verify_windows_user,
             commands::set_interactive,
             commands::release_focus,
             commands::set_gate,
