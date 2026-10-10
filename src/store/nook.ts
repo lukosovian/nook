@@ -356,6 +356,8 @@ export interface Settings extends NativeSettings {
   argusNews: boolean;
   /** Tarayıcıda izlediğini Argus'la eşleştirip işaretlemeyi teklif et */
   argusDetect: boolean;
+  /** İzlerken Hum: Argus'taki dizi/film çalarken içindeki şarkıları bulup Argus'a yaz */
+  humWatch: boolean;
   /** Parola kilidi: kalkan yalnızca parolayla kalkar */
   lockEnabled: boolean;
   /** Parolanın tuzlu SHA-256 özeti ("tuz:özet"); parolanın kendisi saklanmaz */
@@ -479,6 +481,7 @@ export const DEFAULT_SETTINGS: Settings = {
   argusDir: "",
   argusNews: true,
   argusDetect: true,
+  humWatch: false,
   outings: true,
   uiScale: 1,
   colorVision: "normal",

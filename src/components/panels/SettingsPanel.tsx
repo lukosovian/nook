@@ -381,6 +381,16 @@ function ArgusSection() {
       <Row label={tt("İzlediğimi fark et, işaretlemeyi sor")}>
         <Toggle on={s.argusDetect} onChange={(v) => update({ argusDetect: v })} color={ACCENT.orange} />
       </Row>
+      {s.argusDetect && (
+        <>
+          <Row label={tt("İzlerken içindeki müzikleri bul (Hum)")}>
+            <Toggle on={s.humWatch} onChange={(v) => update({ humWatch: v })} color={ACCENT.purple} />
+          </Row>
+          <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+            {tt("Argus'taki bir dizi ya da film çalarken Hum arkada dinler; çalan şarkıyı hangi dakikada çaldığıyla Argus'taki detay penceresinin Müzikler bölümüne yazar.")}
+          </p>
+        </>
+      )}
       <Row label={tt("Klasör")}>
         <div className="flex min-w-0 items-center gap-1">
           <span className="max-w-[150px] truncate text-[10.5px] text-label-3" title={snap.dir}>

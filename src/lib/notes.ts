@@ -72,6 +72,8 @@ export type DemoId =
   | "settabs"
   | "tournew"
   | "tray"
+  | "trayopen"
+  | "humwatch"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -96,6 +98,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.51",
+    date: tt("10 Ekim 2026"),
+    headline: tt("İzlerken Hum: dizinin, filmin müzikleri Argus'ta"),
+    items: [
+      {
+        title: tt("İzlerken Hum"),
+        text: tt("Argus'taki bir diziyi ya da filmi izlerken Hum arkada dinler; çalan şarkıyı bulup hangi dakikada çaldığıyla Argus'taki detay penceresinin Müzikler bölümüne yazar (Argus kapalıyken de). Dizilerde bölüm bölüm ayrılır. Ayarlar › Argus › \"İzlerken içindeki müzikleri bul (Hum)\" ile açılır. İzlerken kısayolla elle Hum yaparsan bulduğun şarkı da oraya gider. Argus'un da güncel olması gerekir."),
+        demo: "humwatch",
+      },
+      {
+        title: tt("Tepsiden \"Adayı aç\" düzeldi"),
+        text: tt("Tepsi menüsündeki \"Adayı aç\" ve simgeye sol tık adayı açmıyordu, yalnızca tıklanabilir yapıyordu. Artık ada açılır ve imleç tepside dururken de açık kalır. İmleç adaya girip çıkınca, başka yere tıklayınca ya da Esc'e basınca kapanır."),
+        demo: "trayopen",
+      },
+    ],
+  },
   {
     version: "0.2.50",
     date: tt("9 Ekim 2026"),

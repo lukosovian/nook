@@ -781,6 +781,47 @@ fn put_json(path: &str, body: Value) -> Result<Value, String> {
     ureq::put(&format!("{API}{path}")).timeout(Duration::from_secs(10)).send_json(body).map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())
 }
 
+fn post_json(path: &str, body: Value) -> Result<Value, String> {
+    match ureq::post(&format!("{API}{path}")).timeout(Duration::from_secs(10)).send_json(body) {
+        Ok(r) => r.into_json().map_err(|e| e.to_string()),
+        // Eski Argus bu uç noktayı bilmiyor
+        Err(ureq::Error::Status(404, _)) => Err("old".into()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SongResult {
+    /// Bu şarkı o bölümde az önce zaten eklenmişti
+    duplicate: bool,
+}
+
+/// İzlerken Hum'un bulduğu şarkıyı içeriğin "Müzikler" listesine yazar (Argus kapalıysa görünmez açar).
+/// `at_ms`: içeriğin kaçıncı ms'sinde çaldı; `approx`: oynatıcı konum vermedi, izlenen süreden tahmin.
+#[tauri::command]
+pub async fn argus_add_song(row_id: String, season: Option<u32>, episode: Option<u32>, at_ms: Option<u64>, approx: bool, track: Value) -> Result<SongResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = argus_dir().ok_or("Argus bulunamadı")?;
+        let pid = {
+            let c = CACHE.lock().unwrap();
+            c.as_ref().ok_or("Argus henüz okunmadı")?.snap.profile_id.clone()
+        };
+        let server = Server::ensure(&dir)?;
+        let mut body = track.as_object().cloned().unwrap_or_default();
+        body.insert("season".into(), json!(season));
+        body.insert("episode".into(), json!(episode));
+        body.insert("atMs".into(), json!(at_ms));
+        body.insert("approx".into(), json!(approx));
+        let res = post_json(&format!("/api/profiles/{pid}/songs/{row_id}"), Value::Object(body));
+        drop(server);
+        let res = res?;
+        Ok(SongResult { duplicate: res.get("duplicate").and_then(|v| v.as_bool()).unwrap_or(false) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkResult {

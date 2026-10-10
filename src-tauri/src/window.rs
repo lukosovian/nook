@@ -332,14 +332,12 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                crate::shortcut::open_island(tray.app_handle());
+                open_from_tray(tray.app_handle());
             }
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
             "quit" => app.exit(0),
-            "open" => {
-                crate::shortcut::open_island(app);
-            }
+            "open" => open_from_tray(app),
             // Diğerleri arayüzde yapılır (ana ada)
             id => {
                 let _ = app.emit_to(ISLAND, "nook://tray", id.to_string());
@@ -350,6 +348,14 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     }
     tray.build(app)?;
     Ok(())
+}
+
+/// Adayı tıklanabilir yap ve arayüze genişlemesini söyle — yalnızca tıklanabilir yapmak adayı
+/// açmıyordu (genişleme imleçle olur; imleç tepside, adanın üstünde değil).
+fn open_from_tray(app: &AppHandle) {
+    if let Some(label) = crate::shortcut::open_island(app) {
+        let _ = app.emit_to(label.as_str(), "nook://tray", "open");
+    }
 }
 
 /// WebView2'nin varsayılan arka planını şeffaf yap. Şeffaf pencerede bile bazen (gizle-göster,

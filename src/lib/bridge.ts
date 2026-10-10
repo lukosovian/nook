@@ -384,6 +384,9 @@ export const argusSnapshot = (profile: string, today: string, dir: string) =>
 export const argusCheckDir = (dir: string) => invoke<string | null>("argus_check_dir", { dir });
 export const argusMark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
   invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode, status });
+/** İzlerken Hum'un bulduğu şarkıyı Argus'taki içeriğin Müzikler listesine yazar */
+export const argusAddSong = (rowId: string, season: number | null, episode: number | null, atMs: number | null, approx: boolean, track: import("./hum").HumTrack) =>
+  invoke<{ duplicate: boolean }>("argus_add_song", { rowId, season, episode, atMs, approx, track });
 /** Adanın sağındaki izleme kartı penceresi (x, y: bu pencereye göre mantıksal konum) */
 export const argusCard = (show: boolean, x: number, y: number) => invoke<void>("argus_card", { show, x, y });
 export const argusInstall = () => invoke<void>("argus_install");
