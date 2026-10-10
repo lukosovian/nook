@@ -118,6 +118,8 @@ pub fn run() {
             argus::argus_snapshot,
             argus::argus_mark,
             argus::argus_add_song,
+            argus::argus_tmdb_search,
+            argus::argus_tmdb_add,
             argus::argus_card,
             argus::argus_open,
             argus::argus_install,

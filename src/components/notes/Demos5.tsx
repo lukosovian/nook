@@ -2,7 +2,8 @@
  * 0.2.50 yama notlarının görselleri: tepsi menüsü, bir saat sessizlik, tek yerde kısayollar ve
  * çakışma uyarısı, parolayı Windows Hello ile açma, çeviri izni, anlaşılır hata mesajları, tanıtımda
  * klavye, Pro kotası dolunca Flash'a geçiş ve küçük düzeltmeler; 0.2.51'de tepsiden "Adayı aç" ve
- * izlerken Hum (dizinin/filmin müzikleri dakikasıyla Argus'a).
+ * izlerken Hum (dizinin/filmin müzikleri dakikasıyla Argus'a); 0.2.53'te klasörlerin altında kalmayan
+ * ada ve kartlar, Argus'ta olmayanı tanıyıp eklemeyi önerme.
  * Hepsi kendi kendine döner.
  */
 import { useEffect, useState } from "react";
@@ -23,6 +24,10 @@ import {
   Moon,
   MousePointer2,
   Music2,
+  Folder,
+  Globe,
+  Plus,
+  X,
   TriangleAlert,
   WifiOff,
   Zap,
@@ -904,7 +909,142 @@ function CardSidesDemo() {
   );
 }
 
+/** Klasör ve tarayıcı pencereleri öne gelince de ada, ses kartı ve Argus kartı üstte kalır */
+function OnTopDemo() {
+  const face = useFace();
+  const n = useTick(1100);
+  const front = n % 2; // öne gelen pencere: 0 klasör · 1 tarayıcı
+  const win = (i: number, icon: React.ReactNode, title: string, x: string, y: number) => (
+    <motion.div
+      className="absolute w-[58%] overflow-hidden rounded-[8px] border border-white/10 bg-[#202634]"
+      style={{ left: x, top: y, height: 92 }}
+      animate={{ zIndex: front === i ? 2 : 1, scale: front === i ? 1 : 0.97, opacity: front === i ? 1 : 0.8 }}
+      transition={{ duration: 0.25 }}
+    >
+      <div className="flex h-4 items-center gap-1 bg-white/10 px-1.5 text-[7.5px] text-label-2">
+        {icon}
+        {title}
+      </div>
+      <div className="grid grid-cols-4 gap-1 p-1.5">
+        {Array.from({ length: 8 }, (_, k) => (
+          <span key={k} className="h-3 rounded-[3px] bg-white/[0.06]" />
+        ))}
+      </div>
+    </motion.div>
+  );
+  return (
+    <Stage bg="linear-gradient(160deg, #2b3a55 0%, #1a2233 60%, #12161f 100%)">
+      {win(0, <Folder size={8} />, tt("Belgeler"), "8%", 30)}
+      {win(1, <Globe size={8} />, tt("Yeni sekme"), "34%", 22)}
+      {/* Ada ve yan kartlar her zaman en üstte */}
+      <div className="absolute left-[44%] top-0 z-10 flex -translate-x-1/2 items-start gap-1">
+        <span
+          className="mt-[3px] h-[26px] w-[34px] rounded-[7px] text-center text-[7px] leading-[26px] font-semibold"
+          style={{ background: tintBg(ACCENT.teal, 30), border: `1px solid ${tintBg(ACCENT.teal, 55)}`, color: tintText(ACCENT.teal) }}
+        >
+          {tt("Ses")}
+        </span>
+        <span className="flex h-8 w-[78px] items-center gap-1.5 rounded-b-[13px] bg-black px-2" style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.06)" }}>
+          <NookFigure look={face.look} color={face.color} size={20} expression="happy" />
+          <span className="h-1.5 flex-1 rounded-full bg-white/15" />
+        </span>
+        <span
+          className="mt-[3px] h-[26px] w-[38px] rounded-[7px] text-center text-[7px] leading-[26px] font-semibold"
+          style={{ background: tintBg(ACCENT.orange, 30), border: `1px solid ${tintBg(ACCENT.orange, 55)}`, color: tintText(ACCENT.orange) }}
+        >
+          Argus
+        </span>
+      </div>
+      <motion.span
+        key={front}
+        className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[8.5px] font-medium"
+        style={{ background: tintBg(ACCENT.green, 18), color: tintText(ACCENT.green) }}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <Check size={9} strokeWidth={3} />
+        {front ? tt("Tarayıcı öne geldi, ada yine üstte") : tt("Klasör öne geldi, ada yine üstte")}
+      </motion.span>
+    </Stage>
+  );
+}
+
+/** Argus'ta olmayanı izlerken: benzer adlı yanlış kayıt yerine "Argus'ta yok, ekleyeyim mi?" */
+function ArgusNewDemo() {
+  const face = useFace();
+  const n = useTick(1000);
+  const phase = n % 7; // 0-1 eskisi (yanlış eşleşme) · 2-4 teklif · 5-6 eklendi
+  const O = ACCENT.orange;
+  const done = phase >= 5;
+  const C = done ? ACCENT.green : O;
+  return (
+    <Stage>
+      {/* Tarayıcıda oynayan film */}
+      <div className="absolute inset-x-4 top-3 h-[58px] overflow-hidden rounded-[8px] border border-white/10 bg-[#141924]">
+        <div className="flex h-3.5 items-center gap-1 bg-white/10 px-1.5 text-[7px] text-label-2">
+          <Globe size={7} />
+          Avatar Aang: The Last Airbender
+        </div>
+        <div className="flex h-[42px] items-center justify-center" style={{ background: "linear-gradient(120deg, #1d3b5c, #3a6d8f 55%, #e0a050)" }}>
+          <span className="h-0 w-0 border-y-[6px] border-l-[10px] border-y-transparent border-l-white/80" />
+        </div>
+      </div>
+      <AnimatePresence mode="wait">
+        {phase <= 1 ? (
+          <motion.div
+            key="old"
+            className="absolute inset-x-4 bottom-3 flex items-center gap-2 rounded-[10px] border px-2 py-1.5"
+            style={{ background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)" }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+          >
+            <span className="h-[30px] w-[21px] shrink-0 rounded-[4px]" style={{ background: "linear-gradient(160deg, #1b6fa8, #0c2c48)" }} />
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[9.5px] font-medium text-label-2 line-through decoration-[#ff6b6b]">Avatar · 2009</p>
+              <p className="text-[8px] text-label-3">{tt("Eskiden: adı benzeyen yanlış kayıt")}</p>
+            </div>
+            <X size={12} color="#ff6b6b" />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="new"
+            className="absolute inset-x-4 bottom-3 flex items-center gap-2 rounded-[10px] border px-2 py-1.5"
+            style={{ background: tintBg(O, 10), borderColor: tintBg(O, 30) }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <span className="h-[30px] w-[21px] shrink-0 rounded-[4px]" style={{ background: "linear-gradient(160deg, #e0a050, #3a6d8f)" }} />
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[9.5px] font-medium" style={{ color: tintText(O) }}>
+                Avatar Aang <span className="font-normal text-label-3">· 2026</span>
+              </p>
+              <p className="text-[8px] text-label-3">{done ? tt("Argus'a eklendi") : tt("İzliyorsun ama Argus'ta yok")}</p>
+            </div>
+            <motion.span
+              className="flex h-5 shrink-0 items-center gap-0.5 rounded-full border px-1.5 text-[8.5px] font-medium"
+              style={{ background: tintBg(C, 16), borderColor: tintBg(C, 40), color: tintText(C) }}
+              animate={{ scale: phase === 4 ? 0.9 : 1 }}
+            >
+              {done ? <Check size={9} strokeWidth={3} /> : <Plus size={9} strokeWidth={3} />}
+              {done ? tt("Eklendi") : tt("Ekle")}
+            </motion.span>
+            {done && (
+              <motion.span className="absolute -top-4 right-2" initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                <NookFigure look={face.look} color={face.color} size={18} expression="happy" />
+              </motion.span>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Stage>
+  );
+}
+
 export const DEMOS5 = {
+  ontop: OnTopDemo,
+  argusnew: ArgusNewDemo,
   humcopy: HumCopyDemo,
   nooknotifs: NookNotifsDemo,
   whitebg: WhiteBgDemo,

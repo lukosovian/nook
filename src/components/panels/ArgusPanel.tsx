@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, ExternalLink, Film, MessageCircle, Shuffle, Tv, X } from "lucide-react";
+import { Check, ExternalLink, Film, MessageCircle, Plus, Shuffle, Tv, X } from "lucide-react";
 import {
   calendar,
   dayLabel,
@@ -16,6 +16,8 @@ import {
   type ArgusItem,
   type PickFilter,
   answerSuggestion,
+  addFresh,
+  skipFresh,
 } from "../../lib/argus";
 import { sendChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
@@ -75,6 +77,7 @@ export function ArgusPanel() {
         </button>
       </div>
       <SuggestionBanner />
+      <FreshBanner />
       <div ref={scroller} className="-mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={focused ? `f${focused.id}` : view} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
@@ -180,6 +183,50 @@ function SuggestionBanner() {
         </button>
       </div>
       <StatusChoice item={item} ep={ep} />
+    </motion.div>
+  );
+}
+
+/** "Avatar: Aang izliyorsun ama Argus'ta yok — ekleyeyim mi?" */
+function FreshBanner() {
+  const f = useArgus((s) => s.fresh);
+  const busy = useArgus((s) => !!f && s.busy === f.key);
+  if (!f) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-2 rounded-[12px] border px-2 py-1.5"
+      style={{ background: tintBg(COLOR, 10), borderColor: tintBg(COLOR, 30) }}
+    >
+      {f.poster ? (
+        <img src={f.poster} alt="" draggable={false} className="shrink-0 rounded-[5px] object-cover" style={{ width: 22, height: 32 }} />
+      ) : (
+        <span className="flex shrink-0 items-center justify-center rounded-[5px] bg-well text-label-3" style={{ width: 22, height: 32 }}>
+          {f.mediaType === "tv" ? <Tv size={10} /> : <Film size={10} />}
+        </span>
+      )}
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="truncate text-[11.5px] font-medium" style={{ color: tintText(COLOR) }}>
+          {f.title}
+          {f.year ? <span className="font-normal text-label-3"> · {f.year}</span> : null}
+        </p>
+        <p className="text-[10px] text-label-3">{tt("İzliyorsun ama Argus'ta yok")}</p>
+      </div>
+      <motion.button
+        whileTap={{ scale: 0.92 }}
+        transition={spring.pop}
+        disabled={busy}
+        onClick={() => void addFresh(f)}
+        className="flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-[10.5px] font-medium disabled:opacity-60"
+        style={{ background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }}
+      >
+        {busy ? <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }} className="h-2.5 w-2.5 rounded-full border-[1.5px] border-current border-t-transparent" /> : <Plus size={11} strokeWidth={2.8} />}
+        {tt("Ekle")}
+      </motion.button>
+      <button onClick={() => skipFresh(f)} title={tt("Ekleme")} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+        <X size={12} />
+      </button>
     </motion.div>
   );
 }

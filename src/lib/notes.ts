@@ -78,6 +78,8 @@ export type DemoId =
   | "nooknotifs"
   | "whitebg"
   | "cardsides"
+  | "ontop"
+  | "argusnew"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -102,6 +104,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.53",
+    date: tt("10 Ekim 2026"),
+    headline: tt("Ada hep üstte, Argus'ta olmayanı da tanıyor"),
+    items: [
+      {
+        title: tt("Ada klasörlerin altında kalmıyor"),
+        text: tt("Bir klasör ya da tarayıcı öne gelince ada, ses kartı ve Argus kartı bazen onların altında kalıyordu. Artık Windows onları alta itse de Nook hemen yeniden en üste çıkarıyor (tam ekran oyunlara dokunmadan)."),
+        demo: "ontop",
+      },
+      {
+        title: tt("Argus'ta olmayanı da tanıyor"),
+        text: tt("İzlediğin şeyin adı Argus'taki bir kayda yalnızca benziyorsa (Avatar Aang'ı izlerken eski Avatar filmi gibi) artık onu göstermiyor; içeriği TMDB'de bulup doğrusunu tanıyor. Argus'ta yoksa birkaç dakika izledikten sonra \"Argus'ta yok, ekleyeyim mi?\" diye soruyor; Ekle'ye basınca afişi ve bölümleriyle Argus'a ekleniyor, izleyince \"bitti mi?\" sorusu yine geliyor. Başlık başka dilde olsa da (İngilizce başlık, Türkçe kayıt) aynı kayıt bulunuyor. Argus'ta TMDB API anahtarı girilmiş olmalı."),
+        demo: "argusnew",
+      },
+    ],
+  },
   {
     version: "0.2.52",
     date: tt("10 Ekim 2026"),

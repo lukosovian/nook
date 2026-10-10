@@ -13,7 +13,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../hooks/useAntics";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import { emitTo, listen } from "@tauri-apps/api/event";
-import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
+import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, argusTmdbAdd, argusTmdbSearch, inTauri, isPrimary } from "./bridge";
 import type { IslandMode } from "./layout";
 import { ISLAND, ISLAND_TOP } from "./layout";
 import { cardHit } from "./soundCard";
@@ -41,6 +41,8 @@ export interface ArgusItem {
   poster: string | null;
   recent: number | null;
   watchDates: string[];
+  /** TMDB kimliği ("movie:123" / "tv:456") */
+  tmdb?: string | null;
   series: {
     aired: number;
     seen: number;
@@ -84,6 +86,20 @@ interface ArgusState {
   focusId: string | null;
   /** Şu an çalan ve Argus'la eşleşen şey: bugün ne kadar izlendi */
   live: ArgusLive | null;
+  /** "Bu Argus'ta yok, ekleyeyim mi?" teklifi */
+  fresh: ArgusFresh | null;
+}
+
+/** Çalan ama Argus'ta olmayan içerik (TMDB'de bulundu) */
+export interface ArgusFresh {
+  key: string;
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  title: string;
+  names: string[];
+  year: string | null;
+  poster: string | null;
+  popularity: number;
 }
 
 export interface ArgusLive extends ArgusSuggestion {
@@ -91,7 +107,7 @@ export interface ArgusLive extends ArgusSuggestion {
   needMs: number;
 }
 
-export const useArgus = create<ArgusState>(() => ({ snap: null, busy: null, suggestion: null, focusId: null, live: null }));
+export const useArgus = create<ArgusState>(() => ({ snap: null, busy: null, suggestion: null, focusId: null, live: null, fresh: null }));
 
 const REFRESH_MS = 60_000;
 const NEWS_KEY = "nook-argus-news";
@@ -251,16 +267,111 @@ export function matchTitle(snap: ArgusSnapshot | null, text: string, pool?: Argu
   return best?.item ?? null;
 }
 
-/** Çalan medya → Argus kaydı + bölüm */
+/** Kayıt + metindeki bölüm → öneri */
+function suggestFor(item: ArgusItem, text: string): ArgusSuggestion | null {
+  if (!item.series) return { itemId: item.id };
+  const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1) ?? item.series.next;
+  return ep ? { itemId: item.id, season: ep.season, episode: ep.episode } : null;
+}
+
+/** Çalan medya → Argus kaydı + bölüm (yalnızca Argus'taki adlarla) */
 export function matchMedia(snap: ArgusSnapshot | null, title: string, artist: string): ArgusSuggestion | null {
   if (!snap) return null;
   const text = `${title} ${artist}`;
   // Her durumdaki kayıt — İzlendi olanlar da (tekrar izleme)
   const item = matchTitle(snap, text);
-  if (!item) return null;
-  if (!item.series) return { itemId: item.id };
-  const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1) ?? item.series.next;
-  return ep ? { itemId: item.id, season: ep.season, episode: ep.episode } : null;
+  return item ? suggestFor(item, text) : null;
+}
+
+// Başlıktaki ad dışı kalıntılar: site, kalite, dublaj, bölüm yazıları
+const SITES = /^(netflix|youtube|prime video|amazon prime video|disney|disney plus|hbo max|max|blutv|blu tv|exxen|gain|tabii|mubi|apple tv|tod|puhutv|twitch|vlc media player|mpv)$/;
+const JUNK =
+  / (izle|izleyin|full|hd|fhd|uhd|4k|1080p|720p|480p|turkce|dublaj|dublajli|altyazi|altyazili|tek|parca|online|watch|free|film|filmi|dizi|dizisi|sezon|bolum|season|episode|ep|part|official|resmi)(?= )/g;
+
+/** Başlığı " | ", " - " gibi ayraçlardan böler, her parçayı yalın kelimelere indirir (site adları atılır) */
+function segments(text: string) {
+  return text
+    .split(/\s[|•\-–—]\s|\s*\|\s*|\n/)
+    .map((seg) => {
+      let t = seg;
+      for (const re of [...EP_PATTERNS, ...BARE_EP_PATTERNS]) t = t.replace(new RegExp(re.source, "gi"), " ");
+      t = norm(t.replace(/\(\s*(19|20)\d\d\s*\)/g, " ")).replace(JUNK, " ").replace(JUNK, " ");
+      return t.split(" ").filter(Boolean);
+    })
+    .filter((w) => w.length && !SITES.test(w.join(" ")));
+}
+
+/** İki adın benzerliği: ortak kelime / kelimesi çok olanın kelime sayısı (0–1) */
+function similarity(a: string[], b: string[]) {
+  if (!a.length || !b.length) return 0;
+  // "Son Havabükücü" = "Son Hava Bükücü"
+  if (a.join("") === b.join("")) return 1;
+  const sa = new Set(a);
+  const sb = new Set(b);
+  const common = [...sa].filter((w) => sb.has(w)).length;
+  return common / Math.max(sa.size, sb.size);
+}
+const words = (s: string) => norm(s).trim().split(" ").filter(Boolean);
+
+/** Kayıt adı başlığın bir parçasını ne kadar karşılıyor — "Avatar", "Avatar Son Hava Bükücü Aang" için zayıf */
+function strength(item: ArgusItem, segs: string[][]) {
+  let best = 0;
+  for (const name of [item.title, item.original]) {
+    if (!name) continue;
+    const w = words(name);
+    for (const seg of segs) best = Math.max(best, similarity(w, seg));
+  }
+  return best;
+}
+
+/** Adlar bu kadar tutuyorsa aynı içerik sayılır */
+const SAME = 0.6;
+const FRESH_SAME = 0.75;
+/** Müzik uygulamaları TMDB'de aranmaz */
+const MUSIC_APPS = /spotify|music|itunes|deezer|tidal|foobar|winamp|aimp|musicbee|soundcloud/i;
+const tmdbCache = new Map<string, Promise<ArgusFresh[]>>();
+
+export type MediaMatch = { sug: ArgusSuggestion | null; fresh: ArgusFresh | null };
+
+/**
+ * Çalan şeyi tanır. Argus'taki ad başlıkla iyi tutuyorsa doğrudan o; tutmuyorsa (ya da hiç yoksa)
+ * TMDB'ye sorar: bulunan içerik Argus'taysa (TMDB kimliği ya da adıyla) o kayıt, değilse "fresh" —
+ * "Argus'ta yok, ekleyeyim mi?". TMDB bir şey bulamazsa zayıf eşleşmeye düşer (eski davranış).
+ */
+export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: string, app: string): Promise<MediaMatch> {
+  const text = `${title} ${artist}`;
+  const local = matchTitle(snap, text);
+  let segs = segments(title);
+  // Başlık yalnızca "Bölüm 3" gibiyse dizinin adı sanatçı alanındadır
+  if (!segs.length) segs = segments(artist);
+  const weak: MediaMatch = { sug: local ? suggestFor(local, text) : null, fresh: null };
+  if (local && strength(local, segs.concat(segments(artist))) >= SAME) return weak;
+  if (MUSIC_APPS.test(app)) return weak;
+  // Önce bütün parçalar ("Avatar: Son Hava Bükücü - Aang"), tutmazsa yalnızca ilki
+  const queries = [segs.flat(), segs[0] ?? []].filter((q, i, all) => q.join(" ").length >= 3 && all.findIndex((x) => x.join(" ") === q.join(" ")) === i);
+  let best: { h: ArgusFresh; sim: number } | undefined;
+  for (const q of queries) {
+    const query = q.join(" ");
+    let p = tmdbCache.get(query);
+    if (!p) {
+      p = argusTmdbSearch(query, locale()).catch(() => []);
+      tmdbCache.set(query, p);
+    }
+    best = (await p)
+      .map((h) => ({ h, sim: Math.max(0, ...h.names.map((n) => similarity(words(n), q))) }))
+      .filter((x) => x.sim >= SAME)
+      .sort((a, b) => b.sim - a.sim || b.h.popularity - a.h.popularity)[0];
+    if (best) break;
+  }
+  if (!best) return weak;
+  const hit = best.h;
+  const names = hit.names.map(norm);
+  const known =
+    snap.items.find((i) => i.tmdb === hit.key) ?? snap.items.find((i) => !i.tmdb && [i.title, i.original].some((n) => n && names.includes(norm(n))));
+  if (known) return { sug: suggestFor(known, text), fresh: null };
+  // TMDB başka bir şey buldu: zayıf yerel eşleşme ("Avatar") yanlıştı. Listede olmayanı önermek için ad
+  // daha sıkı tutmalı ("Dune Part Two Review" gibi videolar sorulmasın)
+  return { sug: null, fresh: best.sim >= FRESH_SAME ? hit : null };
 }
 
 // ------------------------------------------------------------------ yazma
@@ -285,6 +396,48 @@ export async function markWatched(item: ArgusItem, ep?: { season: number; episod
     if (sug?.itemId === item.id) answerSuggestion(sug);
   } catch (e) {
     s.pushToast({ kind: "argus", title: tt("Argus'a yazılamadı"), detail: String(e), ms: 6000 });
+    playAntic("suspicious");
+  } finally {
+    useArgus.setState({ busy: null });
+    s.setBusy("argus", false);
+    await refreshArgus();
+  }
+}
+
+const SKIP_KEY = "nook-argus-skip-new";
+/** "Ekleme" denen içerikler (TMDB anahtarları) — bir daha sorulmaz */
+function skipped(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(SKIP_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+/** "Argus'ta yok" teklifine hayır */
+export function skipFresh(f: ArgusFresh | null = useArgus.getState().fresh) {
+  if (!f) return;
+  try {
+    localStorage.setItem(SKIP_KEY, JSON.stringify([...skipped().filter((k) => k !== f.key), f.key].slice(-200)));
+  } catch {
+    /* önemsiz */
+  }
+  useArgus.setState({ fresh: null });
+}
+
+/** Çalan ama Argus'ta olmayan içeriği Argus'a ekler (İzlenecek; izleyince "bitti mi?" yine sorulur) */
+export async function addFresh(f: ArgusFresh) {
+  if (useArgus.getState().busy) return;
+  useArgus.setState({ busy: f.key });
+  const s = useNook.getState();
+  s.setBusy("argus", true);
+  try {
+    await argusTmdbAdd(f.tmdbId, f.mediaType);
+    s.pushToast({ kind: "argus", title: tt("Argus'a eklendi"), detail: tt("{0} · izleyince bitti mi diye sorarım", f.title), ms: 4500 });
+    playAntic("love");
+    useArgus.setState({ fresh: null });
+  } catch (e) {
+    s.pushToast({ kind: "argus", title: tt("Argus'a eklenemedi"), detail: String(e), ms: 6000 });
     playAntic("suspicious");
   } finally {
     useArgus.setState({ busy: null });
@@ -390,6 +543,10 @@ const TICK_MS = 5000;
 const MAX_STEP_MS = 90_000;
 /** Kullanıcının kendi kuralı: dizi/film 15 dk izlendiyse o güne yazılır (yüzdeye bakılmaz) */
 const MIN_WATCH_MS = 15 * 60_000;
+/** Argus'ta olmayan içerik bu kadar izlenince eklemeyi önerir */
+const FRESH_AFTER_MS = 3 * 60_000;
+/** Bundan kısa videolar (fragman, klip) için önerilmez */
+const FRESH_MIN_LEN_MS = 15 * 60_000;
 /** Durdurulunca hemen "bitti" sayılır — yalnızca yüklenme/reklam gibi anlık takılmalar için kısa pay */
 const IDLE_END_MS = 8000;
 
@@ -451,7 +608,8 @@ export function useArgusDetect() {
     let store = currentPlayed();
     let cur: { key: string; sug: ArgusSuggestion; duration: number; idleSince: number | null } | null = null;
     let lastText = "";
-    let lastMatch: ArgusSuggestion | null = null;
+    let lastSnap: ArgusSnapshot | null = null;
+    let lastMatch: MediaMatch = { sug: null, fresh: null };
     let lastTick = Date.now();
 
     const played = (key: string) => store.ms[key] ?? 0;
@@ -489,6 +647,28 @@ export function useArgusDetect() {
       playAntic("surprised");
     };
 
+    /** Argus'ta olmayan şey birkaç dakika izlenince bir kez "ekleyeyim mi?" */
+    const offerFresh = (f: ArgusFresh, step: number, duration: number) => {
+      const key = `tmdb:${f.key}`;
+      store.ms[key] = played(key) + step;
+      savePlayed(store);
+      // Kısa videolar (fragman, klip) sorulmaz
+      if ((duration && duration < FRESH_MIN_LEN_MS) || played(key) < FRESH_AFTER_MS) return;
+      if (store.asked.includes(key) || skipped().includes(f.key)) return;
+      store.asked.push(key);
+      savePlayed(store);
+      useArgus.setState({ fresh: f });
+      const s = useNook.getState();
+      s.pushToast({
+        kind: "argus",
+        title: tt("{0} Argus'ta yok", `${f.title}${f.year ? ` (${f.year})` : ""}`),
+        detail: tt("İzliyorsun ama listende değil · Üstüme gel, ekleyeyim"),
+        ms: 9000,
+      });
+      s.setPendingTab("argus");
+      playAntic("surprised");
+    };
+
     const t = window.setInterval(() => {
       const now = Date.now();
       const step = Math.min(Math.max(0, now - lastTick), MAX_STEP_MS);
@@ -501,11 +681,17 @@ export function useArgusDetect() {
       if (m?.playing) {
         const text = `${m.title}
 ${m.artist}`;
-        if (text !== lastText) {
+        // Argus yenilenince de (az önce eklenen kayıt artık tanınsın) yeniden bak; TMDB sonuçları önbellekte
+        if (text !== lastText || snap !== lastSnap) {
+          if (text !== lastText) lastMatch = { sug: null, fresh: null };
           lastText = text;
-          lastMatch = matchMedia(snap, m.title, m.artist);
+          lastSnap = snap;
+          void resolveMedia(snap, m.title, m.artist, m.app).then((r) => {
+            if (lastText === text) lastMatch = r;
+          });
         }
-        const sug = lastMatch;
+        const { sug, fresh } = lastMatch;
+        if (fresh && !sug) offerFresh(fresh, step, m.durationMs);
         if (!sug) {
           if (cur) finish();
           return;
@@ -514,6 +700,12 @@ ${m.artist}`;
         if (cur?.key !== key) {
           finish();
           cur = { key, sug, duration: m.durationMs || 0, idleSince: null };
+          // Argus'a eklenmeden önce izlenen süre yeni kayda geçer
+          const tmdb = findItem(sug.itemId)?.tmdb;
+          if (tmdb && store.ms[`tmdb:${tmdb}`]) {
+            store.ms[key] = played(key) + store.ms[`tmdb:${tmdb}`];
+            delete store.ms[`tmdb:${tmdb}`];
+          }
         }
         store.ms[key] = played(key) + step;
         savePlayed(store);

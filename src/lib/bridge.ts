@@ -385,6 +385,9 @@ export const argusCheckDir = (dir: string) => invoke<string | null>("argus_check
 export const argusMark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
   invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode, status });
 /** İzlerken Hum'un bulduğu şarkıyı Argus'taki içeriğin Müzikler listesine yazar */
+export const argusTmdbSearch = (query: string, lang: string) =>
+  inTauri ? invoke<import("./argus").ArgusFresh[]>("argus_tmdb_search", { query, lang }) : Promise.resolve([]);
+export const argusTmdbAdd = (tmdbId: number, mediaType: string) => invoke<string>("argus_tmdb_add", { tmdbId, mediaType });
 export const argusAddSong = (rowId: string, season: number | null, episode: number | null, atMs: number | null, approx: boolean, track: import("./hum").HumTrack) =>
   invoke<{ duplicate: boolean }>("argus_add_song", { rowId, season, episode, atMs, approx, track });
 /** Adanın sağındaki izleme kartı penceresi (x, y: bu pencereye göre mantıksal konum) */

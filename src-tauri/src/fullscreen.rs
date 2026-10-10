@@ -25,6 +25,8 @@ const MIN_GAME: Duration = Duration::from_secs(120);
 const INTRO_PEEK: Duration = Duration::from_secs(5);
 /// Mola hatırlatıcısı için ada oyunun üstünde bu kadar görünür, sonra yine gizlenir.
 const BREAK_PEEK: Duration = Duration::from_secs(8);
+/// Öndeki pencere değişmese de "en üstte" bayrağı bu sıklıkla yeniden verilir.
+const TOPMOST_EVERY: u32 = 8;
 
 /// Tarayıcılar, video oynatıcılar ve sunum gibi "oyun olmayan" tam ekranlar (küçük harf, .exe'siz).
 const NOT_GAMES: &[&str] = &[
@@ -32,6 +34,9 @@ const NOT_GAMES: &[&str] = &[
     "potplayer", "potplayermini", "potplayermini64", "wmplayer", "video.ui", "microsoft.media.player", "spotify", "netflix", "explorer",
     "applicationframehost", "powerpnt", "obs64", "mpv", "kmplayer", "discord", "code", "windowsterminal", "nook",
 ];
+
+/// Hep en üstte durması gereken pencereler (etiket önekleri).
+const ON_TOP: &[&str] = &[crate::window::ISLAND, crate::argus::CARD, crate::argus::SOUND, crate::buddy::PERCH, crate::shield::PREFIX];
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,6 +88,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut peek_until: Option<Instant> = None;
             // Vakti gelen alarm bir kez bildirilir: gizliyken sayfanın saati yavaşlar (Chromium arka plan kısıtlaması)
             let mut rung_for: i64 = 0;
+            let mut last_fg: isize = 0;
+            let mut tick: u32 = 0;
             loop {
                 thread::sleep(POLL);
                 let settings = shared.settings();
@@ -175,6 +182,22 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         imp::raise(ws.hwnd);
                     }
                 }
+                // Windows "her zaman en üstte" pencereleri ara sıra alta itiyor (Gezgin, tarayıcı öne gelince
+                // ada, ses kartı, Argus kartı altta kalıyordu). Öndeki pencere değişince ve arada bir yeniden en öne al.
+                // Tam ekran oyunda dokunulmaz (oyunun üstüne sürekli pencere itmek onu alta atabilir).
+                tick = tick.wrapping_add(1);
+                let fg = imp::foreground();
+                if !in_game && (fg != last_fg || tick % TOPMOST_EVERY == 0) {
+                    for (label, w) in app.webview_windows() {
+                        if hidden.contains(&label) || !ON_TOP.iter().any(|p| label.starts_with(p)) {
+                            continue;
+                        }
+                        if let Ok(h) = w.hwnd() {
+                            imp::keep_on_top(h.0 as isize);
+                        }
+                    }
+                }
+                last_fg = fg;
                 // Pencere yeniden göründükten (ve kareler açıldıktan) sonra
                 if let Some(b) = break_due {
                     let _ = app.emit("nook://game-break", b);
@@ -308,6 +331,20 @@ mod imp {
         }
     }
 
+    pub fn foreground() -> isize {
+        unsafe { GetForegroundWindow() as isize }
+    }
+
+    /// Görünürse, odak çalmadan ve göstermeden "en üstte" katmanın önüne geri al.
+    pub fn keep_on_top(hwnd: isize) {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_ASYNCWINDOWPOS, SWP_NOOWNERZORDER};
+        unsafe {
+            if IsWindowVisible(hwnd as HWND) != 0 {
+                SetWindowPos(hwnd as HWND, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS);
+            }
+        }
+    }
+
     /// Odak çalmadan en üst katmanın da en önüne getir.
     pub fn raise(hwnd: isize) {
         unsafe {
@@ -327,4 +364,8 @@ mod imp {
     }
     pub fn show(_hwnd: isize, _visible: bool) {}
     pub fn raise(_hwnd: isize) {}
+    pub fn foreground() -> isize {
+        0
+    }
+    pub fn keep_on_top(_hwnd: isize) {}
 }

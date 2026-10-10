@@ -70,6 +70,8 @@ pub struct Item {
     /// Filmler için izleme günleri
     watch_dates: Vec<String>,
     series: Option<Series>,
+    /// TMDB kimliği ("movie:123" / "tv:456") — Argus'un tmdb.json'undan
+    tmdb: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -544,6 +546,8 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
         .iter()
         .filter_map(|r| Some((s(r.get("rowId")?)?, r.get("t")?.as_i64()?)))
         .collect();
+    // Satır → TMDB kimliği: oynatıcıdaki ad Argus'takinden farklı dilde olsa da tanınsın
+    let tmdb_refs = read_json(&pdir.join("tmdb.json")).unwrap_or(Value::Null);
     let medya = dir.join("medya");
     let horizon = add_days(today, UPCOMING_DAYS);
     let since = add_days(today, -60);
@@ -649,6 +653,7 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
             recent: recent.get(&id).copied(),
             watch_dates,
             series,
+            tmdb: tmdb_refs.get(&id).and_then(|r| Some(format!("{}:{}", r.get("mediaType")?.as_str()?, r.get("id")?.as_u64()?))),
             id,
         });
     }
@@ -710,6 +715,7 @@ pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: Stri
             mtime(&pdir.join("watched.json")),
             mtime(&pdir.join("recent-watch.json")),
         );
+        let key = format!("{key}|{}", mtime(&pdir.join("tmdb.json")));
         // rows/ klasörünün kendisi dosya yazılınca her zaman değişmeyebilir — dosyaların en yenisi
         let rows_m = std::fs::read_dir(pdir.join("rows"))
             .map(|r| r.flatten().map(|e| mtime(&e.path())).max().unwrap_or(0))
@@ -902,6 +908,109 @@ pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32
         // Bir sonraki özet dosyalardan yeniden okunsun
         drop(server);
         Ok(MarkResult { completed, booted })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// TMDB'de bulunan içerik (Argus'ta olmayabilir)
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TmdbHit {
+    /// "movie:123" — Argus kayıtlarındaki `tmdb` ile aynı biçim
+    key: String,
+    tmdb_id: u64,
+    media_type: String,
+    /// Arama dilindeki ad
+    title: String,
+    /// Bilinen bütün adları (yerel, İngilizce, orijinal) — eşleştirme için
+    names: Vec<String>,
+    year: Option<String>,
+    poster: Option<String>,
+    popularity: f64,
+}
+
+/// Profilin TMDB anahtarı (Argus Ayarlar → API) — yalnızca okunur
+fn tmdb_key(dir: &Path, pid: &str) -> Option<String> {
+    let v = read_json(&dir.join("data").join("profiles").join(pid).join("api-key.json"))?;
+    s(v.get("tmdbApiKey")?).map(|k| k.trim().to_owned()).filter(|k| !k.is_empty())
+}
+
+/// Çalan şeyin adını TMDB'de arar (yerel dil + İngilizce, film ve dizi). Anahtar yoksa ya da çevrimdışıysa boş.
+#[tauri::command]
+pub async fn argus_tmdb_search(query: String, lang: String) -> Vec<TmdbHit> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(dir) = argus_dir() else { return Vec::new() };
+        let Some(pid) = CACHE.lock().unwrap().as_ref().map(|c| c.snap.profile_id.clone()) else { return Vec::new() };
+        let Some(key) = tmdb_key(&dir, &pid) else { return Vec::new() };
+        let mut hits: Vec<TmdbHit> = Vec::new();
+        for lang in [lang.as_str(), "en-US"] {
+            let res = ureq::get("https://api.themoviedb.org/3/search/multi")
+                .query("api_key", &key)
+                .query("query", &query)
+                .query("language", lang)
+                .timeout(Duration::from_secs(8))
+                .call()
+                .ok()
+                .and_then(|r| r.into_json::<Value>().ok());
+            for r in res.as_ref().and_then(|v| v.get("results")?.as_array()).into_iter().flatten().take(10) {
+                let Some(mt) = r.get("media_type").and_then(|v| v.as_str()).filter(|t| *t == "movie" || *t == "tv") else { continue };
+                let Some(id) = r.get("id").and_then(|v| v.as_u64()) else { continue };
+                let (name, orig, date) = if mt == "tv" { ("name", "original_name", "first_air_date") } else { ("title", "original_title", "release_date") };
+                let names: Vec<String> = [name, orig].iter().filter_map(|k| r.get(*k).and_then(s)).collect();
+                let key = format!("{mt}:{id}");
+                match hits.iter_mut().find(|h| h.key == key) {
+                    Some(h) => {
+                        for n in names {
+                            if !h.names.contains(&n) {
+                                h.names.push(n);
+                            }
+                        }
+                    }
+                    None => hits.push(TmdbHit {
+                        key,
+                        tmdb_id: id,
+                        media_type: mt.to_owned(),
+                        title: names.first().cloned().unwrap_or_default(),
+                        names,
+                        year: r.get(date).and_then(s).filter(|d| d.len() >= 4).map(|d| d[..4].to_owned()),
+                        poster: r.get("poster_path").and_then(s).map(|p| format!("https://image.tmdb.org/t/p/w185{p}")),
+                        popularity: r.get("popularity").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    }),
+                }
+            }
+        }
+        hits
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// TMDB'deki içeriği Argus'a ekler (Argus'un kendi "TMDB'den ekle"si — afiş, bölümler vb. Argus doldurur).
+/// Argus kapalıysa görünmez açar. Yeni kaydın kimliğini döner.
+#[tauri::command]
+pub async fn argus_tmdb_add(tmdb_id: u64, media_type: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = argus_dir().ok_or("Argus bulunamadı")?;
+        let (pid, board_id) = {
+            let c = CACHE.lock().unwrap();
+            let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
+            (c.snap.profile_id.clone(), c.snap.board_id.clone())
+        };
+        let server = Server::ensure(&dir)?;
+        let res = ureq::post(&format!("{API}/api/profiles/{pid}/tmdb-add/{board_id}"))
+            .timeout(Duration::from_secs(60))
+            .send_json(json!({ "tmdbId": tmdb_id, "mediaType": media_type, "status": "izlenecek" }));
+        drop(server);
+        match res {
+            Ok(r) => {
+                let v: Value = r.into_json().map_err(|e| e.to_string())?;
+                v.get("rowId").and_then(s).ok_or_else(|| "Argus cevap vermedi".into())
+            }
+            // Argus'un kendi hata mesajı ("zaten arşivinde var", "API anahtarı gir" …)
+            Err(ureq::Error::Status(_, r)) => Err(r.into_json::<Value>().ok().and_then(|v| v.get("error").and_then(s)).unwrap_or_else(|| "Argus'a eklenemedi".into())),
+            Err(e) => Err(e.to_string()),
+        }
     })
     .await
     .map_err(|e| e.to_string())?
