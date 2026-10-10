@@ -943,14 +943,116 @@ pub const CARD: &str = "argus-card";
 pub const CARD_W: f64 = 380.0;
 pub const CARD_H: f64 = 290.0;
 
+/// Kartın adadan taraf: kendi tarafına sığmazsa öbür tarafa geçer; iki kart aynı taraftaysa yan yana
+/// dizilir (Argus adaya yakın, ses kartı onun ötesinde). Kullanıcı "nook'u ekranın soluna/sağına
+/// taşıyınca Argus kartı ekrandan taşıyor, ses kartı da görünmüyor" dedi.
+/// Konumlar ada penceresine göre mantıksal px; kartın pencere içi boşlukları dahil genişlikler:
+const ARGUS_SPAN: f64 = 372.0;
+const SOUND_SPAN: f64 = SOUND_W;
+
+#[derive(Clone, Copy, Default)]
+struct CardSlot {
+    visible: bool,
+    /// Bu kartın sağdaki yerinin başı (adanın sağ kenarı + boşluk)
+    right_x: f64,
+    /// Soldaki yerin sonu (adanın sol kenarı − boşluk)
+    left_end: f64,
+    y: f64,
+    /// Son yerleştirildiği pencere x'i ve tarafı
+    x: f64,
+    right: bool,
+}
+
+/// 0: Argus kartı, 1: ses kartı
+static SLOTS: std::sync::Mutex<[CardSlot; 2]> = std::sync::Mutex::new([CardSlot { visible: false, right_x: 0.0, left_end: 0.0, y: 0.0, x: 0.0, right: false }; 2]);
+
+#[derive(Serialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct CardPlace {
+    /// Kart penceresinin x'i (ada penceresine göre, mantıksal)
+    x: f64,
+    /// Adanın sağında mı
+    right: bool,
+}
+
+/// Adanın ekranının sınırları, ada penceresine göre mantıksal px (sol, sağ)
+fn screen_span(window: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let (Ok(pos), Ok(scale), Ok(Some(mon))) = (window.outer_position(), window.scale_factor(), window.current_monitor()) else { return None };
+    let k = scale * crate::window::zoom();
+    let left = (mon.position().x - pos.x) as f64 / k;
+    let right = (mon.position().x + mon.size().width as i32 - pos.x) as f64 / k;
+    Some((left, right))
+}
+
+/// Görünür kartları yerleştirir: önce Argus (sağı sever), sonra ses (solu sever)
+fn layout(window: &tauri::WebviewWindow, slots: &mut [CardSlot; 2]) {
+    let (lo, hi) = screen_span(window).unwrap_or((f64::MIN, f64::MAX));
+    layout_in(lo, hi, slots);
+}
+
+/// `lo`, `hi`: ekranın solu ve sağı (ada penceresine göre)
+fn layout_in(lo: f64, hi: f64, slots: &mut [CardSlot; 2]) {
+    let Some(base) = slots.iter().find(|s| s.visible).copied() else { return };
+    let (mut rc, mut lc) = (base.right_x, base.left_end);
+    for (i, span, prefer_right) in [(0usize, ARGUS_SPAN, true), (1, SOUND_SPAN, false)] {
+        if !slots[i].visible {
+            continue;
+        }
+        let fits_r = rc + span <= hi + 1.0;
+        let fits_l = lc - span >= lo - 1.0;
+        let right = if prefer_right { fits_r || !fits_l } else { !fits_l && fits_r };
+        let x = if right {
+            let x = rc;
+            rc += span;
+            // Hiçbir yana sığmıyorsa en azından ekranın içinde kalsın
+            if !fits_r && !fits_l { x.min(hi - span) } else { x }
+        } else {
+            lc -= span;
+            if !fits_r && !fits_l { lc.max(lo) } else { lc }
+        };
+        slots[i].x = x;
+        slots[i].right = right;
+    }
+}
+
+/// Yerleşimi uygula; ses kartı yer değiştirdiyse sayfalara haber ver
+fn apply(window: &tauri::WebviewWindow, slots: &[CardSlot; 2], before: &[CardSlot; 2]) {
+    use tauri::Emitter;
+    for (i, label, w, h, interactive) in [(0usize, CARD, CARD_W, CARD_H, false), (1, SOUND, SOUND_W, SOUND_H, true)] {
+        let s = slots[i];
+        if !s.visible {
+            continue;
+        }
+        if let Err(e) = card_inner(window, label, w, h, interactive, true, s.x, s.y) {
+            crate::log::write("warn", &format!("{label}: {e}"));
+        }
+    }
+    let (s, b) = (slots[1], before[1]);
+    if s.visible && b.visible && (s.x != b.x || s.right != b.right) {
+        let app = window.app_handle();
+        let place = CardPlace { x: s.x, right: s.right };
+        let _ = app.emit_to(window.label(), "nook://sound-at", place);
+        if s.right != b.right {
+            let _ = app.emit_to(SOUND, "nook://sound-side", s.right);
+        }
+    }
+}
+
+fn update(window: &tauri::WebviewWindow, i: usize, show: bool, right_x: f64, left_end: f64, y: f64) -> CardPlace {
+    let mut slots = SLOTS.lock().unwrap();
+    let before = *slots;
+    slots[i] = CardSlot { visible: show, right_x, left_end, y, ..slots[i] };
+    layout(window, &mut slots);
+    apply(window, &slots, &before);
+    CardPlace { x: slots[i].x, right: slots[i].right }
+}
+
+/// İzlenen dizi/film kartı: adanın yanında ayrı, tıklanamaz küçük pencere.
+/// `x`: sağdaki yeri, `left_end`: soldaki yerin sonu (ada penceresine göre mantıksal).
 /// Pencere oluşturduğu için async olmalı: senkron komutta Windows'ta kilitlenir (wry#583).
 #[tauri::command]
-pub async fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64) -> Result<(), String> {
-    let r = card_inner(&window, CARD, CARD_W, CARD_H, false, show, x, y);
-    if let Err(e) = &r {
-        crate::log::write("warn", &format!("argus kartı: {e}"));
-    }
-    r
+pub async fn argus_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64, left_end: f64) -> Result<CardPlace, String> {
+    Ok(update(&window, 0, show, x, left_end, y))
 }
 
 /// Adanın solundaki ses kartı: Argus kartı gibi ayrı pencere ama tıklanabilir — tracker kendi
@@ -959,64 +1061,21 @@ pub const SOUND: &str = "sound-card";
 pub const SOUND_W: f64 = 300.0;
 pub const SOUND_H: f64 = 300.0;
 
-/// Ses kartının son yeri (adaya göre): sol konum, sağ konum, üst; görünür mü, sağda mı
-#[derive(Clone, Copy)]
-struct SoundAt {
-    x: f64,
-    alt_x: f64,
-    y: f64,
-    visible: bool,
-    right: bool,
-}
-static SOUND_AT: std::sync::Mutex<Option<SoundAt>> = std::sync::Mutex::new(None);
-
-/// Ses kartını adanın soluna koyar; ekranın solunda yer yoksa (ada sola taşındıysa) sağına.
-/// `alt_x`: sağdaki konum. Kart sağdaysa true döner.
+/// Ses kartı: `x` soldaki pencere yeri, `alt_x` sağdaki. Nereye konduğunu döner.
 #[tauri::command]
-pub async fn side_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64, alt_x: f64) -> Result<bool, String> {
-    if !show {
-        if let Some(s) = SOUND_AT.lock().unwrap().as_mut() {
-            s.visible = false;
-        }
-        return Ok(false);
-    }
-    let right = sound_side(&window, x, alt_x);
-    let r = card_inner(&window, SOUND, SOUND_W, SOUND_H, true, true, if right { alt_x } else { x }, y);
-    if let Err(e) = &r {
-        crate::log::write("warn", &format!("ses kartı: {e}"));
-    }
-    *SOUND_AT.lock().unwrap() = Some(SoundAt { x, alt_x, y, visible: true, right });
-    r.map(|_| right)
+pub async fn side_card(window: tauri::WebviewWindow, show: bool, x: f64, y: f64, alt_x: f64) -> Result<CardPlace, String> {
+    Ok(update(&window, 1, show, alt_x, x + SOUND_W, y))
 }
 
-/// Sol konumda kart ekranın (adanın ekranının) dışına taşıyorsa sağ taraf
-fn sound_side(window: &tauri::WebviewWindow, x: f64, alt_x: f64) -> bool {
-    let (Ok(pos), Ok(scale), Ok(Some(mon))) = (window.outer_position(), window.scale_factor(), window.current_monitor()) else { return false };
-    let k = scale * crate::window::zoom();
-    let left = pos.x as f64 + x * k;
-    let fits_left = left >= mon.position().x as f64 - 1.0;
-    let right_edge = pos.x as f64 + (alt_x + SOUND_W) * k;
-    let fits_right = right_edge <= (mon.position().x + mon.size().width as i32) as f64 + 1.0;
-    !fits_left && fits_right
-}
-
-/// Ada taşınırken (sürükleme) görünür ses kartı onunla birlikte gider; taraf değişirse sayfalara haber verir
+/// Ada taşınırken (sürükleme) görünür kartlar onunla birlikte gider
 pub fn follow_sound(window: &tauri::WebviewWindow) {
-    let Some(at) = *SOUND_AT.lock().unwrap() else { return };
-    if !at.visible {
+    let mut slots = SLOTS.lock().unwrap();
+    if !slots.iter().any(|s| s.visible) {
         return;
     }
-    let right = sound_side(window, at.x, at.alt_x);
-    let _ = card_inner(window, SOUND, SOUND_W, SOUND_H, true, true, if right { at.alt_x } else { at.x }, at.y);
-    if right != at.right {
-        if let Some(s) = SOUND_AT.lock().unwrap().as_mut() {
-            s.right = right;
-        }
-        use tauri::Emitter;
-        let app = window.app_handle();
-        let _ = app.emit_to(window.label(), "nook://sound-side", right);
-        let _ = app.emit_to(SOUND, "nook://sound-side", right);
-    }
+    let before = *slots;
+    layout(window, &mut slots);
+    apply(window, &slots, &before);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1063,4 +1122,41 @@ fn card_inner(window: &tauri::WebviewWindow, label: &str, w: f64, h: f64, intera
     };
     card.set_position(at).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod card_tests {
+    use super::*;
+
+    /// Ada penceresi 600 px, ada 520 px (ekranın neresinde olduğu `lo`/`hi` ile)
+    fn run(lo: f64, hi: f64, argus: bool, sound: bool) -> [CardSlot; 2] {
+        let s = CardSlot { right_x: 570.0, left_end: 30.0, ..Default::default() };
+        let mut slots = [CardSlot { visible: argus, ..s }, CardSlot { visible: sound, ..s }];
+        layout_in(lo, hi, &mut slots);
+        slots
+    }
+
+    #[test]
+    fn middle_sides() {
+        let s = run(-1000.0, 1600.0, true, true);
+        assert!(s[0].right && s[0].x == 570.0);
+        assert!(!s[1].right && s[1].x == 30.0 - SOUND_SPAN);
+    }
+
+    #[test]
+    fn far_left_sound_beyond_argus() {
+        let s = run(0.0, 1900.0, true, true);
+        assert!(s[0].right && s[0].x == 570.0);
+        assert!(s[1].right && s[1].x == 570.0 + ARGUS_SPAN);
+        // Argus yoksa ses kartı adanın hemen sağında
+        let s = run(0.0, 1900.0, false, true);
+        assert!(s[1].right && s[1].x == 570.0);
+    }
+
+    #[test]
+    fn far_right_argus_goes_left() {
+        let s = run(-1300.0, 600.0, true, true);
+        assert!(!s[0].right && s[0].x == 30.0 - ARGUS_SPAN);
+        assert!(!s[1].right && s[1].x == 30.0 - ARGUS_SPAN - SOUND_SPAN);
+    }
 }

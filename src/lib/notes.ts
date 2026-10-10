@@ -74,6 +74,10 @@ export type DemoId =
   | "tray"
   | "trayopen"
   | "humwatch"
+  | "humcopy"
+  | "nooknotifs"
+  | "whitebg"
+  | "cardsides"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -98,6 +102,33 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.52",
+    date: tt("10 Ekim 2026"),
+    headline: tt("Nook'un bildirim geçmişi, kenarda kartlar yerinde"),
+    items: [
+      {
+        title: tt("Bildirimlerde Nook'un geçmişi"),
+        text: tt("Bildirimler çipinde Windows ve Nook sekmeleri var. Nook sekmesinde adada çıkan kartların geçmişi duruyor: işaretlenen bölümler, bulunan şarkılar, takılan USB'ler, uyarılar… 1 saat sessizdeyken gösterilmeyenler de buraya yazılır."),
+        demo: "nooknotifs",
+      },
+      {
+        title: tt("Kenardaki adada kartlar yerinde"),
+        text: tt("Ada ekranın sağına taşınınca Argus kartı ekrandan taşıyordu; sola taşınınca ses kartı Argus kartının altında kalıp görünmüyordu. Artık kart kendi tarafına sığmazsa öbür tarafa geçiyor, iki kart aynı taraftaysa yan yana diziliyor."),
+        demo: "cardsides",
+      },
+      {
+        title: tt("Hum'da kopyalayınca belli oluyor"),
+        text: tt("Hum geçmişinde bir şarkıyı kopyalayınca satır yeşil parlıyor, yanında \"Kopyalandı\" yazıyor ve simge tike dönüyor."),
+        demo: "humcopy",
+      },
+      {
+        title: tt("Dönüşte ada beyazlaşmıyor"),
+        text: tt("Nook bir pencereye tünedikten ya da balık tuttuktan sonra adanın arkası beyaz kalabiliyordu. Artık Nook döndüğünde ve ekran uykudan uyanınca ada yeniden siyah, arkası şeffaf oluyor."),
+        demo: "whitebg",
+      },
+    ],
+  },
   {
     version: "0.2.51",
     date: tt("10 Ekim 2026"),

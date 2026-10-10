@@ -41,7 +41,7 @@ import { tt } from "../../lib/i18n";
 import { ACCENT, MiniNook, tintText } from "../ui/primitives";
 import { CLAUDE_COLOR } from "../../lib/claude";
 
-const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
+export const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = {
   sensitive: { icon: LockKeyhole, color: ACCENT.yellow },
   charging: { icon: BatteryCharging, color: ACCENT.green },
   unplugged: { icon: PlugZap, color: ACCENT.orange },

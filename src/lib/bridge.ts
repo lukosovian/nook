@@ -388,7 +388,12 @@ export const argusMark = (rowId: string, today: string, season?: number, episode
 export const argusAddSong = (rowId: string, season: number | null, episode: number | null, atMs: number | null, approx: boolean, track: import("./hum").HumTrack) =>
   invoke<{ duplicate: boolean }>("argus_add_song", { rowId, season, episode, atMs, approx, track });
 /** Adanın sağındaki izleme kartı penceresi (x, y: bu pencereye göre mantıksal konum) */
-export const argusCard = (show: boolean, x: number, y: number) => invoke<void>("argus_card", { show, x, y });
+/** Yan kartın konduğu yer (ada penceresine göre): Rust, kart kendi yanına sığmazsa öbür yana koyar */
+export interface CardPlace {
+  x: number;
+  right: boolean;
+}
+export const argusCard = (show: boolean, x: number, y: number, leftEnd: number) => invoke<CardPlace>("argus_card", { show, x, y, leftEnd });
 export const argusInstall = () => invoke<void>("argus_install");
 export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
 /** Tanıtım ekranı için pencereyi büyüt; argümansız çağrı varsayılan boyuta döndürür. */
@@ -460,9 +465,11 @@ export const shieldOn = (ask: boolean) => (inTauri ? invoke<void>("shield_on", {
 /** Bilgisayar ne kadar süredir açık (sn) */
 export const systemUptime = () => (inTauri ? invoke<number>("system_uptime") : Promise.resolve(99_999));
 /** Adanın solundaki ses kartı penceresi (x, y: bu pencereye göre mantıksal konum) */
-export const sideCard = (show: boolean, x: number, y: number, altX: number) => invoke<boolean>("side_card", { show, x, y, altX });
+export const sideCard = (show: boolean, x: number, y: number, altX: number) => invoke<CardPlace>("side_card", { show, x, y, altX });
 /** Öndeki pencerenin başlık çubuğuna tün (uygun pencere yoksa false) */
 export const perchStart = () => (inTauri ? invoke<boolean>("perch_start") : Promise.resolve(false));
+/** Adanın zemini beyaza döndüyse yeniden şeffaflaştır */
+export const clearBackground = () => (inTauri ? invoke<void>("clear_background") : Promise.resolve());
 export const perchStop = () => (inTauri ? invoke<void>("perch_stop") : Promise.resolve());
 /** Odak bekçisi uyarıyor: tam ekranda da ada görünsün */
 export const guardAlert = (on: boolean) => (inTauri ? invoke<void>("guard_alert", { on }) : Promise.resolve());

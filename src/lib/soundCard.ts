@@ -1,13 +1,14 @@
 /**
  * Adanın solundaki ses kartı: Argus kartı gibi ayrı bir pencere (adanın içinde yer yok) ama
  * tıklanabilir. Ada açıkken görünür; üst çubuktaki hoparlörle ya da Ayarlar › Davranış'tan kapatılır.
- * Ada sürüklenince kart da gelir (Rust); ekranın solunda yer kalmazsa adanın sağına geçer.
+ * Ada sürüklenince kart da gelir (Rust); ekranın solunda yer kalmazsa adanın sağına geçer (Argus kartı
+ * da oradaysa onun ötesine).
  */
 import { useEffect, useState } from "react";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { setHitExtra } from "../hooks/useHitRect";
 import { useNook } from "../store/nook";
-import { inTauri, isPrimary, sideCard, subscribe } from "./bridge";
+import { inTauri, isPrimary, sideCard, subscribe, type CardPlace } from "./bridge";
 import { ISLAND, ISLAND_TOP, type IslandMode } from "./layout";
 
 const GAP = 10;
@@ -24,6 +25,18 @@ export interface SoundCardData {
   right?: boolean;
 }
 
+/**
+ * Kart ile ada arasındaki alan dahil tıklama alanı (imleç karta geçerken ada kapanmasın).
+ * `a`, `b`: kartın görünen kısmının solu ve sağı (ada penceresine göre).
+ */
+export function cardHit(a: number, b: number, height: number) {
+  const islandL = window.innerWidth / 2 - ISLAND.expanded.width / 2;
+  const islandR = window.innerWidth / 2 + ISLAND.expanded.width / 2;
+  return a >= islandR - 1
+    ? { x: islandR - 4, y: ISLAND_TOP, width: b + 6 - (islandR - 4), height: height + 6 }
+    : { x: a - 6, y: ISLAND_TOP, width: islandL + 4 - (a - 6), height: height + 6 };
+}
+
 let last: SoundCardData = { visible: false, detached: false };
 const send = (d: SoundCardData) => {
   last = d;
@@ -37,10 +50,12 @@ export function useSoundCard(mode: IslandMode) {
   const big = useNook((s) => !!s.big);
   const detached = useNook((s) => (s.settings.islandPos?.fy ?? 0) > 0);
   const show = isPrimary && inTauri && on && mode === "expanded" && !fullscreen && !big;
-  const [right, setRight] = useState(false);
+  const [place, setPlace] = useState<CardPlace | null>(null);
+  const right = !!place?.right;
 
-  // Ada sürüklenirken taraf değişirse (Rust kartı taşır, burası tıklama alanını ve köşeleri günceller)
-  useEffect(() => (isPrimary && inTauri ? subscribe<boolean>("nook://sound-side", setRight) : undefined), []);
+  // Ada sürüklenince ya da Argus kartı gelip gidince kart yer değiştirirse (Rust taşır, burası tıklama
+  // alanını ve köşeleri günceller)
+  useEffect(() => (isPrimary && inTauri ? subscribe<CardPlace>("nook://sound-at", setPlace) : undefined), []);
 
   const left = window.innerWidth / 2 - ISLAND.expanded.width / 2 - GAP - WINDOW_W;
   const alt = window.innerWidth / 2 + ISLAND.expanded.width / 2 + GAP;
@@ -52,19 +67,20 @@ export function useSoundCard(mode: IslandMode) {
       return;
     }
     void sideCard(true, left, ISLAND_TOP, alt)
-      .then((r) => {
-        setRight(r);
-        return send({ visible: true, detached, right: r });
+      .then((p) => {
+        setPlace(p);
+        return send({ visible: true, detached, right: p.right });
       })
       .catch((e) => console.warn("[nook] ses kartı", e));
   }, [show, detached]);
 
   // İmleç karta (ve aradaki boşluğa) geçince ada kapanmasın
   useEffect(() => {
-    if (!show) return;
+    if (!show || !place) return;
     if (last.visible && last.right !== right) void send({ ...last, right });
-    const x = right ? alt - GAP - 4 : left + WINDOW_W - 6 - SOUND_SIZE.width - 6;
-    setHitExtra("sound", { x, y: ISLAND_TOP, width: SOUND_SIZE.width + 12 + GAP + 4, height: SOUND_SIZE.height + 6 });
+    // Sağdaysa kart penceresinin solunda, soldaysa sağında 6 px boşluk
+    const a = right ? place.x + 6 : place.x + WINDOW_W - 6 - SOUND_SIZE.width;
+    setHitExtra("sound", cardHit(a, a + SOUND_SIZE.width, SOUND_SIZE.height));
     return () => setHitExtra("sound", null);
-  }, [show, right]);
+  }, [show, place, right]);
 }

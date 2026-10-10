@@ -373,6 +373,16 @@ pub fn clear_background(win: &WebviewWindow) {
     let _ = win;
 }
 
+/// Bütün ada pencerelerinin zeminini yeniden şeffaflaştır. Başka bir WebView penceresi (tünek)
+/// açılıp kapanınca ya da ekran uykudan dönünce WebView2 adanın arkasını beyaza boyayabiliyordu.
+pub fn clear_islands(app: &AppHandle) {
+    for (label, win) in app.webview_windows() {
+        if label.starts_with(ISLAND) {
+            clear_background(&win);
+        }
+    }
+}
+
 /// Ada üst kenara bu kadar (mantıksal px) yakın bırakılırsa üste yapışır
 const SNAP_TOP: f64 = 28.0;
 

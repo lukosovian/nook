@@ -16,6 +16,7 @@ import { emitTo, listen } from "@tauri-apps/api/event";
 import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, inTauri, isPrimary } from "./bridge";
 import type { IslandMode } from "./layout";
 import { ISLAND, ISLAND_TOP } from "./layout";
+import { cardHit } from "./soundCard";
 import { dayKey, useNook } from "../store/nook";
 import { locale } from "./i18n";
 import { tt } from "./i18n";
@@ -584,17 +585,25 @@ export function useArgusCard(mode: IslandMode) {
         playedMs: live.playedMs,
         needMs: live.needMs,
       };
+      // Sağda yer yoksa (ada ekranın sağına taşındıysa) Rust kartı adanın soluna koyar
       const x = window.innerWidth / 2 + ISLAND.expanded.width / 2 + CARD_GAP;
-      void argusCard(true, x, ISLAND_TOP)
-        .then(() => sendCard(data))
+      const leftEnd = window.innerWidth / 2 - ISLAND.expanded.width / 2 - CARD_GAP;
+      let alive = true;
+      void argusCard(true, x, ISLAND_TOP, leftEnd)
+        .then((p) => {
+          // İmleç karta (ve aradaki boşluğa) geçince ada kapanmasın
+          if (alive) setHitExtra("argus", cardHit(p.x + 6, p.x + 6 + CARD_SIZE.width, CARD_SIZE.height));
+          return sendCard(data);
+        })
         .catch((e) => console.warn("[nook] argus kartı", e));
-      // İmleç karta (ve aradaki boşluğa) geçince ada kapanmasın
-      setHitExtra("argus", { x: x - CARD_GAP - 4, y: ISLAND_TOP, width: CARD_GAP + 4 + 6 + CARD_SIZE.width + 6, height: CARD_SIZE.height + 6 });
-      return () => setHitExtra("argus", null);
+      return () => {
+        alive = false;
+        setHitExtra("argus", null);
+      };
     }
     // Önce kart kendi çıkış animasyonunu oynasın, sonra pencere gizlensin
     void sendCard({ visible: false });
-    const t = window.setTimeout(() => void argusCard(false, 0, 0).catch(() => {}), 260);
+    const t = window.setTimeout(() => void argusCard(false, 0, 0, 0).catch(() => {}), 260);
     return () => window.clearTimeout(t);
   }, [show, live, snap]);
 }

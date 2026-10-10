@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { EVENTS, guardAlert, isPrimary, subscribe, type ForegroundPayload } from "../lib/bridge";
+import { clearBackground, EVENTS, guardAlert, isPrimary, subscribe, type ForegroundPayload } from "../lib/bridge";
 import { matchSite } from "../lib/guard";
 import { canGoOut, endPerch, haul, haulText, perchReturned, startOuting, tryPerch } from "../lib/outings";
 import { isSleeping, isWorking, useNook } from "../store/nook";
@@ -68,6 +68,19 @@ export function useOutings() {
       }
     });
 
+    // Dışarı çıkış bitince adanın zemini yenilenir: tünek penceresi kapanırken ya da boştayken ekran
+    // uyuyup uyanınca WebView2 adanın arkasını beyaza boyayabiliyordu
+    const unsubBg = useNook.subscribe((st, prev) => {
+      if (prev.outing && !st.outing) {
+        void clearBackground().catch(() => {});
+        window.setTimeout(() => void clearBackground().catch(() => {}), 900);
+      }
+    });
+    const onWake = () => {
+      if (document.visibilityState === "visible") void clearBackground().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onWake);
+
     // Ada başka bir hâle geçince (açıldı, kart geldi, Pomodoro başladı) Nook hemen döner
     const unsub = useNook.subscribe((st) => {
       if (!st.outing) return;
@@ -83,6 +96,8 @@ export function useOutings() {
       offLow();
       offIdle();
       unsub();
+      unsubBg();
+      document.removeEventListener("visibilitychange", onWake);
     };
   }, []);
 }

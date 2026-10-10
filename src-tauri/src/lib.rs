@@ -87,6 +87,7 @@ pub fn run() {
             commands::apply_settings,
             commands::list_monitors,
             commands::set_window_size,
+            commands::clear_background,
             commands::island_drag,
             clipboard::clipboard_clear_if,
             clipboard::clipboard_clear,

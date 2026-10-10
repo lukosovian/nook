@@ -155,6 +155,26 @@ export interface NotifItem extends NotificationPayload {
   at: number;
 }
 
+/** Nook'un kendi bildirimi (ada kartı) — Bildirimler › Nook'ta geçmişi */
+export interface NookNotif {
+  id: string;
+  kind: SysEventKind;
+  title: string;
+  detail: string;
+  icon?: string | null;
+  at: number;
+}
+
+const MAX_NOOK_NOTIFS = 150;
+/** Windows bildirimleri zaten kendi listesinde; büyük gömülü simgeler kaydedilmez */
+const logToast = (log: NookNotif[], e: SysEvent & { icon?: string | null }): NookNotif[] =>
+  e.kind === "notify"
+    ? log
+    : [
+        { id: crypto.randomUUID(), kind: e.kind, title: e.title, detail: e.detail, icon: e.icon && e.icon.length < 4000 ? e.icon : null, at: Date.now() },
+        ...log,
+      ].slice(0, MAX_NOOK_NOTIFS);
+
 export interface PinnedApp {
   id: string;
   name: string;
@@ -630,6 +650,8 @@ interface NookState {
   talking: boolean;
   focus: FocusState | null;
   notifications: NotifItem[];
+  /** Nook'un kendi bildirimlerinin geçmişi (en yeni başta) */
+  nookNotifs: NookNotif[];
   pinnedApps: PinnedApp[];
   /** Gün gün istatistik (son 30 gün) */
   days: Record<string, DayStats>;
@@ -764,6 +786,7 @@ interface NookState {
   setFocus: (f: FocusState | null) => void;
   pushNotification: (n: NotificationPayload) => void;
   clearNotifications: () => void;
+  clearNookNotifs: () => void;
   pinApp: (a: Omit<PinnedApp, "id">) => void;
   unpinApp: (id: string) => void;
   /** Bugünün istatistiğine ekle */
@@ -846,6 +869,7 @@ export const useNook = create<NookState>()(
       talking: false,
       focus: null,
       notifications: [],
+      nookNotifs: [],
       pinnedApps: [],
       days: {},
       scores: {},
@@ -1008,8 +1032,12 @@ export const useNook = create<NookState>()(
         })),
       setDevices: (devices) => set({ devices }),
       setOsd: (osd) => set({ osd }),
+      // Sessizdeyken gösterilmeyen kartlar da geçmişe yazılır (sonradan bakılabilsin)
       pushToast: (event) =>
-        set((s) => (isQuiet(s) && !QUIET_ALLOWED.has(event.kind) ? {} : { toasts: [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) })),
+        set((s) => ({
+          nookNotifs: logToast(s.nookNotifs, event),
+          ...(isQuiet(s) && !QUIET_ALLOWED.has(event.kind) ? {} : { toasts: [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) }),
+        })),
       shiftToast: () => set((s) => ({ toasts: s.toasts.slice(1) })),
 
       updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
@@ -1091,6 +1119,7 @@ export const useNook = create<NookState>()(
       pushNotification: (n) =>
         set((s) => ({ notifications: [{ ...n, at: Date.now() }, ...s.notifications.filter((x) => x.id !== n.id)].slice(0, MAX_NOTIFS) })),
       clearNotifications: () => set({ notifications: [] }),
+      clearNookNotifs: () => set({ nookNotifs: [] }),
       pinApp: (a) =>
         set((s) => (s.pinnedApps.some((p) => p.path === a.path) ? {} : { pinnedApps: [...s.pinnedApps, { ...a, id: crypto.randomUUID() }].slice(0, 12) })),
       unpinApp: (id) => set((s) => ({ pinnedApps: s.pinnedApps.filter((p) => p.id !== id) })),
@@ -1192,6 +1221,7 @@ export const useNook = create<NookState>()(
         chat: s.chat.map(({ image: _image, ...m }) => m),
         focus: s.focus,
         notifications: s.notifications,
+        nookNotifs: s.nookNotifs,
         pinnedApps: s.pinnedApps,
         days: s.days,
         scores: s.scores,

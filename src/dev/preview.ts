@@ -300,6 +300,17 @@ export function applyPreview(mode: string) {
   } else if (mode === "tour") {
     useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
   } else if (TABS.includes(mode as Tab)) {
+    if (mode === "notify" && !useNook.getState().nookNotifs.length) {
+      const at = Date.now();
+      useNook.setState({
+        nookNotifs: [
+          { id: "n1", kind: "argus", title: "Bölüm işaretlendi", detail: "Lanterns S1B8", at: at - 2 * 60_000 },
+          { id: "n2", kind: "argus", title: "Africa · Toto", detail: "Lanterns S1B2 · 18:40 · Argus'a eklendi", icon: ART, at: at - 14 * 60_000 },
+          { id: "n3", kind: "usb-in", title: "USB takıldı", detail: "SanDisk 64 GB", at: at - 70 * 60_000 },
+          { id: "n4", kind: "battery-low", title: "Pil azaldı", detail: "%15 kaldı", at: at - 5 * 3_600_000 },
+        ],
+      });
+    }
     if (mode === "hum" && !useNook.getState().hums.length) {
       const at = Date.now();
       useNook.setState({

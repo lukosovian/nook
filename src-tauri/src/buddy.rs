@@ -161,6 +161,7 @@ pub async fn perch_start(app: AppHandle, shared: State<'_, Arc<Shared>>) -> Resu
         let _ = win.set_ignore_cursor_events(true);
         window::clear_background(&win);
         window::apply_zoom(&win);
+        window::clear_islands(&app);
     }
     let frac = 0.3 + rand_unit() * 0.35;
     *STATE.lock().unwrap() =
@@ -176,6 +177,18 @@ pub fn perch_stop(app: AppHandle) {
     if let Some(w) = app.get_webview_window(PERCH) {
         let _ = w.close();
     }
+    clear_after_close(&app);
+}
+
+/// Tünek penceresi kapandıktan biraz sonra adanın zeminini yenile (kapanış beyaz bırakabiliyor)
+fn clear_after_close(app: &AppHandle) {
+    let app = app.clone();
+    thread::spawn(move || {
+        for ms in [150, 800] {
+            thread::sleep(Duration::from_millis(ms));
+            window::clear_islands(&app);
+        }
+    });
 }
 
 /// Uygun pencere kalmadı: Nook adaya döner. Tünekteki Nook "zıplar", ada kendi Nook'unu geri getirir.
@@ -191,6 +204,7 @@ pub(crate) fn leave(app: &AppHandle) {
                 let _ = w.close();
             }
         }
+        clear_after_close(&app);
     });
 }
 

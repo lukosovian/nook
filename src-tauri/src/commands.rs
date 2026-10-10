@@ -73,6 +73,12 @@ pub fn set_window_size(window: WebviewWindow, width: Option<f64>, height: Option
     Ok(())
 }
 
+/// Adanın zemini beyaza döndüyse düzelt (dışarı çıkış bitince, uykudan/boşta kalmadan dönünce)
+#[tauri::command]
+pub fn clear_background(app: AppHandle) {
+    window::clear_islands(&app);
+}
+
 #[tauri::command]
 pub fn list_monitors(app: AppHandle) -> Vec<MonitorInfo> {
     window::list_monitors(&app)
