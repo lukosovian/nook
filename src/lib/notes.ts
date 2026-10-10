@@ -80,6 +80,8 @@ export type DemoId =
   | "cardsides"
   | "ontop"
   | "argusnew"
+  | "argusyear"
+  | "argusnokey"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -104,6 +106,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.54",
+    date: tt("10 Ekim 2026"),
+    headline: tt("Listende olmayan film yanlış kayıtla karışmıyor"),
+    items: [
+      {
+        title: tt("Benzeyen ad artık yanlış kayıt sayılmıyor"),
+        text: tt("İzlediğin film listende yoksa ve adı listedeki başka bir kayda benziyorsa (Avatar Aang izlerken Avatar 1 gibi) Nook artık o kaydı göstermiyor. Önce TMDB'de doğrusunu arıyor; bulamazsa hiçbir şey göstermiyor. Başlıkta yıl yazıyorsa (\"… (2026)\") aynı adlı eski film ya da dizi yerine o yılın içeriği seçiliyor."),
+        demo: "argusyear",
+      },
+      {
+        title: tt("TMDB anahtarı yoksa söylüyor"),
+        text: tt("Listende olmayanı tanımak için Argus'ta TMDB API anahtarı gerekiyor. Anahtar girilmemişse ve uzun bir şey izliyorsan Nook günde bir kez \"İzlediğini tanıyamadım\" diyor ve anahtarın nereye girileceğini gösteriyor (Argus › Ayarlar › Veritabanı › API)."),
+        demo: "argusnokey",
+      },
+    ],
+  },
   {
     version: "0.2.53",
     date: tt("10 Ekim 2026"),

@@ -3,7 +3,8 @@
  * çakışma uyarısı, parolayı Windows Hello ile açma, çeviri izni, anlaşılır hata mesajları, tanıtımda
  * klavye, Pro kotası dolunca Flash'a geçiş ve küçük düzeltmeler; 0.2.51'de tepsiden "Adayı aç" ve
  * izlerken Hum (dizinin/filmin müzikleri dakikasıyla Argus'a); 0.2.53'te klasörlerin altında kalmayan
- * ada ve kartlar, Argus'ta olmayanı tanıyıp eklemeyi önerme.
+ * ada ve kartlar, Argus'ta olmayanı tanıyıp eklemeyi önerme; 0.2.54'te başlıktaki yılla doğru içerik ve
+ * TMDB anahtarı yoksa uyarı.
  * Hepsi kendi kendine döner.
  */
 import { useEffect, useState } from "react";
@@ -26,6 +27,7 @@ import {
   Music2,
   Folder,
   Globe,
+  KeyRound,
   Plus,
   X,
   TriangleAlert,
@@ -1042,7 +1044,107 @@ function ArgusNewDemo() {
   );
 }
 
+/** Başlıktaki yıl doğru içeriği seçtirir; adı yalnızca benzeyen kayıt artık gösterilmez */
+function ArgusYearDemo() {
+  const n = useTick(1100);
+  const phase = n % 5; // 0 başlık · 1 yıl parlar · 2+ adaylar ve seçim
+  const O = ACCENT.orange;
+  const cands = [
+    { t: "Avatar 1", y: "2009", ok: false, c: "linear-gradient(160deg, #1b6fa8, #0c2c48)" },
+    { t: "Avatar: Son Havabükücü", y: "2005", ok: false, c: "linear-gradient(160deg, #c9772f, #5a3a1c)" },
+    { t: "Avatar Aang", y: "2026", ok: true, c: "linear-gradient(160deg, #e0a050, #3a6d8f)" },
+  ];
+  return (
+    <Stage>
+      <div className="absolute left-4 right-[60px] top-3 flex h-6 items-center gap-1 rounded-[8px] border border-white/10 bg-white/[0.05] px-2 text-[8.5px] text-label-2">
+        <Globe size={9} />
+        <span className="truncate">Avatar Aang: Son Havabükücü Film izle</span>
+        <motion.span
+          className="rounded-[4px] px-1 font-semibold tabular-nums"
+          animate={{ background: phase >= 1 ? tintBg(O, 30) : "rgba(0,0,0,0)", color: phase >= 1 ? tintText(O) : "var(--color-label-2)" }}
+        >
+          (2026)
+        </motion.span>
+      </div>
+      <div className="absolute inset-x-4 top-[38px] flex flex-col gap-[3px]">
+        {cands.map((c, i) => {
+          const shown = phase >= 2;
+          const picked = phase >= 3 && c.ok;
+          const dim = phase >= 3 && !c.ok;
+          return (
+            <motion.div
+              key={c.t}
+              className="flex items-center gap-2 rounded-[9px] border px-2 py-[3px]"
+              animate={{
+                opacity: shown ? (dim ? 0.35 : 1) : 0,
+                y: shown ? 0 : 6,
+                borderColor: picked ? tintBg(O, 50) : "rgba(255,255,255,0.06)",
+                background: picked ? tintBg(O, 14) : "rgba(255,255,255,0.03)",
+              }}
+              transition={{ delay: shown && phase === 2 ? i * 0.1 : 0 }}
+            >
+              <span className="h-[18px] w-[13px] shrink-0 rounded-[3px]" style={{ background: c.c }} />
+              <span className={`min-w-0 flex-1 truncate text-[9px] font-medium ${dim ? "line-through" : ""}`} style={{ color: picked ? tintText(O) : "var(--color-label-2)" }}>
+                {c.t}
+              </span>
+              <span className="text-[8px] tabular-nums" style={{ color: c.ok && phase >= 1 ? tintText(O) : "var(--color-label-3)" }}>
+                {c.y}
+              </span>
+              {picked && <Check size={10} strokeWidth={3} color={tintText(O)} />}
+            </motion.div>
+          );
+        })}
+      </div>
+    </Stage>
+  );
+}
+
+/** Argus'ta TMDB anahtarı yoksa tanıyamadığını ve nereye gireceğini söyler */
+function ArgusNoKeyDemo() {
+  const face = useFace();
+  const n = useTick(1200);
+  const phase = n % 5; // 0-1 izleniyor · 2-4 uyarı
+  const O = ACCENT.orange;
+  return (
+    <Stage>
+      <div className="absolute inset-x-4 top-3 h-[52px] overflow-hidden rounded-[8px] border border-white/10 bg-[#141924]">
+        <div className="flex h-3.5 items-center gap-1 bg-white/10 px-1.5 text-[7px] text-label-2">
+          <Globe size={7} />
+          {tt("Yeni bir film izle (2026)")}
+        </div>
+        <div className="flex h-[36px] items-center justify-center" style={{ background: "linear-gradient(120deg, #3b2a5c, #6d3a8f 55%, #e05080)" }}>
+          <span className="h-0 w-0 border-y-[6px] border-l-[10px] border-y-transparent border-l-white/80" />
+        </div>
+      </div>
+      <AnimatePresence>
+        {phase >= 2 && (
+          <motion.div
+            className="absolute inset-x-4 bottom-3 flex items-center gap-2 rounded-[12px] border px-2 py-1.5"
+            style={{ background: "#0c0d12", borderColor: tintBg(O, 30) }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <NookFigure look={face.look} color={face.color} size={20} expression="surprised" />
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[9.5px] font-medium" style={{ color: tintText(O) }}>
+                {tt("İzlediğini tanıyamadım")}
+              </p>
+              <p className="flex items-center gap-1 truncate text-[8px] text-label-3">
+                <KeyRound size={8} />
+                {tt("Argus › Ayarlar › API › TMDB anahtarı")}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Stage>
+  );
+}
+
 export const DEMOS5 = {
+  argusyear: ArgusYearDemo,
+  argusnokey: ArgusNoKeyDemo,
   ontop: OnTopDemo,
   argusnew: ArgusNewDemo,
   humcopy: HumCopyDemo,

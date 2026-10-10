@@ -329,9 +329,14 @@ const SAME = 0.6;
 const FRESH_SAME = 0.75;
 /** Müzik uygulamaları TMDB'de aranmaz */
 const MUSIC_APPS = /spotify|music|itunes|deezer|tidal|foobar|winamp|aimp|musicbee|soundcloud/i;
-const tmdbCache = new Map<string, Promise<ArgusFresh[]>>();
+/** Sorgu → TMDB sonuçları; null: Argus'ta TMDB anahtarı yok */
+const tmdbCache = new Map<string, Promise<ArgusFresh[] | null>>();
 
-export type MediaMatch = { sug: ArgusSuggestion | null; fresh: ArgusFresh | null };
+/** `nokey`: tanınamadı çünkü Argus'ta TMDB anahtarı yok */
+export type MediaMatch = { sug: ArgusSuggestion | null; fresh: ArgusFresh | null; nokey?: boolean };
+
+/** Başlıktaki yıl ("… (2026)", "… 2026") */
+const yearOf = (text: string) => /\b(19[3-9]\d|20\d\d)\b/.exec(text)?.[1] ?? null;
 
 /**
  * Çalan şeyi tanır. Argus'taki ad başlıkla iyi tutuyorsa doğrudan o; tutmuyorsa (ya da hiç yoksa)
@@ -344,9 +349,13 @@ export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: s
   let segs = segments(title);
   // Başlık yalnızca "Bölüm 3" gibiyse dizinin adı sanatçı alanındadır
   if (!segs.length) segs = segments(artist);
-  const weak: MediaMatch = { sug: local ? suggestFor(local, text) : null, fresh: null };
-  if (local && strength(local, segs.concat(segments(artist))) >= SAME) return weak;
+  const sure: MediaMatch = { sug: local ? suggestFor(local, text) : null, fresh: null };
+  if (local && strength(local, segs.concat(segments(artist))) >= SAME) return sure;
+  // Ad yalnızca benziyor ("Avatar" ⊂ "Avatar Aang: Son Havabükücü"): TMDB doğrulamazsa gösterilmez. Dizide
+  // başlıkta bölüm yazıyorsa ("Lanterns S1E8 · Bölümün adı") yine de o dizi sayılır.
+  const weak: MediaMatch = local?.series && parseEpisode(text) ? sure : { sug: null, fresh: null };
   if (MUSIC_APPS.test(app)) return weak;
+  const year = yearOf(title);
   // Önce bütün parçalar ("Avatar: Son Hava Bükücü - Aang"), tutmazsa yalnızca ilki
   const queries = [segs.flat(), segs[0] ?? []].filter((q, i, all) => q.join(" ").length >= 3 && all.findIndex((x) => x.join(" ") === q.join(" ")) === i);
   let best: { h: ArgusFresh; sim: number } | undefined;
@@ -354,13 +363,17 @@ export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: s
     const query = q.join(" ");
     let p = tmdbCache.get(query);
     if (!p) {
-      p = argusTmdbSearch(query, locale()).catch(() => []);
+      p = argusTmdbSearch(query, locale()).catch((e) => (String(e).includes("nokey") ? null : []));
       tmdbCache.set(query, p);
     }
-    best = (await p)
+    const hits = await p;
+    if (!hits) return { ...weak, nokey: true };
+    // Başlıktaki yıl tutan sonuç öne geçer (aynı adlı eski film/dizi yerine)
+    const score = (x: { h: ArgusFresh; sim: number }) => x.sim + (year && x.h.year === year ? 0.3 : 0);
+    best = hits
       .map((h) => ({ h, sim: Math.max(0, ...h.names.map((n) => similarity(words(n), q))) }))
       .filter((x) => x.sim >= SAME)
-      .sort((a, b) => b.sim - a.sim || b.h.popularity - a.h.popularity)[0];
+      .sort((a, b) => score(b) - score(a) || b.h.popularity - a.h.popularity)[0];
     if (best) break;
   }
   if (!best) return weak;
@@ -371,7 +384,7 @@ export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: s
   if (known) return { sug: suggestFor(known, text), fresh: null };
   // TMDB başka bir şey buldu: zayıf yerel eşleşme ("Avatar") yanlıştı. Listede olmayanı önermek için ad
   // daha sıkı tutmalı ("Dune Part Two Review" gibi videolar sorulmasın)
-  return { sug: null, fresh: best.sim >= FRESH_SAME ? hit : null };
+  return { sug: null, fresh: best.sim >= FRESH_SAME || (year && hit.year === year) ? hit : null };
 }
 
 // ------------------------------------------------------------------ yazma
@@ -669,6 +682,21 @@ export function useArgusDetect() {
       playAntic("surprised");
     };
 
+    /** Tanınamayan uzun bir şey izleniyor ve Argus'ta TMDB anahtarı yok: günde bir kez söyle */
+    const hintNoKey = (step: number, duration: number) => {
+      const key = "nokey";
+      store.ms[key] = played(key) + step;
+      if ((duration && duration < FRESH_MIN_LEN_MS) || played(key) < FRESH_AFTER_MS || store.asked.includes(key)) return;
+      store.asked.push(key);
+      savePlayed(store);
+      useNook.getState().pushToast({
+        kind: "argus",
+        title: tt("İzlediğini tanıyamadım"),
+        detail: tt("Argus'ta listende yok; bulmam için Argus › Ayarlar › Veritabanı › API'ye TMDB anahtarı gir"),
+        ms: 9000,
+      });
+    };
+
     const t = window.setInterval(() => {
       const now = Date.now();
       const step = Math.min(Math.max(0, now - lastTick), MAX_STEP_MS);
@@ -690,8 +718,9 @@ ${m.artist}`;
             if (lastText === text) lastMatch = r;
           });
         }
-        const { sug, fresh } = lastMatch;
+        const { sug, fresh, nokey } = lastMatch;
         if (fresh && !sug) offerFresh(fresh, step, m.durationMs);
+        if (nokey && !sug) hintNoKey(step, m.durationMs);
         if (!sug) {
           if (cur) finish();
           return;

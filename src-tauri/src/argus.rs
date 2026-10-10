@@ -936,13 +936,14 @@ fn tmdb_key(dir: &Path, pid: &str) -> Option<String> {
     s(v.get("tmdbApiKey")?).map(|k| k.trim().to_owned()).filter(|k| !k.is_empty())
 }
 
-/// Çalan şeyin adını TMDB'de arar (yerel dil + İngilizce, film ve dizi). Anahtar yoksa ya da çevrimdışıysa boş.
+/// Çalan şeyin adını TMDB'de arar (yerel dil + İngilizce, film ve dizi). Çevrimdışıysa boş;
+/// Argus'ta TMDB anahtarı girilmemişse "nokey" hatası (frontend kullanıcıya söyler).
 #[tauri::command]
-pub async fn argus_tmdb_search(query: String, lang: String) -> Vec<TmdbHit> {
+pub async fn argus_tmdb_search(query: String, lang: String) -> Result<Vec<TmdbHit>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(dir) = argus_dir() else { return Vec::new() };
-        let Some(pid) = CACHE.lock().unwrap().as_ref().map(|c| c.snap.profile_id.clone()) else { return Vec::new() };
-        let Some(key) = tmdb_key(&dir, &pid) else { return Vec::new() };
+        let Some(dir) = argus_dir() else { return Ok(Vec::new()) };
+        let Some(pid) = CACHE.lock().unwrap().as_ref().map(|c| c.snap.profile_id.clone()) else { return Ok(Vec::new()) };
+        let Some(key) = tmdb_key(&dir, &pid) else { return Err("nokey".into()) };
         let mut hits: Vec<TmdbHit> = Vec::new();
         for lang in [lang.as_str(), "en-US"] {
             let res = ureq::get("https://api.themoviedb.org/3/search/multi")
@@ -980,10 +981,10 @@ pub async fn argus_tmdb_search(query: String, lang: String) -> Vec<TmdbHit> {
                 }
             }
         }
-        hits
+        Ok(hits)
     })
     .await
-    .unwrap_or_default()
+    .unwrap_or_else(|_| Ok(Vec::new()))
 }
 
 /// TMDB'deki içeriği Argus'a ekler (Argus'un kendi "TMDB'den ekle"si — afiş, bölümler vb. Argus doldurur).
@@ -1269,3 +1270,4 @@ mod card_tests {
         assert!(!s[1].right && s[1].x == 30.0 - ARGUS_SPAN - SOUND_SPAN);
     }
 }
+
