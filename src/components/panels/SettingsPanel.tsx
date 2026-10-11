@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { Eye, EyeOff, Lock, Play, X } from "lucide-react";
+import { Check, Eye, EyeOff, HelpCircle, Lock, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
-import { alarmRing, listMonitors, openPath, quickState, shieldOn, type AudioOutput, type MonitorInfo } from "../../lib/bridge";
+import { alarmRing, listMonitors, openPath, quickState, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { syncFeeds } from "../../lib/ics";
 import { shortName } from "./ControlPanel";
 import { checkPassword, hashPassword } from "../../lib/lock";
@@ -201,6 +201,8 @@ export function SettingsPanel() {
       <AiSection />
 
       <ArgusSection />
+
+      <PhoneSection />
 
       <Section title={tt("Davranış")}>
         <Row label={tt("Windows açılınca başlat")}>
@@ -404,6 +406,342 @@ function ArgusSection() {
       </Row>
       <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Argus kapalıyken de işaretleyebilirsin; Nook onu arka planda kısa süreliğine açıp kapatır.")}</p>
     </Section>
+  );
+}
+
+/** Nook Mobil: telefon bu PC'ye bağlanır (kapat, uyut, ekran görüntüsü…). QR gizli anahtarı taşıdığı için
+ *  yalnızca istenince ve bir dakikalığına görünür. */
+function PhoneSection() {
+  const [info, setInfo] = useState<RemoteInfo | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const [appQr, setAppQr] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => void remoteInfo().then(setInfo), []);
+  useEffect(() => {
+    if (!showQr) return;
+    // Adresler değişebilir (Tailscale sonradan açıldı): kod gösterilirken tazele
+    void remoteInfo().then(setInfo);
+    const t = window.setTimeout(() => setShowQr(false), 60_000);
+    return () => window.clearTimeout(t);
+  }, [showQr]);
+  if (!info) return null;
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    setInfo(await remoteSet(on).finally(() => setBusy(false)));
+    if (!on) setShowQr(false);
+  };
+  return (
+    <Section title={tt("Telefon")}>
+      <Row label={tt("Nook Mobil bu PC'ye bağlanabilsin")}>
+        <Toggle on={info.enabled} onChange={(v) => void toggle(v)} color={ACCENT.blue} />
+      </Row>
+      {!info.enabled && (
+        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+          {tt("Açınca telefondan bu PC'yi kapatabilir, uyutabilir, kilitleyebilir ve ekran görüntüsü alabilirsin. Bağlantı yalnızca eşleştirdiğin telefona açıktır.")}
+        </p>
+      )}
+      {info.enabled && !info.running && !busy && (
+        <p className="pb-1 text-[10px] text-red/90">{tt("Köprü başlatılamadı: {0} numaralı bağlantı noktası başka bir uygulamada olabilir.", info.port)}</p>
+      )}
+      {info.enabled && (
+        <>
+          <Row label={tt("Telefona Nook Mobil'i kur (Android)")}>
+            <TextButton onClick={() => setAppQr((v) => !v)}>{appQr ? tt("Gizle") : tt("Kodu göster")}</TextButton>
+          </Row>
+          {appQr && info.appQr && (
+            <div className="flex items-center gap-3 py-2">
+              <div className="h-[118px] w-[118px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: info.appQr }} />
+              <p className="text-[10.5px] leading-snug text-label-2">
+                {tt("Telefonun kamerasıyla okut, Nook Mobil indirilir. Açınca Android “bilinmeyen uygulamaları yükle” izni isteyebilir; izin verip kur. Sonraki güncellemeler uygulamanın içinden gelir.")}
+              </p>
+            </div>
+          )}
+          <Row label={tt("Telefonu eşleştir")}>
+            <TextButton onClick={() => setShowQr((v) => !v)}>{showQr ? tt("Gizle") : tt("Kodu göster")}</TextButton>
+          </Row>
+          {showQr && info.qr && (
+            <div className="flex items-center gap-3 py-2">
+              <div className="h-[118px] w-[118px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: info.qr }} />
+              <p className="text-[10.5px] leading-snug text-label-2">
+                {tt("Telefonda Nook'u aç, “PC ekle”ye bas ve bu kodu okut. Kodu kimseyle paylaşma: bu PC'yi yönetmenin anahtarı.")}
+              </p>
+            </div>
+          )}
+          <OutsideSetup />
+          <WakeSetup />
+          <Row label={tt("Eşleşmeyi sıfırla (telefonun bağlantısı kopar)")}>
+            <TextButton
+              tone="danger"
+              onClick={() => {
+                setShowQr(false);
+                void remoteReset().then(setInfo);
+              }}
+            >
+              {tt("Sıfırla")}
+            </TextButton>
+          </Row>
+        </>
+      )}
+    </Section>
+  );
+}
+
+/** Anakart / bilgisayar markasına göre BIOS'ta açılacak ayar */
+function biosGuide(vendor: string | null) {
+  const v = (vendor ?? "").toLowerCase();
+  if (v.includes("asus")) return tt("Açılışta Del'e bas, F7 ile Gelişmiş moda geç. Advanced › APM Configuration'da “Power On By PCI-E” seçeneğini Enabled, “ErP Ready” seçeneğini Disabled yap. F10 ile kaydet.");
+  if (v.includes("micro-star") || v.includes("msi")) return tt("Açılışta Del'e bas. Settings › Advanced › Wake Up Event Setup'ta “Resume By PCI-E Device” seçeneğini Enabled; Power Management Setup'ta “ErP Ready” seçeneğini Disabled yap. F10 ile kaydet.");
+  if (v.includes("gigabyte")) return tt("Açılışta Del'e bas. Settings › Platform Power'da “Wake on LAN” seçeneğini Enabled, “ErP” seçeneğini Disabled yap. F10 ile kaydet.");
+  if (v.includes("asrock")) return tt("Açılışta F2'ye bas. Advanced › ACPI Configuration'da “PCIE Devices Power On” seçeneğini Enabled, “Deep Sleep” seçeneğini Disabled yap. F10 ile kaydet.");
+  if (v.includes("dell")) return tt("Açılışta F2'ye bas. Power Management'ta “Wake on LAN” seçeneğini “LAN Only”, “Deep Sleep Control” seçeneğini Disabled yap. Apply ile kaydet.");
+  if (v.includes("hp") || v.includes("hewlett")) return tt("Açılışta F10'a bas. Advanced › Power-On Options'ta “Remote Wakeup Boot Source” seçeneğini açık; “S5 Maximum Power Savings” seçeneğini Disabled yap. Kaydedip çık.");
+  if (v.includes("lenovo")) return tt("Açılışta F1'e (dizüstünde F2) bas. Power menüsünde “Wake on LAN” seçeneğini Enabled ya da Automatic; “Enhanced Power Saving Mode” seçeneğini Disabled yap. F10 ile kaydet.");
+  return tt("Açılışta Del ya da F2'ye bas. Power, APM ya da ACPI menüsünde “Wake on LAN”, “Power On By PCI-E” ya da “Resume by LAN” seçeneğini aç; “ErP” ya da “Deep Sleep” seçeneğini kapat. F10 ile kaydet.");
+}
+
+/** Telefondan açma hazırlığı: Windows tarafını kontrol edip tek izinle düzeltir, BIOS için tarif verir */
+function WakeSetup() {
+  const [st, setSt] = useState<WolStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [guide, setGuide] = useState(false);
+  const [modem, setModem] = useState(false);
+  const [out, setOut] = useState<OutsideStatus | null>(null);
+  useEffect(() => void wolStatus().then(setSt), []);
+  useEffect(() => void (modem && outsideStatus().then(setOut)), [modem]);
+  if (!st || !st.adapter) return null;
+  const card = st.magicPacket !== false && st.wakeArmed !== false;
+  const fixable = st.fastStartup || !card;
+  const fix = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      setSt(await wolFix());
+    } catch (e) {
+      const m = String(e);
+      if (m !== "cancelled") setErr(m);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const items: { ok: boolean | null; text: string }[] = [
+    { ok: st.wired, text: st.wired ? tt("Kabloyla bağlı") : tt("Wi-Fi'de: kapalıyken çoğu PC uyanmaz, kablo tak") },
+    { ok: !st.fastStartup, text: st.fastStartup ? tt("Hızlı Başlangıç açık") : tt("Hızlı Başlangıç kapalı") },
+    { ok: card ? (st.magicPacket ?? st.wakeArmed) : false, text: card ? tt("Ağ kartı PC'yi uyandırabilir") : tt("Ağ kartının uyandırması kapalı") },
+  ];
+  return (
+    <div className="py-1">
+      <div className="flex min-h-[30px] items-center justify-between gap-2">
+        <span className="text-[12px] text-label">{tt("Telefondan PC'yi açma")}</span>
+        {fixable ? (
+          <TextButton disabled={busy} onClick={() => void fix()}>
+            {busy ? tt("Düzeltiliyor…") : tt("Düzelt")}
+          </TextButton>
+        ) : (
+          <span className="text-[10.5px] text-label-3">{tt("Windows hazır")}</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 pb-1">
+        {items.map((it) => (
+          <WakeItem key={it.text} ok={it.ok} text={it.text} />
+        ))}
+        <div className="flex items-start gap-1.5">
+          <WakeItem ok={null} text={tt("BIOS'ta Wake-on-LAN açık olmalı")} />
+          <button onClick={() => setGuide((v) => !v)} className="ml-auto shrink-0 text-[10.5px] text-label-2 hover:text-label">
+            {guide ? tt("Gizle") : tt("Nasıl?")}
+          </button>
+        </div>
+        {guide && (
+          <p className="rounded-lg bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
+            {st.vendor && <span className="text-label-3">{[st.vendor, st.model].filter(Boolean).join(" ")}: </span>}
+            {biosGuide(st.vendor)}
+          </p>
+        )}
+        <WakeOutsideRow guide={modem} onGuide={() => setModem((v) => !v)} />
+        {modem && <ModemGuide out={out} />}
+      </div>
+      {err && <p className="pb-1 text-[10px] text-red/90">{err}</p>}
+      <p className="pb-1 text-[10px] text-label-3">
+        {fixable
+          ? tt("Düzelt'e basınca Windows yönetici izni ister; ağ bağlantısı birkaç saniye kopabilir.")
+          : tt("Telefon PC'yle aynı ağdayken çalışır. Elektrik kesilirse PC'yi bir kez düğmesinden aç.")}
+      </p>
+    </div>
+  );
+}
+
+/** Dışarıdan açma anahtarı: Nook modemde (UPnP) uyandırma yönlendirmesini kendisi kurar.
+ *  Modem izin vermezse elle ayar tarifi gösterilir. */
+function WakeOutsideRow({ guide, onGuide }: { guide: boolean; onGuide: () => void }) {
+  const [w, setW] = useState<WakeOutside | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => void wakeOutsideStatus().then(setW), []);
+  if (!w) return null;
+  const set = async (on: boolean) => {
+    setBusy(true);
+    setW(await wakeOutsideSet(on).finally(() => setBusy(false)));
+  };
+  const manual = w.on && !busy && (w.upnp === false || !!w.error);
+  const status: { ok: boolean | null; text: string } | null = !w.on
+    ? null
+    : busy
+      ? { ok: null, text: tt("Modem ayarlanıyor…") }
+      : w.cgnat
+        ? { ok: false, text: tt("Operatör ortak adres veriyor; dışarıdan açma çalışmaz") }
+        : w.target
+          ? { ok: true, text: tt("Modem ayarlandı · ev adresi {0}", w.externalIp ?? "?") }
+          : w.upnp === false
+            ? { ok: false, text: tt("Modem otomatik ayarlanamadı (UPnP kapalı)") }
+            : { ok: false, text: w.error ?? tt("Modem ayarlanamadı") };
+  return (
+    <>
+      <div className="flex min-h-[24px] items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-[10.5px] text-label-2">{tt("Evden uzaktayken de açılabilsin")}</span>
+        <Toggle on={w.on} onChange={(v) => void set(v)} color={ACCENT.blue} />
+      </div>
+      {status && (
+        <div className="flex items-center gap-1.5">
+          <WakeItem ok={status.ok} text={status.text} />
+          {manual && (
+            <button onClick={onGuide} className="ml-auto shrink-0 text-[10.5px] text-label-2 hover:text-label">
+              {guide ? tt("Gizle") : tt("Elle nasıl?")}
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Dışarıdan açma: uyandırma paketi evin internet adresine gider, modem PC'ye iletir */
+function ModemGuide({ out }: { out: OutsideStatus | null }) {
+  const ip = out?.lanIp ?? "…";
+  const mac = out?.mac ?? "…";
+  const steps = [
+    tt("Tarayıcıda modemin arayüzünü aç (çoğunlukla 192.168.1.1) ve giriş yap."),
+    tt("DHCP › Adres ayırma: {0} ağ kartına hep {1} verilsin.", mac, ip),
+    tt("Güvenlik › IP ve MAC bağlama (ARP binding): {0} ↔ {1}. PC kapalıyken modem onu unutmasın diye.", ip, mac),
+    tt("NAT › Sanal sunucular (port yönlendirme): UDP 9 → {0}, iç port 9.", ip),
+    out?.wan
+      ? tt("Hepsi bu. Telefon uyandırmayı evin adresine ({0}) de gönderir; adres değişirse PC açıkken telefonda Nook'u bir kez açman yeter.", out.wan)
+      : tt("Hepsi bu. Telefon evin adresini Tailscale açıkken öğrenir: önce aşağıdaki Tailscale adımlarını tamamla."),
+  ];
+  return (
+    <div className="rounded-lg bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
+      <ol className="list-decimal space-y-0.5 pl-3.5">
+        {steps.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ol>
+      <p className="mt-1 text-label-3">
+        {tt("Menü adları modeme göre değişir (TP-Link'te NAT Forwarding › Virtual Servers, Security › IP & MAC Binding). Operatör ortak adres (CGNAT) veriyorsa dışarıdan açma çalışmaz; o zaman operatörden genel IP iste.")}
+      </p>
+    </div>
+  );
+}
+
+/** Evden uzaktayken bağlanma: Tailscale kurulu ve açık mı, güvenlik duvarı izin veriyor mu, telefona nasıl kurulur */
+function OutsideSetup() {
+  const [st, setSt] = useState<OutsideStatus | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [qr, setQr] = useState(false);
+  useEffect(() => {
+    const load = () => void outsideStatus().then(setSt);
+    load();
+    // Kurulum ve giriş Nook'un dışında yapılıyor: ekran açıkken arada bir tazele
+    const t = window.setInterval(load, 4000);
+    return () => window.clearInterval(t);
+  }, []);
+  if (!st) return null;
+  const act = async (id: string, fn: () => Promise<unknown>) => {
+    setBusy(id);
+    setErr(null);
+    try {
+      const r = await fn();
+      if (r && typeof r === "object") setSt(r as OutsideStatus);
+    } catch (e) {
+      const m = String(e);
+      if (m !== "cancelled") setErr(m);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const ready = st.tailscaleInstalled && st.tailscaleUp && st.firewall;
+  return (
+    <div className="py-1">
+      <div className="flex min-h-[30px] items-center justify-between gap-2">
+        <span className="text-[12px] text-label">{tt("Evden uzaktayken bağlanma")}</span>
+        {ready && <span className="text-[10.5px] text-label-3">{tt("Hazır")}</span>}
+      </div>
+      <div className="flex flex-col gap-1 pb-1">
+        <CheckRow ok={st.tailscaleInstalled} text={st.tailscaleInstalled ? tt("Tailscale kurulu") : tt("Tailscale kurulu değil")}>
+          {!st.tailscaleInstalled && (
+            <SmallAction busy={busy === "install"} onClick={() => void act("install", outsideInstallTailscale)}>
+              {busy === "install" ? tt("İndiriliyor…") : tt("Kur")}
+            </SmallAction>
+          )}
+        </CheckRow>
+        {st.tailscaleInstalled && (
+          <CheckRow ok={st.tailscaleUp} text={st.tailscaleUp ? tt("Tailscale'e giriş yapıldı") : tt("Tailscale'e giriş yapılmadı")}>
+            {!st.tailscaleUp && <SmallAction onClick={() => void act("open", outsideOpenTailscale)}>{tt("Aç")}</SmallAction>}
+          </CheckRow>
+        )}
+        <CheckRow ok={st.firewall} text={st.firewall ? tt("Güvenlik duvarı izin veriyor") : tt("Güvenlik duvarı izni yok")}>
+          {!st.firewall && (
+            <SmallAction busy={busy === "fw"} onClick={() => void act("fw", outsideFixFirewall)}>
+              {tt("İzin ver")}
+            </SmallAction>
+          )}
+        </CheckRow>
+        <CheckRow ok={null} text={tt("Telefona da Tailscale kur, aynı hesapla giriş yap")}>
+          <SmallAction onClick={() => setQr((v) => !v)}>{qr ? tt("Gizle") : tt("Kodu göster")}</SmallAction>
+        </CheckRow>
+        {qr && st.phoneQr && (
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-[96px] w-[96px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: st.phoneQr }} />
+            <p className="text-[10.5px] leading-snug text-label-2">
+              {tt("Telefonun kamerasıyla okut, Play Store'da Tailscale açılır. Kurup bu PC'deki hesapla giriş yap; Nook Mobil yeni adresi kendisi öğrenir, kodu yeniden okutmana gerek yok.")}
+            </p>
+          </div>
+        )}
+      </div>
+      {err && <p className="pb-1 text-[10px] text-red/90">{err}</p>}
+      <p className="pb-1 text-[10px] text-label-3">
+        {!st.tailscaleInstalled
+          ? tt("Tailscale ücretsiz; PC ile telefon arasında her yerden çalışan özel, şifreli bir bağlantı kurar. Kur'a basınca resmi kurucu açılır, Google hesabınla giriş yapman yeter.")
+          : ready
+            ? tt("Telefon evdeyken ev ağından, dışarıdayken Tailscale'den bağlanır.")
+            : tt("“İzin ver” Windows yönetici izni ister; yalnızca ev ağından ve Tailscale'den gelen bağlantılara izin verilir.")}
+      </p>
+    </div>
+  );
+}
+
+function CheckRow({ ok, text, children }: { ok: boolean | null; text: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[20px] items-center gap-1.5">
+      <WakeItem ok={ok} text={text} />
+      {children && <span className="ml-auto shrink-0">{children}</span>}
+    </div>
+  );
+}
+
+function SmallAction({ onClick, busy, children }: { onClick: () => void; busy?: boolean; children: React.ReactNode }) {
+  return (
+    <button disabled={busy} onClick={onClick} className="text-[10.5px] text-label-2 hover:text-label disabled:opacity-50">
+      {children}
+    </button>
+  );
+}
+
+function WakeItem({ ok, text }: { ok: boolean | null; text: string }) {
+  const Icon = ok === null ? HelpCircle : ok ? Check : X;
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 text-[10.5px] text-label-2">
+      <Icon size={11} strokeWidth={2.4} className={`shrink-0 ${ok === null ? "text-label-3" : ok ? "text-green" : "text-red/90"}`} />
+      <span className="truncate">{text}</span>
+    </div>
   );
 }
 

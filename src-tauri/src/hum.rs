@@ -68,6 +68,9 @@ struct Found {
     auto: bool,
     /// İzlerken Hum: tanınan sesin başı kaç ms önceydi
     ago_ms: Option<u64>,
+    /// Telefonun mikrofonu duydu (Nook Mobil)
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    phone: bool,
 }
 
 /// Son 12 sn (16 kHz mono) ve en son ses gelen an
@@ -252,6 +255,28 @@ fn listen(app: &AppHandle, shared: &Arc<Shared>) -> Outcome {
     }
 }
 
+/// Nook Mobil: telefonun mikrofonundan gelen ses (16 kHz mono). Bulunursa PC'deki geçmişe ve —
+/// Argus'ta bir şey izleniyorsa ve İzlerken Hum açıksa — Argus'a da yazılır (`agoMs`).
+pub fn phone(app: &AppHandle, samples: &[f32]) -> Outcome {
+    if !audible(samples) {
+        return Outcome::Silent;
+    }
+    let asked = Instant::now();
+    match recognize(samples) {
+        Ok(Some(track)) => {
+            *LAST_KEY.lock().unwrap() = track.key.clone();
+            *LAST_AT.lock().unwrap() = Some(Instant::now());
+            crate::log::write("info", &format!("hum (telefon): {} – {}", track.artist, track.title));
+            let len = samples.len().min(KEEP) as u64 * 1000 / RATE as u64;
+            let ago_ms = Some(len + asked.elapsed().as_millis() as u64);
+            let _ = app.emit("nook://hum-found", Found { track: track.clone(), auto: false, ago_ms, phone: true });
+            Outcome::Found { track }
+        }
+        Ok(None) => Outcome::None,
+        Err(message) => Outcome::Error { message },
+    }
+}
+
 /// Otomatik Hum: ayar açıkken arkada dinler, müzik çalıyorsa arada bir sorar.
 pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
     thread::Builder::new()
@@ -293,7 +318,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                                 *at = Some(Instant::now());
                                 crate::log::write("info", &format!("hum (otomatik): {} – {}", track.artist, track.title));
                                 let ago_ms = watching.then(|| (AUTO_LEN as u64 * 1000 / RATE as u64) + asked.elapsed().as_millis() as u64);
-                                let _ = app.emit("nook://hum-found", Found { track, auto: true, ago_ms });
+                                let _ = app.emit("nook://hum-found", Found { track, auto: true, ago_ms, phone: false });
                                 Duration::from_secs(60)
                             } else {
                                 Duration::from_secs(45)

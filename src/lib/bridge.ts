@@ -191,7 +191,8 @@ export type SysEventKind =
   | "clip"
   | "shelf"
   | "live"
-  | "claude";
+  | "claude"
+  | "phone";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {
@@ -375,6 +376,88 @@ const noop = () => Promise.resolve();
 
 export const applySettings = (settings: NativeSettings) =>
   inTauri ? invoke<void>("apply_settings", { settings }) : noop();
+/** Nook Mobil köprüsü (Ayarlar › Telefon) */
+export interface RemoteInfo {
+  enabled: boolean;
+  running: boolean;
+  name: string;
+  port: number;
+  hosts: string[];
+  tailscale: boolean;
+  mac: string | null;
+  /** Eşleşme QR kodu (SVG); köprü kapalıyken yok */
+  qr: string | null;
+  /** Nook Mobil'i indirme QR kodu (SVG) */
+  appQr: string | null;
+}
+export const remoteInfo = () =>
+  inTauri
+    ? invoke<RemoteInfo>("remote_info")
+    : Promise.resolve<RemoteInfo | null>(
+        import.meta.env.DEV ? { enabled: true, running: true, name: "LUKO-PC", port: 47391, hosts: ["100.101.7.12", "192.168.1.34"], tailscale: true, mac: null, qr: null, appQr: null } : null,
+      );
+/** Telefondan açma (Wake-on-LAN) hazırlığı: Windows tarafındaki ayarlar */
+export interface WolStatus {
+  adapter: string | null;
+  wired: boolean | null;
+  fastStartup: boolean;
+  /** Sürücü bu ayarı göstermiyorsa null */
+  magicPacket: boolean | null;
+  wakeArmed: boolean | null;
+  vendor: string | null;
+  model: string | null;
+}
+export const wolStatus = () =>
+  inTauri
+    ? invoke<WolStatus>("wol_status")
+    : Promise.resolve<WolStatus | null>(
+        import.meta.env.DEV ? { adapter: "Realtek PCIe GbE Family Controller", wired: true, fastStartup: true, magicPacket: false, wakeArmed: true, vendor: "ASUSTeK COMPUTER INC.", model: "PRIME B450M-K II" } : null,
+      );
+/** Yönetici izni ister; reddedilirse "cancelled" hatası */
+export const wolFix = () => invoke<WolStatus>("wol_fix");
+/** Evden uzaktayken bağlanma (Tailscale) ve dışarıdan açma için gereken bilgiler */
+export interface OutsideStatus {
+  tailscaleInstalled: boolean;
+  tailscaleUp: boolean;
+  firewall: boolean;
+  lanIp: string | null;
+  mac: string | null;
+  /** Evin internet adresi */
+  wan: string | null;
+  /** Play Store'daki Tailscale'in QR kodu (SVG) */
+  phoneQr: string | null;
+}
+export const outsideStatus = () =>
+  inTauri
+    ? invoke<OutsideStatus>("outside_status")
+    : Promise.resolve<OutsideStatus | null>(
+        import.meta.env.DEV ? { tailscaleInstalled: true, tailscaleUp: true, firewall: false, lanIp: "192.168.1.5", mac: "58:11:22:DB:FC:60", wan: "213.14.176.118", phoneQr: null } : null,
+      );
+export const outsideInstallTailscale = () => invoke<void>("outside_install_tailscale");
+export const outsideOpenTailscale = () => invoke<void>("outside_open_tailscale");
+/** Yönetici izni ister; reddedilirse "cancelled" hatası */
+export const outsideFixFirewall = () => invoke<OutsideStatus>("outside_fix_firewall");
+/** Dışarıdan açma: modemde UPnP ile uyandırma yönlendirmesi */
+export interface WakeOutside {
+  on: boolean;
+  /** Modemde UPnP bulundu mu (null: denenmedi) */
+  upnp: boolean | null;
+  target: string | null;
+  externalIp: string | null;
+  /** Operatör ortak adres veriyor: dışarıdan açma çalışmaz */
+  cgnat: boolean;
+  error: string | null;
+}
+export const wakeOutsideStatus = () =>
+  inTauri
+    ? invoke<WakeOutside>("wake_outside_status")
+    : Promise.resolve<WakeOutside | null>(import.meta.env.DEV ? { on: true, upnp: true, target: "192.168.1.255", externalIp: "213.14.176.118", cgnat: false, error: null } : null);
+export const wakeOutsideSet = (on: boolean) => invoke<WakeOutside>("wake_outside_set", { on });
+export const remoteSet = (enabled: boolean) => invoke<RemoteInfo>("remote_set", { enabled });
+export const remoteReset = () => invoke<RemoteInfo>("remote_reset");
+/** Telefona gösterilecek Nook (renk, ad, görünüm) ve kullanılacak Argus profili */
+export const remoteProfile = (profile: { color: string; name: string; look: unknown; argusProfile: string }) =>
+  inTauri ? invoke<void>("remote_profile", { profile }) : noop();
 export const listMonitors = () => (inTauri ? invoke<MonitorInfo[]>("list_monitors") : Promise.resolve([]));
 /** Arama açıkken pencere tıklanabilir/odakta kalsın; kapanınca odak önceki uygulamaya döner. */
 export const setInteractive = (on: boolean) => (inTauri ? invoke<void>("set_interactive", { on }) : noop());

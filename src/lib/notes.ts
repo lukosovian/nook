@@ -82,6 +82,21 @@ export type DemoId =
   | "argusnew"
   | "argusyear"
   | "argusnokey"
+  | "phone"
+  | "phonescreens"
+  | "phoneargus"
+  | "phonemedia"
+  | "phonewake"
+  | "phoneclip"
+  | "phonenote"
+  | "phonelive"
+  | "phonehum"
+  | "phonestats"
+  | "wakesetup"
+  | "outside"
+  | "wakeoutside"
+  | "phoneinstall"
+  | "phonetour"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -106,6 +121,88 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.55",
+    date: tt("11 Ekim 2026"),
+    headline: tt("Telefondan bilgisayarına bağlan"),
+    items: [
+      {
+        title: tt("Nook Mobil köprüsü"),
+        text: tt("Ayarlar › Telefon'dan açınca telefondaki Nook bu bilgisayara bağlanabiliyor. Kodu göster'e basıp QR'ı telefonla okutman yeterli. Telefondan ekran görüntüsü alabilir, bilgisayarı kilitleyebilir, ekranı kapatabilir, uyutabilir, yeniden başlatabilir ya da kapatabilirsin; işlemcinin, belleğin ve diskin durumunu da görürsün. Bağlantı yalnızca eşleştirdiğin telefona açık, her istek imzalı. Bilgisayara ve telefona Tailscale kurarsan dışarıdayken de çalışıyor."),
+        demo: "phone",
+      },
+      {
+        title: tt("İki ekranın varsa hangisi olduğunu soruyor"),
+        text: tt("Bilgisayarına birden çok monitör bağlıysa telefondan ekran görüntüsü isteyince Nook hangi ekranı istediğini soruyor: ekranlar masadaki gibi yan yana çiziliyor, ana ekran mavi. Hepsini tek görüntüde de alabilirsin. Görüntüye bakarken üstteki Ekran 1, Ekran 2 ve Hepsi düğmeleriyle diğerine geçebilir, yenile düğmesiyle tazeleyebilirsin."),
+        demo: "phonescreens",
+      },
+      {
+        title: tt("Telefondan Argus"),
+        text: tt("Telefondaki Nook'ta Argus'a girip “Ne izlesem?”e basınca Argus'taki Ne İzlesem ayarlarınla (filtre, arşivden ya da TMDB'den) bir şey seçiliyor. Devam sekmesinde yarım kalan dizilerin sıradaki bölümü duruyor; İzledim'e basınca bilgisayardaki Argus'a yazılıyor. Diziye dokununca bölümleri sezon sezon listeleniyor: istediğin bölümleri işaretleyip işaretini kaldırabilir, Sezonu bitir'le bir sezonun hepsini tek seferde işaretleyebilirsin. İzledim sekmesinden izlediğin bir şeyi arayıp işaretleyebilir, arşivinde yoksa TMDB'den ekleyebilirsin. Argus kapalıysa Nook onu arkada açıp işi bitince kapatıyor."),
+        demo: "phoneargus",
+      },
+      {
+        title: tt("Telefondan Medya"),
+        text: tt("Bilgisayarda çalan şarkı ya da video kapağıyla telefonda görünüyor. Telefondan oynatıp duraklatabilir, önceki ya da sonrakine geçebilir, bilgisayarın sesini açıp kısabilir ya da sessize alabilirsin."),
+        demo: "phonemedia",
+      },
+      {
+        title: tt("Telefondan bilgisayarı açma"),
+        text: tt("Bilgisayar kapalıyken telefondaki Nook'ta “PC'yi aç” düğmesi çıkıyor; basınca telefon uyandırma sinyali (Wake-on-LAN) gönderiyor ve bilgisayar açılıyor. Bilgisayar kabloyla bağlı olmalı ve BIOS'ta Wake-on-LAN açık olmalı; evdeyken hep çalışır, dışarıdan açmak için aşağıdaki “Dışarıdan aç”a bak."),
+        demo: "phonewake",
+      },
+      {
+        title: tt("Telefondan Pano"),
+        text: tt("Bilgisayarda kopyaladıkların telefondaki Nook'un Pano bölümünde listeleniyor; birine dokununca telefonun panosuna kopyalanıyor, görsellere dokununca açılıyor. Telefonda yazdığın ya da kopyaladığın bir metni de tek dokunuşla bilgisayarın panosuna gönderebilirsin; bilgisayarda Ctrl+V ile yapıştırırsın."),
+        demo: "phoneclip",
+      },
+      {
+        title: tt("Telefondan Not"),
+        text: tt("Nook'taki not sekmelerin telefonda da açılıyor. Telefonda yazdığın kısa bir aradan sonra bilgisayardaki nota kaydediliyor, bilgisayarda yazdığın da telefona geliyor. Telefondan yeni not açabilir, notun adını değiştirebilir ya da silebilirsin."),
+        demo: "phonenote",
+      },
+      {
+        title: tt("Telefonda canlı Nook"),
+        text: tt("Telefondaki Nook'un ana ekranında artık bilgisayarın adı yerine en üstte ortada Nook duruyor, bilgisayardaki adada olduğu gibi canlı: göz kırpıyor, etrafına bakınıyor, ara sıra esneyip zıplıyor. Bilgisayarda müzik çalınca dans ediyor, bilgisayara ulaşılamayınca uyuyor. Dokununca tepki veriyor."),
+        demo: "phonelive",
+      },
+      {
+        title: tt("Telefonda Hum"),
+        text: tt("Kafede, arabada ya da televizyonda çalan bir şarkıyı merak edersen telefondaki Nook'ta Hum'a dokun: telefonun mikrofonu birkaç saniye dinliyor, bilgisayar şarkıyı tanıyor. Bulunan şarkı bilgisayardaki Hum geçmişine telefon işaretiyle ekleniyor; bilgisayarda Argus'ta bir şey izlerken ve İzlerken Hum açıksa o içeriğin Müzikler listesine de yazılıyor."),
+        demo: "phonehum",
+      },
+      {
+        title: tt("Bilgisayarın durumu tek bakışta"),
+        text: tt("Telefondaki Nook'un ana ekranında Bilgisayar çipi artık tüm satırı kaplıyor: bilgisayarın ne kadar süredir açık olduğu, işlemci, bellek ve diskte kalan boş yer canlı olarak içinde."),
+        demo: "phonestats",
+      },
+      {
+        title: tt("Telefondan açmaya hazırlık"),
+        text: tt("Ayarlar › Telefon › Telefondan PC'yi açma, bilgisayarın uzaktan açılmaya hazır olup olmadığını gösteriyor: kabloyla bağlı mı, Hızlı Başlangıç kapalı mı, ağ kartı bilgisayarı uyandırabiliyor mu. Eksikleri Düzelt'e basıp tek bir Windows izniyle düzeltiyorsun. BIOS'taki ayarı ise Nook anakartının markasını tanıyıp hangi menüde olduğunu tarif ediyor."),
+        demo: "wakesetup",
+      },
+      {
+        title: tt("Evden uzaktayken de bağlan"),
+        text: tt("Ayarlar › Telefon › Evden uzaktayken bağlanma, dışarıdan bağlanmak için gerekenleri sırayla gösteriyor: ücretsiz Tailscale'i tek tıkla kurabilir, giriş yapıp güvenlik duvarına izin verebilirsin. Telefona Tailscale'i kurmak için de bir QR kod var. Telefon yeni adresi kendisi öğreniyor; eşleşme kodunu yeniden okutman gerekmiyor."),
+        demo: "outside",
+      },
+      {
+        title: tt("Dışarıdan aç"),
+        text: tt("Telefondan PC'yi açma altındaki “Evden uzaktayken de açılabilsin” anahtarını açınca Nook modemini kendisi ayarlıyor (UPnP); modem arayüzüne girmen gerekmiyor. Böylece mobil veriyle dışarıdayken de “PC'yi aç”a basıp bilgisayarını açabiliyorsun. Modem buna izin vermiyorsa Nook söylüyor ve elle nasıl yapılacağını gösteriyor."),
+        demo: "wakeoutside",
+      },
+      {
+        title: tt("Telefona kur, kendiliğinden güncellensin"),
+        text: tt("Ayarlar › Telefon › Telefona Nook Mobil'i kur'daki QR kodu telefonla okutunca Nook Mobil iniyor (Android). Android bilinmeyen uygulamaları yükleme izni isteyebilir. Sonraki sürümler çıkınca uygulamanın ana ekranında Güncelle kartı beliriyor; dokunman yeterli."),
+        demo: "phoneinstall",
+      },
+      {
+        title: tt("Telefonda tanıtım"),
+        text: tt("Nook Mobil ilk açıldığında sayfa sayfa kendini tanıtıyor: her bölümün Nook'u kendi renginde, neler yapabildiğini anlatıyor; son sayfada bilgisayarını ekliyorsun. Sonradan ana ekrandaki menüden “Nook Mobil'i tanı” ile yeniden açabilirsin."),
+        demo: "phonetour",
+      },
+    ],
+  },
   {
     version: "0.2.54",
     date: tt("10 Ekim 2026"),

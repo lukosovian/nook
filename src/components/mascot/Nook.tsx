@@ -235,16 +235,18 @@ interface NookProps {
   look?: Look;
   /** Sürükleme sınırı (ada) — Nook bunun içinde tutulup fırlatılabilir */
   bounds?: RefObject<HTMLElement | null>;
+  /** 3B gövdenin çizim çözünürlüğü (telefonun GPU'su büyük çizimde bozuluyor, orada daha küçük) */
+  res?: number;
 }
 
-export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wear = DEFAULT_LOOK, bounds }: NookProps) {
+export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wear = DEFAULT_LOOK, bounds, res = IMG_RES }: NookProps) {
   const ref = useRef<HTMLDivElement>(null);
   const look = useLook(ref, !NO_LOOK.has(expression));
   const lid = useBlink(BLINKS.has(expression));
   const press = useGrab();
 
   // --- 3B kafa çevirme: gözler kenara kayar ve kısalır, ışık ters yöne gider
-  const img = useBodyImage(wear, color, IMG_RES);
+  const img = useBodyImage(wear, color, res);
   const isBox = expression === "hungry" || expression === "chewing";
   /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
   const solid = !!img && !isBox;

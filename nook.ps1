@@ -22,7 +22,12 @@ $VersionFiles = @(
   @{ Path = "src-tauri\tauri.conf.json"; Pattern = '("version"\s*:\s*")[^"]+(")' },
   @{ Path = "package.json";              Pattern = '("version"\s*:\s*")[^"]+(")' },
   @{ Path = "src-tauri\Cargo.toml";      Pattern = '(?m)(^version\s*=\s*")[^"]+(")' },
-  @{ Path = "src-tauri\Cargo.lock";      Pattern = '(name = "nook"\r?\nversion = ")[^"]+(")' }
+  @{ Path = "src-tauri\Cargo.lock";      Pattern = '(name = "nook"\r?\nversion = ")[^"]+(")' },
+  # Nook Mobil aynı sürüm numarasını taşır (telefon güncellemeyi buna bakarak bulur)
+  @{ Path = "mobile\src-tauri\tauri.conf.json"; Pattern = '("version"\s*:\s*")[^"]+(")' },
+  @{ Path = "mobile\package.json";              Pattern = '("version"\s*:\s*")[^"]+(")' },
+  @{ Path = "mobile\src-tauri\Cargo.toml";      Pattern = '(?m)(^version\s*=\s*")[^"]+(")' },
+  @{ Path = "mobile\src-tauri\Cargo.lock";      Pattern = '(name = "nook-mobile"\r?\nversion = ")[^"]+(")' }
 )
 $Utf8 = New-Object Text.UTF8Encoding $false
 $Current = (Get-Content "$Root\src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json).version
@@ -32,6 +37,9 @@ if ($Yayinla) {
   $parts = $Current.Split(".")
   $parts[2] = [string]([int]$parts[2] + 1)
   $Suggested = $parts -join "."
+  # Sürüm numarası önceden artırılmış ama henüz yayınlanmamışsa (son commit'teki sürümden farklı) aynısı önerilir
+  $Committed = (git show HEAD:src-tauri/tauri.conf.json 2>$null | Out-String | ConvertFrom-Json -ErrorAction SilentlyContinue).version
+  if ($Committed -and $Committed -ne $Current) { $Suggested = $Current }
   if (-not $Surum) {
     $Surum = Read-Host "Yeni sürüm (şu an $Current, Enter = $Suggested)"
     if (-not $Surum) { $Surum = $Suggested }
@@ -70,10 +78,28 @@ $Setup = "$Root\src-tauri\target\release\bundle\nsis\Nook_${Version}_x64-setup.e
 if (-not (Test-Path $Setup)) { throw "Kurulum dosyası yok: $Setup" }
 
 if ($Yayinla) {
+  # Nook Mobil: imzalı APK, release.ps1 sürüme NookMobil.apk adıyla ekler
+  Say "Nook Mobil $Version derleniyor..."
+  $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+  $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+  $env:NDK_HOME = "$env:ANDROID_HOME\ndk\29.0.14206865"
+  $ErrorActionPreference = "Continue"
+  Push-Location "$Root\mobile"
+  npx tauri android build --apk --target aarch64
+  $MobileOk = $LASTEXITCODE -eq 0
+  Pop-Location
+  $ErrorActionPreference = "Stop"
+  if (-not $MobileOk) {
+    foreach ($p in $Backup.Keys) { [IO.File]::WriteAllText($p, $Backup[$p], $Utf8) }
+    throw "Nook Mobil derlenemedi, hiçbir şey gönderilmedi."
+  }
+}
+
+if ($Yayinla) {
   Say "Commit atılıyor"
   # Takip edilen dosyalar + uygulama klasörlerindeki yeni dosyalar (masaüstü çöpü gibi kökteki başıboş dosyalar girmez)
   git add -u
-  git add -A -- src src-tauri nook.ps1 "*.cmd"
+  git add -A -- src src-tauri nook.ps1 "*.cmd" mobile
   git commit -m "${Version}: $Notlar"
   if ($LASTEXITCODE -ne 0) { throw "Commit atılamadı" }
 
@@ -84,9 +110,19 @@ if ($Yayinla) {
 if ($Kur) {
   Say "Bu bilgisayara kuruluyor"
   Get-Process nook -ErrorAction SilentlyContinue | Stop-Process -Force
+  # Kapanması bitmeden kurulum başlarsa nook.exe kilitli kalır ve kurulum 2 koduyla çıkar
+  Get-Process nook -ErrorAction SilentlyContinue | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 1
   $p = Start-Process $Setup -ArgumentList "/S" -Wait -PassThru
-  if ($p.ExitCode -ne 0) { throw "Kurulum hata verdi (çıkış kodu $($p.ExitCode))" }
+  if ($p.ExitCode -ne 0) {
+    # Bir kez daha dene; yine olmazsa Nook kapalı kalmasın
+    Start-Sleep -Seconds 3
+    $p = Start-Process $Setup -ArgumentList "/S" -Wait -PassThru
+  }
+  if ($p.ExitCode -ne 0) {
+    if (-not (Get-Process nook -ErrorAction SilentlyContinue)) { Start-Process "$env:LOCALAPPDATA\Nook\nook.exe" }
+    throw "Kurulum hata verdi (çıkış kodu $($p.ExitCode))"
+  }
   Start-Sleep -Seconds 1
   if (-not (Get-Process nook -ErrorAction SilentlyContinue)) { Start-Process "$env:LOCALAPPDATA\Nook\nook.exe" }
 }

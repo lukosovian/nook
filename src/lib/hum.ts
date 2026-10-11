@@ -23,6 +23,8 @@ export interface HumEntry extends HumTrack {
   at: number;
   /** Otomatik Hum buldu (elle değil) */
   auto: boolean;
+  /** Telefonun mikrofonu duydu (Nook Mobil) */
+  phone?: boolean;
 }
 
 export type HumOutcome =

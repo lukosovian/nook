@@ -48,8 +48,8 @@ export function useHum() {
   useEffect(() => {
     if (!isPrimary) return;
     const offToggle = subscribe(EVENTS.humToggle, () => void toggleHum());
-    const offFound = subscribe<{ track: HumTrack; auto: boolean; agoMs?: number | null }>(EVENTS.humFound, ({ track, auto, agoMs }) => {
-      useNook.getState().addHum({ ...track, auto });
+    const offFound = subscribe<{ track: HumTrack; auto: boolean; agoMs?: number | null; phone?: boolean }>(EVENTS.humFound, ({ track, auto, agoMs, phone }) => {
+      useNook.getState().addHum({ ...track, auto, phone });
       if (agoMs != null) void toArgus(track, agoMs);
     });
     return () => {

@@ -42,6 +42,19 @@ pub async fn quick_state() -> QuickState {
     }
 }
 
+/// Telefon için: ses seviyesi (0-1) ve sessizde mi
+pub fn volume_state() -> (Option<f32>, bool) {
+    (imp::volume(), imp::endpoint_muted(false).unwrap_or(false))
+}
+
+pub fn set_muted(on: bool) -> Result<(), String> {
+    imp::set_endpoint_muted(false, on)
+}
+
+pub fn set_volume(value: f32) -> Result<(), String> {
+    imp::set_volume(value.clamp(0.0, 1.0))
+}
+
 /// Varsayılan mikrofonu değiştirir (tüm roller)
 #[tauri::command]
 pub async fn quick_input(id: String) -> Result<(), String> {

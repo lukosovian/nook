@@ -53,9 +53,11 @@ import {
   useStatsFeed,
   useStorageSync,
 } from "./hooks/useSystemFeeds";
+import { usePhoneSync } from "./hooks/usePhoneSync";
 
 export default function App() {
   useSettingsSync();
+  usePhoneSync();
   useShieldMicFeed();
   // Bilgisayar yeni açıldıysa ve parola kilidi açıksa kalkanla başla
   useEffect(() => {

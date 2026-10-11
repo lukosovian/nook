@@ -20,8 +20,10 @@ mod media;
 mod mixer;
 mod net;
 mod notify;
+pub mod outside;
 mod privacy;
 mod quick;
+mod remote;
 mod share;
 mod shell;
 mod shield;
@@ -32,6 +34,7 @@ mod tracker;
 mod verify;
 mod voice;
 mod window;
+pub mod wol;
 
 use std::sync::Arc;
 
@@ -155,6 +158,19 @@ pub fn run() {
             claude::claude_setup,
             claude::claude_connect,
             claude::claude_disconnect,
+            remote::remote_info,
+            remote::remote_set,
+            remote::remote_reset,
+            remote::remote_profile,
+            remote::remote_mirror,
+            wol::wol_status,
+            wol::wol_fix,
+            outside::outside_status,
+            outside::outside_install_tailscale,
+            outside::outside_open_tailscale,
+            outside::outside_fix_firewall,
+            outside::wake_outside_status,
+            outside::wake_outside_set,
         ])
         .setup(|app| {
             let island = app
@@ -189,6 +205,8 @@ pub fn run() {
             notify::spawn(handle.clone());
             net::spawn(handle.clone());
             share::spawn(handle.clone());
+            remote::spawn(handle.clone());
+            outside::spawn();
             brightness::spawn(handle);
 
             island.show()?;

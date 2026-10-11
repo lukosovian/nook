@@ -679,66 +679,69 @@ fn server_up() -> bool {
 /// Argus'un özeti. `profile`: kullanıcı adı (yoksa ilk profil). `today`: yerel gün (YYYY-MM-DD).
 #[tauri::command]
 pub async fn argus_snapshot(app: AppHandle, profile: Option<String>, today: String, dir: Option<String>) -> Option<Snapshot> {
-    tauri::async_runtime::spawn_blocking(move || {
-        set_custom(dir);
-        let dir = argus_dir()?;
-        let all = profiles(&dir);
-        let want = profile.unwrap_or_default().to_lowercase();
-        // Profil seçilmemişse (ya da yoksa) en son kullanılan profil
-        let active = || {
-            all.iter().max_by_key(|(id, _)| {
-                let d = dir.join("data").join("profiles").join(id);
-                mtime(&d.join("watched.json")).max(mtime(&d.join("recent-watch.json"))).max(mtime(&d.join("boards.json")))
-            })
-        };
-        // Argus kurulu ama henüz profil/arşiv yok: boş özet (panel "Argus'u bir kez aç" der)
-        let empty = || Snapshot {
-            profiles: all.iter().map(|(_, n)| n.clone()).collect(),
-            dir: dir.to_string_lossy().into_owned(),
-            profile: String::new(),
-            profile_id: String::new(),
-            board_id: String::new(),
-            running: server_up(),
-            items: Vec::new(),
-            episode_days: HashMap::new(),
-            statuses: Vec::new(),
-        };
-        let Some((pid, pname)) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned() else {
+    tauri::async_runtime::spawn_blocking(move || snapshot_blocking(&app, profile, today, dir))
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Özetin kendisi (telefon köprüsü de kullanır)
+pub fn snapshot_blocking(app: &AppHandle, profile: Option<String>, today: String, dir: Option<String>) -> Option<Snapshot> {
+    set_custom(dir);
+    let dir = argus_dir()?;
+    let all = profiles(&dir);
+    let want = profile.unwrap_or_default().to_lowercase();
+    // Profil seçilmemişse (ya da yoksa) en son kullanılan profil
+    let active = || {
+        all.iter().max_by_key(|(id, _)| {
+            let d = dir.join("data").join("profiles").join(id);
+            mtime(&d.join("watched.json")).max(mtime(&d.join("recent-watch.json"))).max(mtime(&d.join("boards.json")))
+        })
+    };
+    // Argus kurulu ama henüz profil/arşiv yok: boş özet (panel "Argus'u bir kez aç" der)
+    let empty = || Snapshot {
+        profiles: all.iter().map(|(_, n)| n.clone()).collect(),
+        dir: dir.to_string_lossy().into_owned(),
+        profile: String::new(),
+        profile_id: String::new(),
+        board_id: String::new(),
+        running: server_up(),
+        items: Vec::new(),
+        episode_days: HashMap::new(),
+        statuses: Vec::new(),
+    };
+    let Some((pid, pname)) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned() else {
+        return Some(empty());
+    };
+    let pdir = dir.join("data").join("profiles").join(&pid);
+    let key = format!(
+        "{pid}|{today}|{}|{}|{}|{}|{}",
+        mtime(&pdir.join("boards.json")),
+        mtime(&pdir.join("rows")),
+        mtime(&pdir.join("episodes.json")),
+        mtime(&pdir.join("watched.json")),
+        mtime(&pdir.join("recent-watch.json")),
+    );
+    let key = format!("{key}|{}", mtime(&pdir.join("tmdb.json")));
+    // rows/ klasörünün kendisi dosya yazılınca her zaman değişmeyebilir — dosyaların en yenisi
+    let rows_m = std::fs::read_dir(pdir.join("rows"))
+        .map(|r| r.flatten().map(|e| mtime(&e.path())).max().unwrap_or(0))
+        .unwrap_or(0);
+    let key = format!("{key}|{rows_m}");
+
+    let mut cache = CACHE.lock().unwrap();
+    if cache.as_ref().map(|c| c.key != key).unwrap_or(true) {
+        let Some((snap, meta)) = build(&dir, &pid, &pname, all.iter().map(|(_, n)| n.clone()).collect(), &today) else {
             return Some(empty());
         };
-        let pdir = dir.join("data").join("profiles").join(&pid);
-        let key = format!(
-            "{pid}|{today}|{}|{}|{}|{}|{}",
-            mtime(&pdir.join("boards.json")),
-            mtime(&pdir.join("rows")),
-            mtime(&pdir.join("episodes.json")),
-            mtime(&pdir.join("watched.json")),
-            mtime(&pdir.join("recent-watch.json")),
-        );
-        let key = format!("{key}|{}", mtime(&pdir.join("tmdb.json")));
-        // rows/ klasörünün kendisi dosya yazılınca her zaman değişmeyebilir — dosyaların en yenisi
-        let rows_m = std::fs::read_dir(pdir.join("rows"))
-            .map(|r| r.flatten().map(|e| mtime(&e.path())).max().unwrap_or(0))
-            .unwrap_or(0);
-        let key = format!("{key}|{rows_m}");
-
-        let mut cache = CACHE.lock().unwrap();
-        if cache.as_ref().map(|c| c.key != key).unwrap_or(true) {
-            let Some((snap, meta)) = build(&dir, &pid, &pname, all.iter().map(|(_, n)| n.clone()).collect(), &today) else {
-                return Some(empty());
-            };
-            // Afişler yalnızca bu klasörden okunabilsin
-            let _ = app.asset_protocol_scope().allow_directory(dir.join("medya"), false);
-            *cache = Some(Cache { key, snap, meta });
-        }
-        let mut snap = cache.as_ref()?.snap.clone();
-        drop(cache);
-        snap.running = server_up();
-        Some(snap)
-    })
-    .await
-    .ok()
-    .flatten()
+        // Afişler yalnızca bu klasörden okunabilsin
+        let _ = app.asset_protocol_scope().allow_directory(dir.join("medya"), false);
+        *cache = Some(Cache { key, snap, meta });
+    }
+    let mut snap = cache.as_ref()?.snap.clone();
+    drop(cache);
+    snap.running = server_up();
+    Some(snap)
 }
 
 /// Argus kapalıysa sunucusunu görünmez başlatır; kapsam bitince (Drop) kapatır.
@@ -840,77 +843,79 @@ pub struct MarkResult {
 /// Bir bölümü (season/episode) ya da filmi (ikisi de yoksa) bugün izlendi olarak işaretler.
 #[tauri::command]
 pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<MarkResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let dir = argus_dir().ok_or("Argus bulunamadı")?;
-        let (pid, board_id, meta) = {
-            let c = CACHE.lock().unwrap();
-            let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
-            (c.snap.profile_id.clone(), c.snap.board_id.clone(), c.meta.clone())
-        };
-        // İstenen durum (etiket) → seçenek kimliği
-        let status_id = match status.as_deref().filter(|l| !l.trim().is_empty()) {
-            Some(l) => Some(meta.statuses.iter().find(|(_, x)| same_name(x, l)).map(|(id, _)| id.clone()).ok_or("Argus'ta bu durum yok")?),
-            None => None,
-        };
-        let server = Server::ensure(&dir)?;
-        let booted = server.0.is_some();
-        // Kaydın değerlerini sunucudan alıp günceller
-        let update_row = |f: &mut dyn FnMut(&mut Map<String, Value>, &mut Vec<String>)| -> Result<(), String> {
-            let rows = get_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows"))?;
-            let row = rows.as_array().and_then(|a| a.iter().find(|r| r.get("id").and_then(|v| v.as_str()) == Some(&row_id))).ok_or("Kayıt bulunamadı")?;
-            let mut values = row.get("values").and_then(|v| v.as_object().cloned()).unwrap_or_default();
-            let mut changed = Vec::new();
-            f(&mut values, &mut changed);
-            put_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows/{row_id}"), json!({ "values": values, "_changed": changed }))?;
-            Ok(())
-        };
-        let completed = match (season, episode) {
-            (Some(sn), Some(en)) => {
-                let all = get_json(&format!("/api/profiles/{pid}/watched"))?;
-                let mut row: Map<String, Value> = all.get(&row_id).and_then(|v| v.as_object().cloned()).unwrap_or_default();
-                let key = format!("{sn}-{en}");
-                let mut dates: Vec<Value> = row.get(&key).and_then(|v| v.as_array().cloned()).unwrap_or_default();
-                if !dates.iter().any(|d| d.as_str() == Some(&today)) {
-                    dates.push(Value::String(today.clone()));
-                }
-                row.insert(key, Value::Array(dates));
-                let res = put_json(&format!("/api/profiles/{pid}/watched/{row_id}"), Value::Object(row))?;
-                let auto = res.get("autoWatched").is_some_and(|v| !v.is_null());
-                // Kullanıcının seçtiği durum, Argus'un kendiliğinden verdiğinin önüne geçer
-                if let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id.clone()) {
-                    update_row(&mut |values, changed| {
-                        values.insert(durum.clone(), Value::String(sid.clone()));
-                        changed.push(durum.clone());
-                    })?;
-                }
-                auto
+    tauri::async_runtime::spawn_blocking(move || mark_blocking(row_id, season, episode, status, today))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+pub fn mark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<MarkResult, String> {
+    let dir = argus_dir().ok_or("Argus bulunamadı")?;
+    let (pid, board_id, meta) = {
+        let c = CACHE.lock().unwrap();
+        let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
+        (c.snap.profile_id.clone(), c.snap.board_id.clone(), c.meta.clone())
+    };
+    // İstenen durum (etiket) → seçenek kimliği
+    let status_id = match status.as_deref().filter(|l| !l.trim().is_empty()) {
+        Some(l) => Some(meta.statuses.iter().find(|(_, x)| same_name(x, l)).map(|(id, _)| id.clone()).ok_or("Argus'ta bu durum yok")?),
+        None => None,
+    };
+    let server = Server::ensure(&dir)?;
+    let booted = server.0.is_some();
+    // Kaydın değerlerini sunucudan alıp günceller
+    let update_row = |f: &mut dyn FnMut(&mut Map<String, Value>, &mut Vec<String>)| -> Result<(), String> {
+        let rows = get_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows"))?;
+        let row = rows.as_array().and_then(|a| a.iter().find(|r| r.get("id").and_then(|v| v.as_str()) == Some(&row_id))).ok_or("Kayıt bulunamadı")?;
+        let mut values = row.get("values").and_then(|v| v.as_object().cloned()).unwrap_or_default();
+        let mut changed = Vec::new();
+        f(&mut values, &mut changed);
+        put_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows/{row_id}"), json!({ "values": values, "_changed": changed }))?;
+        Ok(())
+    };
+    let completed = match (season, episode) {
+        (Some(sn), Some(en)) => {
+            let all = get_json(&format!("/api/profiles/{pid}/watched"))?;
+            let mut row: Map<String, Value> = all.get(&row_id).and_then(|v| v.as_object().cloned()).unwrap_or_default();
+            let key = format!("{sn}-{en}");
+            let mut dates: Vec<Value> = row.get(&key).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+            if !dates.iter().any(|d| d.as_str() == Some(&today)) {
+                dates.push(Value::String(today.clone()));
             }
-            _ => {
-                let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id.clone().or(meta.izlendi.clone())) else {
-                    return Err("Argus'ta Durum sütunu bulunamadı".into());
-                };
+            row.insert(key, Value::Array(dates));
+            let res = put_json(&format!("/api/profiles/{pid}/watched/{row_id}"), Value::Object(row))?;
+            let auto = res.get("autoWatched").is_some_and(|v| !v.is_null());
+            // Kullanıcının seçtiği durum, Argus'un kendiliğinden verdiğinin önüne geçer
+            if let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id.clone()) {
                 update_row(&mut |values, changed| {
                     values.insert(durum.clone(), Value::String(sid.clone()));
                     changed.push(durum.clone());
-                    // İzlediği gün izleme tarihine yazılır (tekrar izlemede yeni tarih eklenir)
-                    if let Some(iz) = meta.izleme.clone() {
-                        let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
-                        if !dates.iter().any(|d| d.as_str() == Some(&today)) {
-                            dates.push(Value::String(today.clone()));
-                        }
-                        values.insert(iz.clone(), Value::Array(dates));
-                        changed.push(iz);
-                    }
                 })?;
-                Some(&sid) == meta.izlendi.as_ref()
             }
-        };
-        // Bir sonraki özet dosyalardan yeniden okunsun
-        drop(server);
-        Ok(MarkResult { completed, booted })
-    })
-    .await
-    .map_err(|e| e.to_string())?
+            auto
+        }
+        _ => {
+            let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id.clone().or(meta.izlendi.clone())) else {
+                return Err("Argus'ta Durum sütunu bulunamadı".into());
+            };
+            update_row(&mut |values, changed| {
+                values.insert(durum.clone(), Value::String(sid.clone()));
+                changed.push(durum.clone());
+                // İzlediği gün izleme tarihine yazılır (tekrar izlemede yeni tarih eklenir)
+                if let Some(iz) = meta.izleme.clone() {
+                    let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+                    if !dates.iter().any(|d| d.as_str() == Some(&today)) {
+                        dates.push(Value::String(today.clone()));
+                    }
+                    values.insert(iz.clone(), Value::Array(dates));
+                    changed.push(iz);
+                }
+            })?;
+            Some(&sid) == meta.izlendi.as_ref()
+        }
+    };
+    // Bir sonraki özet dosyalardan yeniden okunsun
+    drop(server);
+    Ok(MarkResult { completed, booted })
 }
 
 /// TMDB'de bulunan içerik (Argus'ta olmayabilir)
@@ -940,81 +945,85 @@ fn tmdb_key(dir: &Path, pid: &str) -> Option<String> {
 /// Argus'ta TMDB anahtarı girilmemişse "nokey" hatası (frontend kullanıcıya söyler).
 #[tauri::command]
 pub async fn argus_tmdb_search(query: String, lang: String) -> Result<Vec<TmdbHit>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let Some(dir) = argus_dir() else { return Ok(Vec::new()) };
-        let Some(pid) = CACHE.lock().unwrap().as_ref().map(|c| c.snap.profile_id.clone()) else { return Ok(Vec::new()) };
-        let Some(key) = tmdb_key(&dir, &pid) else { return Err("nokey".into()) };
-        let mut hits: Vec<TmdbHit> = Vec::new();
-        for lang in [lang.as_str(), "en-US"] {
-            let res = ureq::get("https://api.themoviedb.org/3/search/multi")
-                .query("api_key", &key)
-                .query("query", &query)
-                .query("language", lang)
-                .timeout(Duration::from_secs(8))
-                .call()
-                .ok()
-                .and_then(|r| r.into_json::<Value>().ok());
-            for r in res.as_ref().and_then(|v| v.get("results")?.as_array()).into_iter().flatten().take(10) {
-                let Some(mt) = r.get("media_type").and_then(|v| v.as_str()).filter(|t| *t == "movie" || *t == "tv") else { continue };
-                let Some(id) = r.get("id").and_then(|v| v.as_u64()) else { continue };
-                let (name, orig, date) = if mt == "tv" { ("name", "original_name", "first_air_date") } else { ("title", "original_title", "release_date") };
-                let names: Vec<String> = [name, orig].iter().filter_map(|k| r.get(*k).and_then(s)).collect();
-                let key = format!("{mt}:{id}");
-                match hits.iter_mut().find(|h| h.key == key) {
-                    Some(h) => {
-                        for n in names {
-                            if !h.names.contains(&n) {
-                                h.names.push(n);
-                            }
+    tauri::async_runtime::spawn_blocking(move || tmdb_search_blocking(query, lang))
+        .await
+        .unwrap_or_else(|_| Ok(Vec::new()))
+}
+
+pub fn tmdb_search_blocking(query: String, lang: String) -> Result<Vec<TmdbHit>, String> {
+    let Some(dir) = argus_dir() else { return Ok(Vec::new()) };
+    let Some(pid) = CACHE.lock().unwrap().as_ref().map(|c| c.snap.profile_id.clone()) else { return Ok(Vec::new()) };
+    let Some(key) = tmdb_key(&dir, &pid) else { return Err("nokey".into()) };
+    let mut hits: Vec<TmdbHit> = Vec::new();
+    for lang in [lang.as_str(), "en-US"] {
+        let res = ureq::get("https://api.themoviedb.org/3/search/multi")
+            .query("api_key", &key)
+            .query("query", &query)
+            .query("language", lang)
+            .timeout(Duration::from_secs(8))
+            .call()
+            .ok()
+            .and_then(|r| r.into_json::<Value>().ok());
+        for r in res.as_ref().and_then(|v| v.get("results")?.as_array()).into_iter().flatten().take(10) {
+            let Some(mt) = r.get("media_type").and_then(|v| v.as_str()).filter(|t| *t == "movie" || *t == "tv") else { continue };
+            let Some(id) = r.get("id").and_then(|v| v.as_u64()) else { continue };
+            let (name, orig, date) = if mt == "tv" { ("name", "original_name", "first_air_date") } else { ("title", "original_title", "release_date") };
+            let names: Vec<String> = [name, orig].iter().filter_map(|k| r.get(*k).and_then(s)).collect();
+            let key = format!("{mt}:{id}");
+            match hits.iter_mut().find(|h| h.key == key) {
+                Some(h) => {
+                    for n in names {
+                        if !h.names.contains(&n) {
+                            h.names.push(n);
                         }
                     }
-                    None => hits.push(TmdbHit {
-                        key,
-                        tmdb_id: id,
-                        media_type: mt.to_owned(),
-                        title: names.first().cloned().unwrap_or_default(),
-                        names,
-                        year: r.get(date).and_then(s).filter(|d| d.len() >= 4).map(|d| d[..4].to_owned()),
-                        poster: r.get("poster_path").and_then(s).map(|p| format!("https://image.tmdb.org/t/p/w185{p}")),
-                        popularity: r.get("popularity").and_then(|v| v.as_f64()).unwrap_or(0.0),
-                    }),
                 }
+                None => hits.push(TmdbHit {
+                    key,
+                    tmdb_id: id,
+                    media_type: mt.to_owned(),
+                    title: names.first().cloned().unwrap_or_default(),
+                    names,
+                    year: r.get(date).and_then(s).filter(|d| d.len() >= 4).map(|d| d[..4].to_owned()),
+                    poster: r.get("poster_path").and_then(s).map(|p| format!("https://image.tmdb.org/t/p/w185{p}")),
+                    popularity: r.get("popularity").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                }),
             }
         }
-        Ok(hits)
-    })
-    .await
-    .unwrap_or_else(|_| Ok(Vec::new()))
+    }
+    Ok(hits)
 }
 
 /// TMDB'deki içeriği Argus'a ekler (Argus'un kendi "TMDB'den ekle"si — afiş, bölümler vb. Argus doldurur).
 /// Argus kapalıysa görünmez açar. Yeni kaydın kimliğini döner.
 #[tauri::command]
 pub async fn argus_tmdb_add(tmdb_id: u64, media_type: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let dir = argus_dir().ok_or("Argus bulunamadı")?;
-        let (pid, board_id) = {
-            let c = CACHE.lock().unwrap();
-            let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
-            (c.snap.profile_id.clone(), c.snap.board_id.clone())
-        };
-        let server = Server::ensure(&dir)?;
-        let res = ureq::post(&format!("{API}/api/profiles/{pid}/tmdb-add/{board_id}"))
-            .timeout(Duration::from_secs(60))
-            .send_json(json!({ "tmdbId": tmdb_id, "mediaType": media_type, "status": "izlenecek" }));
-        drop(server);
-        match res {
-            Ok(r) => {
-                let v: Value = r.into_json().map_err(|e| e.to_string())?;
-                v.get("rowId").and_then(s).ok_or_else(|| "Argus cevap vermedi".into())
-            }
-            // Argus'un kendi hata mesajı ("zaten arşivinde var", "API anahtarı gir" …)
-            Err(ureq::Error::Status(_, r)) => Err(r.into_json::<Value>().ok().and_then(|v| v.get("error").and_then(s)).unwrap_or_else(|| "Argus'a eklenemedi".into())),
-            Err(e) => Err(e.to_string()),
+    tauri::async_runtime::spawn_blocking(move || tmdb_add_blocking(tmdb_id, media_type))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+pub fn tmdb_add_blocking(tmdb_id: u64, media_type: String) -> Result<String, String> {
+    let dir = argus_dir().ok_or("Argus bulunamadı")?;
+    let (pid, board_id) = {
+        let c = CACHE.lock().unwrap();
+        let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
+        (c.snap.profile_id.clone(), c.snap.board_id.clone())
+    };
+    let server = Server::ensure(&dir)?;
+    let res = ureq::post(&format!("{API}/api/profiles/{pid}/tmdb-add/{board_id}"))
+        .timeout(Duration::from_secs(60))
+        .send_json(json!({ "tmdbId": tmdb_id, "mediaType": media_type, "status": "izlenecek" }));
+    drop(server);
+    match res {
+        Ok(r) => {
+            let v: Value = r.into_json().map_err(|e| e.to_string())?;
+            v.get("rowId").and_then(s).ok_or_else(|| "Argus cevap vermedi".into())
         }
-    })
-    .await
-    .map_err(|e| e.to_string())?
+        // Argus'un kendi hata mesajı ("zaten arşivinde var", "API anahtarı gir" …)
+        Err(ureq::Error::Status(_, r)) => Err(r.into_json::<Value>().ok().and_then(|v| v.get("error").and_then(s)).unwrap_or_else(|| "Argus'a eklenemedi".into())),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// Argus'u kurar: Argus'un kendi kurulum betiği (Git yoksa kurar, Argus'u masaüstüne indirir,
@@ -1271,3 +1280,120 @@ mod card_tests {
     }
 }
 
+
+// ---------------------------------------------------------------- Telefon (Nook Mobil)
+
+/// Telefon için görünmez açılan Argus sunucusu ve son kullanım anı: son istekten bu kadar sonra kapanır
+static PHONE_SERVER: Mutex<Option<(Server, Instant)>> = Mutex::new(None);
+const PHONE_IDLE: Duration = Duration::from_secs(180);
+
+/// Telefondan bir Argus işi gelince: Argus kapalıysa sunucusunu görünmez açar (ya da açık tutma süresini
+/// uzatır). Son telefon isteğinden PHONE_IDLE sonra kapanır; kullanıcının kendi açtığı Argus'a dokunulmaz.
+pub fn phone_keepalive() -> Result<(), String> {
+    let dir = argus_dir().ok_or("Bu bilgisayarda Argus bulunamadı")?;
+    {
+        let mut keep = PHONE_SERVER.lock().unwrap();
+        match keep.as_mut() {
+            Some((_, last)) => *last = Instant::now(),
+            None => {
+                let server = Server::ensure(&dir)?;
+                // Argus zaten açıksa (kullanıcı açmış) kapatacak bir şey yok
+                if server.0.is_some() {
+                    *keep = Some((server, Instant::now()));
+                    std::thread::spawn(|| loop {
+                        std::thread::sleep(Duration::from_secs(20));
+                        let mut keep = PHONE_SERVER.lock().unwrap();
+                        if keep.as_ref().is_some_and(|(_, last)| last.elapsed() > PHONE_IDLE) {
+                            *keep = None; // Drop → sunucu kapanır
+                            return;
+                        }
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Telefondan gelen Argus isteğini (yalnızca /api/… ve /medya/…) Argus'un yerel sunucusuna aynen iletir.
+/// Argus kapalıysa sunucusu görünmez açılır; art arda gelen istekler için birkaç dakika açık tutulur.
+/// Dönüş: (durum kodu, içerik türü, gövde)
+pub fn phone_proxy(method: &str, path: &str, body: &[u8]) -> Result<(u16, String, Vec<u8>), String> {
+    use std::io::Read;
+    if !(path.starts_with("/api/") || path.starts_with("/medya/")) || path.contains("..") {
+        return Err("izin verilmeyen Argus yolu".into());
+    }
+    phone_keepalive()?;
+    let req = ureq::request(method, &format!("{API}{path}")).timeout(Duration::from_secs(60));
+    let res = if body.is_empty() { req.call() } else { req.set("Content-Type", "application/json").send_bytes(body) };
+    let res = match res {
+        Ok(r) => r,
+        Err(ureq::Error::Status(_, r)) => r,
+        Err(e) => return Err(format!("Argus cevap vermedi: {e}")),
+    };
+    let status = res.status();
+    let ctype = res.header("Content-Type").unwrap_or("application/octet-stream").to_owned();
+    let mut out = Vec::new();
+    res.into_reader().take(30 * 1024 * 1024).read_to_end(&mut out).map_err(|e| e.to_string())?;
+    Ok((status, ctype, out))
+}
+
+/// Bir dizinin bölümleri (sezonlar, ad, yayın günü) ve hangilerinin izlendiği (telefondaki bölüm listesi için).
+/// Argus'un dosyalarından okunur; Argus'un açık olması gerekmez.
+pub fn episodes_for(row_id: &str) -> Result<Value, String> {
+    let dir = argus_dir().ok_or("Argus bulunamadı")?;
+    let pid = CACHE.lock().unwrap().as_ref().ok_or("Argus henüz okunmadı")?.snap.profile_id.clone();
+    let pdir = dir.join("data").join("profiles").join(&pid);
+    let seasons = read_json(&pdir.join("episodes.json")).and_then(|v| v.get(row_id).cloned()).unwrap_or(Value::Array(Vec::new()));
+    let watched = read_json(&pdir.join("watched.json")).and_then(|v| v.get(row_id).cloned()).unwrap_or(Value::Object(Map::new()));
+    // İzlenmiş bölüm anahtarları ("1-3"): tarih listesi boş olmayanlar
+    let seen: Vec<String> = watched
+        .as_object()
+        .map(|m| m.iter().filter(|(_, v)| v.as_array().is_some_and(|a| !a.is_empty())).map(|(k, _)| k.clone()).collect())
+        .unwrap_or_default();
+    let seasons: Vec<Value> = seasons
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|s| {
+                    let eps: Vec<Value> = s
+                        .get("episodes")
+                        .and_then(|e| e.as_array())
+                        .map(|e| {
+                            e.iter()
+                                .map(|ep| json!({ "episode": ep.get("episodeNumber"), "name": ep.get("name"), "airDate": ep.get("airDate") }))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    json!({ "season": s.get("seasonNumber"), "name": s.get("name"), "episodes": eps })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(json!({ "seasons": seasons, "seen": seen }))
+}
+
+/// Birden çok bölümü tek seferde izlendi yapar (`add`, bugünün tarihiyle) ya da işaretini kaldırır (`remove`).
+/// Argus'un kendi sunucusundan geçer: bütün bölümler bitince "İzlendi" yapma gibi kurallar çalışır.
+pub fn set_episodes_blocking(row_id: &str, add: &[(u32, u32)], remove: &[(u32, u32)], today: &str) -> Result<MarkResult, String> {
+    let dir = argus_dir().ok_or("Argus bulunamadı")?;
+    let pid = CACHE.lock().unwrap().as_ref().ok_or("Argus henüz okunmadı")?.snap.profile_id.clone();
+    let server = Server::ensure(&dir)?;
+    let booted = server.0.is_some();
+    let all = get_json(&format!("/api/profiles/{pid}/watched"))?;
+    let mut row: Map<String, Value> = all.get(row_id).and_then(|v| v.as_object().cloned()).unwrap_or_default();
+    for (s, e) in remove {
+        row.remove(&format!("{s}-{e}"));
+    }
+    for (s, e) in add {
+        let key = format!("{s}-{e}");
+        let mut dates: Vec<Value> = row.get(&key).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if !dates.iter().any(|d| d.as_str() == Some(today)) {
+            dates.push(Value::String(today.to_owned()));
+        }
+        row.insert(key, Value::Array(dates));
+    }
+    let res = put_json(&format!("/api/profiles/{pid}/watched/{row_id}"), Value::Object(row))?;
+    drop(server);
+    Ok(MarkResult { completed: res.get("autoWatched").is_some_and(|v| !v.is_null()), booted })
+}

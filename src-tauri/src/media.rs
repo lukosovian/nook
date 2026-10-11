@@ -26,6 +26,44 @@ pub struct Media {
     artwork: Option<String>,
 }
 
+/// Son durum (telefon "şu an çalan"ı sorunca): parça, alındığı an ve kapak (data URL)
+static NOW: std::sync::Mutex<Option<(Media, std::time::Instant)>> = std::sync::Mutex::new(None);
+static ART: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
+
+fn remember(media: Option<&Media>) {
+    let Some(m) = media else {
+        *NOW.lock().unwrap() = None;
+        return;
+    };
+    if let Some(art) = &m.artwork {
+        *ART.lock().unwrap() = Some((m.track_key.clone(), art.clone()));
+    }
+    *NOW.lock().unwrap() = Some((Media { artwork: None, ..m.clone() }, std::time::Instant::now()));
+}
+
+/// Şu an çalan (konum, alındığından beri geçen süre eklenerek) — yoksa None
+pub fn now_playing() -> Option<serde_json::Value> {
+    let (m, at) = NOW.lock().unwrap().clone()?;
+    let pos = if m.playing { (m.position_ms + at.elapsed().as_millis() as u64).min(m.duration_ms.max(m.position_ms)) } else { m.position_ms };
+    let has_art = ART.lock().unwrap().as_ref().is_some_and(|(k, _)| *k == m.track_key);
+    Some(serde_json::json!({
+        "title": m.title, "artist": m.artist, "album": m.album, "app": m.app, "playing": m.playing,
+        "positionMs": pos, "durationMs": m.duration_ms, "trackKey": m.track_key, "hasArt": has_art,
+    }))
+}
+
+/// Çalan parçanın kapağı: (MIME, bayt)
+pub fn artwork_bytes() -> Option<(String, Vec<u8>)> {
+    use base64::Engine;
+    let key = NOW.lock().unwrap().as_ref()?.0.track_key.clone();
+    let (k, url) = ART.lock().unwrap().clone()?;
+    if k != key {
+        return None;
+    }
+    let (head, data) = url.strip_prefix("data:")?.split_once(";base64,")?;
+    Some((head.to_owned(), base64::engine::general_purpose::STANDARD.decode(data).ok()?))
+}
+
 #[tauri::command]
 pub fn media_resync() {
     RESEND.store(true, Ordering::Relaxed);
@@ -93,6 +131,7 @@ mod imp {
                             if last_sig != "none" {
                                 last_sig = "none".into();
                                 art_key.clear();
+                                super::remember(None);
                                 let _ = app.emit("nook://media", Option::<Media>::None);
                             }
                         }
@@ -111,6 +150,7 @@ mod imp {
                                 }
                             }
 
+                            super::remember(Some(&media));
                             let sig = format!("{}|{}|{}", media.track_key, media.playing, media.duration_ms);
                             if force || sig != last_sig || (media.playing && last_emit.elapsed() >= RESYNC) {
                                 last_sig = sig;

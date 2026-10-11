@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy, Music2, Radio, X } from "lucide-react";
+import { Check, Copy, Music2, Radio, Smartphone, X } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { toggleHum } from "../../hooks/useHum";
 import { copyText, openPath } from "../../lib/bridge";
@@ -111,6 +111,11 @@ function Row({ h }: { h: HumEntry }) {
           <span className="text-label-2">{h.artist}</span>
           {" · "}
           {when(h.at)}
+          {h.phone && (
+            <span className="ml-1 inline-flex translate-y-[1px] items-center gap-0.5" title={tt("Telefon duydu")} style={{ color: tintText(ACCENT.purple) }}>
+              <Smartphone size={9} strokeWidth={2.6} />
+            </span>
+          )}
           {h.auto && (
             <span className="ml-1 inline-flex translate-y-[1px] items-center gap-0.5" title={tt("Otomatik Hum buldu")} style={{ color: tintText(ACCENT.purple) }}>
               <Radio size={9} strokeWidth={2.6} />

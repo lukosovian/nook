@@ -18,6 +18,7 @@ import { DEMOS2 } from "./Demos2";
 import { DEMOS3 } from "./Demos3";
 import { DEMOS4 } from "./Demos4";
 import { DEMOS5 } from "./Demos5";
+import { DEMOS6 } from "./Demos6";
 
 /** Her `ms`'de bir artan sayaç (sahneler kendini tekrarlasın) */
 function useTick(ms: number) {
@@ -816,6 +817,7 @@ export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
   ...DEMOS3,
   ...DEMOS4,
   ...DEMOS5,
+  ...DEMOS6,
   lang: LangDemo,
   scale: ScaleDemo,
   cvd: CvdDemo,

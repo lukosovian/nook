@@ -1106,7 +1106,7 @@ export const useNook = create<NookState>()(
         set((s) => {
           const now = Date.now();
           const recent = s.hums.find((h) => h.key === e.key && now - h.at < 10 * 60_000);
-          const entry = { ...e, id: recent?.id ?? crypto.randomUUID(), at: now, auto: recent ? recent.auto && e.auto : e.auto };
+          const entry = { ...e, id: recent?.id ?? crypto.randomUUID(), at: now, auto: recent ? recent.auto && e.auto : e.auto, phone: e.phone || undefined };
           return { hums: [entry, ...s.hums.filter((h) => h !== recent)].slice(0, MAX_HUMS) };
         }),
       removeHum: (id) => set((s) => ({ hums: s.hums.filter((h) => h.id !== id) })),

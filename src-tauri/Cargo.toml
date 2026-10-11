@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.54"
+version = "0.2.55"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -35,6 +35,12 @@ zip = { version = "2", default-features = false, features = ["deflate", "deflate
 unrar = "0.5"
 rustfft = "6"
 crc32fast = "1"
+# Nook Mobil köprüsü: telefonun bağlandığı küçük HTTP sunucusu, imza ve eşleşme QR'ı
+tiny_http = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+getrandom = "0.2"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
@@ -75,6 +81,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_Security",
   # Claude Code köprüsü: named pipe
   "Win32_System_Pipes",
+  # Wake-on-LAN hazırlığı: ağ kartını yeniden başlatma
+  "Win32_Devices_DeviceAndDriverInstallation",
 ] }
 # "Şu an çalan" (GSMTC) — Tauri zaten bu sürümü derliyor
 windows = { version = "0.62", features = [
@@ -104,6 +112,8 @@ windows = { version = "0.62", features = [
   "Win32_System_Ole",
   # Parolayı unutunca Windows Hello (PIN, parmak izi, yüz) ile doğrulama
   "Security_Credentials_UI",
+  # Nook Mobil: güvenlik duvarı kuralı (dışarıdan Tailscale ile bağlanma)
+  "Win32_NetworkManagement_WindowsFirewall",
 ] }
 # WinRT IAsyncOperation türü (Windows Hello doğrulamasını pencereye bağlarken adı gerekiyor)
 windows-future = "0.3"

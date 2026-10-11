@@ -15,6 +15,13 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::state::Shared;
 
 const POLL: Duration = Duration::from_secs(1);
+
+/// Son ölçülen istatistikler (telefon "PC durumu" isteyince)
+pub static LATEST: std::sync::Mutex<Option<Stats>> = std::sync::Mutex::new(None);
+
+pub fn screen_locked() -> bool {
+    imp::screen_locked()
+}
 const LOW_BATTERY: [u8; 2] = [20, 10];
 
 #[derive(Clone, Serialize, Default)]
@@ -87,10 +94,9 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 if mem_total > 0 {
                     shared.mem.store((mem_used * 100 / mem_total) as u32, std::sync::atomic::Ordering::Relaxed);
                 }
-                let _ = app.emit(
-                    "nook://stats",
-                    Stats { cpu: cpu_now, mem_used, mem_total, net_down, net_up, disk_used, disk_total, battery, saver: imp::power_saver(), gpu: gpu_now },
-                );
+                let stats = Stats { cpu: cpu_now, mem_used, mem_total, net_down, net_up, disk_used, disk_total, battery, saver: imp::power_saver(), gpu: gpu_now };
+                *LATEST.lock().unwrap() = Some(stats.clone());
+                let _ = app.emit("nook://stats", stats);
 
                 // --- Ekran kilitlendi / açıldı (pano temizliği)
                 let locked = imp::screen_locked();

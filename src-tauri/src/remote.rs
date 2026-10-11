@@ -1,0 +1,856 @@
+//! Nook Mobil köprüsü: telefondaki Nook uygulaması PC'ye buradan bağlanır.
+//!
+//! Ayarlar › Telefon'dan açılınca 0.0.0.0:47391'de küçük bir HTTP sunucusu çalışır. Telefon ilk açılışta
+//! QR kodu okuyarak ortak gizli anahtarı alır; sonraki her istek bu anahtarla imzalanır:
+//!   x-nook-ts:  unix milisaniye
+//!   x-nook-sig: hex(HMAC-SHA256(anahtar, "{ts}\n{METHOD}\n{yol}\n" + gövde))
+//! İki dakikadan eski ya da daha önce görülmüş imzalar reddedilir. Yalnızca yerel ağ (10/8, 172.16/12,
+//! 192.168/16) ve Tailscale (100.64/10) adreslerinden gelen bağlantılar kabul edilir.
+//! Ayar dosyası: %LOCALAPPDATA%\Nook\remote.json ({ enabled, secret })
+
+use std::collections::VecDeque;
+use std::io::Read;
+use std::net::IpAddr;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use base64::Engine;
+use hmac::{Hmac, Mac};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::Sha256;
+use tauri::AppHandle;
+use tiny_http::{Header, Method, Request, Response, Server};
+
+pub const PORT: u16 = 47391;
+const MAX_SKEW_MS: i64 = 120_000;
+const MAX_BODY: usize = 8 * 1024 * 1024;
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+struct Config {
+    enabled: bool,
+    /// base64url, 32 bayt
+    secret: String,
+}
+
+static CONFIG: Mutex<Option<Config>> = Mutex::new(None);
+static SERVER: Mutex<Option<Arc<Server>>> = Mutex::new(None);
+static RUNNING: AtomicBool = AtomicBool::new(false);
+static APP: Mutex<Option<AppHandle>> = Mutex::new(None);
+/// PC'deki Nook'un rengi, adı, görünümü ve seçili Argus profili (ön yüz her değişince gönderir)
+static PROFILE: Mutex<Value> = Mutex::new(Value::Null);
+/// Ön yüzün aynası: pano geçmişi ve not sekmeleri (ön yüz değiştikçe gönderir; telefon buradan okur)
+static MIRROR: Mutex<Value> = Mutex::new(Value::Null);
+/// Son iki dakikada görülen imzalar (aynı isteğin tekrar gönderilmesine karşı)
+static SEEN: Mutex<VecDeque<(i64, String)>> = Mutex::new(VecDeque::new());
+
+fn config_path() -> Option<PathBuf> {
+    Some(PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Nook").join("remote.json"))
+}
+
+fn new_secret() -> String {
+    let mut buf = [0u8; 32];
+    getrandom::getrandom(&mut buf).expect("rastgele sayı üretilemedi");
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf)
+}
+
+fn load() -> Config {
+    let mut guard = CONFIG.lock().unwrap();
+    if let Some(c) = guard.as_ref() {
+        return c.clone();
+    }
+    let mut cfg: Config = config_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    if cfg.secret.is_empty() {
+        cfg.secret = new_secret();
+        save_locked(&cfg);
+    }
+    *guard = Some(cfg.clone());
+    cfg
+}
+
+fn save_locked(cfg: &Config) {
+    let Some(p) = config_path() else { return };
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(s) = serde_json::to_string_pretty(cfg) {
+        let _ = std::fs::write(p, s);
+    }
+}
+
+fn store(cfg: Config) {
+    save_locked(&cfg);
+    *CONFIG.lock().unwrap() = Some(cfg);
+}
+
+pub fn spawn(app: AppHandle) {
+    *APP.lock().unwrap() = Some(app);
+    if load().enabled {
+        start();
+    }
+}
+
+fn start() {
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let server = match Server::http(("0.0.0.0", PORT)) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            crate::log::write("error", &format!("telefon köprüsü başlatılamadı: {e}"));
+            RUNNING.store(false, Ordering::SeqCst);
+            return;
+        }
+    };
+    *SERVER.lock().unwrap() = Some(server.clone());
+    crate::log::write("info", &format!("telefon köprüsü açık: {PORT}"));
+    thread::Builder::new()
+        .name("nook-remote".into())
+        .spawn(move || {
+            for req in server.incoming_requests() {
+                // Ekran görüntüsü gibi yavaş işler diğer istekleri bekletmesin
+                let _ = thread::Builder::new().name("nook-remote-req".into()).spawn(move || handle(req));
+            }
+            RUNNING.store(false, Ordering::SeqCst);
+        })
+        .expect("remote thread başlatılamadı");
+}
+
+fn stop() {
+    if let Some(s) = SERVER.lock().unwrap().take() {
+        s.unblock();
+    }
+    RUNNING.store(false, Ordering::SeqCst);
+    crate::log::write("info", "telefon köprüsü kapandı");
+}
+
+// ---------------------------------------------------------------- İstekler
+
+fn allowed_peer(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            v4.is_loopback() || v4.is_private() || (o[0] == 100 && (o[1] & 0xC0) == 64)
+        }
+        // Tailscale IPv6 (fd7a:115c:a1e0::/48) ve yerel adresler
+        IpAddr::V6(v6) => v6.is_loopback() || (v6.segments()[0] & 0xfe00) == 0xfc00 || (v6.segments()[0] & 0xffc0) == 0xfe80,
+    }
+}
+
+fn header(req: &Request, name: &'static str) -> Option<String> {
+    req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.as_str().to_owned())
+}
+
+fn cors(mut res: Response<std::io::Cursor<Vec<u8>>>) -> Response<std::io::Cursor<Vec<u8>>> {
+    for (k, v) in [
+        ("Access-Control-Allow-Origin", "*"),
+        ("Access-Control-Allow-Headers", "content-type, x-nook-ts, x-nook-sig"),
+        ("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"),
+        ("Cache-Control", "no-store"),
+    ] {
+        res.add_header(Header::from_bytes(k, v).unwrap());
+    }
+    res
+}
+
+fn json_res(status: u16, v: Value) -> Response<std::io::Cursor<Vec<u8>>> {
+    let mut r = Response::from_data(v.to_string().into_bytes()).with_status_code(status);
+    r.add_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap());
+    cors(r)
+}
+
+fn err(status: u16, msg: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    json_res(status, json!({ "error": msg }))
+}
+
+fn now_ms() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// hex(HMAC-SHA256(anahtar, "{ts}\n{METHOD}\n{yol}\n" + gövde)) — telefondaki mobile/src/lib/pc.ts ile aynı
+fn signature(secret: &str, ts: i64, method: &str, url: &str, body: &[u8]) -> Result<String, &'static str> {
+    let key = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(secret).map_err(|_| "anahtar bozuk")?;
+    let mut mac = Hmac::<Sha256>::new_from_slice(&key).map_err(|_| "anahtar bozuk")?;
+    mac.update(format!("{ts}\n{method}\n{url}\n").as_bytes());
+    mac.update(body);
+    Ok(hex(&mac.finalize().into_bytes()))
+}
+
+fn verify(req: &Request, body: &[u8]) -> Result<(), &'static str> {
+    let ts: i64 = header(req, "x-nook-ts").and_then(|s| s.parse().ok()).ok_or("imza yok")?;
+    let sig = header(req, "x-nook-sig").ok_or("imza yok")?.to_ascii_lowercase();
+    let now = now_ms();
+    if (now - ts).abs() > MAX_SKEW_MS {
+        return Err("saat farkı çok büyük");
+    }
+    if signature(&load().secret, ts, req.method().as_str(), req.url(), body)? != sig {
+        return Err("imza geçersiz");
+    }
+    let mut seen = SEEN.lock().unwrap();
+    while seen.front().is_some_and(|(t, _)| now - t > MAX_SKEW_MS * 2) {
+        seen.pop_front();
+    }
+    if seen.iter().any(|(_, s)| *s == sig) {
+        return Err("tekrarlanan istek");
+    }
+    seen.push_back((now, sig));
+    Ok(())
+}
+
+fn handle(mut req: Request) {
+    let peer = req.remote_addr().map(|a| a.ip());
+    if !peer.is_some_and(allowed_peer) {
+        let _ = req.respond(err(403, "yalnızca yerel ağ ve Tailscale"));
+        return;
+    }
+    if *req.method() == Method::Options {
+        let _ = req.respond(cors(Response::from_data(Vec::new()).with_status_code(204)));
+        return;
+    }
+    // İmzasız tek uç: telefon "bu adreste Nook var mı?" diye bakar
+    if req.url() == "/v1/hello" {
+        let _ = req.respond(json_res(200, json!({ "nook": true, "version": env!("CARGO_PKG_VERSION") })));
+        return;
+    }
+    let mut body = Vec::new();
+    if req.as_reader().take(MAX_BODY as u64 + 1).read_to_end(&mut body).is_err() || body.len() > MAX_BODY {
+        let _ = req.respond(err(413, "istek çok büyük"));
+        return;
+    }
+    if let Err(e) = verify(&req, &body) {
+        crate::log::write("warn", &format!("telefon isteği reddedildi ({e}): {} {}", req.method(), req.url()));
+        let _ = req.respond(err(401, e));
+        return;
+    }
+    let url = req.url().to_owned();
+    let (path, query) = url.split_once('?').unwrap_or((&url, ""));
+    let res = route(req.method(), path, query, &body);
+    let _ = req.respond(res);
+}
+
+fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
+    query.split('&').find_map(|kv| kv.split_once('=').filter(|(k, _)| *k == key).map(|(_, v)| v))
+}
+
+fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std::io::Cursor<Vec<u8>>> {
+    match (method, path) {
+        (Method::Get, "/v1/status") => json_res(200, status()),
+        // ?m=0,1… → o ekran (soldan sağa), ?m=all → hepsi yan yana; yoksa ana ekran
+        (Method::Get, "/v1/screenshot") => match match query_param(query, "m") {
+            Some("all") => crate::imaging::capture_monitor_jpeg(None, 2560, 80),
+            Some(i) => match i.parse() {
+                Ok(i) => crate::imaging::capture_monitor_jpeg(Some(i), 1920, 80),
+                Err(_) => Err("geçersiz ekran".into()),
+            },
+            None => {
+                let primary = crate::imaging::monitors().iter().position(|m| m.1);
+                crate::imaging::capture_monitor_jpeg(primary.or(Some(0)), 1920, 80)
+            }
+        } {
+            Ok(jpg) => {
+                let mut r = Response::from_data(jpg);
+                r.add_header(Header::from_bytes("Content-Type", "image/jpeg").unwrap());
+                cors(r)
+            }
+            Err(e) => err(500, &e),
+        },
+        (Method::Post, "/v1/power") => {
+            let action = serde_json::from_slice::<Value>(body).ok().and_then(|v| v["action"].as_str().map(str::to_owned)).unwrap_or_default();
+            match power(&action) {
+                Ok(()) => json_res(200, json!({ "ok": true })),
+                Err(e) => err(400, &e),
+            }
+        }
+        // Şu an çalan + PC'nin ses seviyesi
+        (Method::Get, "/v1/media") => {
+            let (volume, muted) = crate::quick::volume_state();
+            json_res(200, json!({ "media": crate::media::now_playing(), "volume": volume, "muted": muted }))
+        }
+        (Method::Get, "/v1/media/art") => match crate::media::artwork_bytes() {
+            Some((mime, bytes)) => {
+                let mut r = Response::from_data(bytes);
+                r.add_header(Header::from_bytes("Content-Type", mime.as_bytes()).unwrap_or_else(|_| Header::from_bytes("Content-Type", "image/png").unwrap()));
+                cors(r)
+            }
+            None => err(404, "kapak yok"),
+        },
+        // { action: toggle | next | prev } ya da { volume: 0-1 } ya da { muted: bool }
+        (Method::Post, "/v1/media") => {
+            let b = body_json(body);
+            let r = if let Some(a) = b["action"].as_str() {
+                crate::media::media_control(a.to_owned())
+            } else if let Some(v) = b["volume"].as_f64() {
+                crate::quick::set_volume(v as f32)
+            } else if let Some(m) = b["muted"].as_bool() {
+                crate::quick::set_muted(m)
+            } else {
+                Err("ne yapılacağı belirtilmedi".into())
+            };
+            match r {
+                Ok(()) => json_res(200, json!({ "ok": true })),
+                Err(e) => err(400, &e),
+            }
+        }
+        // Pano: PC'nin pano geçmişi; telefondan gelen metin PC'nin panosuna yazılır
+        (Method::Get, "/v1/clips") => json_res(200, json!({ "clips": MIRROR.lock().unwrap()["clips"].clone() })),
+        (Method::Get, "/v1/clips/image") => {
+            let id = query_param(query, "id").unwrap_or("");
+            // Yalnızca geçmişteki bir görselin dosyası (keyfi dosya okunamasın)
+            let path = MIRROR.lock().unwrap()["clips"]
+                .as_array()
+                .and_then(|a| a.iter().find(|c| c["id"].as_str() == Some(id)))
+                .and_then(|c| c["path"].as_str().map(str::to_owned));
+            match path.and_then(|p| std::fs::read(p).ok()) {
+                Some(bytes) => {
+                    let mut r = Response::from_data(bytes);
+                    r.add_header(Header::from_bytes("Content-Type", "image/png").unwrap());
+                    cors(r)
+                }
+                None => err(404, "görsel yok"),
+            }
+        }
+        (Method::Post, "/v1/clips") => {
+            let text = body_json(body)["text"].as_str().unwrap_or("").to_owned();
+            if text.is_empty() {
+                return err(400, "metin boş");
+            }
+            match APP.lock().unwrap().as_ref() {
+                Some(app) => {
+                    use tauri_plugin_clipboard_manager::ClipboardExt;
+                    match app.clipboard().write_text(text) {
+                        Ok(()) => {
+                            crate::system::emit_event(app, "phone", "Telefondan panoya geldi", "Nook Mobil");
+                            json_res(200, json!({ "ok": true }))
+                        }
+                        Err(e) => err(500, &e.to_string()),
+                    }
+                }
+                None => err(503, "Nook hazır değil"),
+            }
+        }
+        // Not: sekmeler ve metinleri; değişiklik Nook'a iletilir, ayna da hemen güncellenir
+        (Method::Get, "/v1/notes") => {
+            let m = MIRROR.lock().unwrap();
+            json_res(200, json!({ "pads": m["pads"].clone(), "padId": m["padId"].clone() }))
+        }
+        // { op: set | add | remove | rename, id?, text?, title? }
+        (Method::Post, "/v1/notes") => {
+            let b = body_json(body);
+            let op = b["op"].as_str().unwrap_or("");
+            if !matches!(op, "set" | "add" | "remove" | "rename") {
+                return err(400, "bilinmeyen not işlemi");
+            }
+            let mut cmd = b.clone();
+            // Yeni sekmenin kimliği burada verilir ki telefon hemen o sekmeye geçebilsin
+            if op == "add" && cmd["id"].as_str().is_none() {
+                let mut buf = [0u8; 12];
+                let _ = getrandom::getrandom(&mut buf);
+                cmd["id"] = Value::String(hex(&buf));
+            }
+            apply_note(&cmd);
+            match APP.lock().unwrap().as_ref() {
+                Some(app) => {
+                    use tauri::Emitter;
+                    let _ = app.emit_to(crate::window::ISLAND, "nook://remote", json!({ "kind": "note", "cmd": cmd }));
+                    json_res(200, json!({ "ok": true, "id": cmd["id"] }))
+                }
+                None => err(503, "Nook hazır değil"),
+            }
+        }
+        // Hum: telefonun mikrofonundan 16 kHz mono s16le ses; PC tanır, geçmişe (ve Argus'a) yazar
+        (Method::Post, "/v1/hum") => {
+            let samples: Vec<f32> = body.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
+            if samples.len() < 16_000 * 2 {
+                return err(400, "ses çok kısa");
+            }
+            let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
+            let out = crate::hum::phone(&app, &samples);
+            if let crate::hum::Outcome::Found { track } = &out {
+                crate::system::emit_event(&app, "phone", format!("Telefon duydu: {}", track.title), track.artist.clone());
+            }
+            json_res(200, json!(out))
+        }
+        (Method::Get, "/v1/hum") => json_res(200, json!({ "hums": MIRROR.lock().unwrap()["hums"].clone() })),
+        (_, p) if p.starts_with("/v1/argus/") => argus(method, p, query, body),
+        _ => err(404, "bilinmeyen istek"),
+    }
+}
+
+fn body_json(body: &[u8]) -> Value {
+    serde_json::from_slice(body).unwrap_or(Value::Null)
+}
+
+/// Argus (telefondaki Argus Nook'u). Yazma işleri Argus'un kendi sunucusundan geçer (kapalıysa görünmez açılır).
+fn argus(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std::io::Cursor<Vec<u8>>> {
+    use crate::argus as a;
+    let result: Result<Value, String> = match (method, path) {
+        // Nook'un Argus özeti: diziler (sıradaki bölüm), filmler, afişler (/medya/… → proxy ile)
+        (Method::Get, "/v1/argus/summary") => {
+            let today = query_param(query, "today").unwrap_or("").to_owned();
+            let app = APP.lock().unwrap().clone();
+            let profile = PROFILE.lock().unwrap()["argusProfile"].as_str().filter(|p| !p.is_empty()).map(str::to_owned);
+            match app.and_then(|app| a::snapshot_blocking(&app, profile, today, None)) {
+                Some(snap) => {
+                    let mut v = serde_json::to_value(snap).unwrap_or(Value::Null);
+                    // Afişler PC'deki dosya yolu; telefon /medya/… adresiyle proxy'den ister
+                    if let Some(items) = v.get_mut("items").and_then(|x| x.as_array_mut()) {
+                        for it in items {
+                            let rel = it["poster"].as_str().and_then(|p| {
+                                let p = p.replace('\\', "/");
+                                p.find("/medya/").map(|i| p[i..].to_owned())
+                            });
+                            it["poster"] = rel.map(Value::String).unwrap_or(Value::Null);
+                        }
+                    }
+                    Ok(v)
+                }
+                None => Err("Bu bilgisayarda Argus bulunamadı".into()),
+            }
+        }
+        (Method::Post, "/v1/argus/mark") => {
+            let b = body_json(body);
+            let u = |k: &str| b[k].as_u64().map(|x| x as u32);
+            a::phone_keepalive().and_then(|_| {
+                a::mark_blocking(
+                    b["rowId"].as_str().unwrap_or("").to_owned(),
+                    u("season"),
+                    u("episode"),
+                    b["status"].as_str().map(str::to_owned),
+                    b["today"].as_str().unwrap_or("").to_owned(),
+                )
+                .map(|r| serde_json::to_value(r).unwrap_or(Value::Null))
+            })
+        }
+        (Method::Get, "/v1/argus/episodes") => a::episodes_for(query_param(query, "rowId").unwrap_or("")),
+        // { rowId, add: [[sezon, bölüm]…], remove: [[sezon, bölüm]…], today }
+        (Method::Post, "/v1/argus/episodes") => {
+            let b = body_json(body);
+            let pairs = |k: &str| -> Vec<(u32, u32)> {
+                b[k].as_array()
+                    .map(|a| a.iter().filter_map(|p| Some((p.get(0)?.as_u64()? as u32, p.get(1)?.as_u64()? as u32))).collect())
+                    .unwrap_or_default()
+            };
+            a::phone_keepalive().and_then(|_| {
+                a::set_episodes_blocking(b["rowId"].as_str().unwrap_or(""), &pairs("add"), &pairs("remove"), b["today"].as_str().unwrap_or(""))
+                    .map(|r| serde_json::to_value(r).unwrap_or(Value::Null))
+            })
+        }
+        (Method::Post, "/v1/argus/search") => {
+            let b = body_json(body);
+            a::tmdb_search_blocking(b["query"].as_str().unwrap_or("").to_owned(), b["lang"].as_str().unwrap_or("tr-TR").to_owned())
+                .map(|hits| serde_json::to_value(hits).unwrap_or(Value::Null))
+        }
+        (Method::Post, "/v1/argus/add") => {
+            let b = body_json(body);
+            a::phone_keepalive().and_then(|_| {
+                a::tmdb_add_blocking(b["tmdbId"].as_u64().unwrap_or(0), b["mediaType"].as_str().unwrap_or("").to_owned()).map(|id| json!({ "rowId": id }))
+            })
+        }
+        // Argus'un kendi API'si ve görselleri, aynen ("Ne izlesem?" Argus'un ayarlarıyla telefonda çalışır)
+        (m, p) if p.starts_with("/v1/argus/proxy/") => {
+            let target = format!("/{}{}", &p["/v1/argus/proxy/".len()..], if query.is_empty() { String::new() } else { format!("?{query}") });
+            return match a::phone_proxy(m.as_str(), &target, body) {
+                Ok((status, ctype, bytes)) => {
+                    let mut r = Response::from_data(bytes).with_status_code(status);
+                    r.add_header(Header::from_bytes("Content-Type", ctype.as_bytes()).unwrap_or_else(|_| Header::from_bytes("Content-Type", "application/octet-stream").unwrap()));
+                    cors(r)
+                }
+                Err(e) => err(502, &e),
+            };
+        }
+        _ => return err(404, "bilinmeyen Argus isteği"),
+    };
+    match result {
+        Ok(v) => json_res(200, v),
+        Err(e) if e == "nokey" => err(400, "Argus'ta TMDB API anahtarı yok (Argus › Ayarlar › Veritabanı › API)"),
+        Err(e) => err(500, &e),
+    }
+}
+
+fn status() -> Value {
+    json!({
+        "name": host_name(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "locked": crate::system::screen_locked(),
+        "uptimeSec": crate::shield::system_uptime(),
+        "stats": *crate::system::LATEST.lock().unwrap(),
+        "mac": net::primary_mac(),
+        // Telefon eşleşmedeki adresleri bununla tazeler (sonradan Tailscale kurulunca kodu yeniden okutmaya gerek yok)
+        "hosts": net::addresses(),
+        // Dışarıdan açma: evin internet adresi (modem uyandırma paketini PC'ye iletir)
+        "wan": crate::outside::home_ip(),
+        "nook": *PROFILE.lock().unwrap(),
+        // Soldan sağa; ekran görüntüsünde ?m= bu sırayla
+        "monitors": crate::imaging::monitors().iter().map(|((_, _, w, h), primary)| json!({ "width": w, "height": h, "primary": primary })).collect::<Vec<_>>(),
+    })
+}
+
+/// Kapat / yeniden başlat / uyku: yanıt telefona ulaşsın diye biraz bekleyip yapılır.
+fn power(action: &str) -> Result<(), String> {
+    let label = match action {
+        "shutdown" => "Telefondan kapatılıyor",
+        "restart" => "Telefondan yeniden başlatılıyor",
+        "sleep" => "Telefondan uyku moduna alınıyor",
+        "lock" => "Telefondan kilitlendi",
+        "screen-off" => "Telefondan ekran kapatıldı",
+        _ => return Err("bilinmeyen işlem".into()),
+    };
+    crate::log::write("info", &format!("telefon: {action}"));
+    if let Some(app) = APP.lock().unwrap().as_ref() {
+        crate::system::emit_event(app, "phone", label, "Nook Mobil");
+    }
+    let action = action.to_owned();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(if action == "lock" || action == "screen-off" { 200 } else { 2500 }));
+        let r = match action.as_str() {
+            "shutdown" => power::exit(false),
+            "restart" => power::exit(true),
+            "sleep" => power::sleep(),
+            "lock" => crate::quick::quick_action("lock".into()),
+            _ => crate::quick::quick_action("screen-off".into()),
+        };
+        if let Err(e) = r {
+            crate::log::write("error", &format!("telefon: {action} başarısız: {e}"));
+        }
+    });
+    Ok(())
+}
+
+fn host_name() -> String {
+    std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".into())
+}
+
+// ---------------------------------------------------------------- Ayarlar komutları
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Info {
+    enabled: bool,
+    running: bool,
+    name: String,
+    port: u16,
+    /// Telefonun deneyeceği adresler (önce Tailscale, sonra yerel ağ)
+    hosts: Vec<String>,
+    tailscale: bool,
+    mac: Option<String>,
+    /// Eşleşme QR kodu (SVG); köprü kapalıyken yok
+    qr: Option<String>,
+    /// Nook Mobil'i indirme bağlantısının QR kodu (en son sürümün APK'sı)
+    app_qr: Option<String>,
+}
+
+fn pair_url(cfg: &Config, hosts: &[String], mac: Option<&str>) -> String {
+    let enc = |s: &str| s.replace('%', "%25").replace('&', "%26").replace(' ', "%20").replace('#', "%23");
+    format!(
+        "nook://pair?v=1&n={}&h={}&p={PORT}&k={}&m={}",
+        enc(&host_name()),
+        enc(&hosts.join(",")),
+        cfg.secret,
+        mac.unwrap_or("")
+    )
+}
+
+pub(crate) fn qr_svg(data: &str) -> Option<String> {
+    use qrcode::render::svg;
+    let code = qrcode::QrCode::with_error_correction_level(data, qrcode::EcLevel::M).ok()?;
+    Some(code.render::<svg::Color>().min_dimensions(180, 180).quiet_zone(true).dark_color(svg::Color("#000")).light_color(svg::Color("#fff")).build())
+}
+
+#[tauri::command]
+pub fn remote_info() -> Info {
+    let cfg = load();
+    let hosts = net::addresses();
+    let mac = net::primary_mac();
+    let qr = cfg.enabled.then(|| qr_svg(&pair_url(&cfg, &hosts, mac.as_deref()))).flatten();
+    Info {
+        enabled: cfg.enabled,
+        running: RUNNING.load(Ordering::SeqCst),
+        name: host_name(),
+        port: PORT,
+        tailscale: hosts.iter().any(|h| h.starts_with("100.")),
+        hosts,
+        mac,
+        qr,
+        app_qr: qr_svg("https://github.com/lukosovian/nook/releases/latest/download/NookMobil.apk"),
+    }
+}
+
+#[tauri::command]
+pub fn remote_set(enabled: bool) -> Info {
+    let mut cfg = load();
+    cfg.enabled = enabled;
+    store(cfg);
+    if enabled {
+        start();
+    } else {
+        stop();
+    }
+    remote_info()
+}
+
+/// Telefondan gelen not değişikliğini aynaya da uygular (ön yüz sonra kendi aynasını gönderir)
+fn apply_note(cmd: &Value) {
+    let mut m = MIRROR.lock().unwrap();
+    if !m["pads"].is_array() {
+        m["pads"] = Value::Array(Vec::new());
+    }
+    let id = cmd["id"].as_str().unwrap_or("").to_owned();
+    let pads = m["pads"].as_array_mut().unwrap();
+    match cmd["op"].as_str().unwrap_or("") {
+        "set" => {
+            if let Some(p) = pads.iter_mut().find(|p| p["id"].as_str() == Some(&id)) {
+                p["text"] = cmd["text"].clone();
+            }
+        }
+        "rename" => {
+            if let Some(p) = pads.iter_mut().find(|p| p["id"].as_str() == Some(&id)) {
+                p["title"] = cmd["title"].clone();
+            }
+        }
+        "remove" => pads.retain(|p| p["id"].as_str() != Some(&id)),
+        "add" => pads.push(json!({ "id": id, "title": cmd["title"].as_str().unwrap_or("Not"), "text": cmd["text"].as_str().unwrap_or("") })),
+        _ => {}
+    }
+}
+
+/// Ön yüz pano geçmişini ve not sekmelerini gönderir: { clips, pads, padId }
+#[tauri::command]
+pub fn remote_mirror(data: Value) {
+    *MIRROR.lock().unwrap() = data;
+}
+
+#[tauri::command]
+pub fn remote_profile(profile: Value) {
+    *PROFILE.lock().unwrap() = profile;
+}
+
+/// Yeni anahtar: eşleşmiş telefon(lar) bağlantıyı kaybeder, QR yeniden okutulmalı.
+#[tauri::command]
+pub fn remote_reset() -> Info {
+    let mut cfg = load();
+    cfg.secret = new_secret();
+    store(cfg);
+    SEEN.lock().unwrap().clear();
+    crate::log::write("info", "telefon eşleşmesi sıfırlandı");
+    remote_info()
+}
+
+// ---------------------------------------------------------------- Güç
+
+#[cfg(windows)]
+mod power {
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, LUID};
+    use windows_sys::Win32::Security::{AdjustTokenPrivileges, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY};
+    use windows_sys::Win32::System::Shutdown::{ExitWindowsEx, EWX_POWEROFF, EWX_REBOOT, EWX_SHUTDOWN, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OTHER};
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    /// Kapatma yetkisi (SeShutdownPrivilege) işlem için açılmalı
+    fn enable_shutdown_privilege() -> Result<(), String> {
+        unsafe {
+            let mut token: HANDLE = std::ptr::null_mut();
+            if OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token) == 0 {
+                return Err("yetki alınamadı".into());
+            }
+            let name: Vec<u16> = "SeShutdownPrivilege".encode_utf16().chain(Some(0)).collect();
+            let mut luid = LUID { LowPart: 0, HighPart: 0 };
+            let ok = LookupPrivilegeValueW(std::ptr::null(), name.as_ptr(), &mut luid) != 0 && {
+                let tp = TOKEN_PRIVILEGES {
+                    PrivilegeCount: 1,
+                    Privileges: [windows_sys::Win32::Security::LUID_AND_ATTRIBUTES { Luid: luid, Attributes: SE_PRIVILEGE_ENABLED }],
+                };
+                AdjustTokenPrivileges(token, 0, &tp, 0, std::ptr::null_mut(), std::ptr::null_mut()) != 0
+            };
+            CloseHandle(token);
+            if ok {
+                Ok(())
+            } else {
+                Err("kapatma yetkisi yok".into())
+            }
+        }
+    }
+
+    pub fn exit(restart: bool) -> Result<(), String> {
+        enable_shutdown_privilege()?;
+        let flags = if restart { EWX_REBOOT } else { EWX_SHUTDOWN | EWX_POWEROFF };
+        if unsafe { ExitWindowsEx(flags, SHTDN_REASON_MAJOR_OTHER | SHTDN_REASON_FLAG_PLANNED) } == 0 {
+            return Err("Windows kapatmayı reddetti".into());
+        }
+        Ok(())
+    }
+
+    pub fn sleep() -> Result<(), String> {
+        if unsafe { windows_sys::Win32::System::Power::SetSuspendState(0, 0, 0) } == 0 {
+            return Err("uyku moduna geçilemedi".into());
+        }
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+mod power {
+    pub fn exit(_restart: bool) -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+    pub fn sleep() -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+}
+
+// ---------------------------------------------------------------- Ağ bilgisi
+
+#[cfg(windows)]
+mod net {
+    use windows_sys::Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, IP_ADAPTER_ADDRESSES_LH};
+    use windows_sys::Win32::NetworkManagement::Ndis::IfOperStatusUp;
+    use windows_sys::Win32::Networking::WinSock::{AF_INET, SOCKADDR_IN};
+
+    struct Adapter {
+        ips: Vec<std::net::Ipv4Addr>,
+        mac: Option<String>,
+        guid: String,
+        description: String,
+        /// IF_TYPE_ETHERNET_CSMACD (Wi-Fi 71)
+        wired: bool,
+    }
+
+    fn adapters() -> Vec<Adapter> {
+        let mut out = Vec::new();
+        unsafe {
+            let mut size: u32 = 16 * 1024;
+            let mut buf: Vec<u8>;
+            loop {
+                buf = vec![0u8; size as usize];
+                let r = GetAdaptersAddresses(
+                    AF_INET as u32,
+                    GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+                    std::ptr::null(),
+                    buf.as_mut_ptr().cast(),
+                    &mut size,
+                );
+                if r == 111 {
+                    continue; // ERROR_BUFFER_OVERFLOW: size büyütüldü
+                }
+                if r != 0 {
+                    return out;
+                }
+                break;
+            }
+            let mut p = buf.as_ptr() as *const IP_ADAPTER_ADDRESSES_LH;
+            while !p.is_null() {
+                let a = &*p;
+                if a.OperStatus == IfOperStatusUp {
+                    let mut ips = Vec::new();
+                    let mut u = a.FirstUnicastAddress;
+                    while !u.is_null() {
+                        let sa = (*u).Address.lpSockaddr;
+                        if !sa.is_null() && (*sa).sa_family == AF_INET {
+                            let sin = &*(sa as *const SOCKADDR_IN);
+                            ips.push(std::net::Ipv4Addr::from(u32::from_be(sin.sin_addr.S_un.S_addr)));
+                        }
+                        u = (*u).Next;
+                    }
+                    let mac = (a.PhysicalAddressLength == 6).then(|| {
+                        a.PhysicalAddress[..6].iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(":")
+                    });
+                    let guid = if a.AdapterName.is_null() { String::new() } else { std::ffi::CStr::from_ptr(a.AdapterName as *const _).to_string_lossy().into_owned() };
+                    let description = if a.Description.is_null() {
+                        String::new()
+                    } else {
+                        let len = (0..).take_while(|&i| *a.Description.add(i) != 0).count();
+                        String::from_utf16_lossy(std::slice::from_raw_parts(a.Description, len))
+                    };
+                    out.push(Adapter { ips, mac, guid, description, wired: a.IfType == 6 });
+                }
+                p = a.Next;
+            }
+        }
+        out
+    }
+
+    /// Telefonun bağlanabileceği adresler: önce Tailscale (100.64/10), sonra yerel ağ
+    pub fn addresses() -> Vec<String> {
+        let mut ts = Vec::new();
+        let mut lan = Vec::new();
+        for a in adapters() {
+            for ip in a.ips {
+                let o = ip.octets();
+                if o[0] == 100 && (o[1] & 0xC0) == 64 {
+                    ts.push(ip.to_string());
+                } else if ip.is_private() && !ip.is_link_local() {
+                    lan.push(ip.to_string());
+                }
+            }
+        }
+        // İnternete çıkan arayüz yerel ağda başa (sanal ağ bağdaştırıcıları sona)
+        if let Some(main) = crate::disks::local_ip() {
+            if let Some(i) = lan.iter().position(|x| *x == main) {
+                let m = lan.remove(i);
+                lan.insert(0, m);
+            }
+        }
+        ts.extend(lan);
+        ts
+    }
+
+    /// Wake-on-LAN için internete çıkan ağ kartının MAC adresi
+    pub fn primary_mac() -> Option<String> {
+        let main: std::net::Ipv4Addr = crate::disks::local_ip()?.parse().ok()?;
+        adapters().into_iter().find(|a| a.ips.contains(&main)).and_then(|a| a.mac)
+    }
+
+    /// İnternete çıkan ağ kartı (Wake-on-LAN hazırlığı, wol.rs)
+    pub fn primary_adapter() -> Option<super::PrimaryAdapter> {
+        let main: std::net::Ipv4Addr = crate::disks::local_ip()?.parse().ok()?;
+        let a = adapters().into_iter().find(|a| a.ips.contains(&main))?;
+        Some(super::PrimaryAdapter { guid: a.guid, description: a.description, wired: a.wired })
+    }
+}
+
+#[cfg(not(windows))]
+mod net {
+    pub fn addresses() -> Vec<String> {
+        crate::disks::local_ip().into_iter().collect()
+    }
+    pub fn primary_mac() -> Option<String> {
+        None
+    }
+    pub fn primary_adapter() -> Option<super::PrimaryAdapter> {
+        None
+    }
+}
+
+pub struct PrimaryAdapter {
+    pub guid: String,
+    pub description: String,
+    pub wired: bool,
+}
+
+pub use net::{addresses, primary_adapter, primary_mac};
+
+#[cfg(test)]
+mod tests {
+    /// Telefonun WebCrypto ile ürettiği imzayla birebir aynı olmalı
+    #[test]
+    fn signature_matches_phone() {
+        let sig = super::signature("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", 1_700_000_000_000, "POST", "/v1/power", br#"{"action":"lock"}"#).unwrap();
+        assert_eq!(sig, "db1491f09d376ffe5bfa5328f1e7e36a3f3a43c558bf1ba702df30a1c245462d");
+    }
+
+    #[test]
+    fn pair_url_has_hosts_port_key() {
+        let cfg = super::Config { enabled: true, secret: "k".repeat(43) };
+        let url = super::pair_url(&cfg, &["100.64.1.2".into(), "192.168.1.5".into()], Some("AA:BB:CC:DD:EE:FF"));
+        assert!(url.starts_with("nook://pair?v=1&n="));
+        assert!(url.contains("&h=100.64.1.2,192.168.1.5&p=47391&k="));
+    }
+}

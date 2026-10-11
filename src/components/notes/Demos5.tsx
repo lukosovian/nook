@@ -4,10 +4,10 @@
  * klavye, Pro kotası dolunca Flash'a geçiş ve küçük düzeltmeler; 0.2.51'de tepsiden "Adayı aç" ve
  * izlerken Hum (dizinin/filmin müzikleri dakikasıyla Argus'a); 0.2.53'te klasörlerin altında kalmayan
  * ada ve kartlar, Argus'ta olmayanı tanıyıp eklemeyi önerme; 0.2.54'te başlıktaki yılla doğru içerik ve
- * TMDB anahtarı yoksa uyarı.
+ * TMDB anahtarı yoksa uyarı; 0.2.55'te Nook Mobil köprüsü (telefondan ekran görüntüsü, kilit, kapatma) birden çok ekranda hangisinin alınacağını seçme, telefondan Argus, Medya, PC'yi açma, Pano, Not ve ana ekranda canlı Nook.
  * Hepsi kendi kendine döner.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlarmClock,
@@ -28,6 +28,13 @@ import {
   Folder,
   Globe,
   KeyRound,
+  Camera,
+  Power,
+  Smartphone,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+  Pause,
   Plus,
   X,
   TriangleAlert,
@@ -1142,7 +1149,506 @@ function ArgusNoKeyDemo() {
   );
 }
 
+/** Sabit boyutlu sahneyi kartın ortasına koyar; kart darsa (iki sütunlu notlar) sığacak kadar küçültür */
+function Fit({ w, h, children }: { w: number; h: number; children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setScale(Math.min(1, (el.clientWidth - 20) / w, (el.clientHeight - 12) / h)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [w, h]);
+  return (
+    <div ref={box} className="absolute inset-0 flex items-center justify-center">
+      <div className="relative shrink-0" style={{ width: w, height: h, transform: `scale(${scale})` }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Nook Mobil: telefonda Ekran görüntüsü'ne basılır → PC'nin ekranı telefona uçar; sonra Kilitle → adada "Telefondan kilitlendi" */
+function PhoneDemo() {
+  const n = useTick(900);
+  const phase = n % 8; // 0 bekle · 1 dokun · 2-3 görüntü uçar · 4 telefonda · 5 kilit dokun · 6-7 adada kart, ekran kilitli
+  const T = ACCENT.teal;
+  const Y = ACCENT.yellow;
+  const SCREEN = "linear-gradient(120deg, #24324f, #2f5f8f 55%, #3fbfa5)";
+  const btn = (color: string, Icon: typeof Camera, on: boolean) => (
+    <motion.span
+      className="flex h-[20px] items-center justify-center rounded-[6px]"
+      animate={{ scale: on ? 0.84 : 1, background: on ? tintBg(color, 40) : "rgb(255 255 255 / 0.07)" }}
+      transition={{ duration: 0.15 }}
+    >
+      <span className="flex h-[13px] w-[13px] items-center justify-center rounded-full" style={{ background: color, boxShadow: `0 0 6px -1px ${color}` }}>
+        <Icon size={8} strokeWidth={2.8} className="text-black/75" />
+      </span>
+    </motion.span>
+  );
+  return (
+    <Stage>
+      <Fit w={290} h={110}>
+        {/* Telefon */}
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] rounded-[11px] border border-white/20 bg-black p-[5px]">
+          <div className="mb-[5px] flex items-center gap-[4px]">
+            <span className="h-[10px] w-[10px] rounded-full" style={{ background: ACCENT.blue, boxShadow: `0 0 6px ${ACCENT.blue}` }} />
+            <span className="h-[3px] flex-1 rounded-full bg-white/25" />
+          </div>
+          <div className="grid grid-cols-2 gap-[4px]">
+            {btn(T, Camera, phase === 1)}
+            {btn(Y, Lock, phase === 5)}
+            {btn(ACCENT.purple, Moon, false)}
+            {btn(ACCENT.red, Power, false)}
+          </div>
+          <AnimatePresence>
+            {phase >= 4 && phase <= 5 && (
+              <motion.div className="absolute inset-x-[5px] bottom-[6px] h-[26px] rounded-[4px]" style={{ background: SCREEN }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+            )}
+          </AnimatePresence>
+        </div>
+        {/* Bilgisayar */}
+        <div className="absolute right-0 top-[4px] h-[84px] w-[140px] overflow-hidden rounded-[8px] border border-white/15 bg-[#141924]">
+          <div className="absolute inset-x-[6px] bottom-[6px] top-[18px] rounded-[4px]" style={{ background: SCREEN }} />
+          <AnimatePresence>
+            {phase >= 6 && <motion.div className="absolute inset-x-[6px] bottom-[6px] top-[18px] rounded-[4px] bg-black/75" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />}
+            {phase === 2 && <motion.div className="absolute inset-0 bg-white" initial={{ opacity: 0.75 }} animate={{ opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} />}
+          </AnimatePresence>
+          {/* Ada */}
+          <motion.div
+            className="absolute left-1/2 top-[4px] flex h-[11px] -translate-x-1/2 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full bg-black text-[7px] font-medium"
+            style={{ color: tintText(Y) }}
+            animate={{ width: phase >= 6 ? 104 : 40 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+          >
+            {phase >= 6 && (
+              <motion.span className="flex items-center gap-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
+                <Smartphone size={7} />
+                {tt("Telefondan kilitlendi")}
+              </motion.span>
+            )}
+          </motion.div>
+        </div>
+        <div className="absolute right-[60px] top-[88px] h-[7px] w-[20px] bg-white/15" />
+        <div className="absolute right-[48px] top-[95px] h-[3px] w-[44px] rounded-full bg-white/15" />
+        {/* Telefona uçan görüntü */}
+        <AnimatePresence>
+          {(phase === 2 || phase === 3) && (
+            <motion.div
+              className="absolute rounded-[4px] border border-white/30"
+              style={{ background: SCREEN }}
+              initial={{ left: 156, top: 22, width: 128, height: 60, opacity: 0 }}
+              animate={{ left: 5, top: 75, width: 48, height: 26, opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.4, ease: "easeInOut" }}
+            />
+          )}
+        </AnimatePresence>
+      </Fit>
+    </Stage>
+  );
+}
+
+/** İki ekran: telefonda "Hangi ekran?" → 2'ye basılır, sağdaki ekran parlar ve görüntüsü telefona gelir; sonra "Hepsi" */
+function PhoneScreensDemo() {
+  const n = useTick(850);
+  const phase = n % 9; // 0 seçim · 1 "2"ye dokun · 2-3 sağ ekran uçar · 4 telefonda · 5 "Hepsi"ye dokun · 6-7 ikisi uçar · 8 telefonda
+  const B = ACCENT.blue;
+  const SCR = ["linear-gradient(120deg, #24324f, #2f5f8f 55%, #3fbfa5)", "linear-gradient(120deg, #3b2a5c, #6d3a8f 55%, #e05080)"];
+  const pick = phase >= 5 ? "all" : phase >= 1 ? 1 : null;
+  const showRight = phase >= 4 && phase <= 5;
+  const showAll = phase >= 8;
+  const choosing = phase <= 1 || phase === 5;
+  const monitor = (i: number, left: number) => (
+    <div className="absolute top-[8px] h-[54px] w-[88px] overflow-hidden rounded-[6px] border border-white/15 bg-[#141924]" style={{ left }}>
+      <div className="absolute inset-[5px] rounded-[3px]" style={{ background: SCR[i] }} />
+      <AnimatePresence>
+        {((phase === 2 && i === 1) || (phase === 6)) && (
+          <motion.div className="absolute inset-0 bg-white" initial={{ opacity: 0.75 }} animate={{ opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} />
+        )}
+      </AnimatePresence>
+      <span className="absolute bottom-[2px] right-[4px] font-round text-[9px] font-extrabold text-white/80">{i + 1}</span>
+    </div>
+  );
+  return (
+    <Stage>
+      <Fit w={300} h={110}>
+        {/* Telefon */}
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] overflow-hidden rounded-[11px] border border-white/20 bg-black p-[5px]">
+          <AnimatePresence mode="wait">
+            {choosing ? (
+              <motion.div key="pick" className="absolute inset-x-[4px] bottom-[4px] rounded-[7px] bg-[#1c1c1f] p-[4px]" initial={{ y: 30 }} animate={{ y: 0 }} exit={{ y: 40 }}>
+                <p className="mb-[3px] text-center text-[5.5px] font-semibold text-label">{tt("Hangi ekran?")}</p>
+                <div className="flex justify-center gap-[3px]">
+                  {[0, 1].map((i) => (
+                    <motion.span
+                      key={i}
+                      className="flex h-[12px] w-[18px] items-center justify-center rounded-[3px] border text-[6px] font-bold"
+                      animate={{ scale: pick === i ? 0.82 : 1, borderColor: i === 0 ? B : "rgb(255 255 255 / 0.25)", background: pick === i ? tintBg(B, 50) : "rgb(255 255 255 / 0.05)" }}
+                    >
+                      {i + 1}
+                    </motion.span>
+                  ))}
+                </div>
+                <motion.span
+                  className="mt-[3px] block rounded-[3px] py-[2px] text-center text-[5.5px] font-medium text-label"
+                  animate={{ scale: pick === "all" ? 0.86 : 1, background: pick === "all" ? tintBg(B, 50) : "rgb(255 255 255 / 0.07)" }}
+                >
+                  {tt("Hepsi")}
+                </motion.span>
+              </motion.div>
+            ) : (
+              <motion.div key="view" className="absolute inset-x-[4px] top-[30px] flex gap-[1px]" initial={{ opacity: 0 }} animate={{ opacity: showRight || showAll ? 1 : 0 }} exit={{ opacity: 0 }}>
+                {(showAll ? [0, 1] : [1]).map((i) => (
+                  <span key={i} className="h-[26px] flex-1 rounded-[3px]" style={{ background: SCR[i] }} />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        {monitor(0, 112)}
+        {monitor(1, 206)}
+        {/* Uçan görüntü(ler) */}
+        <AnimatePresence>
+          {(phase === 2 || phase === 3 || phase === 6 || phase === 7) && (
+            <motion.div
+              className="absolute flex gap-[1px] overflow-hidden rounded-[4px] border border-white/30"
+              initial={phase <= 3 ? { left: 206, top: 8, width: 88, height: 54, opacity: 0 } : { left: 112, top: 8, width: 182, height: 54, opacity: 0 }}
+              animate={{ left: 5, top: 33, width: 48, height: 26, opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.3, ease: "easeInOut" }}
+            >
+              {(phase <= 3 ? [1] : [0, 1]).map((i) => (
+                <span key={i} className="h-full flex-1" style={{ background: SCR[i] }} />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Fit>
+    </Stage>
+  );
+}
+
+/** Telefonda Argus: "Ne izlesem?"e basılır, afişler hızla döner ve biri seçilir; ardından "İzledim" → PC'deki Argus'ta işaretlenir */
+function PhoneArgusDemo() {
+  const n = useTick(160);
+  const cycle = n % 40; // 0-2 bekle · 3 dokun · 4-17 afişler döner · 18-27 kazanan · 28 İzledim · 29-39 PC'de ✓
+  const O = ACCENT.orange;
+  const POSTERS = ["linear-gradient(160deg,#3b2a5c,#e05080)", "linear-gradient(160deg,#1f3b5c,#3fbfa5)", "linear-gradient(160deg,#5c3b1f,#f2a33a)", "linear-gradient(160deg,#20244a,#3d8bff)", "linear-gradient(160deg,#4a1f2a,#f0545c)"];
+  const spinning = cycle >= 4 && cycle <= 17;
+  const idx = spinning ? cycle % POSTERS.length : 2;
+  const won = cycle >= 18;
+  const marked = cycle >= 29;
+  return (
+    <Stage>
+      <Fit w={290} h={110}>
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] overflow-hidden rounded-[11px] border border-white/20 bg-black p-[5px]">
+          <motion.div
+            key={spinning ? idx : "w"}
+            className="mx-auto h-[56px] w-[38px] rounded-[5px]"
+            style={{ background: cycle >= 4 ? POSTERS[idx] : "rgb(255 255 255 / 0.06)", boxShadow: won ? `0 0 12px -2px ${O}` : undefined }}
+            initial={{ scale: spinning ? 0.9 : 0.8 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: spinning ? 0.08 : 0.35 }}
+          />
+          <motion.span
+            className="mt-[5px] flex h-[13px] items-center justify-center gap-[2px] rounded-[5px] text-[5.5px] font-bold text-black"
+            style={{ background: O }}
+            animate={{ scale: cycle === 3 ? 0.85 : 1 }}
+          >
+            <Shuffle size={6} strokeWidth={3} />
+            {won ? tt("Başka") : tt("Ne izlesem?")}
+          </motion.span>
+          <motion.span
+            className="mt-[3px] flex h-[11px] items-center justify-center gap-[2px] rounded-[5px] text-[5.5px] font-semibold text-label"
+            animate={{ opacity: won ? 1 : 0, scale: cycle === 28 ? 0.85 : 1, background: cycle === 28 ? tintBg(O, 40) : "rgb(255 255 255 / 0.08)" }}
+          >
+            <Check size={6} strokeWidth={3} />
+            {tt("İzledim")}
+          </motion.span>
+        </div>
+        {/* PC'deki Argus */}
+        <div className="absolute right-0 top-[4px] h-[84px] w-[150px] overflow-hidden rounded-[8px] border border-white/15 bg-[#101218] p-[6px]">
+          <div className="mb-[5px] flex items-center gap-1 text-[7px] font-semibold" style={{ color: tintText(O) }}>
+            <span className="h-[6px] w-[6px] rounded-full" style={{ background: O }} />
+            Argus
+          </div>
+          <div className="flex gap-[5px]">
+            {POSTERS.slice(0, 4).map((bg, i) => (
+              <div key={i} className="relative h-[52px] flex-1 rounded-[4px]" style={{ background: bg }}>
+                {i === 2 && (
+                  <AnimatePresence>
+                    {marked && (
+                      <motion.span
+                        className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-black/55"
+                        initial={{ opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <span className="flex h-[16px] w-[16px] items-center justify-center rounded-full" style={{ background: O }}>
+                          <Check size={10} strokeWidth={3} className="text-black" />
+                        </span>
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="absolute right-[65px] top-[88px] h-[7px] w-[20px] bg-white/15" />
+        <div className="absolute right-[53px] top-[95px] h-[3px] w-[44px] rounded-full bg-white/15" />
+      </Fit>
+    </Stage>
+  );
+}
+
+/** Telefonda Medya: PC'de çalan şarkı telefonda; telefondan geç'e basınca PC'deki şarkı değişir, ses kısılır */
+function PhoneMediaDemo() {
+  const n = useTick(700);
+  const phase = n % 10; // 0-3 çalıyor · 4 geç · 5-7 yeni şarkı · 8-9 ses kısılır
+  const P = ACCENT.pink;
+  const song = phase >= 5 ? { t: "Starboy", c: "linear-gradient(135deg,#c0392b,#2c2c54)" } : { t: "Blinding Lights", c: "linear-gradient(135deg,#e74c3c,#f39c12)" };
+  const vol = phase >= 8 ? 30 : 70;
+  const prog = (phase / 10) * 100;
+  return (
+    <Stage>
+      <Fit w={290} h={110}>
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] overflow-hidden rounded-[11px] border border-white/20 bg-black p-[5px]">
+          <motion.div key={song.t} className="mx-auto h-[34px] w-[34px] rounded-[6px]" style={{ background: song.c }} initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} />
+          <p className="mt-[3px] truncate text-center text-[5.5px] font-bold text-label">{song.t}</p>
+          <div className="mx-[2px] mt-[3px] h-[2px] overflow-hidden rounded-full bg-white/10">
+            <div className="h-full" style={{ width: `${prog}%`, background: P }} />
+          </div>
+          <div className="mt-[4px] flex items-center justify-center gap-[4px]">
+            <SkipBack size={7} className="text-label-2" fill="currentColor" />
+            <span className="flex h-[13px] w-[13px] items-center justify-center rounded-full" style={{ background: P }}>
+              <Pause size={7} className="text-black" fill="currentColor" />
+            </span>
+            <motion.span animate={{ scale: phase === 4 ? 0.6 : 1 }}>
+              <SkipForward size={7} className="text-label-2" fill="currentColor" />
+            </motion.span>
+          </div>
+          <div className="mx-[2px] mt-[5px] h-[3px] rounded-full bg-white/10">
+            <motion.div className="h-full rounded-full" style={{ background: P }} animate={{ width: `${vol}%` }} />
+          </div>
+        </div>
+        {/* PC: ada şu an çalanı gösterir */}
+        <div className="absolute right-0 top-[4px] h-[84px] w-[150px] overflow-hidden rounded-[8px] border border-white/15 bg-[#141924]">
+          <div className="absolute inset-x-[6px] bottom-[6px] top-[18px] rounded-[4px]" style={{ background: "linear-gradient(120deg, #24324f, #2f5f8f 55%, #3fbfa5)" }} />
+          <div className="absolute left-1/2 top-[4px] flex h-[12px] -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-black px-1.5 text-[6.5px] font-medium text-label">
+            <motion.span key={song.t} className="h-[7px] w-[7px] rounded-[2px]" style={{ background: song.c }} initial={{ scale: 0 }} animate={{ scale: 1 }} />
+            <motion.span key={song.t + "t"} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              {song.t}
+            </motion.span>
+          </div>
+        </div>
+        <div className="absolute right-[65px] top-[88px] h-[7px] w-[20px] bg-white/15" />
+        <div className="absolute right-[53px] top-[95px] h-[3px] w-[44px] rounded-full bg-white/15" />
+      </Fit>
+    </Stage>
+  );
+}
+
+/** Telefondan PC'yi açma: kapalı ekran → telefonda "PC'yi aç" → dalgalar → ekran açılır, Nook uyanır */
+function PhoneWakeDemo() {
+  const n = useTick(500);
+  const phase = n % 12; // 0-2 kapalı · 3 dokun · 4-6 dalgalar · 7-11 açık
+  const G = "#8FE03A";
+  const on = phase >= 7;
+  return (
+    <Stage>
+      <Fit w={290} h={110}>
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] overflow-hidden rounded-[11px] border border-white/20 bg-black p-[5px]">
+          <div className="mb-[5px] flex items-center gap-[4px]">
+            <span className="h-[8px] w-[8px] rounded-full" style={{ background: on ? ACCENT.green : ACCENT.red }} />
+            <span className="h-[3px] flex-1 rounded-full bg-white/25" />
+          </div>
+          <p className="text-[5.5px] leading-tight text-label-3">{on ? tt("Açık") : tt("Ulaşılamıyor")}</p>
+          <motion.span
+            className="absolute inset-x-[5px] bottom-[8px] flex h-[16px] items-center justify-center gap-[2px] rounded-[5px] text-[6px] font-bold text-black"
+            style={{ background: G }}
+            animate={{ scale: phase === 3 ? 0.84 : 1, opacity: on ? 0.35 : 1 }}
+          >
+            <Power size={7} strokeWidth={3} />
+            {tt("PC'yi aç")}
+          </motion.span>
+        </div>
+        {/* Uyandırma dalgaları */}
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="absolute left-[64px] top-[44px] h-[22px] w-[22px] rounded-full border-2"
+            style={{ borderColor: G }}
+            animate={phase >= 4 && phase <= 6 ? { x: [0, 120], scale: [0.6, 1.6], opacity: [0.9, 0] } : { opacity: 0 }}
+            transition={{ duration: 1.1, delay: i * 0.3, ease: "easeOut" }}
+          />
+        ))}
+        <div className="absolute right-0 top-[4px] h-[84px] w-[140px] overflow-hidden rounded-[8px] border border-white/15 bg-[#0b0c10]">
+          <motion.div
+            className="absolute inset-x-[6px] bottom-[6px] top-[18px] rounded-[4px]"
+            style={{ background: "linear-gradient(120deg, #24324f, #2f5f8f 55%, #3fbfa5)" }}
+            animate={{ opacity: on ? 1 : 0 }}
+            transition={{ duration: 0.6 }}
+          />
+          <motion.div className="absolute left-1/2 top-[4px] h-[11px] w-[40px] -translate-x-1/2 rounded-full bg-black" animate={{ opacity: on ? 1 : 0 }} />
+        </div>
+        <div className="absolute right-[60px] top-[88px] h-[7px] w-[20px] bg-white/15" />
+        <div className="absolute right-[48px] top-[95px] h-[3px] w-[44px] rounded-full bg-white/15" />
+      </Fit>
+    </Stage>
+  );
+}
+
+/** Telefonda Pano: PC'de kopyalanan telefona düşer (dokununca kopyalanır); telefondaki metin PC'nin panosuna gider */
+function PhoneClipDemo() {
+  const n = useTick(600);
+  const phase = n % 12; // 0-1 PC'de seçili · 2 kopyala · 3-5 telefonda belirir · 6 dokun → kopyalandı · 7-8 telefonda yaz · 9 gönder · 10-11 PC'de
+  const V = ACCENT.purple;
+  return (
+    <Stage>
+      <Fit w={290} h={110}>
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] overflow-hidden rounded-[11px] border border-white/20 bg-black p-[4px]">
+          <div className="mb-[3px] rounded-[4px] px-[3px] py-[2px] text-[5px]" style={{ background: tintBg(V, 18), color: phase >= 7 ? "#ececee" : "#5f5f66" }}>
+            {phase >= 7 ? tt("Market listesi") : tt("Yaz…")}
+          </div>
+          <motion.div className="mb-[4px] flex h-[9px] items-center justify-center rounded-[3px] text-[5px] font-bold text-black" style={{ background: V }} animate={{ scale: phase === 9 ? 0.85 : 1 }}>
+            {tt("Gönder")}
+          </motion.div>
+          <AnimatePresence>
+            {phase >= 3 && (
+              <motion.div className="rounded-[4px] bg-white/[0.07] px-[3px] py-[3px] text-[5px] leading-tight text-label" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0, scale: phase === 6 ? 0.9 : 1 }} exit={{ opacity: 0 }}>
+                github.com/nook
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {phase === 6 && (
+              <motion.span className="absolute inset-x-[4px] bottom-[4px] rounded-[4px] bg-[#1c1c1f] py-[2px] text-center text-[5px] text-label" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                {tt("Kopyalandı")}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+        <div className="absolute right-0 top-[4px] h-[84px] w-[150px] overflow-hidden rounded-[8px] border border-white/15 bg-[#101218] p-[6px]">
+          <div className="text-[6.5px] text-label-3">Chrome</div>
+          <motion.div className="mt-[3px] inline-block rounded-[2px] px-[2px] text-[7px] text-label" animate={{ background: phase >= 1 && phase <= 2 ? "rgba(61,139,255,0.55)" : "rgba(0,0,0,0)" }}>
+            github.com/nook
+          </motion.div>
+          <AnimatePresence>
+            {phase >= 10 && (
+              <motion.div
+                className="absolute bottom-[6px] left-[6px] right-[6px] flex items-center gap-1 rounded-[5px] px-[5px] py-[3px] text-[6.5px]"
+                style={{ background: tintBg(V, 22), color: tintText(V) }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <Smartphone size={7} /> {tt("Telefondan panoya geldi")}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        <div className="absolute right-[65px] top-[88px] h-[7px] w-[20px] bg-white/15" />
+        <div className="absolute right-[53px] top-[95px] h-[3px] w-[44px] rounded-full bg-white/15" />
+      </Fit>
+    </Stage>
+  );
+}
+
+/** Telefonda Not: telefonda yazılan, PC'deki notta harf harf belirir */
+function PhoneNoteDemo() {
+  const n = useTick(220);
+  const full = tt("süt, ekmek, pil");
+  const k = n % (full.length + 14);
+  const typed = full.slice(0, Math.min(k, full.length));
+  const O = "#FF6A3D";
+  return (
+    <Stage>
+      <Fit w={290} h={110}>
+        <div className="absolute left-0 top-[3px] h-[104px] w-[58px] overflow-hidden rounded-[11px] border border-white/20 bg-black p-[4px]">
+          <div className="mb-[3px] flex gap-[2px]">
+            <span className="rounded-full px-[4px] py-[1px] text-[5px] font-bold text-black" style={{ background: O }}>
+              {tt("Not 1")}
+            </span>
+            <span className="rounded-full bg-white/10 px-[4px] py-[1px] text-[5px] text-label-2">+</span>
+          </div>
+          <div className="h-[78px] rounded-[5px] p-[3px] text-[5.5px] leading-snug text-label" style={{ background: tintBg(O, 10) }}>
+            {typed}
+            <motion.span className="inline-block h-[6px] w-[1px] bg-white align-middle" animate={{ opacity: [1, 0] }} transition={{ duration: 0.6, repeat: Infinity }} />
+          </div>
+        </div>
+        <div className="absolute right-0 top-[4px] h-[84px] w-[150px] overflow-hidden rounded-[8px] border border-white/15 bg-[#101218] p-[6px]">
+          <div className="mb-[4px] flex items-center gap-1 text-[7px] font-semibold" style={{ color: tintText(O) }}>
+            <span className="h-[6px] w-[6px] rounded-full" style={{ background: O }} />
+            {tt("Not")}
+          </div>
+          <div className="text-[8px] leading-snug text-label">{typed.length > 1 ? typed.slice(0, typed.length - 1) : ""}</div>
+        </div>
+        <div className="absolute right-[65px] top-[88px] h-[7px] w-[20px] bg-white/15" />
+        <div className="absolute right-[53px] top-[95px] h-[3px] w-[44px] rounded-full bg-white/15" />
+      </Fit>
+    </Stage>
+  );
+}
+
+/** Telefonun ana ekranında PC'deki Nook: bakınır, göz kırpar; PC'de müzik çalınca dans eder, PC kapanınca uyur */
+function PhoneLiveNookDemo() {
+  const face = useFace();
+  const n = useTick(700);
+  const phase = n % 12; // 0-2 boşta · 3 göz kırpar · 4-6 müzik: dans · 7-8 esner · 9-11 PC kapalı: uyur
+  const off = phase >= 9;
+  const music = phase >= 4 && phase <= 6;
+  const expression = off ? "sleepy" : phase === 3 ? "wink" : music ? "happy" : phase >= 7 ? "yawn" : "idle";
+  return (
+    <Stage>
+      <Fit w={120} h={112}>
+        <div className="absolute left-1/2 top-0 h-[112px] w-[64px] -translate-x-1/2 overflow-hidden rounded-[12px] border border-white/20 bg-black p-[5px]">
+          <motion.div
+            className="mx-auto mt-[4px] flex w-fit"
+            animate={music ? { rotate: [0, -8, 0, 8, 0], y: [0, -2, 0, -2, 0] } : { rotate: 0, y: [0, -1.2, 0] }}
+            transition={{ duration: music ? 0.9 : 2.2, repeat: Infinity, ease: "easeInOut" }}
+            style={{ filter: off ? "grayscale(1) opacity(0.6)" : "none" }}
+          >
+            <NookFigure look={face.look} color={face.color} size={26} expression={expression} />
+          </motion.div>
+          <p className="mt-[3px] flex items-center justify-center gap-[2px] text-[5px] text-label-2">
+            <span className="h-[4px] w-[4px] rounded-full" style={{ background: off ? ACCENT.red : ACCENT.green }} />
+            {off ? tt("Ulaşılamıyor") : tt("PC açık")}
+          </p>
+          <div className="mt-[5px] grid grid-cols-2 gap-[3px]">
+            {["#8FE03A", "#2B8CFF", "#FF5C8A", "#9B7BFF"].map((c) => (
+              <span key={c} className="h-[10px] rounded-full border" style={{ borderColor: tintBg(c, 45), background: tintBg(c, 14) }} />
+            ))}
+          </div>
+          <AnimatePresence>
+            {music && (
+              <motion.span className="absolute right-[8px] top-[6px]" style={{ color: ACCENT.pink }} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: -2 }} exit={{ opacity: 0 }}>
+                <Music2 size={8} />
+              </motion.span>
+            )}
+            {off && (
+              <motion.span className="absolute right-[12px] top-[4px] text-[7px] font-bold text-label-2" initial={{ opacity: 0 }} animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }} exit={{ opacity: 0 }} transition={{ duration: 1.6, repeat: Infinity }}>
+                z
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+      </Fit>
+    </Stage>
+  );
+}
+
 export const DEMOS5 = {
+  phonelive: PhoneLiveNookDemo,
+  phoneclip: PhoneClipDemo,
+  phonenote: PhoneNoteDemo,
+  phonewake: PhoneWakeDemo,
+  phoneargus: PhoneArgusDemo,
+  phonemedia: PhoneMediaDemo,
+  phonescreens: PhoneScreensDemo,
+  phone: PhoneDemo,
   argusyear: ArgusYearDemo,
   argusnokey: ArgusNoKeyDemo,
   ontop: OnTopDemo,

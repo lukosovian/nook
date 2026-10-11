@@ -80,9 +80,37 @@ pub async fn capture_screen() -> Result<String, String> {
 }
 
 pub fn capture(max: u32) -> Result<String, String> {
+    Ok(data_url("image/jpeg", &capture_jpeg(max, 82)?))
+}
+
+/// Bağlı ekranlar soldan sağa: (x, y, genişlik, yükseklik), ana ekran mı
+pub fn monitors() -> Vec<((i32, i32, i32, i32), bool)> {
+    let mut m = imp::monitors();
+    m.sort_by_key(|((x, y, _, _), _)| (*x, *y));
+    m
+}
+
+/// Belirli bir ekranın (sıra `monitors()` ile aynı) ya da `None` ise tüm ekranların birlikte görüntüsü, ham JPEG
+pub fn capture_monitor_jpeg(index: Option<usize>, max: u32, quality: u8) -> Result<Vec<u8>, String> {
+    let mons = monitors();
+    let rect = match index {
+        Some(i) => mons.get(i).map(|m| m.0).ok_or("böyle bir ekran yok")?,
+        None => {
+            let l = mons.iter().map(|m| m.0 .0).min().ok_or("ekran bulunamadı")?;
+            let t = mons.iter().map(|m| m.0 .1).min().unwrap_or(0);
+            let r = mons.iter().map(|m| m.0 .0 + m.0 .2).max().unwrap_or(0);
+            let b = mons.iter().map(|m| m.0 .1 + m.0 .3).max().unwrap_or(0);
+            (l, t, r - l, b - t)
+        }
+    };
+    let (w, h, rgb) = imp::capture_rect_rgb(rect, max).ok_or("ekran görüntüsü alınamadı")?;
+    encode_jpeg(w as u16, h as u16, &rgb, quality).ok_or_else(|| "görüntü kodlanamadı".into())
+}
+
+/// İmlecin olduğu ekranın görüntüsü, ham JPEG (telefona gönderilen ekran görüntüsü)
+pub fn capture_jpeg(max: u32, quality: u8) -> Result<Vec<u8>, String> {
     let (w, h, rgb) = imp::capture_rgb(max).ok_or("ekran görüntüsü alınamadı")?;
-    let jpg = encode_jpeg(w as u16, h as u16, &rgb, 82).ok_or("görüntü kodlanamadı")?;
-    Ok(data_url("image/jpeg", &jpg))
+    encode_jpeg(w as u16, h as u16, &rgb, quality).ok_or_else(|| "görüntü kodlanamadı".into())
 }
 
 #[cfg(windows)]
@@ -92,8 +120,10 @@ mod imp {
     use windows::Win32::Graphics::Gdi::{
         CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits, GetMonitorInfoW, GetObjectW, MonitorFromPoint,
         ReleaseDC, SelectObject, SetStretchBltMode, StretchBlt, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HALFTONE, HBITMAP,
-        HDC, MONITORINFO, MONITOR_DEFAULTTONEAREST, SRCCOPY,
+        HDC, MONITORINFO, MONITOR_DEFAULTTONEAREST, SRCCOPY, EnumDisplayMonitors, HMONITOR,
     };
+    use windows::Win32::Foundation::{LPARAM, RECT};
+    use windows::core::BOOL;
     use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_MULTITHREADED};
     use windows::Win32::UI::Shell::{IShellItem, IShellItemImageFactory, SHCreateItemFromParsingName, SIGDN_NORMALDISPLAY, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY};
     use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
@@ -168,7 +198,32 @@ mod imp {
                 return None;
             }
             let r = mi.rcMonitor;
-            let (sw, sh) = (r.right - r.left, r.bottom - r.top);
+            capture_rect_rgb((r.left, r.top, r.right - r.left, r.bottom - r.top), max)
+        }
+    }
+
+    /// Bağlı ekranlar (sanal masaüstü koordinatlarında x, y, genişlik, yükseklik; ana ekran mı)
+    pub fn monitors() -> Vec<((i32, i32, i32, i32), bool)> {
+        unsafe extern "system" fn each(mon: HMONITOR, _dc: HDC, _r: *mut RECT, data: LPARAM) -> BOOL {
+            let out = &mut *(data.0 as *mut Vec<((i32, i32, i32, i32), bool)>);
+            let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+            if GetMonitorInfoW(mon, &mut mi).as_bool() {
+                let r = mi.rcMonitor;
+                out.push(((r.left, r.top, r.right - r.left, r.bottom - r.top), mi.dwFlags & 1 != 0));
+            }
+            BOOL(1)
+        }
+        let mut out: Vec<((i32, i32, i32, i32), bool)> = Vec::new();
+        unsafe {
+            let _ = EnumDisplayMonitors(None, None, Some(each), LPARAM(&mut out as *mut _ as isize));
+        }
+        out
+    }
+
+    /// Masaüstünün bir bölgesi (x, y, genişlik, yükseklik), uzun kenarı en fazla `max` piksel
+    pub fn capture_rect_rgb((x, y, sw, sh): (i32, i32, i32, i32), max: u32) -> Option<(u32, u32, Vec<u8>)> {
+        unsafe {
+            let r = RECT { left: x, top: y, right: x + sw, bottom: y + sh };
             let scale = (max as f64 / sw.max(sh) as f64).min(1.0);
             let (w, h) = (((sw as f64) * scale).round() as i32, ((sh as f64) * scale).round() as i32);
 
@@ -204,5 +259,27 @@ mod imp {
     }
     pub fn capture_rgb(_m: u32) -> Option<(u32, u32, Vec<u8>)> {
         None
+    }
+    pub fn monitors() -> Vec<((i32, i32, i32, i32), bool)> {
+        Vec::new()
+    }
+    pub fn capture_rect_rgb(_r: (i32, i32, i32, i32), _m: u32) -> Option<(u32, u32, Vec<u8>)> {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Elle çalıştırılır: bağlı ekranları yakalayıp NOOK_SHOT_DIR'e yazar
+    #[test]
+    #[ignore]
+    fn capture_each_monitor() {
+        let dir = std::env::var("NOOK_SHOT_DIR").unwrap();
+        let mons = super::monitors();
+        println!("ekranlar: {mons:?}");
+        for i in 0..mons.len() {
+            std::fs::write(format!("{dir}/mon{i}.jpg"), super::capture_monitor_jpeg(Some(i), 800, 70).unwrap()).unwrap();
+        }
+        std::fs::write(format!("{dir}/all.jpg"), super::capture_monitor_jpeg(None, 1200, 70).unwrap()).unwrap();
     }
 }
