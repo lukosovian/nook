@@ -26,6 +26,12 @@ pub struct WolStatus {
     /// Anakart / bilgisayar üreticisi ve modeli
     vendor: Option<String>,
     model: Option<String>,
+    /// Dizüstü (SMBIOS kasa tipi): BIOS menüleri farklı, kapalıyken uyanma çoğu modelde yalnızca prizdeyken
+    laptop: bool,
+    /// Modern Bekleme (S0): uyku aslında "bağlı bekleme"; ağdan uyanma bambaşka işler
+    modern_standby: bool,
+    /// Windows açılışta şifre sormadan giriş yapıyor (Nook ancak girişten sonra çalışır)
+    auto_logon: bool,
 }
 
 #[cfg(windows)]
@@ -114,7 +120,9 @@ mod imp {
         let get = |n: &str| k.get_value::<String, _>(n).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && !s.contains("To be filled") && !s.contains("Default string"));
         // Masaüstünde anakart, hazır PC'de (Dell, HP…) sistem üreticisi daha anlamlı
         let sys = get("SystemManufacturer");
-        let branded = sys.as_deref().is_some_and(|s| ["dell", "hp", "hewlett", "lenovo", "acer", "fujitsu", "microsoft"].iter().any(|b| s.to_lowercase().contains(b)));
+        // Dizüstünde de üreticinin adı (ASUS, MSI… dizüstü BIOS'u masaüstü anakartınkinden farklı)
+        let branded = laptop()
+            || sys.as_deref().is_some_and(|s| ["dell", "hp", "hewlett", "lenovo", "acer", "fujitsu", "microsoft", "huawei", "samsung", "casper", "monster", "toshiba", "dynabook"].iter().any(|b| s.to_lowercase().contains(b)));
         if branded {
             (sys, get("SystemProductName"))
         } else {
@@ -122,9 +130,57 @@ mod imp {
         }
     }
 
+    /// SMBIOS'taki kasa tipi (tip 3 yapısı): 8-10, 14, 30-32 taşınabilir
+    fn laptop() -> bool {
+        use windows_sys::Win32::System::SystemInformation::GetSystemFirmwareTable;
+        const RSMB: u32 = u32::from_be_bytes(*b"RSMB");
+        let size = unsafe { GetSystemFirmwareTable(RSMB, 0, std::ptr::null_mut(), 0) };
+        if size == 0 {
+            return false;
+        }
+        let mut buf = vec![0u8; size as usize];
+        if unsafe { GetSystemFirmwareTable(RSMB, 0, buf.as_mut_ptr().cast(), size) } != size {
+            return false;
+        }
+        // RawSMBIOSData: 8 baytlık başlık, sonra yapılar (biçimli kısım + sıfır sıfırla biten metinler)
+        let data = &buf[8.min(buf.len())..];
+        let mut i = 0;
+        while i + 4 <= data.len() {
+            let (kind, len) = (data[i], data[i + 1] as usize);
+            if len < 4 {
+                break;
+            }
+            if kind == 3 && i + 5 < data.len() {
+                return matches!(data[i + 5] & 0x7F, 8 | 9 | 10 | 14 | 30 | 31 | 32);
+            }
+            if kind == 127 {
+                break;
+            }
+            let mut j = i + len;
+            while j + 1 < data.len() && !(data[j] == 0 && data[j + 1] == 0) {
+                j += 1;
+            }
+            i = j + 2;
+        }
+        false
+    }
+
+    fn modern_standby() -> bool {
+        use windows_sys::Win32::System::Power::{GetPwrCapabilities, SYSTEM_POWER_CAPABILITIES};
+        let mut caps: SYSTEM_POWER_CAPABILITIES = unsafe { std::mem::zeroed() };
+        unsafe { GetPwrCapabilities(&mut caps) != 0 && caps.AoAc != 0 }
+    }
+
+    fn auto_logon() -> bool {
+        hklm()
+            .open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon")
+            .and_then(|k| k.get_value::<String, _>("AutoAdminLogon"))
+            .is_ok_and(|v| v.trim() == "1")
+    }
+
     pub fn status() -> WolStatus {
         let (vendor, model) = board();
-        let mut s = WolStatus { fast_startup: fast_startup(), vendor, model, ..Default::default() };
+        let mut s = WolStatus { fast_startup: fast_startup(), vendor, model, laptop: laptop(), modern_standby: modern_standby(), auto_logon: auto_logon(), ..Default::default() };
         if let Some(a) = crate::remote::primary_adapter() {
             s.wired = Some(a.wired);
             s.magic_packet = magic_packet(&a.guid);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Plus, Search, Shuffle, Sparkles } from "lucide-react";
-import { argusAdd, argusEpisodes, argusMark, argusSearch, argusSetEpisodes, argusSummary, today, type ArgusItem, type ArgusSeason, type ArgusSummary, type Pairing, type TmdbHit } from "../lib/pc";
+import { argusAdd, argusEpisodes, argusMark, argusSearch, argusSetEpisodes, argusSummary, cached, PcError, today, type ArgusItem, type ArgusSeason, type ArgusSummary, type Pairing, type TmdbHit } from "../lib/pc";
 import { pickSomething, type Pick } from "../lib/neIzlesem";
 import { Cover, errText, Sheet, tintBg, TopBar, useBackButton, useToast } from "../ui";
 
@@ -18,6 +18,8 @@ export function ArgusScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
   const [tab, setTab] = useState<Tab>(() => (import.meta.env.DEV && (new URLSearchParams(location.search).get("tab") as Tab)) || "pick");
   const [summary, setSummary] = useState<ArgusSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** PC'ye ulaşılamadı: son görülen liste gösteriliyor */
+  const [stale, setStale] = useState(false);
   const [marking, setMarking] = useState<ArgusItem | null>(null);
 
   const load = async () => {
@@ -25,11 +27,16 @@ export function ArgusScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
       const sum = await argusSummary(pairing);
       setSummary(sum);
       setLoadError(null);
+      setStale(false);
       // Önizleme: ?demo=argus&open=1 → o kaydın penceresi açık
       const open = import.meta.env.DEV ? new URLSearchParams(location.search).get("open") : null;
       if (open) setMarking(sum.items.find((i) => i.id === open) ?? null);
     } catch (e) {
-      setLoadError(errText(e));
+      const old = cached<ArgusSummary>("argus");
+      if (old && e instanceof PcError && e.kind === "offline") {
+        setSummary(old);
+        setStale(true);
+      } else setLoadError(errText(e));
     }
   };
   useEffect(() => void load(), [pairing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -66,6 +73,7 @@ export function ArgusScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
       </div>
 
       {loadError && <p className="rounded-3xl bg-red/10 p-4 text-[13.5px] text-red">{loadError}</p>}
+      {stale && <p className="rounded-2xl bg-card px-3.5 py-2.5 text-[12.5px] leading-snug text-label-2">PC kapalı: son görülen liste. İşaretlemek ve eklemek için PC açık olmalı.</p>}
       {!summary && !loadError && <p className="py-10 text-center text-[13.5px] text-label-3">Argus okunuyor…</p>}
 
       {summary && tab === "pick" && <PickTab pairing={pairing} summary={summary} byId={byId} onMark={setMarking} onAdded={load} say={say} />}

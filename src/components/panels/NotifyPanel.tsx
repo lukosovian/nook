@@ -7,7 +7,7 @@ import { STYLE } from "../overlays/ToastView";
 import { tt, locale } from "../../lib/i18n";
 import { notifyStatus } from "../../lib/bridge";
 
-type Source = "windows" | "nook";
+type Source = "windows" | "phone" | "nook";
 /** Son seçilen sekme (panel kapanıp açılınca korunur) */
 let lastSource: Source = "windows";
 
@@ -19,6 +19,8 @@ export function NotifyPanel() {
     setSource(v);
   };
   const nookCount = useNook((s) => s.nookNotifs.length);
+  // Telefon sekmesi yalnızca telefondan bildirim geldiyse (Nook Mobil › Bildirimler)
+  const phoneCount = useNook((s) => s.notifications.filter((n) => n.phone).length);
   const tabs = (
     <Segmented
       id="notify-source"
@@ -27,11 +29,12 @@ export function NotifyPanel() {
       color={ACCENT.purple}
       options={[
         { id: "windows", label: "Windows" },
+        ...(phoneCount || source === "phone" ? [{ id: "phone" as const, label: phoneCount ? `${tt("Telefon")} · ${phoneCount}` : tt("Telefon") }] : []),
         { id: "nook", label: nookCount ? `Nook · ${nookCount}` : "Nook" },
       ]}
     />
   );
-  return source === "nook" ? <NookList tabs={tabs} /> : <WindowsList tabs={tabs} />;
+  return source === "nook" ? <NookList tabs={tabs} /> : <WindowsList tabs={tabs} phone={source === "phone"} />;
 }
 
 /** Nook'un adada gösterdiği kartlar: bölüm işaretlendi, USB takıldı, şarkı bulundu… Sessizdeyken gelmeyenler de. */
@@ -91,10 +94,12 @@ function NookRow({ n }: { n: NookNotif }) {
   );
 }
 
-function WindowsList({ tabs }: { tabs: React.ReactNode }) {
+/** Windows bildirimleri ya da (phone) telefondan gelenler */
+function WindowsList({ tabs, phone }: { tabs: React.ReactNode; phone: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
-  useScrollMemory("notify", scroller);
-  const items = useNook((s) => s.notifications);
+  useScrollMemory(phone ? "notify-phone" : "notify", scroller);
+  const all = useNook((s) => s.notifications);
+  const items = all.filter((n) => !!n.phone === phone);
   const on = useNook((s) => s.settings.notifications);
   const update = useNook((s) => s.updateSettings);
   const clear = useNook((s) => s.clearNotifications);
@@ -114,13 +119,15 @@ function WindowsList({ tabs }: { tabs: React.ReactNode }) {
       </div>
       {!items.length ? (
         <EmptyState
-          title={!on ? tt("Bildirimler kapalı") : readable === false ? tt("Bildirimleri okuyamıyorum") : tt("Bildirim yok")}
+          title={!on ? tt("Bildirimler kapalı") : !phone && readable === false ? tt("Bildirimleri okuyamıyorum") : tt("Bildirim yok")}
           hint={
             !on
               ? tt("Açınca Windows bildirimleri adada da görünür")
-              : readable === false
-                ? tt("Windows'un bildirim kaydına ulaşamadım. Ayarlar › Sistem › Bildirimler açık mı?")
-                : tt("Discord, WhatsApp, Mail… bildirimleri burada birikir")
+              : phone
+                ? tt("Telefonundaki bildirimler burada birikir (Nook Mobil › Bildirimler)")
+                : readable === false
+                  ? tt("Windows'un bildirim kaydına ulaşamadım. Ayarlar › Sistem › Bildirimler açık mı?")
+                  : tt("Discord, WhatsApp, Mail… bildirimleri burada birikir")
           }
           color={ACCENT.purple}
         />

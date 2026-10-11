@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { MoreHorizontal, Plus } from "lucide-react";
-import { getNotes, noteOp, type Pairing, type PcPad } from "../lib/pc";
+import { cached, getNotes, noteOp, type NoteOp, type Pairing, type PcPad } from "../lib/pc";
+import { flush, newNoteId, noteOffline, pending, type NotesState } from "../lib/outbox";
 import { errText, Sheet, tintBg, TopBar, useBackButton, useToast } from "../ui";
+import type { Conn } from "../App";
 
 const ORANGE = "#FF6A3D";
 const SAVE_MS = 700;
 
-/** Not: PC'deki not sekmeleri. Yazdıkça (kısa bir aradan sonra) PC'ye kaydedilir; PC'de değişen de buraya gelir. */
-export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () => void }) {
+/** Not: PC'deki not sekmeleri. Yazdıkça (kısa bir aradan sonra) PC'ye kaydedilir; PC'de değişen de buraya gelir.
+ *  PC kapalıyken son görülen notlar açılır; yazılanlar telefonda saklanır ve PC açılınca gönderilir. */
+export function NotesScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: Conn; onBack: () => void }) {
+  const online = conn === "online";
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
   useBackButton(onBack);
   const [toast, say] = useToast();
   const [pads, setPads] = useState<PcPad[] | null>(null);
@@ -24,16 +30,29 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
   const currentRef = useRef<string | null>(null);
   currentRef.current = current;
 
+  const show = (r: NotesState, first: boolean) => {
+    const list = r.pads ?? [];
+    setPads(list);
+    const id = first ? (r.padId && list.some((p) => p.id === r.padId) ? r.padId : list[0]?.id ?? null) : currentRef.current;
+    if (first) setCurrent(id);
+    if (!dirty.current && !focused.current) setText(list.find((p) => p.id === id)?.text ?? "");
+  };
+
   const load = async (first = false) => {
+    if (!onlineRef.current) {
+      const c = cached<NotesState>("notes");
+      if (c) show(c, first);
+      else if (first) setPads([]);
+      return;
+    }
     try {
-      const r = await getNotes(pairing);
-      const list = r.pads ?? [];
-      setPads(list);
-      const id = first ? (r.padId && list.some((p) => p.id === r.padId) ? r.padId : list[0]?.id ?? null) : currentRef.current;
-      if (first) setCurrent(id);
-      if (!dirty.current && !focused.current) setText(list.find((p) => p.id === id)?.text ?? "");
+      // PC kapalıyken yazılanlar önce gitsin (yoksa PC'deki eski hâli üstüne yazılır)
+      if (pending("note")) await flush(pairing);
+      show(await getNotes(pairing), first);
     } catch (e) {
-      say(errText(e));
+      const c = cached<NotesState>("notes");
+      if (c) show(c, first);
+      else say(errText(e));
     }
   };
 
@@ -42,11 +61,25 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
     const t = window.setInterval(() => void load(), 4000);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pairing]);
+  }, [pairing, online]);
 
-  const flush = async (id: string, value: string) => {
+  /** Çevrimdışıyken (ya da PC'ye o an ulaşılamazsa) değişiklik telefonda saklanır, PC açılınca gider */
+  const apply = async (op: NoteOp) => {
+    if (onlineRef.current) {
+      try {
+        return await noteOp(pairing, op);
+      } catch {
+        /* aşağıda sıraya */
+      }
+    }
+    const list = noteOffline(op);
+    setPads(list);
+    return { ok: true, id: op.op === "add" ? (op.id ?? null) : null };
+  };
+
+  const save = async (id: string, value: string) => {
     try {
-      await noteOp(pairing, { op: "set", id, text: value });
+      await apply({ op: "set", id, text: value });
       dirty.current = false;
       setSaved(true);
       setPads((ps) => ps?.map((p) => (p.id === id ? { ...p, text: value } : p)) ?? ps);
@@ -62,14 +95,14 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
     setSaved(false);
     window.clearTimeout(timer.current);
     const id = current;
-    timer.current = window.setTimeout(() => void flush(id, value), SAVE_MS);
+    timer.current = window.setTimeout(() => void save(id, value), SAVE_MS);
   };
 
   const switchTo = (id: string) => {
     // Bekleyen kaydı önce gönder
     if (dirty.current && current) {
       window.clearTimeout(timer.current);
-      void flush(current, text);
+      void save(current, text);
     }
     setCurrent(id);
     setText(pads?.find((p) => p.id === id)?.text ?? "");
@@ -77,7 +110,7 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
 
   const add = async () => {
     try {
-      const r = await noteOp(pairing, { op: "add" });
+      const r = await apply({ op: "add", id: newNoteId(), title: `Not ${(pads?.length ?? 0) + 1}` });
       await load();
       if (r.id) {
         setCurrent(r.id);
@@ -96,8 +129,13 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
         title="Not"
         nook="note"
         onBack={() => history.back()}
-        right={<span className="text-[12px] text-label-3">{saved ? "Kaydedildi" : "Yazılıyor…"}</span>}
+        right={<span className="text-[12px] text-label-3">{!saved ? "Yazılıyor…" : online ? "Kaydedildi" : "Telefonda saklandı"}</span>}
       />
+      {!online && (
+        <p className="-mt-1 rounded-2xl bg-card px-3.5 py-2.5 text-[12.5px] leading-snug text-label-2">
+          PC kapalı: son görülen notlar açık. Yazdıkların telefonda saklanır, PC açılınca gönderilir.
+        </p>
+      )}
 
       <div className="no-scrollbar -mx-4 flex shrink-0 gap-1.5 overflow-x-auto px-4">
         {pads?.map((p) => (
@@ -149,7 +187,7 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
                 onClick={async () => {
                   setMenu(false);
                   try {
-                    await noteOp(pairing, { op: "remove", id: cur.id });
+                    await apply({ op: "remove", id: cur.id });
                     setCurrent(null);
                     await load(true);
                   } catch (e) {
@@ -165,7 +203,7 @@ export function NotesScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
                   setMenu(false);
                   if (!title.trim() || title === cur.title) return;
                   try {
-                    await noteOp(pairing, { op: "rename", id: cur.id, title: title.trim() });
+                    await apply({ op: "rename", id: cur.id, title: title.trim() });
                     await load();
                   } catch (e) {
                     say(errText(e));

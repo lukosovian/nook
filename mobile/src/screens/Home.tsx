@@ -4,10 +4,13 @@ import { MoreHorizontal } from "lucide-react";
 import { getMedia, wakePc, type Pairing, type NowPlaying, type Status } from "../lib/pc";
 import { ChipNook, errText, NookChip, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
-import { installUpdate, useMobileUpdate } from "../lib/update";
+import { installUpdate, useInstallProgress, useMobileUpdate } from "../lib/update";
+import { diagnose } from "../lib/diagnose";
+import { native } from "../lib/native";
+import { onOutbox, pending } from "../lib/outbox";
 import type { Conn } from "../App";
 
-export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum";
+export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify";
 
 interface Tile {
   id: Screen;
@@ -25,7 +28,11 @@ const TILES: Tile[] = [
   { id: "clips", nook: "clip", label: "Pano", color: "#9B7BFF" },
   { id: "notes", nook: "note", label: "Not", color: "#FF6A3D" },
   { id: "hum", nook: "hum", label: "Hum", color: "#9B7BFF" },
+  { id: "notify", nook: "notify", label: "Bildirimler", color: "#9B7BFF" },
 ];
+
+/** PC kapalıyken de açılanlar (son görülen veriyle; yapılanlar PC açılınca gider) */
+const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "notes", "hum", "notify"];
 
 function gb(bytes: number) {
   return (bytes / 1024 ** 3).toLocaleString("tr-TR", { maximumFractionDigits: 1 });
@@ -70,14 +77,18 @@ export function HomeScreen({
   const online = conn === "online";
   const playing = useNowPlaying(pairing, online);
   const update = useMobileUpdate();
+  const install = useInstallProgress();
+  const waiting = usePending();
+  const diag = conn === "offline" ? diagnose(pairing) : null;
 
   const subtitle = (t: Tile) => {
-    if (t.id === "media") return playing ? `${playing.title}${playing.artist ? ` · ${playing.artist}` : ""}` : "Çalan bir şey yok";
-    if (t.id === "argus") return "Ne izlesem? · Devam et";
-    if (t.id === "clips") return "Kopyalananlar, PC'ye gönder";
-    if (t.id === "notes") return "PC'deki notların";
-    if (t.id === "hum") return "Çalan şarkıyı bul";
-    return "Kapat, uyut, ekran görüntüsü";
+    if (t.id === "media") return !online ? "PC açılınca" : playing ? `${playing.title}${playing.artist ? ` · ${playing.artist}` : ""}` : "Çalan bir şey yok";
+    if (t.id === "argus") return online ? "Ne izlesem? · Devam et" : "Son görülen liste";
+    if (t.id === "clips") return online ? "Kopyalananlar, PC'ye gönder" : "PC açılınca gönderilir";
+    if (t.id === "notes") return online ? "PC'deki notların" : "Yaz, PC açılınca gider";
+    if (t.id === "hum") return online ? "Çalan şarkıyı bul" : "Dinle, PC açılınca bulunur";
+    if (t.id === "notify") return "Telefonun bildirimleri PC'de";
+    return online ? "Kapat, uyut, ekran görüntüsü" : "Aç, uzaktan açma rehberi";
   };
 
   return (
@@ -107,20 +118,37 @@ export function HomeScreen({
       {conn === "auth" && (
         <div className="rounded-3xl bg-red/10 p-4 text-[13.5px] text-red">PC'de eşleşme sıfırlanmış. Menüden “Eşleşmeyi kaldır”a bas ve kodu yeniden okut.</div>
       )}
-      {conn === "offline" && (
+      {diag && (
         <div className="rounded-3xl bg-card p-4">
-          <p className="text-[13.5px] leading-relaxed text-label-2">
-            PC kapalı ya da uykuda olabilir. Evdeysen aynı Wi-Fi'den açılır; dışarıdan açmak için modemde bir kerelik ayar gerekir (PC'de Ayarlar › Telefon › Telefondan PC'yi açma).
-          </p>
-          <button
-            disabled={waking || !(status?.mac || pairing.mac)}
-            onClick={() => void wake()}
-            className="mt-3 w-full rounded-2xl py-3.5 text-[15px] font-bold text-black disabled:opacity-50"
-            style={{ background: "#8FE03A" }}
-          >
-            {waking ? "Açılıyor…" : "PC'yi aç"}
+          <p className="text-[15px] font-bold">{diag.title}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-label-2">{diag.detail}</p>
+          {diag.action === "tailscale-store" && (
+            <button onClick={() => void openTailscaleStore()} className="mt-3 w-full rounded-2xl py-3.5 text-[15px] font-bold text-black" style={{ background: "#2B8CFF" }}>
+              Tailscale'i Play Store'da aç
+            </button>
+          )}
+          {diag.action === "tailscale-open" && (
+            <button onClick={() => native?.openTailscale()} className="mt-3 w-full rounded-2xl py-3.5 text-[15px] font-bold text-black" style={{ background: "#2B8CFF" }}>
+              Tailscale'i aç
+            </button>
+          )}
+          {diag.canWake && (
+            <button
+              disabled={waking || !(status?.mac || pairing.mac)}
+              onClick={() => void wake()}
+              className={`mt-2.5 w-full rounded-2xl py-3.5 text-[15px] font-bold disabled:opacity-50 ${diag.action === "wake" ? "text-black" : "bg-well text-label"}`}
+              style={diag.action === "wake" ? { background: "#8FE03A" } : undefined}
+            >
+              {waking ? "Açılıyor…" : "PC'yi aç"}
+            </button>
+          )}
+          <button onClick={() => onOpen("pc")} className="mt-2 w-full py-1.5 text-[12.5px] font-medium text-label-3">
+            Uzaktan açma rehberi (BIOS, modem…)
           </button>
         </div>
+      )}
+      {waiting > 0 && (
+        <p className="-mt-1 px-2 text-[12px] text-label-3">{online ? "Bekleyenler PC'ye gönderiliyor…" : `${waiting} iş PC açılınca gönderilecek`}</p>
       )}
 
       {update && (
@@ -129,10 +157,25 @@ export function HomeScreen({
             <span className="block text-[14.5px] font-bold" style={{ color: tintText("#3ccf6e") }}>
               Nook Mobil {update.version} hazır
             </span>
-            <span className="block text-[12px] leading-snug text-label-3">İndirince Android kurmak için izin isteyebilir.</span>
+            <span className="block text-[12px] leading-snug text-label-3">
+              {install?.phase === "progress"
+                ? `İndiriliyor… ${install.pct >= 0 ? `%${install.pct}` : ""}`
+                : install?.phase === "permission"
+                  ? "Açılan ekranda “Bu kaynağa izin ver”i aç ve geri dön; güncelleme kendiliğinden devam eder."
+                  : install?.phase === "install"
+                    ? "Açılan pencerede Güncelle'ye bas."
+                    : install?.phase === "error"
+                      ? install.message
+                      : "Uygulamanın içinde iner ve kurulur."}
+            </span>
           </span>
-          <button onClick={() => void installUpdate(update)} className="shrink-0 rounded-2xl px-4 py-2.5 text-[14px] font-bold text-black" style={{ background: "#3ccf6e" }}>
-            Güncelle
+          <button
+            disabled={install?.phase === "progress"}
+            onClick={() => void installUpdate(update)}
+            className="shrink-0 rounded-2xl px-4 py-2.5 text-[14px] font-bold text-black disabled:opacity-50"
+            style={{ background: "#3ccf6e" }}
+          >
+            {install?.phase === "progress" ? "İniyor…" : install?.phase === "error" ? "Yeniden dene" : "Güncelle"}
           </button>
         </section>
       )}
@@ -142,9 +185,9 @@ export function HomeScreen({
       <section className="grid grid-cols-2 gap-2.5 pb-4">
         {TILES.map((t) =>
           t.id === "pc" ? (
-            <PcChip key={t.id} tile={t} sub={subtitle(t)} status={online ? status : null} disabled={!online} onClick={() => onOpen(t.id)} />
+            <PcChip key={t.id} tile={t} sub={subtitle(t)} status={online ? status : null} disabled={false} onClick={() => onOpen(t.id)} />
           ) : (
-            <NookChip key={t.id} id={t.nook} label={t.label} sub={subtitle(t)} color={t.color} disabled={!online} onClick={() => onOpen(t.id)} />
+            <NookChip key={t.id} id={t.nook} label={t.label} sub={subtitle(t)} color={t.color} disabled={!online && !OFFLINE_OK.includes(t.id)} onClick={() => onOpen(t.id)} />
           ),
         )}
       </section>
@@ -177,6 +220,23 @@ export function HomeScreen({
       </AnimatePresence>
     </div>
   );
+}
+
+/** PC kapalıyken yapılıp gönderilmeyi bekleyen işler */
+function usePending() {
+  const [n, setN] = useState(() => pending());
+  useEffect(() => onOutbox(() => setN(pending())), []);
+  return n;
+}
+
+async function openTailscaleStore() {
+  const url = "https://play.google.com/store/apps/details?id=com.tailscale.ipn";
+  try {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } catch {
+    window.open(url, "_blank");
+  }
 }
 
 /** Medya kartının alt yazısı için şu an çalan (ana ekranda 5 sn'de bir) */

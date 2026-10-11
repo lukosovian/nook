@@ -4,6 +4,7 @@ import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { Check, Eye, EyeOff, HelpCircle, Lock, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
 import { alarmRing, listMonitors, openPath, quickState, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
+import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
 import { syncFeeds } from "../../lib/ics";
 import { shortName } from "./ControlPanel";
 import { checkPassword, hashPassword } from "../../lib/lock";
@@ -486,17 +487,19 @@ function PhoneSection() {
   );
 }
 
-/** Anakart / bilgisayar markasına göre BIOS'ta açılacak ayar */
-function biosGuide(vendor: string | null) {
-  const v = (vendor ?? "").toLowerCase();
-  if (v.includes("asus")) return tt("Açılışta Del'e bas, F7 ile Gelişmiş moda geç. Advanced › APM Configuration'da “Power On By PCI-E” seçeneğini Enabled, “ErP Ready” seçeneğini Disabled yap. F10 ile kaydet.");
-  if (v.includes("micro-star") || v.includes("msi")) return tt("Açılışta Del'e bas. Settings › Advanced › Wake Up Event Setup'ta “Resume By PCI-E Device” seçeneğini Enabled; Power Management Setup'ta “ErP Ready” seçeneğini Disabled yap. F10 ile kaydet.");
-  if (v.includes("gigabyte")) return tt("Açılışta Del'e bas. Settings › Platform Power'da “Wake on LAN” seçeneğini Enabled, “ErP” seçeneğini Disabled yap. F10 ile kaydet.");
-  if (v.includes("asrock")) return tt("Açılışta F2'ye bas. Advanced › ACPI Configuration'da “PCIE Devices Power On” seçeneğini Enabled, “Deep Sleep” seçeneğini Disabled yap. F10 ile kaydet.");
-  if (v.includes("dell")) return tt("Açılışta F2'ye bas. Power Management'ta “Wake on LAN” seçeneğini “LAN Only”, “Deep Sleep Control” seçeneğini Disabled yap. Apply ile kaydet.");
-  if (v.includes("hp") || v.includes("hewlett")) return tt("Açılışta F10'a bas. Advanced › Power-On Options'ta “Remote Wakeup Boot Source” seçeneğini açık; “S5 Maximum Power Savings” seçeneğini Disabled yap. Kaydedip çık.");
-  if (v.includes("lenovo")) return tt("Açılışta F1'e (dizüstünde F2) bas. Power menüsünde “Wake on LAN” seçeneğini Enabled ya da Automatic; “Enhanced Power Saving Mode” seçeneğini Disabled yap. F10 ile kaydet.");
-  return tt("Açılışta Del ya da F2'ye bas. Power, APM ya da ACPI menüsünde “Wake on LAN”, “Power On By PCI-E” ya da “Resume by LAN” seçeneğini aç; “ErP” ya da “Deep Sleep” seçeneğini kapat. F10 ile kaydet.");
+/** Tarif kutusu: numaralı adımlar ve alttaki not (wakeGuide.ts; telefonda da aynısı görünür) */
+function GuideBox({ guide }: { guide: Guide }) {
+  return (
+    <div className="rounded-lg bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
+      {guide.title && <p className="mb-0.5 text-label-3">{guide.title}</p>}
+      <ol className="list-decimal space-y-0.5 pl-3.5">
+        {guide.steps.map((s) => (
+          <li key={s}>{tt(s)}</li>
+        ))}
+      </ol>
+      {guide.note && <p className="mt-1 text-label-3">{tt(guide.note)}</p>}
+    </div>
+  );
 }
 
 /** Telefondan açma hazırlığı: Windows tarafını kontrol edip tek izinle düzeltir, BIOS için tarif verir */
@@ -505,8 +508,10 @@ function WakeSetup() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [guide, setGuide] = useState(false);
+  const [logon, setLogon] = useState(false);
   const [modem, setModem] = useState(false);
   const [out, setOut] = useState<OutsideStatus | null>(null);
+  const [wake, setWake] = useState<WakeOutside | null>(null);
   useEffect(() => void wolStatus().then(setSt), []);
   useEffect(() => void (modem && outsideStatus().then(setOut)), [modem]);
   if (!st) return null;
@@ -534,7 +539,7 @@ function WakeSetup() {
     }
   };
   const items: { ok: boolean | null; text: string }[] = [
-    { ok: st.wired, text: st.wired ? tt("Kabloyla bağlı") : tt("Wi-Fi'de: kapalıyken çoğu PC uyanmaz, kablo tak") },
+    { ok: st.wired, text: st.wired ? tt("Kabloyla bağlı") : st.laptop ? tt("Dizüstü Wi-Fi'de: kapalıyken açılmaz, Kapat yerine Uyku kullan") : tt("Wi-Fi'de: kapalıyken çoğu PC uyanmaz, kablo tak") },
     { ok: !st.fastStartup, text: st.fastStartup ? tt("Hızlı Başlangıç açık") : tt("Hızlı Başlangıç kapalı") },
     { ok: card ? (st.magicPacket ?? st.wakeArmed) : false, text: card ? tt("Ağ kartı PC'yi uyandırabilir") : tt("Ağ kartının uyandırması kapalı") },
   ];
@@ -555,19 +560,25 @@ function WakeSetup() {
           <WakeItem key={it.text} ok={it.ok} text={it.text} />
         ))}
         <div className="flex items-start gap-1.5">
-          <WakeItem ok={null} text={tt("BIOS'ta Wake-on-LAN açık olmalı")} />
+          <WakeItem ok={null} text={st.laptop ? tt("BIOS'ta Wake-on-LAN açık olmalı (dizüstü)") : tt("BIOS'ta Wake-on-LAN açık olmalı")} />
           <button onClick={() => setGuide((v) => !v)} className="ml-auto shrink-0 text-[10.5px] text-label-2 hover:text-label">
             {guide ? tt("Gizle") : tt("Nasıl?")}
           </button>
         </div>
-        {guide && (
-          <p className="rounded-lg bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
-            {st.vendor && <span className="text-label-3">{[st.vendor, st.model].filter(Boolean).join(" ")}: </span>}
-            {biosGuide(st.vendor)}
-          </p>
+        {guide && <GuideBox guide={biosGuide(st)} />}
+        {st.autoLogon === false && (
+          <>
+            <div className="flex items-start gap-1.5">
+              <WakeItem ok={null} text={tt("Açılınca Windows giriş ekranında bekler (Nook girişten sonra çalışır)")} />
+              <button onClick={() => setLogon((v) => !v)} className="ml-auto shrink-0 text-[10.5px] text-label-2 hover:text-label">
+                {logon ? tt("Gizle") : tt("Nasıl?")}
+              </button>
+            </div>
+            {logon && <GuideBox guide={autoLogonGuide()} />}
+          </>
         )}
-        <WakeOutsideRow guide={modem} onGuide={() => setModem((v) => !v)} />
-        {modem && <ModemGuide out={out} />}
+        <WakeOutsideRow guide={modem} onGuide={() => setModem((v) => !v)} onStatus={setWake} />
+        {modem && <GuideBox guide={routerGuide(wake ?? { upnp: null }, out?.lanIp ?? null, out?.mac ?? null)} />}
       </div>
       {err && <p className="pb-1 text-[10px] text-red/90">{err}</p>}
       <p className="pb-1 text-[10px] text-label-3">
@@ -581,10 +592,11 @@ function WakeSetup() {
 
 /** Dışarıdan açma anahtarı: Nook modemde (UPnP) uyandırma yönlendirmesini kendisi kurar.
  *  Modem izin vermezse elle ayar tarifi gösterilir. */
-function WakeOutsideRow({ guide, onGuide }: { guide: boolean; onGuide: () => void }) {
+function WakeOutsideRow({ guide, onGuide, onStatus }: { guide: boolean; onGuide: () => void; onStatus: (w: WakeOutside) => void }) {
   const [w, setW] = useState<WakeOutside | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => void wakeOutsideStatus().then(setW), []);
+  useEffect(() => void (w && onStatus(w)), [w]); // eslint-disable-line react-hooks/exhaustive-deps
   // Modem aranırken de satır görünsün (UPnP araması birkaç saniye sürer)
   if (!w)
     return (
@@ -605,7 +617,7 @@ function WakeOutsideRow({ guide, onGuide }: { guide: boolean; onGuide: () => voi
       : w.cgnat
         ? { ok: false, text: tt("Operatör ortak adres veriyor; dışarıdan açma çalışmaz") }
         : w.target
-          ? { ok: true, text: tt("Modem ayarlandı · ev adresi {0}", w.externalIp ?? "?") }
+          ? { ok: true, text: w.router ? tt("{0} ayarlandı · ev adresi {1}", w.router, w.externalIp ?? "?") : tt("Modem ayarlandı · ev adresi {0}", w.externalIp ?? "?") }
           : w.upnp === false
             ? { ok: false, text: tt("Modem otomatik ayarlanamadı (UPnP kapalı)") }
             : { ok: false, text: w.error ?? tt("Modem ayarlanamadı") };
@@ -626,33 +638,6 @@ function WakeOutsideRow({ guide, onGuide }: { guide: boolean; onGuide: () => voi
         </div>
       )}
     </>
-  );
-}
-
-/** Dışarıdan açma: uyandırma paketi evin internet adresine gider, modem PC'ye iletir */
-function ModemGuide({ out }: { out: OutsideStatus | null }) {
-  const ip = out?.lanIp ?? "…";
-  const mac = out?.mac ?? "…";
-  const steps = [
-    tt("Tarayıcıda modemin arayüzünü aç (çoğunlukla 192.168.1.1) ve giriş yap."),
-    tt("DHCP › Adres ayırma: {0} ağ kartına hep {1} verilsin.", mac, ip),
-    tt("Güvenlik › IP ve MAC bağlama (ARP binding): {0} ↔ {1}. PC kapalıyken modem onu unutmasın diye.", ip, mac),
-    tt("NAT › Sanal sunucular (port yönlendirme): UDP 9 → {0}, iç port 9.", ip),
-    out?.wan
-      ? tt("Hepsi bu. Telefon uyandırmayı evin adresine ({0}) de gönderir; adres değişirse PC açıkken telefonda Nook'u bir kez açman yeter.", out.wan)
-      : tt("Hepsi bu. Telefon evin adresini Tailscale açıkken öğrenir: önce aşağıdaki Tailscale adımlarını tamamla."),
-  ];
-  return (
-    <div className="rounded-lg bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
-      <ol className="list-decimal space-y-0.5 pl-3.5">
-        {steps.map((s) => (
-          <li key={s}>{s}</li>
-        ))}
-      </ol>
-      <p className="mt-1 text-label-3">
-        {tt("Menü adları modeme göre değişir (TP-Link'te NAT Forwarding › Virtual Servers, Security › IP & MAC Binding). Operatör ortak adres (CGNAT) veriyorsa dışarıdan açma çalışmaz; o zaman operatörden genel IP iste.")}
-      </p>
-    </div>
   );
 }
 
@@ -699,7 +684,16 @@ function OutsideSetup() {
           )}
         </CheckRow>
         {st.tailscaleInstalled && (
-          <CheckRow ok={st.tailscaleUp} text={st.tailscaleUp ? tt("Tailscale'e giriş yapıldı") : tt("Tailscale'e giriş yapılmadı")}>
+          <CheckRow
+            ok={st.tailscaleUp}
+            text={
+              st.tailscaleUp
+                ? tt("Tailscale açık (Nook kapanırsa yeniden açar)")
+                : st.tailscaleState === "needs-login"
+                  ? tt("Tailscale'e giriş yapılmadı")
+                  : tt("Tailscale kapalı: Nook açıyor…")
+            }
+          >
             {!st.tailscaleUp && <SmallAction onClick={() => void act("open", outsideOpenTailscale)}>{tt("Aç")}</SmallAction>}
           </CheckRow>
         )}

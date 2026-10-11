@@ -4,6 +4,21 @@
     <!-- Hum: etrafta çalan şarkıyı dinlemek için mikrofon -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Güncellemeyi uygulamanın içinden kurmak -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Ev ağında mı, Tailscale açık mı -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Eski Android'de ekran görüntüsünü galeriye kaydetmek -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
+    <!-- Tailscale kurulu mu (aç/kapat için); bildirimlerde uygulama adı ve ikonu -->
+    <queries>
+        <package android:name="com.tailscale.ipn" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -25,7 +40,30 @@
                 <!-- AndroidTV support -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- Başka uygulamadan "Paylaş › Nook": metin PC'nin panosuna, dosyalar PC'ye -->
+            <intent-filter android:label="PC'ye gönder">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter android:label="PC'ye gönder">
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
         </activity>
+
+        <!-- Telefona gelen bildirimleri PC'deki Nook'a iletir (Bildirim erişimi izniyle) -->
+        <service
+            android:name=".NookNotifService"
+            android:label="Nook"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+        <receiver android:name=".TailscaleOffReceiver" android:exported="false" />
 
         <provider
           android:name="androidx.core.content.FileProvider"

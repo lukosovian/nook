@@ -98,6 +98,15 @@ export type DemoId =
   | "phoneinstall"
   | "phonetour"
   | "modemfind"
+  | "phonetunnel"
+  | "phonediagnose"
+  | "phonenotify"
+  | "phoneoffline"
+  | "phoneshot"
+  | "phonescreen"
+  | "phoneguide"
+  | "phoneupdate"
+  | "phoneshare"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -122,6 +131,58 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.57",
+    date: tt("11 Ekim 2026"),
+    headline: tt("Nook Mobil: sağlam bağlantı, bildirimler, PC kapalıyken de çalışma"),
+    items: [
+      {
+        title: tt("Bağlantı kendini toparlıyor, Tailscale kendiliğinden açılıyor"),
+        text: tt("Telefondaki Nook artık bilgisayarın bütün adreslerini aynı anda deniyor ve hangisi cevap verirse ondan bağlanıyor; ev ağında saniyelerce beklemek ve bir anlık kopmada “Ulaşılamıyor”a düşmek bitti. Evden uzaktaysan Nook Mobil Tailscale'i kendisi açıyor, Nook'tan çıkınca kapatıyor (sen açtıysan dokunmuyor). Bilgisayarda Tailscale kapanırsa Nook iki dakika içinde yeniden açıyor ve Windows'a giriş yapılmadan da çalışacak şekilde ayarlıyor."),
+        demo: "phonetunnel",
+      },
+      {
+        title: tt("Bağlanamayınca nedenini söylüyor"),
+        text: tt("Bilgisayara ulaşılamayınca telefondaki Nook neden olduğunu söylüyor: aynı Wi-Fi'desin ama PC kapalı, telefonda Tailscale yok ya da Tailscale açılamadı. Her durumda yapılacak tek adım düğme olarak çıkıyor: PC'yi aç, Play Store'da aç ya da Tailscale'i aç."),
+        demo: "phonediagnose",
+      },
+      {
+        title: tt("Telefonun bildirimleri bilgisayarda"),
+        text: tt("Telefondaki Nook'ta Bildirimler'e girip bildirim erişimine izin verince WhatsApp, Instagram, Gmail gibi uygulamaların bildirimleri bilgisayardaki Nook'ta adada kart olarak çıkıyor ve Bildirimler panelinin yeni Telefon sekmesinde birikiyor. İstemediğin uygulamaları tek tek kapatabilirsin; müzik ve indirme gibi süren bildirimler gelmez. Bilgisayar kapalıyken gelenler açılınca listeye düşer."),
+        demo: "phonenotify",
+      },
+      {
+        title: tt("Bilgisayar kapalıyken de Not, Pano, Hum ve Argus"),
+        text: tt("Bilgisayar kapalıyken telefonda Not, Pano, Hum ve Argus artık açılıyor. Not'ta yazdıkların, Pano'dan gönderdiklerin telefonda saklanıyor ve bilgisayar açılınca gidiyor; aynı not bilgisayarda da değiştiyse hiçbir şey kaybolmuyor, telefondaki hali “(telefon)” adıyla ayrı not oluyor. Hum dinleyip kaydediyor, şarkı bilgisayar açılınca bulunup geçmişe ekleniyor. Argus son görülen listeyi gösteriyor."),
+        demo: "phoneoffline",
+      },
+      {
+        title: tt("Ekran görüntüsünü yakınlaştır, telefona ya da bilgisayara kaydet"),
+        text: tt("Telefondan aldığın ekran görüntüsünü iki parmakla büyütüp kaydırabilir, iki kez dokunarak yakınlaştırabilirsin. Altındaki düğmelerle telefonun galerisine (Resimler › Nook) kaydedebilir, istediğin uygulamayla paylaşabilir ya da bilgisayarın Ekran görüntüleri klasörüne kaydedebilirsin."),
+        demo: "phoneshot",
+      },
+      {
+        title: tt("Ekranı kapat, sonra yine telefondan aç"),
+        text: tt("Telefondan bilgisayarın ekranını kapatınca düğme “Ekranı aç”a dönüşüyor; basınca ekran geri geliyor. Bilgisayarda biri fareye ya da klavyeye dokunursa düğme kendiliğinden “Ekranı kapat”a döner."),
+        demo: "phonescreen",
+      },
+      {
+        title: tt("Uzaktan açma rehberi telefonda, bilgisayar kapalıyken de"),
+        text: tt("Telefondaki Nook'ta Bilgisayar ekranında uzaktan açma ve dışarıdan bağlanma için ne hazır ne eksik listeleniyor; her eksiğe dokununca nasıl yapılacağı adım adım çıkıyor. BIOS tarifi bilgisayarının anakartına ya da dizüstü modeline göre (Nook dizüstü olduğunu kendisi anlıyor), modem tarifi modemin markasına göre veriliyor; Windows'un açılışta şifre sorduğunu da söylüyor. Liste bilgisayar kapalıyken de son kontrolle görünüyor; aynı tarifler bilgisayarda Ayarlar › Telefon'da da var."),
+        demo: "phoneguide",
+      },
+      {
+        title: tt("Güncelleme uygulamanın içinde kuruluyor"),
+        text: tt("Nook Mobil'de Güncelle'ye basınca yeni sürüm artık tarayıcıya gitmeden uygulamanın içinde iniyor ve Android'in kurulum penceresi kendiliğinden açılıyor; indirilenler klasöründe dosya aramana gerek yok. İlk seferde Android “bu kaynaktan yükle” izni isterse izin verip geri dönmen yeterli, kaldığı yerden devam ediyor."),
+        demo: "phoneupdate",
+      },
+      {
+        title: tt("Başka uygulamadan bilgisayara gönder"),
+        text: tt("Galeride, WhatsApp'ta ya da herhangi bir uygulamada Paylaş'a basıp Nook'u seçince fotoğraf, video ve dosyalar bilgisayarda İndirilenler › Nook Mobil klasörüne gidiyor; yazı ve bağlantılar bilgisayarın panosuna kopyalanıyor (bilgisayar kapalıysa açılınca)."),
+        demo: "phoneshare",
+      },
+    ],
+  },
   {
     version: "0.2.56",
     date: tt("11 Ekim 2026"),

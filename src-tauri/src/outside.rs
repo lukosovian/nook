@@ -26,6 +26,22 @@ pub struct OutsideStatus {
     wan: Option<String>,
     /// Telefona Tailscale kurmak için Play Store bağlantısının QR kodu (SVG)
     phone_qr: Option<String>,
+    /// missing | running | stopped | needs-login | starting
+    tailscale_state: TsState,
+}
+
+/// PC'deki Tailscale'in durumu
+#[derive(Clone, Copy, Serialize, Default, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum TsState {
+    #[default]
+    Missing,
+    Running,
+    /// Kapatılmış (Disconnect): Nook kendisi yeniden bağlar
+    Stopped,
+    /// Oturum açılmamış: kullanıcının Tailscale'e bir kez giriş yapması gerek
+    NeedsLogin,
+    Starting,
 }
 
 #[cfg(windows)]
@@ -54,15 +70,21 @@ pub fn wan_ip() -> Option<String> {
     None
 }
 
+/// Tailscale'in kendi komut satırı aracı (imzalı tailscale.exe; betik değil)
 #[cfg(windows)]
-fn query_wan() -> Option<String> {
+fn ts_cli(args: &[&str]) -> Option<std::process::Output> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let exe = tailscale_dir().join("tailscale.exe");
     if !exe.exists() {
         return None;
     }
-    let out = std::process::Command::new(exe).args(["status", "--json"]).creation_flags(CREATE_NO_WINDOW).output().ok()?;
+    std::process::Command::new(exe).args(args).creation_flags(CREATE_NO_WINDOW).output().ok()
+}
+
+#[cfg(windows)]
+fn query_wan() -> Option<String> {
+    let out = ts_cli(&["status", "--json"])?;
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
     v["Self"]["Addrs"].as_array()?.iter().filter_map(|a| a.as_str()).find_map(|a| {
         let ip: std::net::Ipv4Addr = a.rsplit_once(':')?.0.parse().ok()?;
@@ -115,6 +137,87 @@ mod fw {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Tailscale'i açık tutma: telefon evden uzaktayken PC'ye yalnızca Tailscale'den ulaşır. Biri Tailscale'i
+// kapatırsa (Disconnect) ya da Windows yeniden başlayınca kapalı kalırsa Nook yeniden bağlar. Bir kez de
+// "Unattended" moduna alır: PC uzaktan açılıp Windows'a giriş yapılmadan da Tailscale çalışsın.
+
+#[cfg(windows)]
+mod ts {
+    use super::{ts_cli, TsState};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+
+    static STATE: Mutex<TsState> = Mutex::new(TsState::Missing);
+    static LAST_UP: Mutex<Option<Instant>> = Mutex::new(None);
+    static UNATTENDED: AtomicBool = AtomicBool::new(false);
+
+    pub fn installed() -> bool {
+        super::tailscale_dir().join("tailscale.exe").exists()
+    }
+
+    fn connected() -> bool {
+        crate::remote::addresses().iter().any(|h| h.starts_with("100."))
+    }
+
+    fn backend() -> Option<String> {
+        let out = ts_cli(&["status", "--json"])?;
+        let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+        v["BackendState"].as_str().map(str::to_owned)
+    }
+
+    /// Bir kez: Unattended kapalıysa açar (yönetici gerekmez)
+    fn ensure_unattended() {
+        if UNATTENDED.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let prefs = ts_cli(&["debug", "prefs"]).map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+        if !prefs.contains("\"ForceDaemon\": true") {
+            let ok = ts_cli(&["set", "--unattended=true"]).is_some_and(|o| o.status.success());
+            crate::log::write("info", &format!("tailscale unattended: {}", if ok { "açıldı" } else { "açılamadı" }));
+        }
+    }
+
+    pub fn state() -> TsState {
+        *STATE.lock().unwrap()
+    }
+
+    /// Kapalıysa bağlar; durumu döner. Bağlıyken süreç başlatmaz (yalnızca ağ kartlarına bakar).
+    pub fn keep() -> TsState {
+        let st = if !installed() {
+            TsState::Missing
+        } else if connected() {
+            ensure_unattended();
+            TsState::Running
+        } else {
+            match backend().as_deref() {
+                Some("Stopped") => {
+                    let due = LAST_UP.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(5 * 60));
+                    if due {
+                        *LAST_UP.lock().unwrap() = Some(Instant::now());
+                        let ok = ts_cli(&["up", "--timeout=20s"]).is_some_and(|o| o.status.success());
+                        crate::log::write("info", &format!("tailscale kapalıydı, yeniden bağlanma: {}", if ok { "tamam" } else { "olmadı" }));
+                        if ok {
+                            ensure_unattended();
+                        }
+                    }
+                    if connected() || backend().as_deref() == Some("Running") {
+                        TsState::Running
+                    } else {
+                        TsState::Stopped
+                    }
+                }
+                Some("NeedsLogin") | Some("NeedsMachineAuth") | Some("NoState") => TsState::NeedsLogin,
+                Some("Running") => TsState::Running,
+                _ => TsState::Starting,
+            }
+        };
+        *STATE.lock().unwrap() = st;
+        st
+    }
+}
+
 /// main.rs `fw-fix` (yönetici)
 #[cfg(windows)]
 pub fn fix_elevated() -> i32 {
@@ -137,6 +240,7 @@ pub fn outside_status() -> OutsideStatus {
             mac: crate::remote::primary_mac(),
             wan: wan_ip(),
             phone_qr: crate::remote::qr_svg("https://play.google.com/store/apps/details?id=com.tailscale.ipn"),
+            tailscale_state: if hosts.iter().any(|h| h.starts_with("100.")) { TsState::Running } else { ts::state() },
         }
     }
     #[cfg(not(windows))]
@@ -163,11 +267,17 @@ pub async fn outside_install_tailscale() -> Result<(), String> {
     Err("Yalnızca Windows".into())
 }
 
-/// Tailscale'i açar (giriş yapılmadıysa giriş penceresini gösterir)
+/// Tailscale'i açar: kapatılmışsa yeniden bağlar, giriş yapılmadıysa giriş penceresini gösterir
 #[tauri::command]
-pub fn outside_open_tailscale() -> Result<(), String> {
+pub async fn outside_open_tailscale() -> Result<(), String> {
     #[cfg(windows)]
-    return crate::wol::shell_open(&tailscale_dir().join("tailscale-ipn.exe").to_string_lossy(), "", false).map(|_| ());
+    {
+        let st = tauri::async_runtime::spawn_blocking(ts::keep).await.map_err(|e| e.to_string())?;
+        if st == TsState::Running {
+            return Ok(());
+        }
+        return crate::wol::shell_open(&tailscale_dir().join("tailscale-ipn.exe").to_string_lossy(), "", false).map(|_| ());
+    }
     #[cfg(not(windows))]
     Err("Yalnızca Windows".into())
 }
@@ -203,6 +313,48 @@ pub struct WakeOutside {
     /// Operatör ortak adres veriyor: dışarıdan gelen paket modeme ulaşmaz
     cgnat: bool,
     error: Option<String>,
+    /// Modemin markası ve modeli (UPnP'den ya da arayüz sayfasından)
+    router: Option<String>,
+    /// Modemin adresi (arayüzü buradan açılır)
+    gateway: Option<String>,
+}
+
+/// UPnP kapalıyken modemi arayüz sayfasından (başlık, sunucu adı) tanır
+fn router_from_page(gw: std::net::Ipv4Addr) -> Option<String> {
+    use std::io::Read;
+    let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(3)).redirects(2).build();
+    let res = match agent.get(&format!("http://{gw}/")).call() {
+        Ok(r) | Err(ureq::Error::Status(_, r)) => r,
+        Err(_) => return None,
+    };
+    let server = res.header("server").unwrap_or("").to_owned();
+    let mut body = String::new();
+    let _ = res.into_reader().take(64 * 1024).read_to_string(&mut body);
+    let low = format!("{server} {body}").to_lowercase();
+    const BRANDS: [(&str, &str); 12] = [
+        ("tp-link", "TP-Link"),
+        ("tplink", "TP-Link"),
+        ("zyxel", "Zyxel"),
+        ("huawei", "Huawei"),
+        ("zte", "ZTE"),
+        ("airties", "AirTies"),
+        ("keenetic", "Keenetic"),
+        ("fritz", "FRITZ!Box"),
+        ("asus", "ASUS"),
+        ("netgear", "Netgear"),
+        ("sagemcom", "Sagemcom"),
+        ("mikrotik", "MikroTik"),
+    ];
+    let brand = BRANDS.iter().find(|(k, _)| low.contains(k)).map(|(_, v)| *v);
+    let title = body
+        .find("<title>")
+        .and_then(|i| body[i + 7..].find("</title>").map(|j| body[i + 7..i + 7 + j].trim().to_owned()))
+        .filter(|t| !t.is_empty() && t.len() < 60);
+    match (brand, title) {
+        (Some(b), Some(t)) if t.to_lowercase().contains(&b.to_lowercase()) => Some(t),
+        (Some(b), _) => Some(b.to_owned()),
+        (None, t) => t,
+    }
 }
 
 static WAKE: std::sync::Mutex<Option<WakeOutside>> = std::sync::Mutex::new(None);
@@ -230,6 +382,8 @@ mod upnp {
     pub struct Gateway {
         control: String,
         service: &'static str,
+        /// Üretici ve model ("TP-Link EX530v")
+        pub name: Option<String>,
     }
 
     fn tag<'a>(s: &'a str, name: &str) -> Option<&'a str> {
@@ -273,13 +427,20 @@ mod upnp {
         // http://192.168.1.1:1900/... → kök
         let after = location.split_once("//")?.1;
         let root = format!("http://{}", after.split('/').next()?);
+        let name = [tag(&xml, "manufacturer"), tag(&xml, "modelName").or_else(|| tag(&xml, "friendlyName"))]
+            .into_iter()
+            .flatten()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let name = (!name.is_empty()).then_some(name);
         for service in WAN {
             let Some(i) = xml.find(&format!("<serviceType>{service}</serviceType>")) else { continue };
             let block = &xml[i..];
             let block = &block[..block.find("</service>").unwrap_or(block.len())];
             if let Some(ctl) = tag(block, "controlURL") {
                 let control = if ctl.starts_with("http") { ctl.to_string() } else { format!("{root}{}{ctl}", if ctl.starts_with('/') { "" } else { "/" }) };
-                return Some(Gateway { control, service });
+                return Some(Gateway { control, service, name });
             }
         }
         None
@@ -340,11 +501,15 @@ fn refresh_wake() -> WakeOutside {
         st.error = Some("Ağ bağlantısı yok".into());
         return store_wake(st);
     };
+    let gw_ip = crate::remote::primary_adapter().and_then(|a| a.gateway);
+    st.gateway = gw_ip.map(|g| g.to_string());
     let Some(gw) = upnp::discover(lan) else {
         st.upnp = Some(false);
+        st.router = gw_ip.and_then(router_from_page);
         return store_wake(st);
     };
     st.upnp = Some(true);
+    st.router = gw.name.clone().or_else(|| gw_ip.and_then(router_from_page));
     st.external_ip = gw.external_ip();
     st.cgnat = st.external_ip.as_deref().and_then(|s| s.parse::<std::net::Ipv4Addr>().ok()).is_some_and(|ip| {
         let o = ip.octets();
@@ -377,17 +542,49 @@ pub fn home_ip() -> Option<String> {
     }
 }
 
-/// Açılışta ve yarım saatte bir: ayar açıksa modemdeki yönlendirmeyi tazeler
+/// İki dakikada bir: telefon köprüsü açıksa Tailscale'i açık tutar. Yarım saatte bir: ayar açıksa
+/// modemdeki yönlendirmeyi tazeler.
 pub fn spawn() {
     std::thread::Builder::new()
         .name("nook-wake-outside".into())
-        .spawn(|| loop {
-            if wake_on() {
-                refresh_wake();
+        .spawn(|| {
+            // Açılışta ağ henüz hazır olmayabilir
+            std::thread::sleep(std::time::Duration::from_secs(20));
+            let mut tick: u64 = 0;
+            loop {
+                #[cfg(windows)]
+                if crate::remote::enabled() {
+                    ts::keep();
+                }
+                if tick % 15 == 0 && wake_on() {
+                    refresh_wake();
+                }
+                tick += 1;
+                std::thread::sleep(std::time::Duration::from_secs(2 * 60));
             }
-            std::thread::sleep(std::time::Duration::from_secs(30 * 60));
         })
         .expect("dışarıdan açma iş parçacığı başlatılamadı");
+}
+
+/// Telefonun sakladığı kurulum raporu (/v1/setup): PC kapalıyken de telefonda neyin eksik olduğu ve
+/// nasıl yapılacağı görünsün diye. Modem bilgisi önbellekten (yoksa bir kez aranır).
+pub fn setup_report() -> serde_json::Value {
+    let cached = WAKE.lock().unwrap().clone();
+    let wake = cached.unwrap_or_else(refresh_wake);
+    #[allow(unused_mut)]
+    let mut out = outside_status();
+    out.phone_qr = None;
+    #[cfg(windows)]
+    if !out.tailscale_up && out.tailscale_installed {
+        out.tailscale_state = ts::keep();
+    }
+    serde_json::json!({
+        "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),
+        "wol": crate::wol::wol_status(),
+        "outside": out,
+        "wake": wake,
+        "bridge": crate::remote::enabled(),
+    })
 }
 
 #[tauri::command]
@@ -415,6 +612,12 @@ mod tests {
     #[ignore]
     fn print_status() {
         println!("{}", serde_json::to_string_pretty(&super::outside_status()).unwrap());
+    }
+
+    #[test]
+    #[ignore]
+    fn print_setup() {
+        println!("{}", serde_json::to_string_pretty(&super::setup_report()).unwrap());
     }
 
     /// Modemi bulup dış adresi sorar (yönlendirmeye dokunmaz)

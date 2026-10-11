@@ -150,7 +150,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
 }
 
 /// Windows 11'de Win+PrtSc ve Ekran Alıntısı Aracı buraya kaydeder.
-fn screenshots_dir(app: &AppHandle) -> Option<PathBuf> {
+pub(crate) fn screenshots_dir(app: &AppHandle) -> Option<PathBuf> {
     let pictures = app.path().picture_dir().ok()?;
     ["Screenshots", "Ekran görüntüleri"]
         .iter()

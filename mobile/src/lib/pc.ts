@@ -3,8 +3,11 @@
  * (bkz. src-tauri/src/remote.rs):
  *   x-nook-ts:  unix milisaniye
  *   x-nook-sig: hex(HMAC-SHA256(anahtar, "{ts}\n{METHOD}\n{yol}\n" + gövde))
- * PC'nin birden çok adresi olabilir (Tailscale + ev ağı): son çalışan önce denenir.
+ * PC'nin birden çok adresi olabilir (Tailscale + ev ağı): son çalışan önce denenir; o yanıt vermezse
+ * bütün adresler aynı anda yoklanır (imzasız /v1/hello) ve ilk yanıt veren kullanılır.
  */
+import { native } from "./native";
+import type { SetupReport } from "@nook/lib/wakeGuide";
 
 export interface Pairing {
   name: string;
@@ -47,12 +50,14 @@ export interface Status {
   nook?: { color?: string; name?: string; look?: unknown; argusProfile?: string } | null;
   /** Soldan sağa; ekran görüntüsünde bu sırayla istenir (eski PC sürümlerinde yok) */
   monitors?: { width: number; height: number; primary: boolean }[];
+  /** Ekran telefondan kapatıldı ve o zamandan beri PC'de kimse dokunmadı */
+  screenOff?: boolean;
 }
 
 /** Ekran görüntüsü hedefi: ekranın sırası ya da hepsi birlikte */
 export type ShotTarget = number | "all";
 
-export type PowerAction = "shutdown" | "restart" | "sleep" | "lock" | "screen-off";
+export type PowerAction = "shutdown" | "restart" | "sleep" | "lock" | "screen-off" | "screen-on";
 
 const STORE = "nook.pairing";
 
@@ -71,6 +76,12 @@ export function savePairing(p: Pairing | null) {
     else localStorage.removeItem(STORE);
   } catch {
     /* depolama kapalıysa bu oturumla sınırlı kalır */
+  }
+  // Bildirim servisi ve paylaşım uygulama kapalıyken de PC'ye ulaşabilsin (Android tarafı)
+  try {
+    native?.setPairing(p ? JSON.stringify(p) : "");
+  } catch {
+    /* önizleme */
   }
 }
 
@@ -137,22 +148,74 @@ async function attempt(p: Pairing, host: string, method: string, path: string, b
   }
 }
 
-/** İmzalı istek; adresleri sırayla dener, çalışanı hatırlar. `json` bayt dizisiyse olduğu gibi gönderilir. */
+const HELLO_MS = 2200;
+
+/** İmzasız "orada mısın": PC açık ve Nook köprüsü çalışıyorsa hemen yanıt verir */
+async function hello(p: Pairing, host: string) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), HELLO_MS);
+  try {
+    const r = await fetch(`http://${host}:${p.port}/v1/hello`, { signal: ctl.signal });
+    return r.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let probing: Promise<string | null> | null = null;
+
+/**
+ * Bütün adresleri aynı anda yoklar; ilk yanıt vereni hatırlar. Evdeyken ev ağı adresi, dışarıdayken
+ * Tailscale'inki kazanır; eski "son çalışan" adres yüzünden saniyelerce beklenmez.
+ */
+export function findHost(p: Pairing): Promise<string | null> {
+  if (import.meta.env.DEV && p.key === "demo") return Promise.resolve(p.hosts[0]);
+  if (probing) return probing;
+  probing = new Promise<string | null>((resolve) => {
+    let left = p.hosts.length;
+    if (!left) resolve(null);
+    for (const h of p.hosts)
+      void hello(p, h).then((ok) => {
+        if (ok) resolve(h);
+        else if (--left === 0) resolve(null);
+      });
+  }).then((h) => {
+    probing = null;
+    if (h && p.lastHost !== h) {
+      p.lastHost = h;
+      savePairing(p);
+    }
+    return h;
+  });
+  return probing;
+}
+
+/** İmzalı istek. Son çalışan adres yanıt vermezse diğerlerine geçer. `json` bayt dizisiyse olduğu gibi gönderilir. */
 export async function request(p: Pairing, method: "GET" | "POST", path: string, json?: unknown, timeoutMs = 3500): Promise<Response> {
   const raw = json instanceof Uint8Array;
   const body = raw ? json : json === undefined ? new Uint8Array() : new TextEncoder().encode(JSON.stringify(json));
   const type = raw ? "application/octet-stream" : "application/json";
-  const order = p.lastHost ? [p.lastHost, ...p.hosts.filter((h) => h !== p.lastHost)] : p.hosts;
-  for (const host of order) {
+  let host = p.lastHost ?? (await findHost(p));
+  if (!host) throw new PcError("PC'ye ulaşılamıyor", "offline");
+  for (let round = 0; round < 3; round++) {
     let res: Response;
     try {
       res = await attempt(p, host, method, path, body, timeoutMs, type);
     } catch {
-      continue; // bu adres ulaşılamıyor, sıradakini dene
-    }
-    if (p.lastHost !== host) {
-      p.lastHost = host;
-      savePairing(p);
+      // Bu adres yanıt vermedi: hangisinin çalıştığına bak
+      const alive = await findHost(p);
+      if (!alive) throw new PcError("PC'ye ulaşılamıyor", "offline");
+      if (alive === host) {
+        // PC orada ama bu istek zaman aşımına uğradı: okuma bir kez daha denenir, yazma tekrarlanmaz
+        if (method === "GET" && round === 0) continue;
+        throw new PcError("PC yanıt vermedi, bir daha dene", "server");
+      }
+      // Yazma isteği eski adrese ulaşmış olabilir: o adres hâlâ yanıt veriyorsa tekrarlama
+      if (method === "POST" && (await hello(p, host))) throw new PcError("PC yanıt vermedi, bir daha dene", "server");
+      host = alive;
+      continue;
     }
     if (res.status === 401) throw new PcError("Eşleşme geçersiz: PC'de kodu yeniden okut.", "auth");
     if (!res.ok) {
@@ -163,6 +226,46 @@ export async function request(p: Pairing, method: "GET" | "POST", path: string, 
   }
   throw new PcError("PC'ye ulaşılamıyor", "offline");
 }
+
+// ---------------------------------------------------------------- Çevrimdışı önbellek
+
+/** PC kapalıyken de gösterilsin diye son görülen veri (notlar, pano, Hum, Argus, kurulum raporu) */
+export function cached<T>(name: string): T | null {
+  try {
+    const raw = localStorage.getItem(`nook.cache.${name}`);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function cache(name: string, value: unknown) {
+  try {
+    localStorage.setItem(`nook.cache.${name}`, JSON.stringify(value));
+  } catch {
+    /* yer yoksa önbelleksiz devam */
+  }
+}
+
+/** Uzaktan açma ve bağlantı hazırlığı; PC kapalıyken saklanan son rapor gösterilir */
+export const getSetup = (p: Pairing) =>
+  (import.meta.env.DEV && p.key === "demo"
+    ? Promise.resolve<SetupReport>({
+        at: Date.now(),
+        bridge: true,
+        wol: { adapter: "Realtek PCIe GbE", wired: true, fastStartup: false, magicPacket: true, wakeArmed: true, vendor: "ASUSTeK COMPUTER INC.", model: "PRIME B450M-K II", laptop: false, modernStandby: false, autoLogon: false },
+        outside: { tailscaleInstalled: true, tailscaleUp: true, firewall: true, lanIp: "192.168.1.5", mac: "58:11:22:DB:FC:60", wan: "213.14.176.118", tailscaleState: "running" },
+        wake: { on: true, upnp: false, target: null, externalIp: null, cgnat: false, error: null, router: "TP-Link EX530v", gateway: "192.168.1.1" },
+      })
+    : request(p, "GET", "/v1/setup", undefined, 15000).then((r) => r.json() as Promise<SetupReport>)
+  ).then((s) => {
+      cache("setup", s);
+      return s;
+    });
+
+/** Telefondan PC'ye dosya (İndirilenler › Nook Mobil; to=shots: Resimler › Ekran görüntüleri) */
+export const sendFile = (p: Pairing, name: string, bytes: Uint8Array, to?: "shots") =>
+  request(p, "POST", `/v1/file?name=${encodeURIComponent(name)}${to ? `&to=${to}` : ""}`, bytes, 60000).then((r) => r.json() as Promise<{ path: string }>);
 
 /** Geliştirme önizlemesi (?demo=home): PC'ye bağlanmadan örnek verilerle */
 export const DEMO_PAIRING: Pairing = { name: "LUKO-PC", hosts: ["100.101.7.12", "192.168.1.34"], port: 47391, key: "demo", mac: "" };
@@ -184,11 +287,9 @@ export const getStatus = (p: Pairing) =>
 
 export const power = (p: Pairing, action: PowerAction) => request(p, "POST", "/v1/power", { action }).then(() => undefined);
 
-/** Ekran görüntüsü → blob URL (işi bitince URL.revokeObjectURL) */
+/** Ekran görüntüsü (JPEG) */
 export const screenshot = (p: Pairing, target?: ShotTarget) =>
-  request(p, "GET", target === undefined ? "/v1/screenshot" : `/v1/screenshot?m=${target}`, undefined, 12000)
-    .then((r) => r.blob())
-    .then((b) => URL.createObjectURL(b));
+  request(p, "GET", target === undefined ? "/v1/screenshot" : `/v1/screenshot?m=${target}`, undefined, 12000).then((r) => r.blob());
 
 // ---------------------------------------------------------------- Medya
 
@@ -298,7 +399,9 @@ export const argusSummary = (p: Pairing): Promise<ArgusSummary> =>
         profiles: ["Luko"], profile: "Luko", profileId: "demo", boardId: "demo", running: false, statuses: [],
         items: [demoItem("1", "Kaos Show", "Dizi", [24, 13, 1, 14, "Yeni Sezon"]), demoItem("2", "Severance", "Dizi", [19, 9, 2, 1, "Hello, Ms. Cobel"]), demoItem("3", "Dune: Part Two", "Film")],
       })
-    : request(p, "GET", `/v1/argus/summary?today=${today()}`, undefined, 30000).then((r) => r.json() as Promise<ArgusSummary>);
+    : request(p, "GET", `/v1/argus/summary?today=${today()}`, undefined, 30000)
+        .then((r) => r.json() as Promise<ArgusSummary>)
+        .then((s) => (cache("argus", s), s));
 
 /** Bölümü (season/episode) ya da filmi (ikisi de yoksa) bugün izlendi yapar */
 export const argusMark = (p: Pairing, rowId: string, season?: number, episode?: number) =>
@@ -392,7 +495,9 @@ export const getClips = (p: Pairing) =>
         { id: "c", kind: "text", text: "Yarın 10:00'da toplantı, sunumu unutma", color: null, at: Date.now() - 3_600_000, app: "Teams", pinned: false, files: 0 },
         { id: "d", kind: "files", text: "rapor.pdf, tablo.xlsx", color: null, at: Date.now() - 7_200_000, app: "Gezgin", pinned: false, files: 2 },
       ] as PcClip[])
-    : request(p, "GET", "/v1/clips").then((r) => r.json().then((j: { clips: PcClip[] | null }) => j.clips ?? []));
+    : request(p, "GET", "/v1/clips")
+        .then((r) => r.json().then((j: { clips: PcClip[] | null }) => j.clips ?? []))
+        .then((c) => (cache("clips", c), c));
 
 export const clipImage = (p: Pairing, id: string) =>
   request(p, "GET", `/v1/clips/image?id=${encodeURIComponent(id)}`, undefined, 15000)
@@ -405,9 +510,11 @@ export const sendToPcClipboard = (p: Pairing, text: string) => request(p, "POST"
 export const getNotes = (p: Pairing) =>
   DEMO(p)
     ? Promise.resolve({ pads: [{ id: "n1", title: "Not 1", text: "- süt\n- ekmek\n- **pil** al", at: 0 }, { id: "n2", title: "Fikirler", text: "Nook için telefon uygulaması", at: 0 }], padId: "n1" })
-    : request(p, "GET", "/v1/notes").then((r) => r.json() as Promise<{ pads: PcPad[] | null; padId: string | null }>);
+    : request(p, "GET", "/v1/notes")
+        .then((r) => r.json() as Promise<{ pads: PcPad[] | null; padId: string | null }>)
+        .then((n) => (cache("notes", n), n));
 
-export type NoteOp = { op: "set"; id: string; text: string } | { op: "add"; title?: string } | { op: "remove"; id: string } | { op: "rename"; id: string; title: string };
+export type NoteOp = { op: "set"; id: string; text: string } | { op: "add"; title?: string; id?: string } | { op: "remove"; id: string } | { op: "rename"; id: string; title: string };
 
 export const noteOp = (p: Pairing, op: NoteOp) => request(p, "POST", "/v1/notes", op).then((r) => r.json() as Promise<{ ok: boolean; id: string | null }>);
 
@@ -445,13 +552,16 @@ export interface PcHum {
   phone: boolean;
 }
 
-/** Mikrofondan 16 kHz mono ses (s16le): PC Shazam'a sorar, bulursa geçmişe (ve izlenen Argus içeriğine) yazar */
-export const humRecognize = (p: Pairing, pcm: Int16Array) =>
+/** Mikrofondan 16 kHz mono ses (s16le): PC Shazam'a sorar, bulursa geçmişe (ve izlenen Argus içeriğine) yazar.
+ *  agoMs: PC kapalıyken kaydedilip sonradan gönderilen dinleme ne kadar önceydi */
+export const humRecognize = (p: Pairing, pcm: Int16Array, agoMs = 0) =>
   DEMO(p)
     ? new Promise<HumOutcome>((r) =>
         setTimeout(() => r({ status: "found", track: { key: "1", title: "Blinding Lights", artist: "The Weeknd", cover: null, url: null } }), 900),
       )
-    : request(p, "POST", "/v1/hum", new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 20_000).then((r) => r.json() as Promise<HumOutcome>);
+    : request(p, "POST", agoMs ? `/v1/hum?ago=${Math.round(agoMs)}` : "/v1/hum", new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 20_000).then(
+        (r) => r.json() as Promise<HumOutcome>,
+      );
 
 export const getHums = (p: Pairing) =>
   DEMO(p)
@@ -460,4 +570,6 @@ export const getHums = (p: Pairing) =>
         { id: "h2", title: "Kara Toprak", artist: "Barış Manço", cover: null, url: null, at: Date.now() - 3_600_000, phone: false },
         { id: "h3", title: "Where Is My Mind?", artist: "Pixies", cover: null, url: null, at: Date.now() - 86_400_000, phone: false },
       ])
-    : request(p, "GET", "/v1/hum").then((r) => r.json().then((j: { hums: PcHum[] | null }) => j.hums ?? []));
+    : request(p, "GET", "/v1/hum")
+        .then((r) => r.json().then((j: { hums: PcHum[] | null }) => j.hums ?? []))
+        .then((h) => (cache("hums", h), h));

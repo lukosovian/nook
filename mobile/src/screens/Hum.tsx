@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Copy, Music2, Smartphone } from "lucide-react";
-import { getHums, humRecognize, phoneClipboard, type HumTrack, type Pairing, type PcHum } from "../lib/pc";
+import { cached, getHums, humRecognize, phoneClipboard, type HumTrack, type Pairing, type PcHum } from "../lib/pc";
 import { startMic, type Mic } from "../lib/mic";
+import { pcmBase64, queue } from "../lib/outbox";
 import { ChipNook, errText, tintBg, tintText, TopBar, useBackButton, useToast } from "../ui";
+import type { Conn } from "../App";
 
 const PURPLE = "#9B7BFF";
 /** Dinlemeye başladıktan sonra PC'ye sorma anları (sn); sonuncusu en uzun dinleme */
@@ -20,13 +22,15 @@ function ago(ms: number) {
 }
 
 /** Hum: telefonun mikrofonu etrafta çalan şarkıyı dinler, PC tanır. Bulunan PC'deki Hum geçmişine
- *  ve (PC'de Argus'ta bir şey izlenirken, İzlerken Hum açıksa) Argus'a yazılır. */
-export function HumScreen({ pairing, onBack }: { pairing: Pairing; onBack: () => void }) {
+ *  ve (PC'de Argus'ta bir şey izlenirken, İzlerken Hum açıksa) Argus'a yazılır. PC kapalıyken dinlenen
+ *  telefonda saklanır, PC açılınca tanınır. */
+export function HumScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: Conn; onBack: () => void }) {
   useBackButton(onBack);
+  const online = conn === "online";
   const [toast, say] = useToast();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [level, setLevel] = useState(0);
-  const [hums, setHums] = useState<PcHum[] | null>(null);
+  const [hums, setHums] = useState<PcHum[] | null>(() => cached<PcHum[]>("hums"));
   const mic = useRef<Mic | null>(null);
   const run = useRef(0);
 
@@ -35,10 +39,10 @@ export function HumScreen({ pairing, onBack }: { pairing: Pairing; onBack: () =>
       .then(setHums)
       .catch(() => {});
   useEffect(() => {
-    void load();
-    return () => stop();
+    if (online) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pairing]);
+  }, [pairing, online]);
+  useEffect(() => () => stop(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop = () => {
     run.current++;
@@ -65,6 +69,22 @@ export function HumScreen({ pairing, onBack }: { pairing: Pairing; onBack: () =>
     const meter = window.setInterval(() => setLevel(m.level()), 80);
     let lastErr: string | null = null;
     let heard = false;
+    if (!online) {
+      // PC kapalı: en uzun dinlemeyi sakla, PC açılınca tanınsın
+      try {
+        const at = Date.now();
+        while (m.seconds() < TRIES[TRIES.length - 1]) {
+          await new Promise((r) => setTimeout(r, 100));
+          if (run.current !== id) return;
+        }
+        queue({ kind: "hum", pcm: pcmBase64(m.take()), at });
+        setPhase({ kind: "miss", text: "Kaydettim: PC açılınca şarkı bulunup Hum geçmişine eklenecek" });
+      } finally {
+        window.clearInterval(meter);
+        if (run.current === id) stop();
+      }
+      return;
+    }
     try {
       for (const at of TRIES) {
         while (m.seconds() < at) {
@@ -120,7 +140,7 @@ export function HumScreen({ pairing, onBack }: { pairing: Pairing; onBack: () =>
           </span>
         </motion.button>
         <p className="px-6 text-center text-[14px] font-semibold" style={{ color: tintText(PURPLE) }}>
-          {listening ? "Dinliyorum… (durdurmak için dokun)" : "Çalan şarkıyı bulmak için dokun"}
+          {listening ? "Dinliyorum… (durdurmak için dokun)" : online ? "Çalan şarkıyı bulmak için dokun" : "PC kapalı: dokun, dinleyip saklayayım"}
         </p>
         <AnimatePresence mode="wait">
           {phase.kind === "found" && (

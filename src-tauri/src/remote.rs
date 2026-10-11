@@ -28,6 +28,8 @@ use tiny_http::{Header, Method, Request, Response, Server};
 pub const PORT: u16 = 47391;
 const MAX_SKEW_MS: i64 = 120_000;
 const MAX_BODY: usize = 8 * 1024 * 1024;
+/// Telefondan PC'ye gönderilen dosya (fotoğraf, video, belge)
+const MAX_FILE: usize = 200 * 1024 * 1024;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct Config {
@@ -46,6 +48,8 @@ static PROFILE: Mutex<Value> = Mutex::new(Value::Null);
 static MIRROR: Mutex<Value> = Mutex::new(Value::Null);
 /// Son iki dakikada görülen imzalar (aynı isteğin tekrar gönderilmesine karşı)
 static SEEN: Mutex<VecDeque<(i64, String)>> = Mutex::new(VecDeque::new());
+/// Telefondan ekran kapatıldıysa ne zaman (o andan beri klavye/fare kullanılmadıysa ekran hâlâ kapalı)
+static SCREEN_OFF_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
 fn config_path() -> Option<PathBuf> {
     Some(PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Nook").join("remote.json"))
@@ -87,6 +91,11 @@ fn save_locked(cfg: &Config) {
 fn store(cfg: Config) {
     save_locked(&cfg);
     *CONFIG.lock().unwrap() = Some(cfg);
+}
+
+/// Köprü açık mı (Ayarlar › Telefon)
+pub fn enabled() -> bool {
+    load().enabled
 }
 
 pub fn spawn(app: AppHandle) {
@@ -222,8 +231,9 @@ fn handle(mut req: Request) {
         let _ = req.respond(json_res(200, json!({ "nook": true, "version": env!("CARGO_PKG_VERSION") })));
         return;
     }
+    let limit = if req.url().starts_with("/v1/file") { MAX_FILE } else { MAX_BODY };
     let mut body = Vec::new();
-    if req.as_reader().take(MAX_BODY as u64 + 1).read_to_end(&mut body).is_err() || body.len() > MAX_BODY {
+    if req.as_reader().take(limit as u64 + 1).read_to_end(&mut body).is_err() || body.len() > limit {
         let _ = req.respond(err(413, "istek çok büyük"));
         return;
     }
@@ -374,16 +384,109 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
                 return err(400, "ses çok kısa");
             }
             let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
-            let out = crate::hum::phone(&app, &samples);
+            // PC kapalıyken kaydedilip sonradan gönderilen dinleme: ne kadar önce duyulduğu
+            let ago = query_param(query, "ago").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+            let out = crate::hum::phone(&app, &samples, ago);
             if let crate::hum::Outcome::Found { track } = &out {
                 crate::system::emit_event(&app, "phone", format!("Telefon duydu: {}", track.title), track.artist.clone());
             }
             json_res(200, json!(out))
         }
         (Method::Get, "/v1/hum") => json_res(200, json!({ "hums": MIRROR.lock().unwrap()["hums"].clone() })),
+        // Uzaktan açma ve bağlantı hazırlığının tamamı: telefon saklar, PC kapalıyken de gösterir
+        (Method::Get, "/v1/setup") => json_res(200, crate::outside::setup_report()),
+        // Telefona gelen bildirim → Nook'un bildirimleri (Windows'unkilerle aynı akış)
+        (Method::Post, "/v1/notify") => {
+            let b = body_json(body);
+            let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
+            let s = |k: &str| b[k].as_str().unwrap_or("").trim().to_owned();
+            if s("title").is_empty() && s("text").is_empty() {
+                return err(400, "bildirim boş");
+            }
+            use tauri::Emitter;
+            let name = s("app");
+            let _ = app.emit(
+                "nook://notification",
+                json!({
+                    "id": -now_ms(),
+                    "app": if name.is_empty() { "Telefon".to_owned() } else { format!("{name} · Telefon") },
+                    "appId": format!("phone:{}", s("pkg")),
+                    "title": if s("title").is_empty() { name.clone() } else { s("title") },
+                    "body": s("text"),
+                    "icon": b["icon"].as_str().filter(|i| i.starts_with("data:image/")),
+                    "phone": true,
+                    // PC kapalıyken telefonda bekleyip şimdi gelen: listeye girsin, adada kart açmasın
+                    "quiet": b["at"].as_i64().is_some_and(|at| now_ms() - at > 120_000),
+                }),
+            );
+            json_res(200, json!({ "ok": true }))
+        }
+        // Telefondan dosya: ?name=…&to=shots (ekran görüntüleri klasörü); yoksa İndirilenler › Nook Mobil
+        (Method::Post, "/v1/file") => {
+            let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
+            let name = query_param(query, "name").map(url_decode).unwrap_or_default();
+            match save_file(&app, &name, query_param(query, "to") == Some("shots"), body) {
+                Ok(path) => {
+                    let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    crate::system::emit_event(&app, "phone", "Telefondan dosya geldi", file);
+                    json_res(200, json!({ "ok": true, "path": path.to_string_lossy() }))
+                }
+                Err(e) => err(500, &e),
+            }
+        }
         (_, p) if p.starts_with("/v1/argus/") => argus(method, p, query, body),
         _ => err(404, "bilinmeyen istek"),
     }
+}
+
+/// "a%20b" → "a b" (UTF-8)
+fn url_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hexv = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
+        if b[i] == b'%' && i + 3 <= b.len() {
+            if let (Some(h), Some(l)) = (hexv(b[i + 1]), hexv(b[i + 2])) {
+                out.push(h << 4 | l);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(if b[i] == b'+' { b' ' } else { b[i] });
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Telefondan gelen dosyayı kaydeder; ad temizlenir, aynı adda dosya varsa "(2)" eklenir
+fn save_file(app: &AppHandle, name: &str, shots: bool, bytes: &[u8]) -> Result<PathBuf, String> {
+    use tauri::Manager;
+    if bytes.is_empty() {
+        return Err("dosya boş".into());
+    }
+    let dir = if shots {
+        crate::system::screenshots_dir(app).or_else(|| app.path().picture_dir().ok()).ok_or("Resimler klasörü bulunamadı")?
+    } else {
+        app.path().download_dir().map_err(|e| e.to_string())?.join("Nook Mobil")
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let clean: String = name.chars().map(|c| if c.is_control() || r#"\/:*?"<>|"#.contains(c) { '_' } else { c }).collect();
+    let clean = clean.trim().trim_matches('.').to_owned();
+    let clean = if clean.is_empty() { format!("telefon-{}.bin", now_ms()) } else { clean };
+    let (stem, ext) = match clean.rsplit_once('.') {
+        Some((s, e)) if !s.is_empty() => (s.to_owned(), format!(".{e}")),
+        _ => (clean.clone(), String::new()),
+    };
+    let mut path = dir.join(&clean);
+    let mut n = 2;
+    while path.exists() {
+        path = dir.join(format!("{stem} ({n}){ext}"));
+        n += 1;
+    }
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    crate::log::write("info", &format!("telefondan dosya: {}", path.display()));
+    Ok(path)
 }
 
 fn body_json(body: &[u8]) -> Value {
@@ -490,6 +593,7 @@ fn status() -> Value {
         // Dışarıdan açma: evin internet adresi (modem uyandırma paketini PC'ye iletir)
         "wan": crate::outside::home_ip(),
         "nook": *PROFILE.lock().unwrap(),
+        "screenOff": screen_off(),
         // Soldan sağa; ekran görüntüsünde ?m= bu sırayla
         "monitors": crate::imaging::monitors().iter().map(|((_, _, w, h), primary)| json!({ "width": w, "height": h, "primary": primary })).collect::<Vec<_>>(),
     })
@@ -503,20 +607,23 @@ fn power(action: &str) -> Result<(), String> {
         "sleep" => "Telefondan uyku moduna alınıyor",
         "lock" => "Telefondan kilitlendi",
         "screen-off" => "Telefondan ekran kapatıldı",
+        "screen-on" => "Telefondan ekran açıldı",
         _ => return Err("bilinmeyen işlem".into()),
     };
+    *SCREEN_OFF_AT.lock().unwrap() = (action == "screen-off").then(|| std::time::Instant::now() + Duration::from_millis(200));
     crate::log::write("info", &format!("telefon: {action}"));
     if let Some(app) = APP.lock().unwrap().as_ref() {
         crate::system::emit_event(app, "phone", label, "Nook Mobil");
     }
     let action = action.to_owned();
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(if action == "lock" || action == "screen-off" { 200 } else { 2500 }));
+        thread::sleep(Duration::from_millis(if matches!(action.as_str(), "lock" | "screen-off" | "screen-on") { 200 } else { 2500 }));
         let r = match action.as_str() {
             "shutdown" => power::exit(false),
             "restart" => power::exit(true),
             "sleep" => power::sleep(),
             "lock" => crate::quick::quick_action("lock".into()),
+            "screen-on" => crate::quick::screen_on(),
             _ => crate::quick::quick_action("screen-off".into()),
         };
         if let Err(e) = r {
@@ -524,6 +631,12 @@ fn power(action: &str) -> Result<(), String> {
         }
     });
     Ok(())
+}
+
+/// Telefondan kapatılan ekran hâlâ kapalı mı: o andan beri klavye ya da fare kullanılmadıysa
+fn screen_off() -> bool {
+    let Some(at) = *SCREEN_OFF_AT.lock().unwrap() else { return false };
+    crate::tracker::system_idle().is_some_and(|idle| idle >= at.elapsed())
 }
 
 fn host_name() -> String {
@@ -723,6 +836,8 @@ mod net {
         wired: bool,
         /// Gerçek ağ kartı (kablolu ya da Wi-Fi) ve varsayılan ağ geçidi (modem) var
         physical: bool,
+        /// Varsayılan ağ geçidi (modem)
+        gateway: Option<std::net::Ipv4Addr>,
     }
 
     fn adapters() -> Vec<Adapter> {
@@ -772,7 +887,17 @@ mod net {
                         String::from_utf16_lossy(std::slice::from_raw_parts(a.Description, len))
                     };
                     let physical = (a.IfType == 6 || a.IfType == 71) && !a.FirstGatewayAddress.is_null();
-                    out.push(Adapter { ips, mac, guid, description, wired: a.IfType == 6, physical });
+                    let mut gateway = None;
+                    let mut g = a.FirstGatewayAddress;
+                    while !g.is_null() && gateway.is_none() {
+                        let sa = (*g).Address.lpSockaddr;
+                        if !sa.is_null() && (*sa).sa_family == AF_INET {
+                            let sin = &*(sa as *const SOCKADDR_IN);
+                            gateway = Some(std::net::Ipv4Addr::from(u32::from_be(sin.sin_addr.S_un.S_addr)));
+                        }
+                        g = (*g).Next;
+                    }
+                    out.push(Adapter { ips, mac, guid, description, wired: a.IfType == 6, physical, gateway });
                 }
                 p = a.Next;
             }
@@ -827,7 +952,7 @@ mod net {
     pub fn primary_adapter() -> Option<super::PrimaryAdapter> {
         let a = primary()?;
         let ip = a.ips.iter().copied().find(|ip| ip.is_private() && !ip.is_link_local())?;
-        Some(super::PrimaryAdapter { guid: a.guid, description: a.description, wired: a.wired, ip })
+        Some(super::PrimaryAdapter { guid: a.guid, description: a.description, wired: a.wired, ip, gateway: a.gateway })
     }
 }
 
@@ -854,6 +979,7 @@ pub struct PrimaryAdapter {
     pub description: String,
     pub wired: bool,
     pub ip: std::net::Ipv4Addr,
+    pub gateway: Option<std::net::Ipv4Addr>,
 }
 
 pub use net::{addresses, primary_adapter, primary_mac};

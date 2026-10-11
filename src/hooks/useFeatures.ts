@@ -125,7 +125,7 @@ export function useNotificationFeed() {
       s.pushNotification(n);
       s.track({ notifs: 1 });
       const focusing = s.settings.focusMute && s.focus?.phase === "work" && s.focus.endsAt !== null;
-      if (s.fullscreen || focusing) return;
+      if (s.fullscreen || focusing || n.quiet) return;
       s.pushToast({ kind: "notify", title: n.title, detail: n.body || n.app, icon: n.icon, ms: 4500 });
       playAntic("surprised");
     });

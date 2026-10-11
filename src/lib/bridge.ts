@@ -93,6 +93,10 @@ export interface NotificationPayload {
   body: string;
   /** Uygulama ikonu (PNG data URL) */
   icon: string | null;
+  /** Telefondan geldi (Nook Mobil) */
+  phone?: boolean;
+  /** PC kapalıyken telefonda bekleyip sonradan geldi: adada kart açılmaz */
+  quiet?: boolean;
 }
 
 /** Sesli komut: kısayol basılınca "start", bırakınca kayıt (base64 WAV) ya da hata. */
@@ -406,6 +410,11 @@ export interface WolStatus {
   wakeArmed: boolean | null;
   vendor: string | null;
   model: string | null;
+  /** Dizüstü (BIOS menüleri ve uyanma kuralları farklı) */
+  laptop?: boolean;
+  modernStandby?: boolean;
+  /** Windows açılışta şifre sormadan giriş yapıyor */
+  autoLogon?: boolean;
 }
 export const wolStatus = () =>
   inTauri
@@ -426,6 +435,8 @@ export interface OutsideStatus {
   wan: string | null;
   /** Play Store'daki Tailscale'in QR kodu (SVG) */
   phoneQr: string | null;
+  /** Nook Tailscale'i açık tutar; giriş yapılmamışsa needs-login */
+  tailscaleState?: "missing" | "running" | "stopped" | "needs-login" | "starting";
 }
 export const outsideStatus = () =>
   inTauri
@@ -447,6 +458,9 @@ export interface WakeOutside {
   /** Operatör ortak adres veriyor: dışarıdan açma çalışmaz */
   cgnat: boolean;
   error: string | null;
+  /** Modemin markası/modeli ve adresi */
+  router?: string | null;
+  gateway?: string | null;
 }
 export const wakeOutsideStatus = () =>
   inTauri

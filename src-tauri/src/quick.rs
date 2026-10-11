@@ -202,6 +202,11 @@ pub fn quick_action(action: String) -> Result<(), String> {
     }
 }
 
+/// Telefondan kapatılan ekranı açar
+pub fn screen_on() -> Result<(), String> {
+    imp::screen_on()
+}
+
 #[cfg(windows)]
 mod imp {
     use windows::Devices::Radios::{Radio, RadioAccessStatus, RadioKind, RadioState};
@@ -468,6 +473,22 @@ mod imp {
         unsafe { PostMessageW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER as usize, 2) };
         Ok(())
     }
+
+    /// Ekranı açmanın güvenilir yolu kullanıcı girdisi: fareyi bir piksel oynatıp geri getirir
+    pub fn screen_on() -> Result<(), String> {
+        use windows_sys::Win32::System::Power::{SetThreadExecutionState, ES_DISPLAY_REQUIRED};
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_MOVE, MOUSEINPUT};
+        let mv = |dx: i32| INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 { mi: MOUSEINPUT { dx, dy: 0, mouseData: 0, dwFlags: MOUSEEVENTF_MOVE, time: 0, dwExtraInfo: 0 } },
+        };
+        let seq = [mv(1), mv(-1)];
+        unsafe {
+            SetThreadExecutionState(ES_DISPLAY_REQUIRED);
+            SendInput(seq.len() as u32, seq.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(not(windows))]
@@ -531,6 +552,9 @@ mod imp {
         Err("yalnızca Windows".into())
     }
     pub fn screen_off() -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+    pub fn screen_on() -> Result<(), String> {
         Err("yalnızca Windows".into())
     }
 }

@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Camera, Lock, MonitorOff, Moon, Power, RefreshCw, RotateCcw, X, type LucideIcon } from "lucide-react";
-import { power, screenshot, type Pairing, type PowerAction, type ShotTarget, type Status } from "../lib/pc";
+import { Camera, Download, Lock, Monitor, MonitorOff, Moon, Power, RefreshCw, RotateCcw, Share2, Upload, X, type LucideIcon } from "lucide-react";
+import { power, screenshot, sendFile, wakePc, type Pairing, type PowerAction, type ShotTarget, type Status } from "../lib/pc";
+import { blobBase64, native } from "../lib/native";
 import { Ball, errText, Sheet, TopBar, useBackButton, useToast } from "../ui";
+import { ZoomImage } from "../Zoom";
+import { SetupView } from "./Setup";
 import type { Conn } from "../App";
 
 interface Action {
@@ -14,36 +17,50 @@ interface Action {
   confirm?: string;
 }
 
+const SCREEN_OFF: Action = { id: "screen-off", label: "Ekranı kapat", icon: MonitorOff, color: "#8f6bff" };
+const SCREEN_ON: Action = { id: "screen-on", label: "Ekranı aç", icon: Monitor, color: "#8f6bff" };
+
 const ACTIONS: Action[] = [
   { id: "shot", label: "Ekran görüntüsü", icon: Camera, color: "#3fbfa5" },
   { id: "lock", label: "Kilitle", icon: Lock, color: "#ffd23f" },
-  { id: "screen-off", label: "Ekranı kapat", icon: MonitorOff, color: "#8f6bff" },
+  SCREEN_OFF,
   { id: "sleep", label: "Uyku", icon: Moon, color: "#3d8bff", confirm: "PC uyku moduna alınsın mı?" },
   { id: "restart", label: "Yeniden başlat", icon: RotateCcw, color: "#f2a33a", confirm: "PC yeniden başlatılsın mı? Kaydedilmemiş işler kaybolabilir." },
   { id: "shutdown", label: "Kapat", icon: Power, color: "#f0545c", confirm: "PC kapatılsın mı? Kaydedilmemiş işler kaybolabilir." },
 ];
 
-/** Bilgisayar: ekran görüntüsü, kilit, ekranı kapatma, uyku, yeniden başlatma, kapatma */
+function stamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}`;
+}
+
+/** Bilgisayar: ekran görüntüsü, kilit, ekranı kapatma/açma, uyku, yeniden başlatma, kapatma; uzaktan açma rehberi */
 export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing: Pairing; status: Status | null; conn: Conn; onBack: () => void; onOffline: () => void }) {
   useBackButton(onBack);
   const [toast, say] = useToast();
   const [ask, setAsk] = useState<Action | null>(null);
-  const [shot, setShot] = useState<{ url: string; target?: ShotTarget } | null>(null);
+  const [shot, setShot] = useState<{ url: string; blob: Blob; target?: ShotTarget } | null>(null);
   // Önizleme: ?demo=pc&pick → ekran seçimi açık
   const [pickShot, setPickShot] = useState(() => import.meta.env.DEV && new URLSearchParams(location.search).has("pick"));
   const [shooting, setShooting] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [waking, setWaking] = useState(false);
+  // Ekranı kapattıktan sonra PC'nin durumu gelene kadar düğme hemen "Ekranı aç" olsun
+  const [screenOff, setScreenOff] = useState<boolean | null>(null);
+  useEffect(() => setScreenOff(null), [status?.screenOff]);
   const online = conn === "online";
   const monitors = status?.monitors ?? [];
+  const off = screenOff ?? !!status?.screenOff;
+
+  useEffect(() => () => void (shot && URL.revokeObjectURL(shot.url)), [shot]);
 
   const takeShot = async (target?: ShotTarget) => {
     setPickShot(false);
     setShooting(true);
     try {
-      const url = await screenshot(pairing, target);
-      setShot((old) => {
-        if (old) URL.revokeObjectURL(old.url);
-        return { url, target };
-      });
+      const blob = await screenshot(pairing, target);
+      setShot({ url: URL.createObjectURL(blob), blob, target });
     } catch (e) {
       say(errText(e));
     } finally {
@@ -61,32 +78,104 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
     }
     try {
       await power(pairing, a.id);
-      say(a.id === "shutdown" ? "PC kapanıyor" : a.id === "restart" ? "PC yeniden başlıyor" : a.id === "sleep" ? "PC uyuyor" : "Tamam");
+      say(a.id === "shutdown" ? "PC kapanıyor" : a.id === "restart" ? "PC yeniden başlıyor" : a.id === "sleep" ? "PC uyuyor" : a.id === "screen-off" ? "Ekran kapandı" : a.id === "screen-on" ? "Ekran açıldı" : "Tamam");
+      if (a.id === "screen-off") setScreenOff(true);
+      if (a.id === "screen-on") setScreenOff(false);
       if (a.id === "shutdown" || a.id === "sleep" || a.id === "restart") onOffline();
     } catch (e) {
       say(errText(e));
     }
   };
 
+  const wake = async () => {
+    setWaking(true);
+    try {
+      await wakePc(pairing, status?.mac);
+      say("Uyandırma gönderildi; PC birkaç saniyede açılır");
+    } catch (e) {
+      say(errText(e));
+    }
+    window.setTimeout(() => setWaking(false), 60_000);
+  };
+
+  const name = () => `Nook ekran ${stamp()}.jpg`;
+  const saveToPhone = async () => {
+    if (!shot) return;
+    setSaving("phone");
+    try {
+      if (native) {
+        const err = native.saveImage(await blobBase64(shot.blob), name());
+        say(err || "Galeriye kaydedildi (Resimler › Nook)");
+      } else {
+        const a = document.createElement("a");
+        a.href = shot.url;
+        a.download = name();
+        a.click();
+      }
+    } catch (e) {
+      say(errText(e));
+    } finally {
+      setSaving(null);
+    }
+  };
+  const share = async () => {
+    if (!shot || !native) return;
+    try {
+      native.shareImage(await blobBase64(shot.blob), name());
+    } catch (e) {
+      say(errText(e));
+    }
+  };
+  const saveToPc = async () => {
+    if (!shot) return;
+    setSaving("pc");
+    try {
+      await sendFile(pairing, name(), new Uint8Array(await shot.blob.arrayBuffer()), "shots");
+      say("PC'de Ekran görüntüleri klasörüne kaydedildi");
+    } catch (e) {
+      say(errText(e));
+    } finally {
+      setSaving(null);
+    }
+  };
+
   return (
-    <div className="safe flex min-h-screen flex-col gap-4 px-4">
+    <div className="safe flex min-h-screen flex-col gap-4 px-4 pb-6">
       <TopBar title="Bilgisayar" nook="control" onBack={() => history.back()} />
-      {!online && <p className="rounded-3xl bg-card p-4 text-[13.5px] text-label-2">PC'ye şu an ulaşılamıyor.</p>}
+      {!online && (
+        <div className="rounded-3xl bg-card p-4">
+          <p className="text-[13.5px] text-label-2">PC'ye şu an ulaşılamıyor. Kapalıysa buradan açabilirsin.</p>
+          <button
+            disabled={waking || !(status?.mac || pairing.mac)}
+            onClick={() => void wake()}
+            className="mt-3 w-full rounded-2xl py-3.5 text-[15px] font-bold text-black disabled:opacity-50"
+            style={{ background: "#8FE03A" }}
+          >
+            {waking ? "Açılıyor…" : "PC'yi aç"}
+          </button>
+        </div>
+      )}
 
       <section className="grid grid-cols-2 gap-2.5">
-        {ACTIONS.map((a) => (
-          <motion.button
-            key={a.id}
-            whileTap={{ scale: 0.95 }}
-            disabled={!online || (a.id === "shot" && shooting)}
-            onClick={() => (a.confirm ? setAsk(a) : void run(a))}
-            className="flex items-center gap-3 rounded-3xl bg-card p-3.5 text-left disabled:opacity-40"
-          >
-            <Ball color={a.color} icon={a.icon} />
-            <span className="text-[14px] font-medium leading-tight">{a.id === "shot" && shooting ? "Alınıyor…" : a.label}</span>
-          </motion.button>
-        ))}
+        {ACTIONS.map((x) => {
+          const a = x.id === "screen-off" && off ? SCREEN_ON : x;
+          return (
+            <motion.button
+              key={x.id}
+              whileTap={{ scale: 0.95 }}
+              disabled={!online || (a.id === "shot" && shooting)}
+              onClick={() => (a.confirm ? setAsk(a) : void run(a))}
+              className="flex items-center gap-3 rounded-3xl bg-card p-3.5 text-left disabled:opacity-40"
+            >
+              <Ball color={a.color} icon={a.icon} />
+              <span className="text-[14px] font-medium leading-tight">{a.id === "shot" && shooting ? "Alınıyor…" : a.label}</span>
+            </motion.button>
+          );
+        })}
       </section>
+
+      <h2 className="-mb-2 mt-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Uzaktan açma ve bağlantı</h2>
+      <SetupView pairing={pairing} online={online} />
 
       <AnimatePresence>
         {ask && (
@@ -133,24 +222,36 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
               <button onClick={() => void takeShot(shot.target)} disabled={shooting} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-label-2">
                 <RefreshCw size={18} className={shooting ? "animate-spin" : ""} />
               </button>
-              <button
-                onClick={() => {
-                  URL.revokeObjectURL(shot.url);
-                  setShot(null);
-                }}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card"
-              >
+              <button onClick={() => setShot(null)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card">
                 <X size={20} />
               </button>
             </div>
-            <div className="flex flex-1 items-center overflow-auto">
-              <img src={shot.url} alt="" className={`w-full transition-opacity ${shooting ? "opacity-50" : ""}`} />
+            <ZoomImage key={shot.url} src={shot.url} className={`min-h-0 flex-1 transition-opacity ${shooting ? "opacity-50" : ""}`} />
+            <p className="py-1.5 text-center text-[11.5px] text-label-3">İki parmakla yakınlaştır · iki kez dokun</p>
+            <div className="grid grid-cols-3 gap-2 px-4 pb-3">
+              <ShotButton icon={Download} label={saving === "phone" ? "Kaydediliyor…" : "Telefona kaydet"} disabled={!!saving} onClick={() => void saveToPhone()} />
+              <ShotButton icon={Share2} label="Paylaş" disabled={!native} onClick={() => void share()} />
+              <ShotButton icon={Upload} label={saving === "pc" ? "Gönderiliyor…" : "PC'ye kaydet"} disabled={!!saving || !online} onClick={() => void saveToPc()} />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
       {toast}
     </div>
+  );
+}
+
+function ShotButton({ icon: Icon, label, disabled, onClick }: { icon: LucideIcon; label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex flex-col items-center gap-1 rounded-2xl bg-card py-2.5 text-[12px] font-medium text-label-2 disabled:opacity-40"
+    >
+      <Icon size={19} />
+      {label}
+    </motion.button>
   );
 }
 

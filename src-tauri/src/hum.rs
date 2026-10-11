@@ -257,7 +257,7 @@ fn listen(app: &AppHandle, shared: &Arc<Shared>) -> Outcome {
 
 /// Nook Mobil: telefonun mikrofonundan gelen ses (16 kHz mono). Bulunursa PC'deki geçmişe ve —
 /// Argus'ta bir şey izleniyorsa ve İzlerken Hum açıksa — Argus'a da yazılır (`agoMs`).
-pub fn phone(app: &AppHandle, samples: &[f32]) -> Outcome {
+pub fn phone(app: &AppHandle, samples: &[f32], ago_extra_ms: u64) -> Outcome {
     if !audible(samples) {
         return Outcome::Silent;
     }
@@ -268,7 +268,7 @@ pub fn phone(app: &AppHandle, samples: &[f32]) -> Outcome {
             *LAST_AT.lock().unwrap() = Some(Instant::now());
             crate::log::write("info", &format!("hum (telefon): {} – {}", track.artist, track.title));
             let len = samples.len().min(KEEP) as u64 * 1000 / RATE as u64;
-            let ago_ms = Some(len + asked.elapsed().as_millis() as u64);
+            let ago_ms = Some(len + asked.elapsed().as_millis() as u64 + ago_extra_ms);
             let _ = app.emit("nook://hum-found", Found { track: track.clone(), auto: false, ago_ms, phone: true });
             Outcome::Found { track }
         }

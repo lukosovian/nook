@@ -559,3 +559,6 @@ export const DEMOS6 = {
   phonetour: PhoneTourDemo,
   modemfind: ModemFindDemo,
 };
+
+/** 0.2.57 görselleri (Demos7) aynı sahne parçalarını kullanır */
+export { useTick, Stage, Fit, Phone, Pc, Mark };

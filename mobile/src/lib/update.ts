@@ -1,9 +1,11 @@
 /**
  * Nook Mobil güncellemesi: PC'deki Nook'la aynı GitHub sürümüne NookMobil.apk eklenir (nook.ps1 -Yayinla).
- * Uygulama açılınca en son sürüme bakar; daha yeniyse ana sayfada "Güncelle" kartı çıkar. APK tarayıcıyla
- * indirilir, Android kurulum ekranını açar (ilk seferde "bilinmeyen uygulamaları yükle" izni ister).
+ * Uygulama açılınca en son sürüme bakar; daha yeniyse ana sayfada "Güncelle" kartı çıkar. APK uygulamanın
+ * içinde indirilir (NookBridge.installApk) ve Android'in kurulum penceresi açılır; ilk seferde "bu kaynaktan
+ * yükle" izni istenir, izin verilip dönülünce kendiliğinden devam eder.
  */
 import { useEffect, useState } from "react";
+import { native, onNative } from "./native";
 
 const LATEST = "https://api.github.com/repos/lukosovian/nook/releases/latest";
 const ASSET = "NookMobil.apk";
@@ -46,8 +48,21 @@ export async function checkUpdate(): Promise<MobileUpdate | null> {
   return { version, url: apk.browser_download_url, notes: rel.body ?? "" };
 }
 
-/** APK'yı tarayıcıyla indirir; indirme bitince Android kurulum ekranı açılır */
+export type InstallProgress = { phase: "progress"; pct: number } | { phase: "permission" } | { phase: "install" } | { phase: "error"; message: string };
+
+/** İndirme ve kurulum durumu (ana sayfadaki kartta) */
+export function useInstallProgress() {
+  const [p, setP] = useState<InstallProgress | null>(null);
+  useEffect(() => onNative("apk", (d) => setP(d as unknown as InstallProgress)), []);
+  return p;
+}
+
+/** APK'yı uygulamanın içinde indirip kurulum penceresini açar (eski yol: tarayıcıyla indirme) */
 export async function installUpdate(u: MobileUpdate) {
+  if (native) {
+    native.installApk(u.url);
+    return;
+  }
   try {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(u.url);

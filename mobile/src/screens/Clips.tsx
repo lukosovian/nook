@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ClipboardPaste, Copy, FileText, Image as ImageIcon, Pin, Send, X } from "lucide-react";
-import { clipImage, getClips, phoneClipboard, sendToPcClipboard, type Pairing, type PcClip } from "../lib/pc";
+import { cached, clipImage, getClips, phoneClipboard, sendToPcClipboard, type Pairing, type PcClip } from "../lib/pc";
+import { queue } from "../lib/outbox";
 import { errText, tintBg, TopBar, useBackButton, useToast } from "../ui";
+import { ZoomImage } from "../Zoom";
+import type { Conn } from "../App";
 
 const PURPLE = "#9B7BFF";
 
@@ -14,11 +17,13 @@ function ago(ms: number) {
   return h < 24 ? `${h} sa önce` : `${Math.round(h / 24)} gün önce`;
 }
 
-/** Pano: PC'nin pano geçmişi (dokun → telefona kopyala) ve telefondan PC'nin panosuna metin gönderme */
-export function ClipsScreen({ pairing, onBack }: { pairing: Pairing; onBack: () => void }) {
+/** Pano: PC'nin pano geçmişi (dokun → telefona kopyala) ve telefondan PC'nin panosuna metin gönderme.
+ *  PC kapalıyken son görülen geçmiş açılır; gönderilen metin PC açılınca panosuna yazılır. */
+export function ClipsScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: Conn; onBack: () => void }) {
   useBackButton(onBack);
+  const online = conn === "online";
   const [toast, say] = useToast();
-  const [clips, setClips] = useState<PcClip[] | null>(null);
+  const [clips, setClips] = useState<PcClip[] | null>(() => cached<PcClip[]>("clips"));
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [image, setImage] = useState<string | null>(null);
@@ -26,17 +31,19 @@ export function ClipsScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
   const load = () =>
     getClips(pairing)
       .then(setClips)
-      .catch((e) => say(errText(e)));
+      .catch((e) => (cached("clips") ? undefined : say(errText(e))));
   useEffect(() => {
+    if (!online) return;
     void load();
     // PC'de yeni bir şey kopyalanınca liste kendiliğinden yenilensin
     const t = window.setInterval(() => void load(), 3000);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pairing]);
+  }, [pairing, online]);
 
   const copy = async (c: PcClip) => {
     if (c.kind === "image") {
+      if (!online) return say("Görsel PC'de: PC açılınca bakabilirsin");
       try {
         setImage(await clipImage(pairing, c.id));
       } catch (e) {
@@ -58,6 +65,12 @@ export function ClipsScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
 
   const send = async (t: string) => {
     if (!t.trim()) return;
+    if (!online) {
+      queue({ kind: "clip", text: t, at: Date.now() });
+      say("PC açılınca panosuna gönderilecek");
+      setText("");
+      return;
+    }
     setSending(true);
     try {
       await sendToPcClipboard(pairing, t);
@@ -106,12 +119,12 @@ export function ClipsScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
             className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl py-2.5 text-[14px] font-bold text-black disabled:opacity-40"
             style={{ background: PURPLE }}
           >
-            <Send size={16} /> {sending ? "Gönderiliyor…" : "PC'nin panosuna gönder"}
+            <Send size={16} /> {sending ? "Gönderiliyor…" : online ? "PC'nin panosuna gönder" : "PC açılınca gönder"}
           </motion.button>
         </div>
       </section>
 
-      <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">PC'de kopyalananlar</h2>
+      <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">{online ? "PC'de kopyalananlar" : "PC'de kopyalananlar · PC kapalı, son görülen"}</h2>
       {clips && !clips.length && <p className="py-8 text-center text-[13px] text-label-3">PC'nin pano geçmişi boş.</p>}
       <div className="flex flex-col gap-2 pb-4">
         {clips?.map((c) => (
@@ -144,9 +157,7 @@ export function ClipsScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
                 <X size={20} />
               </button>
             </div>
-            <div className="flex flex-1 items-center overflow-auto">
-              <img src={image} alt="" className="w-full" />
-            </div>
+            <ZoomImage src={image} className="min-h-0 flex-1" />
           </motion.div>
         )}
       </AnimatePresence>
