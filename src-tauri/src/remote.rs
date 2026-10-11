@@ -710,7 +710,7 @@ mod power {
 
 #[cfg(windows)]
 mod net {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, IP_ADAPTER_ADDRESSES_LH};
+    use windows_sys::Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, IP_ADAPTER_ADDRESSES_LH};
     use windows_sys::Win32::NetworkManagement::Ndis::IfOperStatusUp;
     use windows_sys::Win32::Networking::WinSock::{AF_INET, SOCKADDR_IN};
 
@@ -721,6 +721,8 @@ mod net {
         description: String,
         /// IF_TYPE_ETHERNET_CSMACD (Wi-Fi 71)
         wired: bool,
+        /// Gerçek ağ kartı (kablolu ya da Wi-Fi) ve varsayılan ağ geçidi (modem) var
+        physical: bool,
     }
 
     fn adapters() -> Vec<Adapter> {
@@ -732,7 +734,7 @@ mod net {
                 buf = vec![0u8; size as usize];
                 let r = GetAdaptersAddresses(
                     AF_INET as u32,
-                    GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+                    GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS,
                     std::ptr::null(),
                     buf.as_mut_ptr().cast(),
                     &mut size,
@@ -769,7 +771,8 @@ mod net {
                         let len = (0..).take_while(|&i| *a.Description.add(i) != 0).count();
                         String::from_utf16_lossy(std::slice::from_raw_parts(a.Description, len))
                     };
-                    out.push(Adapter { ips, mac, guid, description, wired: a.IfType == 6 });
+                    let physical = (a.IfType == 6 || a.IfType == 71) && !a.FirstGatewayAddress.is_null();
+                    out.push(Adapter { ips, mac, guid, description, wired: a.IfType == 6, physical });
                 }
                 p = a.Next;
             }
@@ -802,17 +805,29 @@ mod net {
         ts
     }
 
-    /// Wake-on-LAN için internete çıkan ağ kartının MAC adresi
-    pub fn primary_mac() -> Option<String> {
-        let main: std::net::Ipv4Addr = crate::disks::local_ip()?.parse().ok()?;
-        adapters().into_iter().find(|a| a.ips.contains(&main)).and_then(|a| a.mac)
+    /// Evdeki modeme bağlı ağ kartı. İnternete çıkan arayüz bir VPN'se (ya da Tailscale çıkış düğümü)
+    /// onun yerine modeme bağlı gerçek kart seçilir; Wake-on-LAN ve modem ayarı ona göre yapılır
+    fn primary() -> Option<Adapter> {
+        let main: Option<std::net::Ipv4Addr> = crate::disks::local_ip().and_then(|s| s.parse().ok());
+        let mut all: Vec<Adapter> = adapters().into_iter().filter(|a| a.ips.iter().any(|ip| ip.is_private() && !ip.is_link_local())).collect();
+        if let Some(i) = all.iter().position(|a| a.physical && main.is_some_and(|m| a.ips.contains(&m))) {
+            return Some(all.swap_remove(i));
+        }
+        // Kablolu kart Wi-Fi'den önce
+        all.sort_by_key(|a| !a.wired);
+        all.into_iter().find(|a| a.physical)
     }
 
-    /// İnternete çıkan ağ kartı (Wake-on-LAN hazırlığı, wol.rs)
+    /// Wake-on-LAN için modeme bağlı ağ kartının MAC adresi
+    pub fn primary_mac() -> Option<String> {
+        primary()?.mac
+    }
+
+    /// Modeme bağlı ağ kartı (Wake-on-LAN hazırlığı wol.rs, modem ayarı outside.rs)
     pub fn primary_adapter() -> Option<super::PrimaryAdapter> {
-        let main: std::net::Ipv4Addr = crate::disks::local_ip()?.parse().ok()?;
-        let a = adapters().into_iter().find(|a| a.ips.contains(&main))?;
-        Some(super::PrimaryAdapter { guid: a.guid, description: a.description, wired: a.wired })
+        let a = primary()?;
+        let ip = a.ips.iter().copied().find(|ip| ip.is_private() && !ip.is_link_local())?;
+        Some(super::PrimaryAdapter { guid: a.guid, description: a.description, wired: a.wired, ip })
     }
 }
 
@@ -829,10 +844,16 @@ mod net {
     }
 }
 
+/// Yerel ağ adresi: modeme bağlı kartınki, bulunamazsa internete çıkan arayüzünki
+pub fn lan_ip() -> Option<std::net::Ipv4Addr> {
+    primary_adapter().map(|a| a.ip).or_else(|| crate::disks::local_ip()?.parse().ok())
+}
+
 pub struct PrimaryAdapter {
     pub guid: String,
     pub description: String,
     pub wired: bool,
+    pub ip: std::net::Ipv4Addr,
 }
 
 pub use net::{addresses, primary_adapter, primary_mac};

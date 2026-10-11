@@ -2,6 +2,7 @@
  * 0.2.55 Nook Mobil yama notunun ikinci yarısının görselleri: telefonda Hum, Bilgisayar çipindeki durum,
  * PC'yi telefondan açmaya hazırlık (Windows ayarlarını düzelt), evden uzaktayken bağlanma (Tailscale),
  * dışarıdan açma (modem), telefona kurma ve uygulama içi güncelleme, telefonda tanıtım.
+ * 0.2.56: VPN açıkken ya da yeni modemlerde de modemi bulma.
  * Hepsi kendi kendine döner.
  */
 import { useEffect, useRef, useState } from "react";
@@ -385,6 +386,57 @@ function WakeOutsideDemo() {
   );
 }
 
+// ---------------------------------------------------------------- VPN açıkken de modemi bulma (0.2.56)
+
+/** Ayarlar satırı: VPN açık olsa da Nook modeme bağlı kartı seçer; önce "Modem aranıyor…", sonra anahtar açılır ve modem ayarlanır */
+function ModemFindDemo() {
+  const n = useTick(500);
+  const phase = n % 12; // 0-2 aranıyor · 3-4 bulundu, anahtar kapalı · 5 dokun · 6-11 ayarlandı
+  const on = phase >= 6;
+  const B = ACCENT.blue;
+  return (
+    <Stage>
+      <Fit w={230} h={104}>
+        <div className="absolute inset-0 rounded-[10px] border border-white/10 bg-[#14161c] px-[10px] py-[8px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[8px] text-label">{tt("Telefondan PC'yi açma")}</span>
+            <span className="flex items-center gap-[3px] rounded-full px-[5px] py-[1px] text-[6.5px]" style={{ background: tintBg(ACCENT.purple, 20), color: tintText(ACCENT.purple) }}>
+              <ShieldCheck size={7} /> {tt("VPN açık")}
+            </span>
+          </div>
+          <div className="mt-[6px] flex flex-col gap-[4px] text-[7px] text-label-2">
+            <span className="flex items-center gap-[4px]">
+              <Mark ok /> {tt("Kabloyla bağlı · Realtek PCIe GbE")}
+            </span>
+            <span className="flex items-center gap-[4px]">
+              <Mark ok /> {tt("Ağ kartı PC'yi uyandırabilir")}
+            </span>
+            <div className="flex items-center gap-[4px]">
+              <span className="min-w-0 flex-1 truncate">{tt("Evden uzaktayken de açılabilsin")}</span>
+              {phase < 3 ? (
+                <motion.span className="text-[6.5px] text-label-3" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, repeat: Infinity }}>
+                  {tt("Modem aranıyor…")}
+                </motion.span>
+              ) : (
+                <motion.span className="relative h-[11px] w-[19px] rounded-full" animate={{ background: on ? B : "rgba(255,255,255,0.18)", scale: phase === 5 ? 0.85 : 1 }}>
+                  <motion.span className="absolute top-[1.5px] h-[8px] w-[8px] rounded-full bg-white" animate={{ left: on ? 9.5 : 1.5 }} />
+                </motion.span>
+              )}
+            </div>
+            <AnimatePresence>
+              {on && (
+                <motion.span initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-[4px]">
+                  <Mark ok /> {tt("Modem ayarlandı · ev adresi 88.241.12.7")}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </Fit>
+    </Stage>
+  );
+}
+
 // ---------------------------------------------------------------- Telefona kurma ve güncelleme
 
 /** PC'deki QR okutulur → Nook Mobil iner ve kurulur; sonra yeni sürüm çıkınca uygulamada "Güncelle" kartı */
@@ -505,4 +557,5 @@ export const DEMOS6 = {
   wakeoutside: WakeOutsideDemo,
   phoneinstall: PhoneInstallDemo,
   phonetour: PhoneTourDemo,
+  modemfind: ModemFindDemo,
 };

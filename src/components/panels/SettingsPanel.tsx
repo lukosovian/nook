@@ -509,7 +509,16 @@ function WakeSetup() {
   const [out, setOut] = useState<OutsideStatus | null>(null);
   useEffect(() => void wolStatus().then(setSt), []);
   useEffect(() => void (modem && outsideStatus().then(setOut)), [modem]);
-  if (!st || !st.adapter) return null;
+  if (!st) return null;
+  if (!st.adapter)
+    return (
+      <div className="py-1">
+        <span className="text-[12px] text-label">{tt("Telefondan PC'yi açma")}</span>
+        <div className="pb-1 pt-1">
+          <WakeItem ok={false} text={tt("Modeme bağlı ağ kartı bulunamadı: PC'yi kabloyla modeme bağla")} />
+        </div>
+      </div>
+    );
   const card = st.magicPacket !== false && st.wakeArmed !== false;
   const fixable = st.fastStartup || !card;
   const fix = async () => {
@@ -576,7 +585,14 @@ function WakeOutsideRow({ guide, onGuide }: { guide: boolean; onGuide: () => voi
   const [w, setW] = useState<WakeOutside | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => void wakeOutsideStatus().then(setW), []);
-  if (!w) return null;
+  // Modem aranırken de satır görünsün (UPnP araması birkaç saniye sürer)
+  if (!w)
+    return (
+      <div className="flex min-h-[24px] items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-[10.5px] text-label-2">{tt("Evden uzaktayken de açılabilsin")}</span>
+        <span className="text-[10.5px] text-label-3">{tt("Modem aranıyor…")}</span>
+      </div>
+    );
   const set = async (on: boolean) => {
     setBusy(true);
     setW(await wakeOutsideSet(on).finally(() => setBusy(false)));

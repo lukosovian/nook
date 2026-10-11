@@ -133,7 +133,7 @@ pub fn outside_status() -> OutsideStatus {
             tailscale_installed: tailscale_dir().join("tailscale-ipn.exe").exists(),
             tailscale_up: hosts.iter().any(|h| h.starts_with("100.")),
             firewall: fw::has_rule(),
-            lan_ip: crate::disks::local_ip(),
+            lan_ip: crate::remote::lan_ip().map(|ip| ip.to_string()),
             mac: crate::remote::primary_mac(),
             wan: wan_ip(),
             phone_qr: crate::remote::qr_svg("https://play.google.com/store/apps/details?id=com.tailscale.ipn"),
@@ -223,7 +223,9 @@ mod upnp {
     use std::net::{Ipv4Addr, UdpSocket};
     use std::time::{Duration, Instant};
 
-    const WAN: [&str; 2] = ["urn:schemas-upnp-org:service:WANIPConnection:1", "urn:schemas-upnp-org:service:WANPPPConnection:1"];
+    /// Yeni modemler (IGD v2) WANIPConnection:2 sunuyor; eskiler :1
+    const WAN: [&str; 3] = ["urn:schemas-upnp-org:service:WANIPConnection:2", "urn:schemas-upnp-org:service:WANIPConnection:1", "urn:schemas-upnp-org:service:WANPPPConnection:1"];
+    const SEARCH: [&str; 2] = ["urn:schemas-upnp-org:device:InternetGatewayDevice:1", "urn:schemas-upnp-org:device:InternetGatewayDevice:2"];
 
     pub struct Gateway {
         control: String,
@@ -241,13 +243,15 @@ mod upnp {
     pub fn discover(lan: Ipv4Addr) -> Option<Gateway> {
         let sock = UdpSocket::bind((lan, 0)).ok()?;
         sock.set_read_timeout(Some(Duration::from_millis(500))).ok()?;
-        let msg = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n\r\n";
         let end = Instant::now() + Duration::from_secs(3);
         let mut buf = [0u8; 2048];
         let mut sent: Option<Instant> = None;
         while Instant::now() < end {
             if sent.is_none_or(|t| t.elapsed() > Duration::from_secs(1)) {
-                let _ = sock.send_to(msg.as_bytes(), "239.255.255.250:1900");
+                for st in SEARCH {
+                    let msg = format!("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: {st}\r\n\r\n");
+                    let _ = sock.send_to(msg.as_bytes(), "239.255.255.250:1900");
+                }
                 sent = Some(Instant::now());
             }
             let Ok((n, _)) = sock.recv_from(&mut buf) else { continue };
@@ -308,14 +312,18 @@ mod upnp {
             tag(&r, "NewExternalIPAddress").filter(|s| !s.is_empty()).map(str::to_string)
         }
 
+        /// Önce süresiz; IGD v2 modemler süresiz kaydı reddeder, onlara bir haftalık (yarım saatte bir tazeleniyor)
         pub fn forward(&self, target: Ipv4Addr) -> Result<(), String> {
-            self.soap(
-                "AddPortMapping",
-                &format!(
-                    "<NewRemoteHost></NewRemoteHost><NewExternalPort>9</NewExternalPort><NewProtocol>UDP</NewProtocol><NewInternalPort>9</NewInternalPort><NewInternalClient>{target}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>Nook WoL</NewPortMappingDescription><NewLeaseDuration>0</NewLeaseDuration>"
-                ),
-            )
-            .map(|_| ())
+            let add = |lease: u32| {
+                self.soap(
+                    "AddPortMapping",
+                    &format!(
+                        "<NewRemoteHost></NewRemoteHost><NewExternalPort>9</NewExternalPort><NewProtocol>UDP</NewProtocol><NewInternalPort>9</NewInternalPort><NewInternalClient>{target}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>Nook WoL</NewPortMappingDescription><NewLeaseDuration>{lease}</NewLeaseDuration>"
+                    ),
+                )
+                .map(|_| ())
+            };
+            add(0).or_else(|_| add(604_800))
         }
 
         pub fn remove(&self) {
@@ -328,7 +336,7 @@ mod upnp {
 fn refresh_wake() -> WakeOutside {
     let on = wake_on();
     let mut st = WakeOutside { on, ..Default::default() };
-    let Some(lan) = crate::disks::local_ip().and_then(|s| s.parse::<std::net::Ipv4Addr>().ok()) else {
+    let Some(lan) = crate::remote::lan_ip() else {
         st.error = Some("Ağ bağlantısı yok".into());
         return store_wake(st);
     };
@@ -413,7 +421,7 @@ mod tests {
     #[test]
     #[ignore]
     fn upnp_probe() {
-        let lan: std::net::Ipv4Addr = crate::disks::local_ip().unwrap().parse().unwrap();
+        let lan = crate::remote::lan_ip().unwrap();
         let gw = super::upnp::discover(lan).expect("modem bulunamadı");
         println!("dış adres: {:?}", gw.external_ip());
     }

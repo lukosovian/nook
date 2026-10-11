@@ -97,6 +97,7 @@ export type DemoId =
   | "wakeoutside"
   | "phoneinstall"
   | "phonetour"
+  | "modemfind"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -121,6 +122,18 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.56",
+    date: tt("11 Ekim 2026"),
+    headline: tt("Dışarıdan açma daha çok bilgisayarda çalışıyor"),
+    items: [
+      {
+        title: tt("VPN açıkken ve yeni modemlerde de modem bulunuyor"),
+        text: tt("Bilgisayarda bir VPN açıksa Nook artık onu ağ kartı sanmıyor; modeme bağlı gerçek kartı seçiyor, Wake-on-LAN ve modem ayarını ona göre yapıyor. Yeni nesil modemler (UPnP IGD 2) de artık tanınıyor. Ayarlar › Telefon › Telefondan PC'yi açma bölümü ağ kartı bulunamasa da görünüyor ve nedenini söylüyor; “Evden uzaktayken de açılabilsin” satırı modem aranırken de görünüyor."),
+        demo: "modemfind",
+      },
+    ],
+  },
   {
     version: "0.2.55",
     date: tt("11 Ekim 2026"),
