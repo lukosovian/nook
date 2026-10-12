@@ -265,99 +265,117 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
     let mut peak = 0f32;
     let mut last_level = Instant::now();
 
-    let result = imp::capture(&stop, |frame| {
-        // Örnekler yeniden kaydedildiyse yükle
-        if loaded.elapsed() > Duration::from_secs(5) {
-            store = load();
-            loaded = Instant::now();
-        }
-        let speech = vad.speech(frame);
-        let busy = ENROLLING.load(Ordering::Relaxed) || crate::voice::active();
-        phase = match std::mem::replace(&mut phase, Phase::Idle) {
-            Phase::Idle => {
-                if speech && !busy && Instant::now() >= cooldown && !store.templates.is_empty() {
-                    let mut audio: Vec<f32> = preroll.iter().copied().collect();
-                    audio.extend_from_slice(frame);
-                    Phase::Collect { audio, silent: 0 }
-                } else {
-                    Phase::Idle
-                }
+    let mut warned = false;
+    loop {
+        let result = imp::capture(&stop, |frame| {
+            // Örnekler yeniden kaydedildiyse yükle
+            if loaded.elapsed() > Duration::from_secs(5) {
+                store = load();
+                loaded = Instant::now();
             }
-            Phase::Collect { mut audio, mut silent } => {
-                audio.extend_from_slice(frame);
-                silent = if speech { 0 } else { silent + 1 };
-                let longest = store.templates.iter().map(Vec::len).max().unwrap_or(80);
-                let enough = audio.len() >= (longest * 16 / 10 + 30) * HOP + WIN;
-                // Söz bitti (300 ms sessizlik) ya da yeterince ses toplandı: karşılaştır
-                if silent >= 30 || enough {
-                    let (dist, end) = compare(&store, &feats, &audio);
-                    let thr = threshold(&store, CONFIG.lock().unwrap().sensitivity);
-                    let woke = dist <= thr;
-                    let _ = app.emit("nook://wake-heard", Heard { score: (thr / dist.max(1e-6)).min(1.5) / 1.5, woke });
-                    if woke {
-                        let target = crate::shortcut::target(&app);
-                        let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Start);
-                        let rest = audio.get(end.min(audio.len())..).unwrap_or_default().to_vec();
-                        // Uyandırma sözüyle komut bir solukta söylendiyse komutun başı zaten elde
-                        let spoke = rest.len() > RATE / 3 && silent < 30;
-                        Phase::Command { audio: rest, silent: if spoke { 0 } else { silent }, spoke, started: Instant::now() }
-                    } else if silent >= 30 {
+            let speech = vad.speech(frame);
+            let busy = ENROLLING.load(Ordering::Relaxed) || crate::voice::active();
+            phase = match std::mem::replace(&mut phase, Phase::Idle) {
+                Phase::Idle => {
+                    if speech && !busy && Instant::now() >= cooldown && !store.templates.is_empty() {
+                        let mut audio: Vec<f32> = preroll.iter().copied().collect();
+                        audio.extend_from_slice(frame);
+                        Phase::Collect { audio, silent: 0 }
+                    } else {
+                        Phase::Idle
+                    }
+                }
+                Phase::Collect { mut audio, mut silent } => {
+                    audio.extend_from_slice(frame);
+                    silent = if speech { 0 } else { silent + 1 };
+                    let longest = store.templates.iter().map(Vec::len).max().unwrap_or(80);
+                    let enough = audio.len() >= (longest * 16 / 10 + 30) * HOP + WIN;
+                    // Söz bitti (300 ms sessizlik) ya da yeterince ses toplandı: karşılaştır
+                    if silent >= 30 || enough {
+                        let (dist, end) = compare(&store, &feats, &audio);
+                        let thr = threshold(&store, CONFIG.lock().unwrap().sensitivity);
+                        let woke = dist <= thr;
+                        let _ = app.emit("nook://wake-heard", Heard { score: (thr / dist.max(1e-6)).min(1.5) / 1.5, woke });
+                        if woke {
+                            let target = crate::shortcut::target(&app);
+                            let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Start);
+                            let rest = audio.len().saturating_sub(end);
+                            // Uyandırma sözüyle komut bir solukta söylendiyse komutun başı zaten elde
+                            let spoke = rest > RATE / 3 && silent < 30;
+                            // Sözün bittiği yer kestirim: komutun ilk hecesi kesilmesin diye bütün ses gider
+                            // ("Hey Nook" yazıya dökülünce baştan atılır)
+                            Phase::Command { audio, silent: if spoke { 0 } else { silent }, spoke, started: Instant::now() }
+                        } else if silent >= 30 {
+                            Phase::Idle
+                        } else {
+                            Phase::Skip { silent }
+                        }
+                    } else {
+                        Phase::Collect { audio, silent }
+                    }
+                }
+                Phase::Skip { silent } => {
+                    let silent = if speech { 0 } else { silent + 1 };
+                    if silent >= 30 {
                         Phase::Idle
                     } else {
                         Phase::Skip { silent }
                     }
-                } else {
-                    Phase::Collect { audio, silent }
+                }
+                Phase::Command { mut audio, mut silent, mut spoke, started } => {
+                    audio.extend_from_slice(frame);
+                    if speech {
+                        spoke = true;
+                        silent = 0;
+                    } else {
+                        silent += 1;
+                    }
+                    peak = frame.iter().fold(peak, |p, s| p.max(s.abs()));
+                    if last_level.elapsed() > Duration::from_millis(70) {
+                        let _ = app.emit("nook://voice-level", (peak * 3.0).min(1.0));
+                        peak = 0.0;
+                        last_level = Instant::now();
+                    }
+                    let waited = started.elapsed();
+                    // Komut bitti: konuştuktan sonra 0,6 sn sessizlik, hiç konuşmadan 6 sn, ya da 15 sn
+                    let done = (spoke && silent >= 60) || (!spoke && waited > Duration::from_secs(6)) || waited > Duration::from_secs(15);
+                    if done {
+                        let _ = app.emit("nook://voice-level", 0f32);
+                        let keep = audio.len().saturating_sub(silent.saturating_sub(20) * HOP);
+                        audio.truncate(keep);
+                        let wav = spoke.then(|| crate::voice::wav_base64(&audio, RATE as u32));
+                        let target = crate::shortcut::target(&app);
+                        let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Done { audio: wav });
+                        cooldown = Instant::now() + Duration::from_millis(1500);
+                        Phase::Idle
+                    } else {
+                        Phase::Command { audio, silent, spoke, started }
+                    }
+                }
+            };
+            if preroll.len() + frame.len() > HOP * 25 {
+                preroll.drain(..frame.len().min(preroll.len()));
+            }
+            preroll.extend(frame.iter().copied());
+            true
+        });
+        match result {
+            // Mikrofon yok ya da açılamadı (çıkarıldı, başka uygulama kilitledi): bir kez haber ver, sonra sessizce yeniden dene
+            Err(e) => {
+                if !warned {
+                    crate::log::write("warn", &format!("hey nook: {e}"));
+                    let _ = app.emit("nook://wake-error", e);
+                    warned = true;
+                }
+                for _ in 0..30 {
+                    if stop.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_secs(1));
                 }
             }
-            Phase::Skip { silent } => {
-                let silent = if speech { 0 } else { silent + 1 };
-                if silent >= 30 {
-                    Phase::Idle
-                } else {
-                    Phase::Skip { silent }
-                }
-            }
-            Phase::Command { mut audio, mut silent, mut spoke, started } => {
-                audio.extend_from_slice(frame);
-                if speech {
-                    spoke = true;
-                    silent = 0;
-                } else {
-                    silent += 1;
-                }
-                peak = frame.iter().fold(peak, |p, s| p.max(s.abs()));
-                if last_level.elapsed() > Duration::from_millis(70) {
-                    let _ = app.emit("nook://voice-level", (peak * 3.0).min(1.0));
-                    peak = 0.0;
-                    last_level = Instant::now();
-                }
-                let waited = started.elapsed();
-                // Komut bitti: konuştuktan sonra 1 sn sessizlik, hiç konuşmadan 6 sn, ya da 15 sn
-                let done = (spoke && silent >= 100) || (!spoke && waited > Duration::from_secs(6)) || waited > Duration::from_secs(15);
-                if done {
-                    let _ = app.emit("nook://voice-level", 0f32);
-                    let keep = audio.len().saturating_sub(silent.saturating_sub(20) * HOP);
-                    audio.truncate(keep);
-                    let wav = spoke.then(|| crate::voice::wav_base64(&audio, RATE as u32));
-                    let target = crate::shortcut::target(&app);
-                    let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Done { audio: wav });
-                    cooldown = Instant::now() + Duration::from_millis(1500);
-                    Phase::Idle
-                } else {
-                    Phase::Command { audio, silent, spoke, started }
-                }
-            }
-        };
-        if preroll.len() + frame.len() > HOP * 25 {
-            preroll.drain(..frame.len().min(preroll.len()));
+            Ok(()) => return,
         }
-        preroll.extend(frame.iter().copied());
-        true
-    });
-    if let Err(e) = result {
-        crate::log::write("warn", &format!("hey nook: {e}"));
-        let _ = app.emit("nook://wake-error", e);
     }
 }
 

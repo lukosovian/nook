@@ -158,6 +158,16 @@ async function probeModel(key: string, id: string): Promise<boolean | null> {
 
 async function aliveModels(key: string, models: ModelInfo[]): Promise<ModelInfo[]> {
   const probe = loadProbe(key);
+  // Daha önce yoklandıysa liste beklemesin (sesli komut, sohbet hemen başlasın); eskiyenler arka planda
+  if (Object.keys(probe).length) {
+    void refreshProbe(key, models, probe);
+    return models.filter((m) => probe[m.id]?.ok !== false);
+  }
+  await refreshProbe(key, models, probe);
+  return models.filter((m) => probe[m.id]?.ok !== false);
+}
+
+async function refreshProbe(key: string, models: ModelInfo[], probe: Probe) {
   const now = Date.now();
   await Promise.all(
     models.map(async (m) => {
@@ -168,7 +178,6 @@ async function aliveModels(key: string, models: ModelInfo[]): Promise<ModelInfo[
     }),
   );
   saveProbe(key, probe);
-  return models.filter((m) => probe[m.id]?.ok !== false);
 }
 
 /** Yoğunlukta geçilecek yedek: en yeni kararlı "Flash" (lite olmayan); yoksa başka herhangi biri. */
@@ -255,18 +264,35 @@ export function pickQuickModel(models: ModelInfo[]): string | null {
   return pickFallbackModel(models, "") ?? pickDefaultModel(models);
 }
 
-/** Akışsız tek seferlik istek; düz metin cevabı döner. */
-export async function generateOnce(key: string, model: string, parts: Part[], system?: string, signal?: AbortSignal): Promise<string> {
-  const r = await fetch(`${BASE}/models/${model}:generateContent`, {
-    method: "POST",
-    signal: signal ?? AbortSignal.timeout(30_000),
-    headers: headers(key),
-    body: JSON.stringify({
-      ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-      contents: [{ role: "user", parts }],
-      generationConfig: { temperature: 0.2 },
-    }),
-  });
+/** Gemini'ye bağlantıyı önceden aç (sesli komut başlarken): ilk istekte el sıkışma beklenmesin */
+export function warmGemini(key: string) {
+  if (!key) return;
+  void fetch(`${BASE}/models?pageSize=1`, { headers: headers(key), signal: AbortSignal.timeout(5000) }).catch(() => {});
+}
+
+/** En hızlı model (yazıya dökme gibi basit işler): kararlı "Flash Lite"; yoksa null */
+export function pickLiteModel(models: ModelInfo[]): string | null {
+  return models.find((m) => /flash-lite/i.test(m.id) && !/(preview|exp|latest)/i.test(m.id))?.id ?? models.find((m) => /flash-lite/i.test(m.id))?.id ?? null;
+}
+
+/**
+ * Akışsız tek seferlik istek; düz metin cevabı döner. `fast`: model düşünmeden cevaplasın
+ * (desteklemeyen model reddederse düşünme ayarı olmadan bir kez daha denenir).
+ */
+export async function generateOnce(key: string, model: string, parts: Part[], system?: string, signal?: AbortSignal, fast = false): Promise<string> {
+  const send = (noThinking: boolean) =>
+    fetch(`${BASE}/models/${model}:generateContent`, {
+      method: "POST",
+      signal: signal ?? AbortSignal.timeout(fast ? 15_000 : 30_000),
+      headers: headers(key),
+      body: JSON.stringify({
+        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        contents: [{ role: "user", parts }],
+        generationConfig: { temperature: 0.2, ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      }),
+    });
+  let r = await send(fast);
+  if (fast && r.status === 400) r = await send(false);
   if (!r.ok) throw await apiError(r);
   const j = (await r.json()) as { candidates?: { content?: { parts?: Part[] } }[] };
   return (j.candidates?.[0]?.content?.parts ?? [])

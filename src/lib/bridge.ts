@@ -41,6 +41,8 @@ export const EVENTS = {
   notification: "nook://notification",
   voice: "nook://voice",
   wakeHeard: "nook://wake-heard",
+  sttProgress: "nook://stt-progress",
+  sttReady: "nook://stt-ready",
   voiceLevel: "nook://voice-level",
   askScreen: "nook://ask-screen",
   online: "nook://online",
@@ -125,6 +127,21 @@ export const fileIcon = (path: string, size = 48) => (inTauri ? invoke<string | 
 export const captureScreen = () => (inTauri ? invoke<string>("capture_screen") : Promise.reject(new Error(tt("yalnızca uygulamada"))));
 export const voiceStart = () => (inTauri ? invoke<boolean>("voice_start") : Promise.resolve(false));
 export const voiceStop = () => (inTauri ? invoke<string | null>("voice_stop") : Promise.resolve(null));
+
+/** Yerel konuşma tanıma (Whisper): model indirildi mi, iniyor mu, bellekte mi */
+export interface SttStatus {
+  installed: boolean;
+  downloading: boolean;
+  progress: number;
+  loaded: boolean;
+}
+const STT_DEMO: SttStatus = { installed: false, downloading: false, progress: 0, loaded: false };
+export const sttStatus = () => (inTauri ? invoke<SttStatus>("stt_status") : Promise.resolve(STT_DEMO));
+export const sttDownload = () => (inTauri ? invoke<void>("stt_download") : noop());
+export const sttDelete = () => (inTauri ? invoke<SttStatus>("stt_delete") : Promise.resolve(STT_DEMO));
+export const sttPreload = () => (inTauri ? invoke<void>("stt_preload") : noop());
+/** Base64 WAV → metin, bu bilgisayarda; `prompt`: tanımaya ipucu olan adlar */
+export const sttTranscribe = (audio: string, prompt: string) => (inTauri ? invoke<string>("stt_transcribe", { audio, prompt }) : Promise.resolve(""));
 
 /** "Hey Nook": kaç örnek tanıtılmış, dinleyici açık mı */
 export interface WakeStatus {
@@ -617,6 +634,12 @@ export const openPath = (path: string) =>
   inTauri ? invoke<void>("open_path", { path }) : Promise.resolve(void window.open(path, "_blank"));
 export const revealPath = (path: string) => (inTauri ? invoke<void>("reveal_path", { path }) : noop());
 export const listApps = () => (inTauri ? invoke<AppEntry[]>("list_apps") : Promise.resolve([]));
+/** Uygulama listesi, 5 dk önbellekli (sesli komutta her seferinde Başlat menüsü taranmasın) */
+let appsCache: { at: number; list: Promise<AppEntry[]> } | null = null;
+export function appsCached() {
+  if (!appsCache || Date.now() - appsCache.at > 5 * 60_000) appsCache = { at: Date.now(), list: listApps().catch(() => []) };
+  return appsCache.list;
+}
 /** Şarkı/videonun YouTube kimliği (ilk arama sonucu); bulunamazsa null */
 export const musicFind = (query: string) => (inTauri ? invoke<string | null>("music_find", { query }) : Promise.resolve(null));
 

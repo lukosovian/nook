@@ -43,7 +43,11 @@ import { Report } from "./report/Report";
 import { SearchPanel } from "./search/SearchPanel";
 import { Tour, useTourSteps } from "./tour/Tour";
 
-const SHADOW = "0 14px 34px -12px rgba(0,0,0,0.8)";
+/**
+ * Dış gölge yok: şeffaf pencerede yarı saydam siyah, WebView2'nin zemini ara sıra "saydam beyaz"a
+ * döndüğünde açık gri bir hare olarak çiziliyordu (adanın arkasında parlama)
+ */
+const SHADOW = "none";
 
 /** Transform katmanı (layout'tan bağımsız): çiğnerken squash & stretch, açken nefes, ekran değiştirirken kaçış. */
 /** Ekran geçiş efektlerinden kalabilecek dönüş/kayma/renk izlerini sıfırlar */

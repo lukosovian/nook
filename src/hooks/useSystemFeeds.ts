@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { pauseFrames, setFrameRate } from "../lib/frameCap";
 import {
-  applySettings, remoteProfile, wakeConfig,
+  applySettings, remoteProfile, wakeConfig, sttPreload,
   clipboardClear,
   clipboardClearIf,
   clipboardPrune,
@@ -700,6 +700,11 @@ export function useSettingsSync() {
     if (!isPrimary) return;
     void syncAutostart(settings.autostart).catch((e) => console.warn("[nook] autostart", e));
   }, [settings.autostart]);
+  // Yerel konuşma tanıma açıksa model şimdiden belleğe yüklensin (ilk komut beklemesin)
+  useEffect(() => {
+    if (!isPrimary || !settings.localStt) return;
+    void sttPreload().catch(() => {});
+  }, [settings.localStt]);
   // "Hey Nook" dinleyicisi
   useEffect(() => {
     if (!isPrimary) return;

@@ -307,6 +307,8 @@ export interface Settings extends NativeSettings {
   wakeWord: boolean;
   /** 0 az tetiklenir … 1 kolay tetiklenir */
   wakeSensitivity: number;
+  /** Sesli komut bu bilgisayarda yazıya dökülsün (Whisper; internetsiz, Gemini kotası harcamaz) */
+  localStt: boolean;
   weather: boolean;
   /** Boşsa konum IP'den tahmin edilir */
   weatherCity: string;
@@ -555,6 +557,7 @@ export const DEFAULT_SETTINGS: Settings = {
   humAuto: false,
   wakeWord: false,
   wakeSensitivity: 0.5,
+  localStt: true,
   uiSounds: true,
   uiVolume: 0.6,
 };

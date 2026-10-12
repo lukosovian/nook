@@ -136,8 +136,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         .game_screen
                         .lock()
                         .unwrap()
-                        .is_some_and(|(l, t, r, b)| px >= l as f64 && px < r as f64 && py >= t as f64 && py < b as f64)
-                        && !crate::alarm::imminent(&shared);
+                        .is_some_and(|(l, t, r, b)| px >= l as f64 && px < r as f64 && py >= t as f64 && py < b as f64);
 
                     let mut over_any = false;
                     for (label, ws) in windows {
@@ -170,6 +169,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                             // Tauri/tao'nun kendi durumunu da güncel tut (o ana iş parçacığında, gecikmeli uygulanır)
                             if let Some(win) = app.get_webview_window(&label) {
                                 let _ = win.set_ignore_cursor_events(!inside);
+                                // WebView2 zemini ara sıra şeffaf beyaza dönüyor: adanın kenarı gri parlıyordu
+                                if inside {
+                                    window::clear_background(&win);
+                                }
                             }
                         }
                         // Asıl geçiş: pencere stilini Windows'a doğrudan, beklemeden yaz. Her adımda

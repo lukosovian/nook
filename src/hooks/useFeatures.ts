@@ -20,6 +20,11 @@ import { transcribe } from "../lib/assist";
 import { aiErrorText } from "../lib/ai";
 import { note } from "../lib/log";
 import { sendChat } from "../lib/chat";
+import { runLocalCommand } from "../lib/voiceCommands";
+import { warmGemini } from "../lib/ai";
+import { modelsFor } from "./useGemini";
+import { appsCached } from "../lib/bridge";
+import { playSfx } from "../lib/sfx";
 import { openBrief } from "../lib/brief";
 import { notesDue, openNotes } from "../lib/notes";
 import { nextPhase, remaining } from "../lib/focus";
@@ -132,6 +137,10 @@ export function useNotificationFeed() {
   }, []);
 }
 
+/** Baştaki "Hey Nook" (ve yanlış duyulmuş hâlleri: "hey nuk", "hey look"…) */
+const WAKE_PREFIX = /^\s*(hey|hay|hei|he|hi|ey)[\s,]*(nook|nuk|nuh|nok|nouk|nook'?a|look|book|nu)\b[\s,.!:;-]*/i;
+const stripWake = (t: string) => t.replace(WAKE_PREFIX, "").replace(/^[\s,.!-]+/, "").trim();
+
 /** Sesli komut kaydını yazıya döküp sohbete gönderir. */
 export async function handleVoiceAudio(audio: string | null) {
   const s = useNook.getState();
@@ -139,13 +148,30 @@ export async function handleVoiceAudio(audio: string | null) {
   if (!audio) return;
   s.setBusy("voice", true);
   try {
-    const text = await transcribe(audio);
+    const t0 = performance.now();
+    const text = stripWake(await transcribe(audio));
+    note(`sesli komut: yazıya dökme ${Math.round(performance.now() - t0)} ms → "${text}"`);
     if (!text) {
       s.pushToast({ kind: "chat", title: tt("Anlayamadım"), detail: tt("Bir daha söyler misin?") });
       playAntic("suspicious");
       return;
     }
-    void sendChat(text, { voice: true });
+    // Duyduğu cümle hemen görünsün
+    s.pushToast({ kind: "chat", title: tt("Duydum"), detail: `“${text}”`, ms: 4000 });
+    const heardId = useNook.getState().toasts.at(-1)?.id;
+    // Sık komutlar (aç, çal, ses, durdur…) Gemini'ye sorulmadan hemen yapılır
+    const t1 = performance.now();
+    const local = await runLocalCommand(text).catch(() => null);
+    if (local) note(`sesli komut: yerelde yapıldı ${Math.round(performance.now() - t1)} ms`);
+    if (local) {
+      s.pushChat({ id: crypto.randomUUID(), role: "user", text, voice: true });
+      s.pushChat({ id: crypto.randomUUID(), role: "nook", text: local.note.text });
+      useNook.setState((st) => ({ toasts: st.toasts.filter((x) => x.id !== heardId) }));
+      s.pushToast({ kind: "chat", title: `“${text}”`, detail: local.note.text, ms: 5000 });
+      return;
+    }
+    // Gerisi Gemini'de, hızlı modelle (seçili model Pro olsa da sesli komut beklemesin)
+    void sendChat(text, { voice: true, quick: true });
   } catch (e) {
     s.pushToast({ kind: "chat", title: tt("Sesli komut"), detail: aiErrorText(e), ms: 5000 });
   } finally {
@@ -170,7 +196,20 @@ export function useVoiceFeed() {
     const off = subscribe<VoicePayload>(EVENTS.voice, (v) => {
       const s = useNook.getState();
       if (v.phase === "start") {
+        // Başka bir şeyle uğraşıyorsa (gezinti, açık panel) bırakıp adaya dönsün ve dinlesin
+        if (s.outing) s.setOuting(null);
+        s.setAntic(null);
+        s.setSearching(false);
+        s.setPinned(false);
         s.setListening(true);
+        playSfx("attention");
+        // Kullanıcı konuşurken bağlantı ve model listesi hazırlansın
+        const key = s.settings.geminiKey.trim();
+        if (key) {
+          warmGemini(key);
+          void modelsFor(key).catch(() => {});
+          void appsCached();
+        }
         playAntic("surprised");
       } else if (v.phase === "done") {
         void handleVoiceAudio(v.audio);

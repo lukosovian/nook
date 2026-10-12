@@ -239,14 +239,20 @@ interface NookProps {
   res?: number;
 }
 
-export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wear = DEFAULT_LOOK, bounds, res = IMG_RES }: NookProps) {
+export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wanted = DEFAULT_LOOK, bounds, res = IMG_RES }: NookProps) {
   const ref = useRef<HTMLDivElement>(null);
   const look = useLook(ref, !NO_LOOK.has(expression));
   const lid = useBlink(BLINKS.has(expression));
   const press = useGrab();
 
   // --- 3B kafa çevirme: gözler kenara kayar ve kısalır, ışık ters yöne gider
-  const img = useBodyImage(wear, color, res);
+  const fresh = useBodyImage(wanted, color, res);
+  // Yeni görünümün çizimi hazırlanırken (programı derlenirken) düz küreye düşmesin: eskisi kalsın,
+  // yenisi gelince gövde, aksesuarlar ve gözler birlikte değişsin
+  const shownRef = useRef<{ wear: typeof wanted; img: string } | null>(null);
+  if (fresh) shownRef.current = { wear: wanted, img: fresh };
+  const wear = fresh ? wanted : shownRef.current?.wear ?? wanted;
+  const img = fresh ?? shownRef.current?.img ?? null;
   const isBox = expression === "hungry" || expression === "chewing";
   /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
   const solid = !!img && !isBox;

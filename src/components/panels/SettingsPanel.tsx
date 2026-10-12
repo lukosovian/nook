@@ -3,6 +3,8 @@ import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { Check, Eye, EyeOff, HelpCircle, Lock, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
+import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
+import { refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
 import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
 import { alarmRing, listMonitors, openPath, quickState, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
@@ -132,6 +134,8 @@ export function SettingsPanel() {
           <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
         </Row>
       </Section>
+
+      <SupportersSection />
 
       <ShortcutsSection />
 
@@ -803,9 +807,49 @@ function PalettePreview() {
   );
 }
 
+/** Destekçiler: GitHub'da Nook'a yıldız verenler; profil fotoğrafına basınca GitHub sayfası açılır */
+function SupportersSection() {
+  const list = useSupporters((s) => s.list);
+  const stars = useSupporters((s) => s.stars);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setBusy(true);
+    void refreshSupporters(true)
+      .catch(() => {})
+      .finally(() => setBusy(false));
+  }, []);
+  return (
+    <Section title={tt("Destekçiler")}>
+      <div className="py-1.5">
+        <p className="text-[10.5px] leading-snug text-label-3">
+          {list.length || stars
+            ? tt("GitHub'da Nook'a yıldız veren {0} kişi. Teşekkürler!", Math.max(list.length, stars ?? 0))
+            : busy
+              ? tt("Yükleniyor…")
+              : tt("Henüz kimse yıldız vermedi. İlk destekçi sen ol!")}
+        </p>
+        {!!list.length && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {list.slice(0, 60).map((s) => (
+              <button key={s.login} title={s.login} onClick={() => void openPath(s.url)} className="group flex flex-col items-center gap-0.5">
+                <img src={s.avatar} alt={s.login} className="h-8 w-8 rounded-full ring-1 ring-white/10 transition-transform group-hover:scale-110" draggable={false} />
+                <span className="max-w-[52px] truncate text-[9.5px] text-label-3">{s.login}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="mt-1.5 flex justify-end">
+          <TextButton onClick={() => void openPath(REPO_URL)}>{tt("GitHub'da yıldız ver ⭐")}</TextButton>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 /** Bölümler arası hızlı geçiş: üstte yapışık kalan ince sekme şeridi; kaydırdıkça bulunulan bölüm parlar */
 const INDEX: { label: string; title: string }[] = [
   { label: "Nook", title: "Nook" },
+  { label: tt("Destekçiler"), title: tt("Destekçiler") },
   { label: tt("Kısayollar"), title: tt("Kısayollar") },
   { label: tt("Erişilebilirlik"), title: tt("Erişilebilirlik") },
   { label: tt("Molalar"), title: tt("Mola hatırlatıcıları") },
@@ -1486,14 +1530,74 @@ function WakeSection() {
           </div>
         </>
       )}
+      <LocalStt />
       {(trained || step > 0) && (
-        <p className="py-1 text-[10.5px] leading-snug" style={{ color: noKey ? ACCENT.orange : "var(--color-label-3)" }}>
-          {noKey
-            ? tt("Komutları anlamak için Gemini API anahtarı gerekiyor (yukarıda).")
-            : tt("Mikrofon yalnızca bu bilgisayarda dinlenir; Windows mikrofon simgesi açık kalır. Yalnızca “Hey Nook”tan sonra söylediğin cümle Gemini'ye gider.")}
+        <p className="py-1 text-[10.5px] leading-snug" style={{ color: noKey && !s.localStt ? ACCENT.orange : "var(--color-label-3)" }}>
+          {noKey && !s.localStt
+            ? tt("Komutları anlamak için Gemini API anahtarı ya da “Bilgisayarda yazıya dök” gerekiyor.")
+            : s.localStt
+              ? tt("Mikrofon yalnızca bu bilgisayarda dinlenir; Windows mikrofon simgesi açık kalır. “Aç, çal, ses” gibi komutlar hiç internete çıkmaz; yalnızca Nook'un bilmediği istekler Gemini'ye gider.")
+              : tt("Mikrofon yalnızca bu bilgisayarda dinlenir; Windows mikrofon simgesi açık kalır. Yalnızca “Hey Nook”tan sonra söylediğin cümle Gemini'ye gider.")}
         </p>
       )}
     </Section>
+  );
+}
+
+/**
+ * Bilgisayarda yazıya dök (Whisper): model bir kez iner (~190 MB), sesli komut internetsiz ve
+ * Gemini kotası harcamadan yazıya dökülür.
+ */
+function LocalStt() {
+  const on = useNook((st) => st.settings.localStt);
+  const update = useNook((st) => st.updateSettings);
+  const [st, setSt] = useState<SttStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void sttStatus().then(setSt);
+    const offP = subscribe<number>(EVENTS.sttProgress, (progress) => setSt((cur) => (cur ? { ...cur, downloading: true, progress } : cur)));
+    const offR = subscribe<true | string>(EVENTS.sttReady, (r) => {
+      if (r === true) {
+        update({ localStt: true });
+        setError(null);
+      } else setError(tt("İnemedi: {0}", r));
+      void sttStatus().then(setSt);
+    });
+    return () => {
+      offP();
+      offR();
+    };
+  }, [update]);
+  if (!st) return null;
+  return (
+    <div className="py-1.5">
+      <div className="flex min-h-[26px] items-center justify-between gap-2">
+        <span className="text-[12px] text-label">{tt("Bilgisayarda yazıya dök")}</span>
+        {st.installed ? (
+          <Toggle on={on} onChange={(v) => update({ localStt: v })} color={ACCENT.teal} />
+        ) : st.downloading ? (
+          <span className="text-[11px] font-medium tabular-nums" style={{ color: tintText(ACCENT.teal) }}>
+            %{Math.round(st.progress)}
+          </span>
+        ) : (
+          <TextButton onClick={() => void sttDownload().then(() => setSt({ ...st, downloading: true, progress: 0 }))}>{tt("İndir (190 MB)")}</TextButton>
+        )}
+      </div>
+      {st.downloading && <Bar pct={Math.round(st.progress)} color={ACCENT.teal} className="mt-1" />}
+      <p className="mt-1 text-[10.5px] leading-snug" style={{ color: error ? ACCENT.orange : "var(--color-label-3)" }}>
+        {error ??
+          (st.installed
+            ? tt("Sesli komut internetsiz, Gemini kotası harcamadan bu bilgisayarda (Whisper) yazıya dökülür.")
+            : tt("Sesli komutu internete göndermeden, Gemini'ye bağlı kalmadan bu bilgisayarda yazıya döker (Whisper). Model bir kez iner."))}
+      </p>
+      {st.installed && (
+        <div className="flex justify-end">
+          <TextButton tone="danger" onClick={() => void sttDelete().then((x) => (setSt(x), update({ localStt: false })))}>
+            {tt("Modeli sil")}
+          </TextButton>
+        </div>
+      )}
+    </div>
   );
 }
 

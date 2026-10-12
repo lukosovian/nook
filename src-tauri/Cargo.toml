@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.2.58"
+version = "0.2.59"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -41,6 +41,8 @@ hmac = "0.12"
 sha2 = "0.10"
 getrandom = "0.2"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# Yerel konuşma tanıma (sesli komutu internetsiz, Gemini kotası harcamadan yazıya döker)
+whisper-rs = { version = "0.16", features = ["openmp"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
@@ -125,3 +127,9 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# Yerel konuşma tanıma hesap yoğun: boyut değil hız için derlensin
+[profile.release.package.whisper-rs-sys]
+opt-level = 3
+[profile.release.package.whisper-rs]
+opt-level = 3

@@ -34,6 +34,7 @@ mod tracker;
 mod verify;
 mod voice;
 mod wake;
+mod stt;
 mod window;
 pub mod wol;
 
@@ -157,6 +158,11 @@ pub fn run() {
             wake::wake_enroll_reset,
             wake::wake_enroll_save,
             wake::wake_forget,
+            stt::stt_status,
+            stt::stt_download,
+            stt::stt_delete,
+            stt::stt_preload,
+            stt::stt_transcribe,
             hum::hum_listen,
             hum::hum_cancel,
             hum::hum_watching,
@@ -198,6 +204,7 @@ pub fn run() {
 
             window::build_tray(app.handle())?;
             wake::init(app.handle());
+            stt::init();
             let handle = app.handle().clone();
             tracker::spawn(handle.clone(), shared.clone());
             clipboard::spawn(handle.clone());

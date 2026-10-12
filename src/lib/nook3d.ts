@@ -198,8 +198,11 @@ function program(c: Ctx, key: string): Prog {
   gl.linkProgram(prog);
   const p: Prog = { prog, fs, state: "pending", t0: performance.now(), u: new Map() };
   progs.set(key, p);
-  if (c.ext) later(poll, 0);
-  else finish(c, key, p);
+  if (!c.ext) finish(c, key, p);
+  else if (!polling) {
+    polling = true;
+    later(poll, 0);
+  }
   return p;
 }
 
@@ -222,13 +225,10 @@ function finish(c: Ctx, key: string, p: Prog) {
 let polling = false;
 function poll() {
   const c = ctx;
-  if (!c?.ext) return;
-  polling = false;
+  if (!c?.ext) return void (polling = false);
   for (const [key, p] of progs) if (p.state === "pending" && c.gl.getProgramParameter(p.prog, c.ext.COMPLETION_STATUS_KHR)) finish(c, key, p);
-  if ([...progs.values()].some((p) => p.state === "pending") && !polling) {
-    polling = true;
-    later(poll, 40);
-  }
+  if ([...progs.values()].some((p) => p.state === "pending")) later(poll, 40);
+  else polling = false;
 }
 
 function draw(c: Ctx, p: Prog, look: Look, color: string, size: number) {
@@ -375,6 +375,11 @@ function readiness(look: Look): "wait" | "ok" | "none" {
   if (!c) return "none";
   const p = program(c, progKey(look));
   return p.state === "pending" ? "wait" : p.state === "ready" ? "ok" : "none";
+}
+
+/** Görünümün programını şimdiden derlemeye başla (ör. "Şaşırt beni"nin sıradaki görünümü) */
+export function warmLook(look: Look) {
+  void readiness(look);
 }
 
 /** Görünümün resmi (data URL); WebGL yoksa ya da programı daha derleniyorsa null. Aynı görünüm bir kez çizilir. */

@@ -1,3 +1,4 @@
+import { useSupportersFeed } from "./lib/supporters";
 import { useEffect } from "react";
 import { CHIP_NOOKS } from "./lib/look";
 import { prefetchBodies } from "./lib/nook3d";
@@ -73,6 +74,7 @@ export default function App() {
   useStatsFeed();
   useDevicesFeed();
   useClaudeFeed();
+  useSupportersFeed();
   useFullscreenFeed();
   usePrivacyFeed();
   useDownloadsFeed();

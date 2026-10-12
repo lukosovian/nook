@@ -627,7 +627,199 @@ function GeminiModelsDemo() {
   );
 }
 
+/** Sesli komut: duyduğu cümle hemen çıkar, sık komut beklemeden yapılır (saat göstergesi kısa) */
+function VoiceFastDemo() {
+  const n = useTick(1500);
+  const steps = [
+    { said: tt("“Spotify'ı aç”"), done: tt("Spotify açıldı") },
+    { said: tt("“Sezen Aksu çal”"), done: tt("Çalıyor: Sezen Aksu") },
+    { said: tt("“Sesi yüzde 40 yap”"), done: tt("Ses %40") },
+    { said: tt("“Sonraki şarkı”"), done: tt("Sonraki parça") },
+  ];
+  const cur = steps[n % steps.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-6">
+        <AnimatePresence mode="popLayout">
+          <motion.div key={n} className="flex w-full flex-col items-center gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+            <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] text-label-3">{tt("Duydum")}</span>
+            <span className="rounded-[10px] bg-well px-2.5 py-1 text-[11px] text-label">{cur.said}</span>
+            <motion.span initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.35 }} className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: tintBg(ACCENT.green, 16), color: tintText(ACCENT.green) }}>
+              <Check size={10} strokeWidth={3} /> {cur.done} <span className="font-normal text-label-3">· {tt("anında")}</span>
+            </motion.span>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
+/** "Hey Nook": gezintideki Nook ses çıkarıp adaya döner ve kulak kabartır */
+function WakeBackDemo() {
+  const n = useTick(800);
+  const phase = n % 6; // 0-1 gezintide, 2 "Hey Nook" (ses), 3-5 adada dinliyor
+  const home = phase >= 3;
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-3 h-[22px] w-[120px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
+        {home && (
+          <div className="absolute inset-y-0 right-3 flex items-center gap-[2px]">
+            {[0, 1, 2, 3].map((i) => (
+              <motion.span key={i} className="w-[2.5px] rounded-full" style={{ background: ACCENT.teal }} animate={{ height: [3, 9 - i, 3] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.08 }} />
+            ))}
+          </div>
+        )}
+      </div>
+      <motion.div className="absolute" animate={home ? { left: "calc(50% - 50px)", top: 6, scale: 0.42 } : { left: "62%", top: 52, scale: 1 }} transition={{ type: "spring", stiffness: 160, damping: 18 }}>
+        <NookFigure look={DEFAULT_LOOK} color="#F4F4F6" size={40} expression={phase === 2 ? "surprised" : home ? "hungry" : "wander"} />
+      </motion.div>
+      <AnimatePresence>
+        {phase === 2 && (
+          <motion.span key="hey" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-4 left-6 rounded-[10px] px-2 py-1 text-[10.5px] font-semibold" style={{ background: tintBg(ACCENT.teal, 16), color: tintText(ACCENT.teal) }}>
+            {tt("“Hey Nook”")} ♪
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </Stage>
+  );
+}
+
+/** Oyunda alarm: oyun ekranda kalır, yalnızca ses çalar; oyundan çıkınca alarm adada bekler */
+function AlarmGameDemo() {
+  const n = useTick(900);
+  const phase = n % 7; // 0-1 oyun, 2-4 alarm sesi (oyun yerinde), 5-6 masaüstü: adada alarm
+  const ringing = phase >= 2;
+  const desktop = phase >= 5;
+  return (
+    <Stage>
+      <div className="absolute inset-x-8 bottom-3 top-3 overflow-hidden rounded-[8px]" style={{ background: desktop ? "linear-gradient(135deg,#1d2a44,#2b2140)" : "linear-gradient(160deg,#16402c,#0d2a1d 60%,#2a1d0d)" }}>
+        {!desktop && (
+          <>
+            <span className="absolute left-3 top-2 text-[9px] font-semibold text-white/70">{tt("Oyun · tam ekran")}</span>
+            <motion.span className="absolute h-3 w-3 rounded-full bg-yellow-300" animate={{ left: ["20%", "70%", "20%"], top: ["60%", "40%", "60%"] }} transition={{ duration: 2.4, repeat: Infinity }} />
+          </>
+        )}
+        {desktop && (
+          <div className="absolute left-1/2 top-2 flex h-[24px] w-[150px] -translate-x-1/2 items-center gap-2 rounded-full bg-black px-2.5 text-[10px] font-semibold" style={{ color: tintText(ACCENT.yellow) }}>
+            ⏰ 22:00 <span className="ml-auto rounded-full px-1.5 py-[1px] text-[9px]" style={{ background: tintBg(ACCENT.yellow, 22) }}>{tt("Kapat")}</span>
+          </div>
+        )}
+        {ringing && !desktop && (
+          <motion.span className="absolute bottom-2 right-3 text-[14px]" animate={{ scale: [1, 1.25, 1], rotate: [0, -12, 12, 0] }} transition={{ duration: 0.5, repeat: Infinity }}>
+            🔔
+          </motion.span>
+        )}
+        {ringing && !desktop && <span className="absolute bottom-2 left-3 text-[9px] text-white/60">{tt("Oyun yerinde, yalnızca ses")}</span>}
+      </div>
+    </Stage>
+  );
+}
+
+/** "Şaşırt beni": her basışta Nook bütün parçalarıyla birlikte, tek seferde değişir */
+function ShuffleDemo() {
+  const n = useTick(1300);
+  const looks: { look: Look; color: string }[] = [
+    { look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "crown", face: "sparkle" }, color: "#9B7BFF" },
+    { look: { ...DEFAULT_LOOK, shape: "bear", texture: "knit", glasses: "round", head: "beanie" }, color: "#2FD4C0" },
+    { look: { ...DEFAULT_LOOK, shape: "egg", texture: "galaxy", head: "halo" }, color: "#6B4BFF" },
+    { look: { ...DEFAULT_LOOK, shape: "heart", eyes: "happy", head: "party", neck: "bowtie" }, color: "#FF5C8A" },
+  ];
+  const cur = looks[n % looks.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex items-center justify-center gap-6">
+        <AnimatePresence mode="popLayout">
+          <motion.div key={n} initial={{ scale: 0.6, opacity: 0, rotate: -12 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 420, damping: 20 }}>
+            <NookFigure look={cur.look} color={cur.color} size={54} />
+          </motion.div>
+        </AnimatePresence>
+        <motion.span key={`b${n}`} initial={{ scale: 0.9 }} animate={{ scale: [0.9, 1.06, 1] }} className="rounded-full bg-well px-2.5 py-1 text-[10.5px] font-medium text-label-2">
+          ⤮ {tt("Şaşırt beni")}
+        </motion.span>
+      </div>
+    </Stage>
+  );
+}
+
+/** Bilgisayarda yazıya dökme: ses dalgası çipe girer, ~1 sn'de yazı çıkar; bulut üstü çizili (internet yok) */
+function LocalSttDemo() {
+  const n = useTick(1400);
+  const steps = [tt("“Argus'u aç”"), tt("“Sesi yüzde yüz yap”"), tt("“Tarkan çal”")];
+  const cur = steps[n % steps.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex items-center justify-center gap-3 px-4">
+        <div className="flex h-6 items-end gap-[2px]">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <motion.span key={i} className="w-[3px] rounded-full" style={{ background: ACCENT.teal }} animate={{ height: [4, 16 - Math.abs(2.5 - i) * 3, 4] }} transition={{ duration: 0.45, repeat: Infinity, delay: i * 0.05 }} />
+          ))}
+        </div>
+        <span className="rounded-[10px] px-2 py-1 text-[9.5px] font-semibold" style={{ background: tintBg(ACCENT.teal, 16), color: tintText(ACCENT.teal) }}>
+          {tt("Bu bilgisayarda")}
+          <span className="block text-[8.5px] font-normal text-label-3">{tt("internetsiz · ~1 sn")}</span>
+        </span>
+        <AnimatePresence mode="popLayout">
+          <motion.span key={n} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.25 }} className="rounded-[10px] bg-well px-2 py-1 text-[10.5px] text-label">
+            {cur}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
+/** Destekçiler: profil fotoğrafları sırayla gelir, yeni yıldızda adada teşekkür çıkar */
+function SupportersDemo() {
+  const n = useTick(900);
+  const people = ["#FF6A3D", "#2B8CFF", "#16C47F", "#9B7BFF", "#FFD21F"];
+  const shown = (n % 7) + 1;
+  return (
+    <Stage>
+      <div className="absolute left-1/2 top-3 flex h-[24px] -translate-x-1/2 items-center gap-1.5 rounded-full bg-black px-3 text-[10px] font-semibold" style={{ color: tintText(ACCENT.yellow), opacity: shown >= 6 ? 1 : 0, transition: "opacity .3s" }}>
+        ⭐ {tt("Nook'a yeni bir yıldız geldi!")}
+      </div>
+      <div className="absolute inset-x-6 bottom-4 top-11 flex flex-col gap-1.5">
+        <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] text-label-3">{tt("Destekçiler")}</span>
+        <div className="flex gap-2">
+          {people.slice(0, Math.min(shown, people.length)).map((c, i) => (
+            <motion.span key={i} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 18 }} className="flex flex-col items-center gap-0.5">
+              <span className="h-7 w-7 rounded-full ring-1 ring-white/10" style={{ background: `radial-gradient(circle at 35% 30%, ${c}, color-mix(in srgb, ${c} 60%, black))` }} />
+              <span className="text-[8.5px] text-label-3">{["ugur", "ayse", "mert", "deniz", "can"][i]}</span>
+            </motion.span>
+          ))}
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
+/** Ada artık gölgesiz: koyu oyun ekranının üstünde kenarında gri hare yok */
+function NoHaloDemo() {
+  const n = useTick(1400);
+  const before = n % 2 === 0;
+  return (
+    <Stage>
+      <div className="absolute inset-0" style={{ background: "linear-gradient(160deg,#0b1626,#122236)" }} />
+      <motion.div
+        className="absolute left-1/2 top-0 h-[60px] w-[180px] -translate-x-1/2 rounded-b-[22px] bg-black"
+        animate={{ boxShadow: before ? "0 10px 30px 4px rgba(150,165,190,0.35)" : "0 0 0 0 rgba(0,0,0,0)" }}
+        transition={{ duration: 0.4 }}
+      />
+      <span className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] font-medium" style={{ color: before ? tintText(ACCENT.red) : tintText(ACCENT.green) }}>
+        {before ? tt("Önce: kenarda gri parlama") : tt("Şimdi: temiz kenar")}
+      </span>
+    </Stage>
+  );
+}
+
 export const DEMOS7 = {
+  supporters: SupportersDemo,
+  nohalo: NoHaloDemo,
+  localstt: LocalSttDemo,
+  shuffle: ShuffleDemo,
+  alarmgame: AlarmGameDemo,
+  voicefast: VoiceFastDemo,
+  wakeback: WakeBackDemo,
   heynook: HeyNookDemo,
   voicetools: VoiceToolsDemo,
   geminimodels: GeminiModelsDemo,

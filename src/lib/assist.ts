@@ -3,10 +3,11 @@
  *  - Sesli komut kaydını yazıya dökme
  *  - Kopyalanan yabancı metni kullanıcının diline çevirme (anahtar yoksa MyMemory)
  */
-import { GeminiError, generateOnce, pickQuickModel, type Part } from "./ai";
+import { GeminiError, generateOnce, pickLiteModel, pickQuickModel, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
 import { note } from "./log";
 import { useNook } from "../store/nook";
+import { appsCached as listApps, sttTranscribe } from "./bridge";
 import { lang, LANG_NAME_TR, tt, type Lang } from "./i18n";
 
 /** Kotası dolan model bir süre denenmesin (her kopyalamada boşa istek gitmesin). */
@@ -17,18 +18,21 @@ const REST_MS = 15 * 60_000;
  * Önce hızlı model (Flash); `slowOk` ise o yoğunken sohbette kullanılan (daha yavaş) model.
  * Anahtar yoksa null.
  */
-async function ask(parts: Part[], system: string, slowOk: boolean): Promise<string | null> {
+async function ask(parts: Part[], system: string, slowOk: boolean, fastest = false): Promise<string | null> {
   const s = useNook.getState().settings;
   const key = s.geminiKey.trim();
   if (!key) return null;
-  const quickModel = pickQuickModel(await modelsFor(key));
-  const models = [...new Set([quickModel, slowOk ? s.aiModel : null].filter(Boolean) as string[])].filter(
+  const list = await modelsFor(key);
+  const quickModel = pickQuickModel(list);
+  const lite = fastest ? pickLiteModel(list) : null;
+  // Hızlı model önce; Lite yalnızca o meşgulse (yazıya dökmede daha çok yanılıyor)
+  const models = [...new Set([quickModel, lite, slowOk ? s.aiModel : null].filter(Boolean) as string[])].filter(
     (m) => (resting.get(m) ?? 0) < Date.now(),
   );
   let last: unknown = new GeminiError(tt("Gemini modelleri şu an meşgul"), true);
   for (const model of models) {
     try {
-      return await generateOnce(key, model, parts, system);
+      return await generateOnce(key, model, parts, system, undefined, fastest);
     } catch (e) {
       last = e;
       note(`gemini ${model}: ${(e as Error).message}`);
@@ -41,10 +45,39 @@ async function ask(parts: Part[], system: string, slowOk: boolean): Promise<stri
 }
 
 /** Base64 WAV → konuşmanın metni (boşsa ""). */
+/** Whisper'ın sessizlikte ya da gürültüde uydurduğu bilinen cümleler (altyazı kalıntıları) */
+const HALLUCINATION = /altyaz[ıi]|abone ol|izlediğiniz için|teşekkürler\.?$|^[\s.,!?…-]*$|^\[.*\]$|^\(.*\)$/i;
+
+/** Önce bu bilgisayarda (Whisper, açıksa), olmazsa Gemini ile */
 export async function transcribe(wavBase64: string): Promise<string> {
+  if (useNook.getState().settings.localStt) {
+    try {
+      const apps = (await listApps().catch(() => []))
+        .map((a) => a.name)
+        .filter((n) => n.length <= 20 && !/(uninstall|kaldır|readme|help|yardım|setup)/i.test(n))
+        .slice(0, 40);
+      const prompt = `Hey Nook, Argus'u aç. Spotify'ı aç. YouTube Music'ten Tarkan çal. Sesi yüzde 50 yap. ${apps.join(", ")}.`;
+      const text = (await sttTranscribe(wavBase64, prompt)).trim();
+      if (text && !HALLUCINATION.test(text)) return text.replace(/^["“]|["”]$/g, "").trim();
+      if (!text || HALLUCINATION.test(text)) return "";
+    } catch (e) {
+      note(`whisper: ${String(e)}`);
+    }
+  }
+  return transcribeGemini(wavBase64);
+}
+
+async function transcribeGemini(wavBase64: string): Promise<string> {
+  // Bu bilgisayardaki uygulama adları: "Argus'u aç" "tuş" diye yazılmasın
+  const apps = (await listApps().catch(() => []))
+    .map((a) => a.name)
+    .filter((n) => n.length <= 24 && !/(uninstall|kaldır|readme|help|yardım)/i.test(n))
+    .slice(0, 150);
+  const vocab = [...new Set(["Nook", "Argus", "YouTube", "YouTube Music", "Spotify", "Gmail", "Discord", "Chrome", ...apps])].join(", ");
   const text = await ask(
     [{ inlineData: { mimeType: "audio/wav", data: wavBase64 } }, { text: "Bu ses kaydındaki konuşmayı olduğu gibi yaz." }],
-    "Sen bir konuşma-yazı çevirmenisin. Yalnızca söyleneni, söylendiği dilde ve noktalamasıyla yaz; yorum ekleme. Kayıtta anlaşılır konuşma yoksa hiçbir şey yazma.",
+    `Sen bir konuşma-yazı çevirmenisin. Bu, bilgisayara verilen kısa bir sesli komut; çoğunlukla Türkçe. Kayıt "Hey Nook" ile başlayabilir. Yalnızca söyleneni, söylendiği dilde ve noktalamasıyla yaz; yorum ekleme. Sayıları rakamla yaz ("yüzde yüz" → "%100", "yetmiş beş" → "75"). Kayıtta anlaşılır konuşma yoksa hiçbir şey yazma. Geçebilecek özel adlar (bunlara benzeyen bir ses duyarsan bu yazılışı kullan): ${vocab}.`,
+    true,
     true,
   );
   if (text === null) throw new Error("Sesli komut için Ayarlar'a Gemini API anahtarını eklemen lazım");

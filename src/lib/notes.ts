@@ -113,6 +113,13 @@ export type DemoId =
   | "heynook"
   | "voicetools"
   | "geminimodels"
+  | "voicefast"
+  | "wakeback"
+  | "alarmgame"
+  | "shuffle"
+  | "localstt"
+  | "supporters"
+  | "nohalo"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -137,6 +144,48 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.59",
+    date: tt("12 Ekim 2026"),
+    headline: tt("Sesli komut internetsiz ve anında, oyunda alarm oyunu alta atmıyor"),
+    items: [
+      {
+        title: tt("Sesli komut bilgisayarda yazıya dökülüyor (internetsiz)"),
+        text: tt("Ayarlar › Hey Nook › “Bilgisayarda yazıya dök”ten modeli bir kez indir (190 MB): sesli komutların artık Gemini'ye gitmeden, bu bilgisayarda yaklaşık bir saniyede yazıya dökülüyor. Gemini'nin kotası dolsa da, internet kesilse de “Argus'u aç”, “Tarkan çal”, “sesi yüzde yüz yap” gibi komutlar çalışıyor; bilgisayarındaki uygulama adlarını da tanıyor. Yalnızca Nook'un kendi bilmediği sorular Gemini'ye gidiyor."),
+        demo: "localstt",
+      },
+      {
+        title: tt("Duyduğunu gösteriyor, sık komutları beklemeden yapıyor"),
+        text: tt("Sesli komut verince Nook önce duyduğu cümleyi adada gösteriyor. “Spotify'ı aç”, “Discord'u aç”, “Gmail'i aç”, “Tarkan çal”, “YouTube Music'ten … aç”, “sesi yüzde 40 yap” (yazıyla da: “yüzde yetmiş beş”), “sesi sonuna kadar aç”, “sesi biraz kıs”, “sonraki şarkı”, “durdur”, “Wi-Fi'ı kapat”, “Bluetooth aç”, “karanlık modu aç”, “10 dakikalık sayaç kur” gibi komutlar artık Gemini'ye sorulmadan, bilgisayarda anında yapılıyor. Daha uzun istekler Gemini'ye gidiyor ama seçili model Pro olsa da sesli komutta hızlı model kullanılıyor; uzun uzun dönüp “Gemini cevap vermedi” demesi bitti. Bilgisayarındaki uygulama adlarını (Argus, Discord…) artık daha doğru duyuyor, “Hey Nook”la tek solukta söylenen komutun başı kesilmiyor; ne istediğini anlamazsa tahminle rastgele bir şey açmak yerine soruyor."),
+        demo: "voicefast",
+      },
+      {
+        title: tt("“Hey Nook” deyince ses veriyor ve adaya dönüyor"),
+        text: tt("Nook seni duyduğunda kısa bir ses çıkarıyor. O sırada ekranda geziniyorsa ya da bir panel açıksa bırakıp adaya dönüyor ve kulak kabartıp dinliyor."),
+        demo: "wakeback",
+      },
+      {
+        title: tt("Oyundayken alarm oyunu alta atmıyor"),
+        text: tt("Tam ekran oyun oynarken alarm çalınca Nook adayı oyunun üstüne çıkarıyordu; bazı oyunlar bunu odak kaybı sayıp alta düşüyordu. Artık oyundayken (DirectX'in özel tam ekran kipi dahil) alarm yalnızca çalıyor, ada oyunun üstüne çıkmıyor; oyundan çıkınca alarm adada seni bekliyor. Özel tam ekran kipindeki oyunlarda da ada artık kendiliğinden gizleniyor."),
+        demo: "alarmgame",
+      },
+      {
+        title: tt("“Şaşırt beni” bütün parçalarıyla anında geliyor"),
+        text: tt("Görünüm'de “Şaşırt beni”ye basınca Nook önce düz gelip şapkası, gözlüğü sonradan beliriyordu. Artık sıradaki görünüm önceden hazırlanıyor; basınca gövde, doku ve aksesuarlar birlikte geliyor. Başka bir parça seçerken de Nook bir an düz küreye dönmüyor, yenisi hazır olunca tek seferde değişiyor."),
+        demo: "shuffle",
+      },
+      {
+        title: tt("Adanın arkasındaki gri parlama gitti"),
+        text: tt("Fare adanın üstündeyken, özellikle koyu pencerelerin (oyun, Discord) önünde adanın kenarında gri bir hare beliriyordu. Adanın gölgesi kaldırıldı ve pencerenin zemini her açılışta yeniden şeffaflaştırılıyor; kenar artık temiz."),
+        demo: "nohalo",
+      },
+      {
+        title: tt("Destekçiler"),
+        text: tt("Ayarlar'da yeni Destekçiler bölümünde Nook'a GitHub'da yıldız verenler profil fotoğraflarıyla görünüyor; birine basınca GitHub sayfası açılıyor. Yeni bir yıldız gelince Nook adada teşekkür ediyor. Sen de “GitHub'da yıldız ver”e basıp destek olabilirsin."),
+        demo: "supporters",
+      },
+    ],
+  },
   {
     version: "0.2.58",
     date: tt("12 Ekim 2026"),

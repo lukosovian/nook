@@ -104,7 +104,9 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     crate::log::write("info", &format!("alarm vakti: tam ekran={fg:?}, gizli ada={}", hidden.len()));
                 }
                 let guard = shared.guard.load(Ordering::Relaxed);
-                let enabled = settings.hide_in_fullscreen && !alarm && !guard;
+                // Alarm oyunun üstüne çıkmaz: tam ekran oyunun üstüne pencere itmek oyunu alta atıyordu.
+                // Oyunda alarm yalnızca çalar; oyundan çıkınca adada bekler.
+                let enabled = settings.hide_in_fullscreen && !guard;
                 let mut break_due: Option<GamePeek> = None;
                 let detected = imp::fullscreen_monitor(&shared);
 
@@ -149,8 +151,11 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 *shared.game_screen.lock().unwrap() = if in_session_game { detected.as_ref().map(|d| d.0) } else { None };
 
                 let peek = peek_until.is_some_and(|t| Instant::now() < t);
-                let in_game = detected.is_some();
-                let full = if enabled && !peek { detected.map(|d| d.0) } else { None };
+                // DirectX'in özel tam ekran kipi pencere boyutundan anlaşılmayabilir: Windows'a da sor
+                let in_game = detected.is_some() || imp::exclusive_fullscreen();
+                shared.exclusive.store(in_game, Ordering::Relaxed);
+                let rect = detected.map(|d| d.0).or_else(|| if in_game { imp::foreground_monitor(&shared) } else { None });
+                let full = if enabled && !peek { rect } else { None };
 
                 let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                 for (label, ws) in windows {
@@ -178,7 +183,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", false);
                     }
                     // Oyun da "en üstte" olabilir — alarm/kısa gösterim sırasında adayı tekrar tekrar en öne it
-                    if alarm || guard || (peek && in_game) {
+                    if (alarm && !in_game) || guard || (peek && in_game) {
                         imp::raise(ws.hwnd);
                     }
                 }
@@ -239,6 +244,13 @@ mod imp {
     };
 
     use crate::state::Shared;
+
+    /// Windows'a göre öndeki uygulama tam ekran mı (DirectX özel tam ekran, sunum kipi)
+    pub fn exclusive_fullscreen() -> bool {
+        use windows_sys::Win32::UI::Shell::{SHQueryUserNotificationState, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN};
+        let mut state = 0;
+        unsafe { SHQueryUserNotificationState(&mut state) >= 0 && (state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE) }
+    }
 
     /// Masaüstü, görev çubuğu, Başlat menüsü "tam ekran" sayılmaz.
     const SHELL_CLASSES: &[&str] = &[
@@ -335,6 +347,23 @@ mod imp {
         unsafe { GetForegroundWindow() as isize }
     }
 
+    /// Öndeki (bizim olmayan) pencerenin bulunduğu monitör
+    pub fn foreground_monitor(shared: &Shared) -> Option<(i32, i32, i32, i32)> {
+        unsafe {
+            let fg = GetForegroundWindow();
+            if fg.is_null() || shared.is_ours(fg as isize) {
+                return None;
+            }
+            let mut mi: MONITORINFO = std::mem::zeroed();
+            mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            if GetMonitorInfoW(MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST), &mut mi) == 0 {
+                return None;
+            }
+            let r = mi.rcMonitor;
+            Some((r.left, r.top, r.right, r.bottom))
+        }
+    }
+
     /// Görünürse, odak çalmadan ve göstermeden "en üstte" katmanın önüne geri al.
     pub fn keep_on_top(hwnd: isize) {
         use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_ASYNCWINDOWPOS, SWP_NOOWNERZORDER};
@@ -356,6 +385,9 @@ mod imp {
 #[cfg(not(windows))]
 mod imp {
     use crate::state::Shared;
+    pub fn exclusive_fullscreen() -> bool {
+        false
+    }
     pub fn fullscreen_monitor(_shared: &Shared) -> Option<((i32, i32, i32, i32), Option<(u32, String)>)> {
         None
     }
@@ -366,6 +398,9 @@ mod imp {
     pub fn raise(_hwnd: isize) {}
     pub fn foreground() -> isize {
         0
+    }
+    pub fn foreground_monitor(_shared: &Shared) -> Option<(i32, i32, i32, i32)> {
+        None
     }
     pub fn keep_on_top(_hwnd: isize) {}
 }

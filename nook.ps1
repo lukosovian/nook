@@ -96,10 +96,13 @@ if ($Yayinla) {
 }
 
 if ($Yayinla) {
+  # Destekçiler listesi (GitHub'da yıldız verenler) depoya yazılsın, herkesin Nook'u okusun
+  try { & "$Root\supporters.ps1" } catch { Write-Host "Destekçiler güncellenemedi: $_" -ForegroundColor Yellow }
   Say "Commit atılıyor"
   # Takip edilen dosyalar + uygulama klasörlerindeki yeni dosyalar (masaüstü çöpü gibi kökteki başıboş dosyalar girmez)
   git add -u
-  git add -A -- src src-tauri nook.ps1 "*.cmd" mobile
+  git add -A -- src src-tauri nook.ps1 supporters.ps1 "*.cmd" mobile
+  if (Test-Path "$Root\supporters.json") { git add supporters.json }
   git commit -m "${Version}: $Notlar"
   if ($LASTEXITCODE -ne 0) { throw "Commit atılamadı" }
 

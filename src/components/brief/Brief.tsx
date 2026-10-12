@@ -38,15 +38,25 @@ function useTodayLine() {
     if (line !== null || !key) return;
     let alive = true;
     void (async () => {
-      // Günde bir istek: hızlı model yerine sohbette çalışan model daha güvenilir
-      const model = useNook.getState().settings.aiModel || pickQuickModel(await modelsFor(key));
-      if (!model) return;
-      const text = await generateOnce(
-        key,
-        model,
-        [{ text: tt("Güne başlarken bana tek cümlelik, sıcak ve kısa bir günaydın mesajı ver. Hava, alarmlar ya da notum ilginçse birine değin. En fazla 18 kelime.") }],
-        systemPrompt(),
-      );
+      // Günde bir istek: önce hızlı model (Pro sabahları sık sık yoğun/zaman aşımı veriyordu), olmazsa seçili model
+      const quick = pickQuickModel(await modelsFor(key).catch(() => []));
+      const models = [...new Set([quick, useNook.getState().settings.aiModel].filter(Boolean) as string[])];
+      let text = "";
+      for (const model of models) {
+        try {
+          text = await generateOnce(
+            key,
+            model,
+            [{ text: tt("Güne başlarken bana tek cümlelik, sıcak ve kısa bir günaydın mesajı ver. Hava, alarmlar ya da notum ilginçse birine değin. En fazla 18 kelime.") }],
+            systemPrompt(),
+            undefined,
+            true,
+          );
+          break;
+        } catch (e) {
+          if (model === models[models.length - 1]) throw e;
+        }
+      }
       if (!alive || !text) return;
       setLine(text);
       try {

@@ -21,6 +21,7 @@ import {
   type Look,
 } from "../../lib/look";
 import { spring } from "../../lib/motion";
+import { warmLook } from "../../lib/nook3d";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 import { ACCENT } from "../ui/primitives";
@@ -37,6 +38,9 @@ export function LookPanel() {
   const color = normalizeColor(useNook((s) => s.settings.faceColor));
   const update = useNook((s) => s.updateSettings);
   const set = (patch: Partial<Look>) => update({ look: { ...look, ...patch } });
+  // "Şaşırt beni"nin sıradaki görünümü önceden seçilir ve çizimi hazırlanır: basınca beklemeden gelsin
+  const [nextRandom, setNextRandom] = useState(randomLook);
+  useEffect(() => warmLook(nextRandom.look), [nextRandom]);
 
   return (
     <div ref={scroller} className="-mr-1.5 h-full space-y-2.5 overflow-y-auto pr-1.5">
@@ -46,8 +50,8 @@ export function LookPanel() {
           whileTap={{ scale: 0.94 }}
           transition={spring.pop}
           onClick={() => {
-            const r = randomLook();
-            update({ look: r.look, faceColor: r.color });
+            update({ look: nextRandom.look, faceColor: nextRandom.color });
+            setNextRandom(randomLook());
           }}
           className="flex shrink-0 items-center gap-1 rounded-full bg-well px-2.5 py-1 text-[11px] font-medium text-label-2 transition-colors hover:bg-well-hi hover:text-label"
         >

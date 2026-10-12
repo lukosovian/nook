@@ -194,6 +194,8 @@ pub struct Shared {
     pub alert: AtomicBool,
     /// Odak bekçisi uyarıyor (yasaklı site) — tam ekranda da ada görünür kalır.
     pub guard: AtomicBool,
+    /// Öndeki uygulama tam ekran oyun (pencere boyutundan ya da DirectX özel tam ekran kipinden)
+    pub exclusive: AtomicBool,
     /// Sıradaki alarmın zamanı (Unix ms, 0 = yok). Tam ekrandayken gizli pencerenin
     /// zamanlayıcıları kısılır; vakit yaklaşınca ada önceden açılsın ki alarm kaçmasın.
     pub next_alarm: std::sync::atomic::AtomicI64,

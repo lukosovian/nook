@@ -1,0 +1,14 @@
+# whisper.cpp (yerel konuşma tanıma) derlemesi için: Visual Studio Build Tools'taki CMake,
+# bağlamaları üretmek için LLVM'in libclang'ı (winget install LLVM.LLVM)
+[env]
+CMAKE = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+LIBCLANG_PATH = 'C:\Program Files\LLVM\bin'
+# MSVC'de GGML_NATIVE işlemciyi algılamıyor: AVX2'yi açıkça aç (yoksa Whisper ~10 kat yavaş)
+GGML_NATIVE = "OFF"
+GGML_AVX = "ON"
+GGML_AVX2 = "ON"
+GGML_FMA = "ON"
+GGML_F16C = "ON"
+# Rust'ın cmake aracı Release bayraklarını boş geçiyor (whisper.cpp optimizasyonsuz derleniyordu, ~15 kat yavaş)
+CMAKE_C_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG"
+CMAKE_CXX_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG"

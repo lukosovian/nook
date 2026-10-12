@@ -2,7 +2,7 @@
  * Sohbet yürütücüsü: mesajı Gemini'ye gönderir, cevabı akarken gösterir, model bir araç
  * kullanmak isterse çalıştırıp sonucu geri verir (en fazla birkaç tur).
  */
-import { aiErrorText, GeminiError, inlinePart, pickFallbackModel, streamChat, type Content, type Part } from "./ai";
+import { aiErrorText, GeminiError, inlinePart, pickFallbackModel, pickQuickModel, streamChat, type Content, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
 import { functions, runTool, systemPrompt } from "./aiTools";
 import { useNook, type ChatItem } from "../store/nook";
@@ -34,7 +34,11 @@ export function stopChat() {
  * `image`: "Ekrana sor" görüntüsü (data URL) — soruya eklenir.
  * `voice`: soru sesle soruldu (balonda mikrofon işareti).
  */
-export async function sendChat(text: string, opts: { image?: string | null; voice?: boolean } = {}) {
+/** Sesli komutta yazıya dökme yanılmış olabilir: anlamsız bir isteği tahminle yapmasın */
+const VOICE_RULES =
+  "\n\nBu mesaj sesli komuttan yazıya döküldü; birkaç kelime yanlış duyulmuş olabilir. Bir ad yanlış duyulmuş gibiyse benzediği bilinen bir uygulama ya da site (Argus, Spotify, Discord, YouTube…) kastedilmiş olabilir; emin değilsen sor. İstek anlamsızsa ya da ne istendiğinden emin değilsen hiçbir araç çağırma; kısaca ne duyduğunu söyleyip ne demek istediğini sor. Asla rastgele bir şarkı ya da video açma.";
+
+export async function sendChat(text: string, opts: { image?: string | null; voice?: boolean; quick?: boolean } = {}) {
   const image = opts.image ?? undefined;
   // Görüntü varsa boş soru da olur: "bu ne?"
   const q = text.trim() || (image ? tt("Ekranımda ne görüyorsun? Kısaca anlat, bir sorun varsa nasıl çözeceğimi söyle.") : "");
@@ -42,6 +46,8 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   if (!q || s.chatBusy) return;
   const key = s.settings.geminiKey.trim();
   let model = s.settings.aiModel;
+  // Sesli komut: hızlı model (Flash) — Pro uzun uzun düşünüp bekletmesin
+  if (opts.quick && key) model = pickQuickModel(await modelsFor(key).catch(() => [])) ?? model;
   /** Bu cevapta yoğunluk yüzünden yedek modele geçildi mi */
   let fellBack = false;
 
@@ -77,7 +83,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
         parts.length = 0;
         reply = reply.slice(0, turnStart);
         try {
-          for await (const ev of streamChat(key, model, systemPrompt(), contents, functions(), controller.signal)) {
+          for await (const ev of streamChat(key, model, opts.voice ? systemPrompt() + VOICE_RULES : systemPrompt(), contents, functions(), controller.signal)) {
             if (ev.type === "part") {
               parts.push(ev.part);
               continue;
