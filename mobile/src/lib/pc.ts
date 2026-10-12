@@ -52,6 +52,8 @@ export interface Status {
   monitors?: { width: number; height: number; primary: boolean }[];
   /** Ekran telefondan kapatıldı ve o zamandan beri PC'de kimse dokunmadı */
   screenOff?: boolean;
+  /** PC'de Claude Code varsa: bekleyen onay ve çalışan oturum sayısı (eski PC sürümlerinde yok) */
+  claude?: { asks: number; working: number; sessions: number } | null;
 }
 
 /** Ekran görüntüsü hedefi: ekranın sırası ya da hepsi birlikte */
@@ -280,6 +282,7 @@ const DEMO_STATUS: Status = {
     { width: 1920, height: 1080, primary: false },
   ],
   stats: { cpu: 18, memUsed: 11.4 * 1024 ** 3, memTotal: 32 * 1024 ** 3, netDown: 0, netUp: 0, diskUsed: 610 * 1024 ** 3, diskTotal: 1000 * 1024 ** 3, battery: null },
+  claude: { asks: 1, working: 1, sessions: 2 },
 };
 
 export const getStatus = (p: Pairing) =>
@@ -519,6 +522,82 @@ export type NoteOp = { op: "set"; id: string; text: string } | { op: "add"; titl
 export const noteOp = (p: Pairing, op: NoteOp) => request(p, "POST", "/v1/notes", op).then((r) => r.json() as Promise<{ ok: boolean; id: string | null }>);
 
 /** Telefonun panosu (Tauri eklentisi; tarayıcı önizlemesinde navigator.clipboard) */
+/** Nook'un görünümünü (gövde, doku, aksesuarlar) ve rengini PC'de değiştir */
+export const setLook = (p: Pairing, look: unknown, color: string) => request(p, "POST", "/v1/look", { look, color }).then(() => undefined);
+
+// ---------------------------------------------------------------- Claude Code
+
+export type ClaudeState = "working" | "waiting" | "done" | "idle";
+
+export interface ClaudeSessionInfo {
+  id: string;
+  project: string;
+  state: ClaudeState;
+  /** Şu an ne yapıyor: "Düzenliyor · Panels.tsx" */
+  action: string;
+  prompt: string;
+  reply: string;
+  updatedAt: number;
+  turnAt: number;
+  edits: number;
+  commands: number;
+  files: string[];
+}
+
+export interface ClaudeQuestionInfo {
+  question: string;
+  header?: string;
+  multiSelect: boolean;
+  options: { label: string; description?: string }[];
+}
+
+export interface ClaudeAskInfo {
+  askId: number;
+  session: string;
+  project: string;
+  tool: string;
+  title: string;
+  detail: string;
+  questions: ClaudeQuestionInfo[] | null;
+  canAlways: boolean;
+  at: number;
+}
+
+export interface ClaudeWindow {
+  usedPct: number;
+  resetsAt: number;
+}
+
+export interface ClaudeInfo {
+  present: boolean;
+  hooked: boolean;
+  sessions: ClaudeSessionInfo[];
+  asks: ClaudeAskInfo[];
+  plan: { fiveHour?: ClaudeWindow; sevenDay?: ClaudeWindow; updatedAt: number } | null;
+}
+
+const DEMO_CLAUDE: ClaudeInfo = {
+  present: true,
+  hooked: true,
+  sessions: [
+    { id: "a", project: "Nook", state: "waiting", action: "Onay bekliyor · npm run build", prompt: "Telefona Claude bölümünü ekle", reply: "", updatedAt: Date.now() - 20_000, turnAt: Date.now() - 6 * 60_000, edits: 7, commands: 3, files: ["Claude.tsx", "remote.rs", "pc.ts"] },
+    { id: "b", project: "Argus", state: "done", action: "Bitti", prompt: "Takvimdeki boş günleri düzelt", reply: "Takvimde bölümü olmayan günler artık gri görünüyor; yeni sezon başlangıçları da işaretli.", updatedAt: Date.now() - 14 * 60_000, turnAt: Date.now() - 22 * 60_000, edits: 4, commands: 1, files: ["Calendar.tsx"] },
+  ],
+  asks: [{ askId: 7, session: "a", project: "Nook", tool: "Bash", title: "Komut çalıştırmak istiyor", detail: "npm run build", questions: null, canAlways: true, at: Date.now() - 20_000 }],
+  plan: { fiveHour: { usedPct: 42, resetsAt: Date.now() + 2.5 * 3600_000 }, sevenDay: { usedPct: 68, resetsAt: Date.now() + 3 * 86400_000 }, updatedAt: Date.now() },
+};
+
+export const getClaude = (p: Pairing) =>
+  import.meta.env.DEV && p.key === "demo"
+    ? Promise.resolve(DEMO_CLAUDE)
+    : request(p, "GET", "/v1/claude")
+        .then((r) => r.json() as Promise<ClaudeInfo | null>)
+        .then((c) => (cache("claude", c), c));
+
+/** Onay isteğine cevap: izin ver, her zaman izin ver, reddet ya da sorulara cevaplar */
+export const claudeDecide = (p: Pairing, askId: number, decision: "allow" | "always" | "deny" | { answers: Record<string, string | string[]> }) =>
+  import.meta.env.DEV && p.key === "demo" ? Promise.resolve() : request(p, "POST", "/v1/claude/decide", { askId, decision }).then(() => undefined);
+
 export async function phoneClipboard(): Promise<{ read: () => Promise<string>; write: (t: string) => Promise<void> }> {
   try {
     const m = await import("@tauri-apps/plugin-clipboard-manager");

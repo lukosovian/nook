@@ -193,3 +193,25 @@ mod imp {
         }
     }
 }
+
+/// Şarkı/video arar, ilk videonun kimliğini döner (YouTube arama sayfasından; anahtar gerekmez).
+/// Nook bununla YouTube Music'te ya da YouTube'da şarkıyı doğrudan açar.
+#[tauri::command]
+pub async fn music_find(query: String) -> Result<Option<String>, String> {
+    let url = format!(
+        "https://www.youtube.com/results?search_query={}&sp=EgIQAQ%3D%3D",
+        query.trim().bytes().map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") }).collect::<String>()
+    );
+    let html = ureq::get(&url)
+        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+        .set("Accept-Language", "tr-TR,tr;q=0.9,en;q=0.8")
+        .set("Cookie", "CONSENT=YES+1; SOCS=CAI")
+        .timeout(std::time::Duration::from_secs(8))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_string()
+        .map_err(|e| e.to_string())?;
+    // Reklam ve kısa videolar değil, arama sonucundaki ilk video
+    const MARK: &str = "\"videoRenderer\":{\"videoId\":\"";
+    Ok(html.find(MARK).map(|i| &html[i + MARK.len()..]).and_then(|rest| rest.get(..11)).filter(|id| id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')).map(str::to_owned))
+}

@@ -1,11 +1,13 @@
 /**
  * Nook Mobil: pano geçmişi ve not sekmeleri köprüye aynalanır (telefon oradan okur); telefondan gelen
- * not değişiklikleri ("nook://remote") buradaki depoya uygulanır. Yalnızca ana adada çalışır.
+ * not ve görünüm değişiklikleri ("nook://remote") buradaki depoya uygulanır. Yalnızca ana adada çalışır.
  */
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { inTauri, isPrimary, subscribe } from "../lib/bridge";
 import { useNook, type Pad } from "../store/nook";
+import { normalizeColor, normalizeLook, type Look } from "../lib/look";
+import { useClaude } from "../lib/claude";
 
 /** Telefona gönderilen geçmiş en fazla bu kadar */
 const MAX_CLIPS = 80;
@@ -36,9 +38,25 @@ function mirror() {
       })),
       pads: pads.map((p) => ({ id: p.id, title: p.title, text: p.text, at: p.at })),
       padId,
+      claude: claudeMirror(),
       hums: hums.slice(0, MAX_HUMS).map((h) => ({ id: h.id, title: h.title, artist: h.artist, cover: h.cover ?? null, url: h.url ?? null, at: h.at, phone: !!h.phone })),
     },
   }).catch(() => {});
+}
+
+/** Telefondaki Claude ekranı: oturumlar (en yeni önce), bekleyen onaylar, plan kullanımı */
+function claudeMirror() {
+  const { setup, sessions, asks, plan } = useClaude.getState();
+  return {
+    present: !!setup?.present,
+    hooked: !!setup?.hooked,
+    sessions: Object.values(sessions)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 12)
+      .map(({ id, project, state, action, prompt, reply, updatedAt, turnAt, edits, commands, files }) => ({ id, project, state, action, prompt, reply, updatedAt, turnAt, edits, commands, files })),
+    asks: asks.map(({ askId, session, project, tool, title, detail, questions, canAlways, at }) => ({ askId, session, project, tool, title, detail, questions, canAlways, at })),
+    plan,
+  };
 }
 
 function applyNote(cmd: NoteCmd) {
@@ -79,12 +97,25 @@ export function usePhoneSync() {
     const unsub = useNook.subscribe((st, prev) => {
       if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums) schedule();
     });
-    const off = subscribe<{ kind: string; cmd: NoteCmd }>("nook://remote", (e) => {
+    // Claude'da onay isteği hemen telefona yansısın
+    const unsubClaude = useClaude.subscribe((st, prev) => {
+      if (st.asks !== prev.asks) {
+        window.clearTimeout(timer);
+        mirror();
+      } else if (st.sessions !== prev.sessions || st.plan !== prev.plan || st.setup !== prev.setup) schedule();
+    });
+    const off = subscribe<{ kind: string; cmd: NoteCmd; look?: Partial<Look>; color?: string | null }>("nook://remote", (e) => {
       if (e.kind === "note") applyNote(e.cmd);
+      // Telefondan görünüm değişti
+      if (e.kind === "look") {
+        const s = useNook.getState();
+        s.updateSettings({ look: normalizeLook(e.look), faceColor: e.color ? normalizeColor(e.color) : s.settings.faceColor });
+      }
     });
     return () => {
       window.clearTimeout(timer);
       unsub();
+      unsubClaude();
       off();
     };
   }, []);

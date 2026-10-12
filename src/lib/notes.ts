@@ -107,6 +107,12 @@ export type DemoId =
   | "phoneguide"
   | "phoneupdate"
   | "phoneshare"
+  | "collection"
+  | "newparts"
+  | "facewear"
+  | "heynook"
+  | "voicetools"
+  | "geminimodels"
   | "quiet"
   | "shortcuts"
   | "hello"
@@ -131,6 +137,43 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.58",
+    date: tt("12 Ekim 2026"),
+    headline: tt("“Hey Nook” diye seslen, Görünüm'de 80'e yakın hazır Nook"),
+    items: [
+      {
+        title: tt("“Hey Nook” diye seslenince dinliyor"),
+        text: tt("Ayarlar › Hey Nook'tan sesini tanıt (üç kez “Hey Nook” de) ve aç: artık kısayola basmadan “Hey Nook, YouTube Music'ten Tarkan aç”, “Hey Nook, yarın 8'e alarm kur” diyebilirsin. Adını tek solukta komutla da söyleyebilirsin, “Hey Nook” deyip durunca da Nook kulak kabartıp komutu bekliyor. Mikrofon yalnızca bu bilgisayarda dinleniyor; yalnızca “Hey Nook”tan sonraki cümle Gemini'ye gidiyor. Kendi kendine uyanıyorsa ya da seni duymuyorsa duyarlılığı Ayarlar'dan değiştirebilirsin."),
+        demo: "heynook",
+      },
+      {
+        title: tt("Sesle şarkı çal, site aç, sesi ayarla"),
+        text: tt("Nook artık istediğin şarkıyı bulup YouTube Music'te (ya da YouTube'da) hemen çalıyor; Spotify dersen Spotify'da arıyor. “Gmail'i aç”, “Ekşi Sözlük'ü aç” gibi siteleri açıyor, “sesi yüzde 30 yap” deyince ses düzeyini ayarlıyor. Hepsi hem “Hey Nook”la hem sesli komut kısayoluyla hem de sohbete yazarak çalışıyor."),
+        demo: "voicetools",
+      },
+      {
+        title: tt("Gemini'de kapanmış modeller listeden çıktı"),
+        text: tt("Ayarlar › Yapay zekâ'daki model listesinde Google'ın kapattığı ya da anahtarına açık olmayan modeller artık görünmüyor; her model günde bir kez yoklanıyor, çalışmayan çıkarılıyor. Seçili model kapanmışsa Nook kendiliğinden en yeni çalışan Pro modele geçiyor."),
+        demo: "geminimodels",
+      },
+      {
+        title: tt("Koleksiyon: tek dokunuşla hazır Nook'lar"),
+        text: tt("Görünüm'ün en üstünde yeni Koleksiyon var; 80'e yakın hazır Nook kategorilere ayrılmış: Öne çıkanlar (Astronot, Kral, Melek, Kardan adam, Noel Baba…), Meslekler (Polis, Hemşire, Viking, Şövalye, Pilot, Dedektif, Korsan, Palyaço, Robot…), Hayvanlar (Kurbağa, Panda, Tilki, Penguen, Baykuş, Arı, Yengeç, Ejderha…), Yiyecekler (Karpuz, Cupcake, Dondurma, Donut, Ananas…), Doğa (Yağmur, Fırtına, Kristal, Kaktüs, Güneş, Ay…) ve Malzemeler (Mermer, Cam, Ekose, Kot, Krom…). Birine dokununca Nook'un gövdesi, rengi ve aksesuarları birlikte değişiyor; sonra istediğin parçayı tek tek değiştirebilirsin."),
+        demo: "collection",
+      },
+      {
+        title: tt("Yeni gövdeler, dokular ve başlıklar"),
+        text: tt("Gövde'ye 32 yeni biçim geldi: hayvanlar (kurbağa, panda, tilki, penguen, baykuş, ördek, arı, yengeç, ejderha), yiyecekler (çilek, mantar, karpuz, cupcake, dondurma, şeker, donut, marşmelov, ananas, palamut, portakal, kiraz) ve doğa (alev, damlacık, yağmur ve fırtına bulutu, kristal, yaprak, kaktüs, kaya, kütük, güneş, ay). Doku'ya Galaksi, Örgü, Lav, Kamuflaj, Mermer, Cam, Işıltı, Ekose, Çizgili, Kot, Piksel, Kabarık, Altın ve Krom; Başlık'a Taç, Hale, Parti, Ponponlu bere, Aşçı, Mantar, Astronot, Büyücü, Noel, Cin, Polis, Hemşire, Viking, Şövalye, Pilot, Kaşif, Dedektif, Madenci, Uyku başlığı, Palyaço peruğu, Bandana, Kulaklı bere, Kar kulaklığı ve Robot eklendi. Hepsi birbiriyle ve her renkle birleşebiliyor."),
+        demo: "newparts",
+      },
+      {
+        title: tt("Maskeler, yüz süsleri ve yeni gözler"),
+        text: tt("Gözlük'e Kahraman ve Balo maskesi, Neon panjur gözlük ve Şnorkel; yeni Yüz ve süs bölümüne Bıyık, Sakal, Palyaço burnu ve Nook'un yanında süzülen Nota, Parıltı, Baloncuk eklendi. Gözler'de artık Mutlu, Sıkı, Göz kırpma ve Robot gözler de var."),
+        demo: "facewear",
+      },
+    ],
+  },
   {
     version: "0.2.57",
     date: tt("11 Ekim 2026"),

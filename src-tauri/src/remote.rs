@@ -377,6 +377,46 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
                 None => err(503, "Nook hazır değil"),
             }
         }
+        // Claude Code: oturumlar, bekleyen onaylar, plan kullanımı (PC'deki adanın aynası)
+        (Method::Get, "/v1/claude") => json_res(200, MIRROR.lock().unwrap()["claude"].clone()),
+        // Onay isteğine telefondan cevap: { askId, decision: allow | always | deny | {"answers":…} }
+        (Method::Post, "/v1/claude/decide") => {
+            let b = body_json(body);
+            let Some(id) = b["askId"].as_u64() else { return err(400, "istek yok") };
+            let decision = match &b["decision"] {
+                Value::String(s) if matches!(s.as_str(), "allow" | "always" | "deny") => s.clone(),
+                v @ Value::Object(_) => v.to_string(),
+                _ => return err(400, "geçersiz cevap"),
+            };
+            crate::claude::claude_decide(id, decision);
+            json_res(200, json!({ "ok": true }))
+        }
+        // Görünüm: telefondan Nook'un gövdesi, rengi, aksesuarları { look, color }
+        (Method::Post, "/v1/look") => {
+            let b = body_json(body);
+            if !b["look"].is_object() {
+                return err(400, "görünüm yok");
+            }
+            let color = b["color"].as_str().filter(|c| c.len() == 7 && c.starts_with('#')).map(str::to_owned);
+            // Telefon bir sonraki durum isteğinde yeni görünümü hemen görsün (PC kendi profilini sonra yine yazar)
+            {
+                let mut p = PROFILE.lock().unwrap();
+                if p.is_object() {
+                    p["look"] = b["look"].clone();
+                    if let Some(c) = &color {
+                        p["color"] = Value::String(c.clone());
+                    }
+                }
+            }
+            match APP.lock().unwrap().as_ref() {
+                Some(app) => {
+                    use tauri::Emitter;
+                    let _ = app.emit_to(crate::window::ISLAND, "nook://remote", json!({ "kind": "look", "look": b["look"], "color": color }));
+                    json_res(200, json!({ "ok": true }))
+                }
+                None => err(503, "Nook hazır değil"),
+            }
+        }
         // Hum: telefonun mikrofonundan 16 kHz mono s16le ses; PC tanır, geçmişe (ve Argus'a) yazar
         (Method::Post, "/v1/hum") => {
             let samples: Vec<f32> = body.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
@@ -580,6 +620,20 @@ fn argus(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
     }
 }
 
+fn claude_summary() -> Value {
+    let m = MIRROR.lock().unwrap();
+    let c = &m["claude"];
+    if !c["present"].as_bool().unwrap_or(false) {
+        return Value::Null;
+    }
+    let sessions = c["sessions"].as_array().map(Vec::as_slice).unwrap_or_default();
+    json!({
+        "asks": c["asks"].as_array().map_or(0, Vec::len),
+        "working": sessions.iter().filter(|s| s["state"] == "working").count(),
+        "sessions": sessions.len(),
+    })
+}
+
 fn status() -> Value {
     json!({
         "name": host_name(),
@@ -594,6 +648,8 @@ fn status() -> Value {
         "wan": crate::outside::home_ip(),
         "nook": *PROFILE.lock().unwrap(),
         "screenOff": screen_off(),
+        // Ana ekrandaki Claude çipi: kaç onay bekliyor, kaç oturum çalışıyor
+        "claude": claude_summary(),
         // Soldan sağa; ekran görüntüsünde ?m= bu sırayla
         "monitors": crate::imaging::monitors().iter().map(|((_, _, w, h), primary)| json!({ "width": w, "height": h, "primary": primary })).collect::<Vec<_>>(),
     })

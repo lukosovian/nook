@@ -6,7 +6,7 @@
  */
 import { AnimatePresence, motion } from "motion/react";
 import { Check, ChevronDown, Download, FileImage, Lock, Monitor, MonitorOff, Share2, ShieldCheck, Upload } from "lucide-react";
-import { CHIP_NOOKS, DEFAULT_LOOK } from "../../lib/look";
+import { CHIP_NOOKS, COLLECTION_GROUPS, DEFAULT_LOOK, type Look } from "../../lib/look";
 import { NookFigure } from "../mascot/Figure";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
@@ -415,7 +415,225 @@ function PhoneShareDemo() {
   );
 }
 
+// ---------------------------------------------------------------- Görünüm
+
+/** Koleksiyon: kategoriler sırayla gelir (Meslekler, Hayvanlar…); her birinde Nook'lar sırayla öne çıkar */
+function CollectionDemo() {
+  const n = useTick(900);
+  const PER = 4;
+  const g = COLLECTION_GROUPS[Math.floor(n / PER) % COLLECTION_GROUPS.length];
+  const row = g.items.slice(0, 12);
+  const cur = row[(n % PER) % row.length];
+  return (
+    <Stage>
+      <span className="absolute left-4 top-3 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">{g.title}</span>
+      <div className="absolute bottom-2 left-4 top-7 flex w-[132px] flex-wrap content-center gap-x-1 gap-y-2">
+        {row.map((o) => (
+          <span key={o.name} className="flex h-[26px] w-[30px] items-end justify-center transition-opacity duration-300" style={{ opacity: o === cur ? 1 : 0.4 }}>
+            <NookFigure look={o.look} color={o.color} size={18} />
+          </span>
+        ))}
+      </div>
+      <div className="absolute inset-y-0 right-6 flex w-[110px] flex-col items-center justify-center gap-1.5">
+        <AnimatePresence mode="popLayout">
+          <motion.div key={cur.name} initial={{ scale: 0.5, opacity: 0, y: 6 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 380, damping: 20 }}>
+            <NookFigure look={cur.look} color={cur.color} size={52} />
+          </motion.div>
+        </AnimatePresence>
+        <span className="text-[10px] text-label-2">{cur.name}</span>
+      </div>
+    </Stage>
+  );
+}
+
+/** Yeni parçalar: aynı Nook önce gövde, sonra doku, sonra başlık değiştirir */
+function NewPartsDemo() {
+  const n = useTick(1100);
+  const steps: { look: Look; color: string; label: string }[] = [
+    { look: { ...DEFAULT_LOOK, shape: "strawberry" }, color: "#FF3B4A", label: tt("Gövde · Çilek") },
+    { look: { ...DEFAULT_LOOK, shape: "mushroom" }, color: "#FF3B4A", label: tt("Gövde · Mantar") },
+    { look: { ...DEFAULT_LOOK, shape: "flame" }, color: "#FF6A3D", label: tt("Gövde · Alev") },
+    { look: { ...DEFAULT_LOOK, shape: "drop", texture: "jelly" }, color: "#00B8FF", label: tt("Gövde · Damlacık") },
+    { look: { ...DEFAULT_LOOK, texture: "galaxy" }, color: "#6B4BFF", label: tt("Doku · Galaksi") },
+    { look: { ...DEFAULT_LOOK, texture: "knit" }, color: "#2B8CFF", label: tt("Doku · Örgü") },
+    { look: { ...DEFAULT_LOOK, texture: "lava" }, color: "#FF6A3D", label: tt("Doku · Lav") },
+    { look: { ...DEFAULT_LOOK, texture: "camo" }, color: "#16C47F", label: tt("Doku · Kamuflaj") },
+    { look: { ...DEFAULT_LOOK, head: "crown" }, color: "#F4F4F6", label: tt("Başlık · Taç") },
+    { look: { ...DEFAULT_LOOK, head: "astronaut" }, color: "#F4F4F6", label: tt("Başlık · Astronot") },
+    { look: { ...DEFAULT_LOOK, head: "santa" }, color: "#F4F4F6", label: tt("Başlık · Noel") },
+    { look: { ...DEFAULT_LOOK, head: "chef" }, color: "#FFE3A8", label: tt("Başlık · Aşçı") },
+    { look: { ...DEFAULT_LOOK, shape: "frog" }, color: "#8FE03A", label: tt("Gövde · Kurbağa") },
+    { look: { ...DEFAULT_LOOK, shape: "penguin", eyes: "bead" }, color: "#1E3A8A", label: tt("Gövde · Penguen") },
+    { look: { ...DEFAULT_LOOK, shape: "bee" }, color: "#FFD21F", label: tt("Gövde · Arı") },
+    { look: { ...DEFAULT_LOOK, shape: "cupcake" }, color: "#FF9EC4", label: tt("Gövde · Cupcake") },
+    { look: { ...DEFAULT_LOOK, shape: "donut" }, color: "#FF9EC4", label: tt("Gövde · Donut") },
+    { look: { ...DEFAULT_LOOK, shape: "cactus" }, color: "#16C47F", label: tt("Gövde · Kaktüs") },
+    { look: { ...DEFAULT_LOOK, shape: "storm" }, color: "#8A8F99", label: tt("Gövde · Fırtına") },
+    { look: { ...DEFAULT_LOOK, shape: "bear", texture: "glass" }, color: "#00B8FF", label: tt("Doku · Cam") },
+    { look: { ...DEFAULT_LOOK, shape: "bear", texture: "plaid" }, color: "#FF3B4A", label: tt("Doku · Ekose") },
+    { look: { ...DEFAULT_LOOK, shape: "bear", texture: "chrome" }, color: "#8A8F99", label: tt("Doku · Krom") },
+    { look: { ...DEFAULT_LOOK, head: "viking" }, color: "#FFE3A8", label: tt("Başlık · Viking") },
+    { look: { ...DEFAULT_LOOK, head: "knight" }, color: "#8A8F99", label: tt("Başlık · Şövalye") },
+    { look: { ...DEFAULT_LOOK, head: "pilot" }, color: "#FFE3A8", label: tt("Başlık · Pilot") },
+  ];
+  const cur = steps[n % steps.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+        <AnimatePresence mode="popLayout">
+          <motion.div key={n} initial={{ scale: 0.5, opacity: 0, y: 6 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 380, damping: 20 }}>
+            <NookFigure look={cur.look} color={cur.color} size={54} />
+          </motion.div>
+        </AnimatePresence>
+        <span className="text-[10px] text-label-2">{cur.label}</span>
+      </div>
+    </Stage>
+  );
+}
+
+/** Yüz ve süs: aynı Nook'a sırayla maske, bıyık, sakal, palyaço burnu, nota; gözleri de değişir */
+function FaceWearDemo() {
+  const n = useTick(1100);
+  const steps: { look: Partial<Look>; label: string }[] = [
+    { look: { glasses: "hero" }, label: tt("Kahraman maskesi") },
+    { look: { glasses: "masquerade" }, label: tt("Balo maskesi") },
+    { look: { glasses: "neon" }, label: tt("Neon gözlük") },
+    { look: { glasses: "snorkel" }, label: tt("Şnorkel") },
+    { look: { face: "mustache" }, label: tt("Bıyık") },
+    { look: { face: "beard" }, label: tt("Sakal") },
+    { look: { face: "nose" }, label: tt("Palyaço burnu") },
+    { look: { face: "note", eyes: "wink" }, label: tt("Nota · göz kırpma") },
+    { look: { face: "sparkle", eyes: "happy" }, label: tt("Parıltı · mutlu gözler") },
+    { look: { face: "bubbles", eyes: "squint" }, label: tt("Baloncuk · sıkı gözler") },
+    { look: { eyes: "led" }, label: tt("Robot gözler") },
+  ];
+  const cur = steps[n % steps.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+        <AnimatePresence mode="popLayout">
+          <motion.div key={n} initial={{ scale: 0.5, opacity: 0, y: 6 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 380, damping: 20 }}>
+            <NookFigure look={{ ...DEFAULT_LOOK, ...cur.look }} color="#FFE3A8" size={54} />
+          </motion.div>
+        </AnimatePresence>
+        <span className="text-[10px] text-label-2">{cur.label}</span>
+      </div>
+    </Stage>
+  );
+}
+
+// ---------------------------------------------------------------- Hey Nook ve sesli komutlar
+
+/** "Hey Nook" deyince Nook kulak kabartır (dalga), ardından komut balonu ve yapılan iş çıkar */
+function HeyNookDemo() {
+  const n = useTick(700);
+  const phase = n % 8; // 0-1 sessiz, 2 "Hey Nook", 3-4 dinliyor, 5-7 komut ve sonuç
+  const listening = phase >= 2 && phase <= 4;
+  return (
+    <Stage>
+      <div className="absolute inset-y-0 left-6 flex w-[90px] flex-col items-center justify-center gap-1">
+        <motion.div animate={listening ? { scale: [1, 1.08, 1] } : { scale: 1 }} transition={{ duration: 0.6, repeat: listening ? Infinity : 0 }}>
+          <NookFigure look={DEFAULT_LOOK} color="#F4F4F6" size={46} expression={listening ? "surprised" : phase >= 5 ? "happy" : "idle"} />
+        </motion.div>
+        <div className="flex h-3 items-end gap-[2px]">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <motion.span key={i} className="w-[3px] rounded-full" style={{ background: ACCENT.teal }} animate={{ height: listening ? [3, 10 - Math.abs(2 - i) * 2, 3] : 2 }} transition={{ duration: 0.5, repeat: listening ? Infinity : 0, delay: i * 0.06 }} />
+          ))}
+        </div>
+      </div>
+      <div className="absolute inset-y-0 right-4 flex w-[150px] flex-col justify-center gap-1.5">
+        <AnimatePresence>
+          {phase >= 2 && (
+            <motion.span key="hey" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="self-start rounded-[10px] px-2 py-1 text-[10.5px] font-semibold" style={{ background: tintBg(ACCENT.teal, 16), color: tintText(ACCENT.teal) }}>
+              {tt("“Hey Nook”")}
+            </motion.span>
+          )}
+          {phase >= 4 && (
+            <motion.span key="cmd" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="self-start rounded-[10px] bg-well px-2 py-1 text-[10px] text-label-2">
+              {tt("“YouTube Music'ten Tarkan aç”")}
+            </motion.span>
+          )}
+          {phase >= 6 && (
+            <motion.span key="ok" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1 self-start text-[10px] font-medium" style={{ color: tintText(ACCENT.green) }}>
+              <Check size={11} strokeWidth={3} /> {tt("Çalıyor: Tarkan")}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
+/** Yeni sesli komutlar: şarkı çal, site aç, sesi ayarla — her biri kendi sonucuyla */
+function VoiceToolsDemo() {
+  const n = useTick(1600);
+  const steps = [
+    { say: tt("“Hey Nook, Sezen Aksu çal”"), done: tt("YouTube Music'te çalıyor"), color: ACCENT.red },
+    { say: tt("“Hey Nook, Gmail'i aç”"), done: tt("mail.google.com açıldı"), color: ACCENT.blue },
+    { say: tt("“Hey Nook, sesi yüzde 30 yap”"), done: tt("Ses %30"), color: ACCENT.teal },
+    { say: tt("“Hey Nook, YouTube'da kedi videosu aç”"), done: tt("YouTube'da açıldı"), color: ACCENT.red },
+  ];
+  const cur = steps[n % steps.length];
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4">
+        <AnimatePresence mode="popLayout">
+          <motion.div key={n} className="flex flex-col items-center gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+            <span className="rounded-[10px] bg-well px-2.5 py-1 text-[10.5px] text-label">{cur.say}</span>
+            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: tintBg(cur.color, 16), color: tintText(cur.color) }}>
+              <Check size={10} strokeWidth={3} /> {cur.done}
+            </motion.span>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
+/** Model listesi: kapanmış modeller sırayla üstü çizilip listeden düşer */
+function GeminiModelsDemo() {
+  const n = useTick(900);
+  const models = [
+    { id: "Gemini 3 Pro", dead: false },
+    { id: "Gemini 2.0 Flash Exp", dead: true },
+    { id: "Gemini 3 Flash", dead: false },
+    { id: "Gemini 2.5 Pro Preview 03-25", dead: true },
+    { id: "Gemini 3 Flash Lite", dead: false },
+  ];
+  const step = n % 6; // 0-1 tam liste, 2-3 kapanmışlar kızarır, 4-5 düşer
+  return (
+    <Stage>
+      <div className="absolute inset-0 flex flex-col justify-center gap-1 px-10">
+        <AnimatePresence initial={false}>
+          {models
+            .filter((m) => !(m.dead && step >= 4))
+            .map((m) => (
+              <motion.div
+                key={m.id}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="flex items-center justify-between rounded-[8px] bg-well px-2 py-[3px] text-[10px]"
+                style={m.dead && step >= 2 ? { color: tintText(ACCENT.red), textDecoration: "line-through" } : undefined}
+              >
+                <span className={m.dead && step >= 2 ? "" : "text-label-2"}>{m.id}</span>
+                {m.dead && step >= 2 ? <span className="text-[9px]">{tt("kapandı")}</span> : <Check size={10} strokeWidth={3} style={{ color: ACCENT.green }} />}
+              </motion.div>
+            ))}
+        </AnimatePresence>
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS7 = {
+  heynook: HeyNookDemo,
+  voicetools: VoiceToolsDemo,
+  geminimodels: GeminiModelsDemo,
+  facewear: FaceWearDemo,
+  collection: CollectionDemo,
+  newparts: NewPartsDemo,
   phonetunnel: PhoneTunnelDemo,
   phonediagnose: PhoneDiagnoseDemo,
   phonenotify: PhoneNotifyDemo,

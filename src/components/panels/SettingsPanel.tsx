@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { Check, Eye, EyeOff, HelpCircle, Lock, Play, X } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
+import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
 import { alarmRing, listMonitors, openPath, quickState, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
 import { syncFeeds } from "../../lib/ics";
@@ -200,6 +201,7 @@ export function SettingsPanel() {
       <LockSection />
 
       <AiSection />
+      <WakeSection />
 
       <ArgusSection />
 
@@ -817,6 +819,7 @@ const INDEX: { label: string; title: string }[] = [
   { label: tt("Kalkan"), title: tt("Gizlilik kalkanı") },
   { label: tt("Kilit"), title: tt("Parola kilidi") },
   { label: tt("Yapay zekâ"), title: tt("Yapay zekâ") },
+  { label: "Hey Nook", title: "Hey Nook" },
   { label: "Argus", title: "Argus" },
   { label: tt("Davranış"), title: tt("Davranış") },
   { label: tt("Bildirimler"), title: tt("Bildirimler") },
@@ -1363,6 +1366,133 @@ function AiSection() {
           <p className="mt-0.5 text-[10.5px] text-label-3">{tt("Sohbette \"şunu hatırla…\" dersen burada görünür.")}</p>
         )}
       </div>
+    </Section>
+  );
+}
+
+const WAKE_SENS: { id: number; label: string }[] = [
+  { id: 0.2, label: tt("Az") },
+  { id: 0.5, label: tt("Orta") },
+  { id: 0.85, label: tt("Çok") },
+];
+
+/**
+ * "Hey Nook": sesini üç örnekle tanıt, sonra Nook adını duyunca dinlesin. Mikrofon bu
+ * bilgisayarda dinlenir; yalnızca "Hey Nook"tan sonra söylenen cümle Gemini'ye gider.
+ */
+function WakeSection() {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const [status, setStatus] = useState<WakeStatus | null>(null);
+  // Tanıtım: kaçıncı örnek (0 kapalı), hata, kayıt sürüyor mu
+  const [step, setStep] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [level, setLevel] = useState(0);
+  const [heard, setHeard] = useState<WakeHeard | null>(null);
+
+  useEffect(() => {
+    void wakeStatus().then(setStatus);
+    const offHeard = subscribe<WakeHeard>(EVENTS.wakeHeard, setHeard);
+    const offLevel = subscribe<number>(EVENTS.voiceLevel, setLevel);
+    return () => {
+      offHeard();
+      offLevel();
+    };
+  }, [s.wakeWord]);
+
+  const record = async (n: number) => {
+    setStep(n);
+    setRecording(true);
+    setError(null);
+    try {
+      const got = await wakeEnroll();
+      if (got < 3) return void record(got + 1);
+      const st = await wakeEnrollSave();
+      setStatus(st);
+      setStep(0);
+      update({ wakeWord: true });
+      playSfx("success");
+    } catch (e) {
+      setError(String(e));
+      // Örnekler birbirine benzemediyse baştan
+      if (/benzemedi/.test(String(e))) {
+        await wakeEnrollReset();
+        setStep(1);
+      }
+    } finally {
+      setRecording(false);
+    }
+  };
+  const start = async () => {
+    await wakeEnrollReset();
+    void record(1);
+  };
+
+  const trained = (status?.trained ?? 0) >= 3;
+  const noKey = !s.geminiKey.trim();
+
+  return (
+    <Section title="Hey Nook">
+      {step > 0 ? (
+        <div className="py-2">
+          <p className="text-[12px] text-label">{tt("Normal sesinle söyle: “Hey Nook” ({0}/3)", step)}</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <Bar pct={recording ? Math.round(level * 100) : 0} color={ACCENT.teal} className="flex-1" />
+            {!recording && (
+              <TextButton onClick={() => void record(step)}>{tt("Tekrar dene")}</TextButton>
+            )}
+          </div>
+          <p className="mt-1 text-[10.5px]" style={{ color: error ? ACCENT.orange : "var(--color-label-3)" }}>
+            {error ?? (recording ? tt("Dinliyorum…") : "")}
+          </p>
+        </div>
+      ) : !trained ? (
+        <div className="py-1.5">
+          <p className="text-[10.5px] leading-snug text-label-3">
+            {tt("“Hey Nook” deyince Nook dinler, sonra söylediğini yapar: “Hey Nook, YouTube Music'ten Tarkan aç”, “Hey Nook, sesi yüzde 30 yap”, “Hey Nook, yarın 8'e alarm kur”. Önce sesini tanıt: üç kez “Hey Nook” diyeceksin.")}
+          </p>
+          <div className="mt-1.5 flex justify-end">
+            <TextButton onClick={() => void start()}>{tt("Sesimi tanıt")}</TextButton>
+          </div>
+        </div>
+      ) : (
+        <>
+          <Row label={tt("Seslenince dinle")}>
+            <Toggle on={s.wakeWord} onChange={(v) => update({ wakeWord: v })} color={ACCENT.teal} />
+          </Row>
+          <Row label={tt("Duyarlılık")}>
+            <Segmented id="wake-sens" options={WAKE_SENS} value={WAKE_SENS.reduce((a, b) => (Math.abs(b.id - s.wakeSensitivity) < Math.abs(a.id - s.wakeSensitivity) ? b : a)).id} onChange={(v) => update({ wakeSensitivity: v })} />
+          </Row>
+          {s.wakeWord && (
+            <div className="py-1.5">
+              <div className="flex items-baseline justify-between text-[12px]">
+                <span className="text-label">{tt("Son duyduğu")}</span>
+                <span className="text-[10.5px] font-medium" style={{ color: heard?.woke ? ACCENT.green : "var(--color-label-3)" }}>
+                  {heard ? (heard.woke ? tt("Uyandı") : tt("Benzemedi")) : tt("Bir şey söyle")}
+                </span>
+              </div>
+              <Bar pct={Math.round((heard?.score ?? 0) * 100)} color={heard?.woke ? ACCENT.green : ACCENT.teal} className="mt-1" />
+              <p className="mt-1 text-[10.5px] leading-snug text-label-3">
+                {tt("Çubuk ne kadar doluysa o kadar “Hey Nook”a benziyor. Seni duymuyorsa duyarlılığı artır; kendi kendine uyanıyorsa azalt.")}
+              </p>
+            </div>
+          )}
+          <div className="flex justify-end gap-1 py-1">
+            <TextButton onClick={() => void start()}>{tt("Yeniden tanıt")}</TextButton>
+            <TextButton tone="danger" onClick={() => void wakeForget().then((st) => (setStatus(st), update({ wakeWord: false })))}>
+              {tt("Sesimi unut")}
+            </TextButton>
+          </div>
+        </>
+      )}
+      {(trained || step > 0) && (
+        <p className="py-1 text-[10.5px] leading-snug" style={{ color: noKey ? ACCENT.orange : "var(--color-label-3)" }}>
+          {noKey
+            ? tt("Komutları anlamak için Gemini API anahtarı gerekiyor (yukarıda).")
+            : tt("Mikrofon yalnızca bu bilgisayarda dinlenir; Windows mikrofon simgesi açık kalır. Yalnızca “Hey Nook”tan sonra söylediğin cümle Gemini'ye gider.")}
+        </p>
+      )}
     </Section>
   );
 }

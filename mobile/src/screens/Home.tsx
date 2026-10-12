@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { MoreHorizontal } from "lucide-react";
-import { getMedia, wakePc, type Pairing, type NowPlaying, type Status } from "../lib/pc";
+import { cached, getMedia, wakePc, type Pairing, type NowPlaying, type Status } from "../lib/pc";
 import { ChipNook, errText, NookChip, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
 import { installUpdate, useInstallProgress, useMobileUpdate } from "../lib/update";
@@ -10,7 +10,7 @@ import { native } from "../lib/native";
 import { onOutbox, pending } from "../lib/outbox";
 import type { Conn } from "../App";
 
-export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify";
+export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify" | "look" | "claude";
 
 interface Tile {
   id: Screen;
@@ -29,10 +29,12 @@ const TILES: Tile[] = [
   { id: "notes", nook: "note", label: "Not", color: "#FF6A3D" },
   { id: "hum", nook: "hum", label: "Hum", color: "#9B7BFF" },
   { id: "notify", nook: "notify", label: "Bildirimler", color: "#9B7BFF" },
+  { id: "look", nook: "look", label: "Görünüm", color: "#FF5C8A" },
+  { id: "claude", nook: "claude", label: "Claude", color: "#D97757" },
 ];
 
 /** PC kapalıyken de açılanlar (son görülen veriyle; yapılanlar PC açılınca gider) */
-const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "notes", "hum", "notify"];
+const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "notes", "hum", "notify", "claude"];
 
 function gb(bytes: number) {
   return (bytes / 1024 ** 3).toLocaleString("tr-TR", { maximumFractionDigits: 1 });
@@ -88,6 +90,12 @@ export function HomeScreen({
     if (t.id === "notes") return online ? "PC'deki notların" : "Yaz, PC açılınca gider";
     if (t.id === "hum") return online ? "Çalan şarkıyı bul" : "Dinle, PC açılınca bulunur";
     if (t.id === "notify") return "Telefonun bildirimleri PC'de";
+    if (t.id === "look") return online ? "Nook'unu giydir" : "PC açılınca";
+    if (t.id === "claude") {
+      const c = status?.claude;
+      if (!online || !c) return "Son görülen oturumlar";
+      return c.asks ? `${c.asks} onay bekliyor` : c.working ? "Çalışıyor" : c.sessions ? `${c.sessions} oturum` : "Açık oturum yok";
+    }
     return online ? "Kapat, uyut, ekran görüntüsü" : "Aç, uzaktan açma rehberi";
   };
 
@@ -98,7 +106,8 @@ export function HomeScreen({
         <button onClick={() => setMenu(true)} className="absolute right-0 top-1 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-card text-label-2">
           <MoreHorizontal size={20} />
         </button>
-        <div className={online ? "" : "opacity-60 grayscale"}>
+        {/* Nook'a dokununca Görünüm açılır */}
+        <div className={online ? "" : "opacity-60 grayscale"} onClick={() => online && onOpen("look")}>
           <LiveNook look={status?.nook?.look} color={status?.nook?.color} online={online} playing={!!playing?.playing} />
         </div>
         <p className="-mt-1 flex items-center gap-1.5 text-[13px] text-label-2">
@@ -183,7 +192,7 @@ export function HomeScreen({
 
       <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Nook'lar</h2>
       <section className="grid grid-cols-2 gap-2.5 pb-4">
-        {TILES.map((t) =>
+        {TILES.filter((t) => t.id !== "claude" || status?.claude || cached("claude")).map((t) =>
           t.id === "pc" ? (
             <PcChip key={t.id} tile={t} sub={subtitle(t)} status={online ? status : null} disabled={false} onClick={() => onOpen(t.id)} />
           ) : (

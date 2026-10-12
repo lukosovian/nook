@@ -88,11 +88,87 @@ export async function listModels(key: string): Promise<ModelInfo[]> {
   const r = await fetch(`${BASE}/models?pageSize=200`, { headers: headers(key), signal: AbortSignal.timeout(8000) });
   if (!r.ok) throw await apiError(r);
   const j = (await r.json()) as { models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[] };
-  return (j.models ?? [])
+  const all = (j.models ?? [])
     .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
     .filter((m) => /gemini/i.test(m.name) && !/(embedding|image|tts|audio|vision|aqa|live|native)/i.test(m.name))
+    // Çoktan kapatılmış eski aileler
+    .filter((m) => !/gemini-(1\.0|1\.5|pro$|pro-vision)/i.test(m.name))
     .map((m) => ({ id: m.name.replace(/^models\//, ""), label: m.displayName ?? m.name }))
     .sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }));
+  const alive = await aliveModels(key, all);
+  // Yoklama hiç sonuç vermediyse (internet kesik) listeyi boşaltma
+  return alive.length ? alive : all;
+}
+
+// ------------------------------------------------------------------ çalışmayan modelleri ayıklama
+
+/**
+ * Google kapatılan (ya da bu anahtara kapalı) modelleri bir süre daha listede gösterir; seçilince
+ * hata verir. Her model bir kez tek kelimelik istekle yoklanır, sonuç bir gün saklanır.
+ * Kapatılmış, bulunamayan, izin verilmeyen ya da kotası sıfır olanlar çıkarılır; geçici
+ * yoğunluk (503, dolmuş günlük kota) modeli çıkarmaz.
+ */
+const PROBE_STORE = "nook.geminiProbe";
+const PROBE_TTL = 24 * 3600_000;
+
+type Probe = Record<string, { ok: boolean; at: number }>;
+
+function loadProbe(key: string): Probe {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROBE_STORE) ?? "{}") as Record<string, Probe>;
+    return all[key.slice(-8)] ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function saveProbe(key: string, probe: Probe) {
+  try {
+    localStorage.setItem(PROBE_STORE, JSON.stringify({ [key.slice(-8)]: probe }));
+  } catch {
+    /* yalnızca bu oturum */
+  }
+}
+
+async function probeModel(key: string, id: string): Promise<boolean | null> {
+  try {
+    const r = await fetch(`${BASE}/models/${id}:generateContent`, {
+      method: "POST",
+      headers: headers(key),
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: 1 } }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (r.ok) return true;
+    let message = "";
+    try {
+      message = ((await r.json()) as { error?: { message?: string } }).error?.message ?? "";
+    } catch {
+      // gövde JSON değil
+    }
+    if (r.status === 404 || r.status === 403) return false;
+    if (r.status === 400 && /deprecat|discontinu|no longer|not (found|supported|available)|retired|shut ?down/i.test(message)) return false;
+    // Ücretsiz anahtarda hiç kotası olmayan model ("limit: 0")
+    if (r.status === 429 && /limit:\s*0\b/i.test(message)) return false;
+    return true;
+  } catch {
+    // Zaman aşımı, internet: bilinmiyor
+    return null;
+  }
+}
+
+async function aliveModels(key: string, models: ModelInfo[]): Promise<ModelInfo[]> {
+  const probe = loadProbe(key);
+  const now = Date.now();
+  await Promise.all(
+    models.map(async (m) => {
+      const p = probe[m.id];
+      if (p && now - p.at < PROBE_TTL) return;
+      const ok = await probeModel(key, m.id);
+      if (ok !== null) probe[m.id] = { ok, at: now };
+    }),
+  );
+  saveProbe(key, probe);
+  return models.filter((m) => probe[m.id]?.ok !== false);
 }
 
 /** Yoğunlukta geçilecek yedek: en yeni kararlı "Flash" (lite olmayan); yoksa başka herhangi biri. */

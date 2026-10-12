@@ -44,13 +44,24 @@ const OPEN = pill(3.6, 7.6);
 const SHUT = pill(5, 1.6, 1);
 const HIDDEN = pill(0.1, 0.1);
 
-/** Kullanıcının seçtiği göz: yalnızca "açık, olağan" bakışın yerine geçer; ifadeler (mutlu, uykulu…) aynı kalır. */
-const OPEN_STYLES: Record<EyeStyle, EyeShape> = {
+/**
+ * Kullanıcının seçtiği göz: yalnızca "açık, olağan" bakışın yerine geçer; ifadeler (mutlu, uykulu…) aynı kalır.
+ * İki gözü farklı olanlar (göz kırpma, sıkı) [sol, sağ] olarak verilir.
+ */
+const OPEN_STYLES: Record<EyeStyle, EyeShape | [EyeShape, EyeShape]> = {
   pill: OPEN,
   bead: pill(4.4, 4.6, 0.6),
   diamond: { ...pill(4, 4, 0.5, 0.9), rotate: 45 },
   sparkle: pill(4.2, 8),
   calm: { ...pill(4.6, 4, 1.2), borderTopLeftRadius: 0.9, borderTopRightRadius: 0.9 },
+  // Mutlu: gülerken kapanmış "∩ ∩"
+  happy: arch(5, 3.2),
+  // Sıkı: içe eğik, sımsıkı kapalı çizgiler
+  squint: [{ ...pill(5.4, 1.9, 0.4), rotate: 20 }, { ...pill(5.4, 1.9, 0.4), rotate: -20 }],
+  // Göz kırpma: sol açık, sağ kapalı
+  wink: [OPEN, arch(5, 2.6)],
+  // Robot: köşeleri az yuvarlak, ekran gibi enli
+  led: pill(5.4, 3.6, 0, 0.8),
 };
 /** Bu gözlerde küçük ışık parıltısı var */
 const SHINES = new Set<EyeStyle>(["bead", "sparkle"]);
@@ -58,9 +69,10 @@ const SHINES = new Set<EyeStyle>(["bead", "sparkle"]);
 /** [sol, sağ] göz ve parıltı */
 export function eyesFor(expression: Expression, style: EyeStyle): [EyeShape, EyeShape, boolean, boolean] {
   const [l, r] = EYES[expression];
-  const s = OPEN_STYLES[style];
+  const st = OPEN_STYLES[style];
+  const [sl, sr] = Array.isArray(st) ? st : [st, st];
   const shine = SHINES.has(style);
-  return [l === OPEN ? s : l, r === OPEN ? s : r, shine && l === OPEN, shine && r === OPEN];
+  return [l === OPEN ? sl : l, r === OPEN ? sr : r, shine && l === OPEN, shine && r === OPEN];
 }
 
 /** [sol, sağ] göz. */

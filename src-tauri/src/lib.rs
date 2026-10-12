@@ -33,6 +33,7 @@ mod system;
 mod tracker;
 mod verify;
 mod voice;
+mod wake;
 mod window;
 pub mod wol;
 
@@ -132,6 +133,7 @@ pub fn run() {
             shell::open_path,
             shell::reveal_path,
             shell::list_apps,
+            shell::music_find,
             media::media_control,
             media::media_resync,
             quick::quick_state,
@@ -149,6 +151,12 @@ pub fn run() {
             imaging::capture_screen,
             voice::voice_start,
             voice::voice_stop,
+            wake::wake_config,
+            wake::wake_status,
+            wake::wake_enroll,
+            wake::wake_enroll_reset,
+            wake::wake_enroll_save,
+            wake::wake_forget,
             hum::hum_listen,
             hum::hum_cancel,
             hum::hum_watching,
@@ -189,6 +197,7 @@ pub fn run() {
             shared.register(&island);
 
             window::build_tray(app.handle())?;
+            wake::init(app.handle());
             let handle = app.handle().clone();
             tracker::spawn(handle.clone(), shared.clone());
             clipboard::spawn(handle.clone());

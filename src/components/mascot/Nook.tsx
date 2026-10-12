@@ -16,7 +16,7 @@ import { setInteractive } from "../../lib/bridge";
 import { FACE } from "../../lib/layout";
 import { spring } from "../../lib/motion";
 import { DEFAULT_LOOK, radii, roundBody, type BodyShape, type Look } from "../../lib/look";
-import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, lensOn, SPAN, useBodyImage } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, hidesEyes, lensOn, SPAN, useBodyImage } from "../../lib/nook3d";
 import { useNook, type Expression, type Status } from "../../store/nook";
 import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
@@ -297,7 +297,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const floater = expression === "sleepy" && sleepStyle === "bubble" ? undefined : FLOATER[expression];
   const tint = status ? STATUS_COLOR[status] : null;
   /** Güneş gözlüğünün ardındaki gözler görünmez */
-  const hideEyes = solid && wear.glasses === "shades";
+  const hideEyes = solid && hidesEyes(wear);
 
   return (
     // Dış katman: sürükle-fırlat. Bırakınca yay ile yerine döner.

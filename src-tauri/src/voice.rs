@@ -49,6 +49,16 @@ pub fn stop() -> Result<Option<String>, String> {
     Ok(Some(base64::engine::general_purpose::STANDARD.encode(wav(&resample(&samples, rate, OUT_RATE), OUT_RATE))))
 }
 
+/// Kısayolla ya da sohbetten kayıt sürüyor mu ("Hey Nook" bu sırada uyanmasın)
+pub fn active() -> bool {
+    REC.lock().unwrap().is_some()
+}
+
+/// 16 bit WAV, base64 ("Hey Nook"tan sonraki komut da bununla gider)
+pub fn wav_base64(samples: &[f32], rate: u32) -> String {
+    base64::engine::general_purpose::STANDARD.encode(wav(samples, rate))
+}
+
 #[tauri::command]
 pub fn voice_start(app: AppHandle) -> bool {
     start(&app)

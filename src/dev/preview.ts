@@ -239,6 +239,8 @@ export function applyPreview(mode: string) {
     if (c) useNook.getState().patchClip(c.id, { askTranslate: true, translation: undefined });
   }
   if (params.get("scroll")) window.setInterval(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 500);
+  // ?sec=Başlık → Ayarlar'da o bölüme kaydır
+  if (params.get("sec")) window.setInterval(() => document.querySelector(`[data-sec="${params.get("sec")}"]`)?.scrollIntoView({ block: "start" }), 500);
   // ?look=şekil,göz,gözlük,başlık,boyun,doku&color=… &name=…
   const q = new URLSearchParams(location.search);
   const lk = q.get("look")?.split(",");

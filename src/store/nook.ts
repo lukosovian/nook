@@ -303,6 +303,10 @@ export interface Settings extends NativeSettings {
   nookName: string;
   /** Gövde, gözler, gözlük, aksesuarlar (lib/look) */
   look: Look;
+  /** "Hey Nook" diye seslenince dinlesin (mikrofon sürekli, yalnızca bu bilgisayarda dinlenir) */
+  wakeWord: boolean;
+  /** 0 az tetiklenir … 1 kolay tetiklenir */
+  wakeSensitivity: number;
   weather: boolean;
   /** Boşsa konum IP'den tahmin edilir */
   weatherCity: string;
@@ -465,7 +469,7 @@ export const DEFAULT_SETTINGS: Settings = {
   events: true,
   faceColor: "#F4F4F6",
   nookName: "",
-  look: { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none" },
+  look: { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none", face: "none" },
   hideInFullscreen: true,
   islandPos: null,
   sensitiveGuard: true,
@@ -549,6 +553,8 @@ export const DEFAULT_SETTINGS: Settings = {
   liveShortcut: "Ctrl+Alt+L",
   humShortcut: "Ctrl+Alt+M",
   humAuto: false,
+  wakeWord: false,
+  wakeSensitivity: 0.5,
   uiSounds: true,
   uiVolume: 0.6,
 };

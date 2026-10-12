@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { pauseFrames, setFrameRate } from "../lib/frameCap";
 import {
-  applySettings, remoteProfile,
+  applySettings, remoteProfile, wakeConfig,
   clipboardClear,
   clipboardClearIf,
   clipboardPrune,
@@ -700,6 +700,11 @@ export function useSettingsSync() {
     if (!isPrimary) return;
     void syncAutostart(settings.autostart).catch((e) => console.warn("[nook] autostart", e));
   }, [settings.autostart]);
+  // "Hey Nook" dinleyicisi
+  useEffect(() => {
+    if (!isPrimary) return;
+    void wakeConfig(settings.wakeWord, settings.wakeSensitivity).catch(() => {});
+  }, [settings.wakeWord, settings.wakeSensitivity]);
   // Telefondaki Nook aynı renkte/adla görünsün, Argus'ta aynı profili kullansın
   const profileKey = JSON.stringify([settings.faceColor, settings.nookName, settings.look, settings.argusProfile]);
   useEffect(() => {

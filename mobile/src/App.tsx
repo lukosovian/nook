@@ -13,6 +13,8 @@ import { ClipsScreen } from "./screens/Clips";
 import { NotesScreen } from "./screens/Notes";
 import { HumScreen } from "./screens/Hum";
 import { NotifyScreen } from "./screens/Notify";
+import { LookScreen } from "./screens/Look";
+import { ClaudeScreen } from "./screens/Claude";
 import { ShareSheet, type Shared } from "./screens/Share";
 import { tourSeen, TourScreen } from "./screens/Tour";
 import { useToast } from "./ui";
@@ -110,7 +112,7 @@ export function App() {
   });
   const [screen, setScreen] = useState<Screen>(() => {
     const s = import.meta.env.DEV ? new URLSearchParams(location.search).get("demo") : null;
-    return s === "pc" || s === "argus" || s === "media" || s === "clips" || s === "notes" || s === "hum" || s === "notify" ? s : "home";
+    return s === "pc" || s === "argus" || s === "media" || s === "clips" || s === "notes" || s === "hum" || s === "notify" || s === "look" || s === "claude" ? s : "home";
   });
   const [toast, say] = useToast();
   // PC açılınca: PC kapalıyken yazılan notlar, panoya gönderilenler, Hum kayıtları ve telefonun bildirimleri gider
@@ -183,6 +185,10 @@ export function App() {
         return <HumScreen {...common} />;
       case "notify":
         return <NotifyScreen {...common} />;
+      case "look":
+        return <LookScreen {...common} />;
+      case "claude":
+        return <ClaudeScreen {...common} />;
       default:
         return (
           <HomeScreen

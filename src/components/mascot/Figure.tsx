@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { motion } from "motion/react";
 import { normalizeColor, normalizeLook, type Look } from "../../lib/look";
-import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, lensOn, SPAN, useBodyImageQueued } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, hidesEyes, lensOn, SPAN, useBodyImageQueued } from "../../lib/nook3d";
 import { useNook, type Expression } from "../../store/nook";
 import { eyesFor } from "./Eye";
 
@@ -38,7 +38,7 @@ export function NookFigure({
   alive?: boolean;
 }) {
   const img = useBodyImageQueued(look, color, res ?? figureRes(size));
-  const [eye, , shine] = eyesFor(expression, look.eyes);
+  const [eyeL, eyeR, shineL, shineR] = eyesFor(expression, look.eyes);
   const span = (size * SPAN) / 2;
   const unit = size / 2; // 1 birim (yüz yarıçapı) kaç px
   const a = ANCHORS[look.shape];
@@ -53,7 +53,7 @@ export function NookFigure({
       {img ? (
         <span className="nook-fade absolute" style={{ width: span, height: span, left: (size - span) / 2, top: (size - span) / 2 }}>
           <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />
-          {look.glasses !== "shades" && (
+          {!hidesEyes(look) && (
             <motion.span
               className="absolute inset-0"
               style={{ originY: `${eyeLine}px` }}
@@ -66,7 +66,10 @@ export function NookFigure({
                 transition={alive ? { duration: 3.2, times: [0, 0.1, 0.18, 0.45, 0.53, 0.8, 0.9], repeat: Infinity, repeatDelay: rhythm.glance, delay: rhythm.delay + 1, ease: "easeInOut" } : undefined}
               >
             {/* Göz bandı sol gözü örter */}
-            {(look.glasses === "eyepatch" ? [1] : [-1, 1]).map((side) => (
+            {(look.glasses === "eyepatch" ? [1] : [-1, 1]).map((side) => {
+              const eye = side < 0 ? eyeL : eyeR;
+              const shine = side < 0 ? shineL : shineR;
+              return (
               <span
                 key={side}
                 className="absolute bg-black"
@@ -81,7 +84,8 @@ export function NookFigure({
               >
                 {shine && <span className="absolute rounded-full bg-white/90" style={{ width: 1.3 * k, height: 1.3 * k, left: "16%", top: "14%" }} />}
               </span>
-            ))}
+              );
+            })}
               </motion.span>
             </motion.span>
           )}

@@ -38,7 +38,7 @@ enum Role {
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "phase", rename_all = "camelCase")]
-enum VoiceEvent {
+pub(crate) enum VoiceEvent {
     Start,
     Done { audio: Option<String> },
     Error { message: String },

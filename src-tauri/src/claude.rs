@@ -168,7 +168,9 @@ mod server {
             return;
         }
 
-        let away = !terminal_in_front();
+        // Bilgisayarın başında değilse (terminal önde kalmış olsa bile) istek adaya ve telefona düşsün
+        let idle = crate::tracker::system_idle().is_some_and(|d| d > Duration::from_secs(90));
+        let away = !terminal_in_front() || idle;
         let mut ui = Value::Object(map);
         cap_strings_to(&mut ui, 600);
         if let Value::Object(m) = &mut ui {

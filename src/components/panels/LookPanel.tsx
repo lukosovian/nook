@@ -4,6 +4,8 @@ import { Shuffle } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import {
   BODY_COLORS,
+  COLLECTION_GROUPS,
+  FACES,
   EYE_STYLES,
   GLASSES,
   HALLOWEEN,
@@ -51,6 +53,21 @@ export function LookPanel() {
         >
           <Shuffle size={11} strokeWidth={2.4} />{tt("Şaşırt beni")}</motion.button>
       </div>
+
+      {COLLECTION_GROUPS.map((g) => (
+        <Group key={g.title} title={`${tt("Koleksiyon")} · ${g.title}`}>
+          {g.items.map((o) => (
+            <Option
+              key={o.name}
+              label={o.name}
+              on={color.toLowerCase() === o.color.toLowerCase() && JSON.stringify(look) === JSON.stringify(o.look)}
+              onClick={() => update({ look: o.look, faceColor: o.color })}
+            >
+              <Figure look={o.look} color={o.color} drop={3} />
+            </Option>
+          ))}
+        </Group>
+      ))}
 
       <Group title={tt("Cadılar Bayramı 🎃")}>
         {HALLOWEEN.map((o) => (
@@ -116,12 +133,20 @@ export function LookPanel() {
           </Option>
         ))}
       </Group>
+
+      <Group title={tt("Yüz ve süs")}>
+        {FACES.map((o) => (
+          <Option key={o.id} label={o.label} on={look.face === o.id} onClick={() => set({ face: o.id })}>
+            <Figure look={{ ...bare(look), face: o.id }} color={color} zoom={o.id === "mustache" || o.id === "nose"} />
+          </Option>
+        ))}
+      </Group>
     </div>
   );
 }
 
 /** Bir seçeneği gösterirken öbür aksesuarlar kalabalık etmesin */
-const bare = (look: Look): Look => ({ ...look, glasses: "none", head: "none", neck: "none" });
+const bare = (look: Look): Look => ({ ...look, glasses: "none", head: "none", neck: "none", face: "none" });
 
 function NameInput() {
   const name = useNook((s) => s.settings.nookName);

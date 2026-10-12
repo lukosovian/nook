@@ -7,12 +7,17 @@ import { useNook } from "../store/nook";
 import { isTurkish } from "./i18n";
 import { tt } from "./i18n";
 
-export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost" | "cube" | "egg" | "star" | "cat" | "bear";
-export type Texture = "smooth" | "plush" | "matte" | "jelly" | "metal" | "spots";
-export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm";
-export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle" | "eyepatch" | "goggles";
-export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat" | "cowboy" | "pirate" | "straw" | "conductor" | "helmet" | "hardhat";
+export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "bean" | "blob" | "pumpkin" | "ghost" | "cube" | "egg" | "star" | "cat" | "bear" | "strawberry" | "flame" | "mushroom" | "drop"
+  | "frog" | "panda" | "fox" | "penguin" | "owl" | "duck" | "bee" | "crab" | "dragon"
+  | "watermelon" | "cupcake" | "icecream" | "candy" | "donut" | "marshmallow" | "pineapple" | "acorn" | "orange" | "cherry"
+  | "raincloud" | "storm" | "crystal" | "leaf" | "cactus" | "rock" | "stump" | "sun" | "moon";
+export type Texture = "smooth" | "plush" | "matte" | "jelly" | "metal" | "spots" | "galaxy" | "knit" | "lava" | "camo" | "marble" | "glass" | "glow" | "plaid" | "stripes" | "denim" | "pixel" | "fluffy" | "gold" | "chrome";
+export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm" | "happy" | "squint" | "wink" | "led";
+export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle" | "eyepatch" | "goggles" | "hero" | "masquerade" | "neon" | "snorkel";
+export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat" | "cowboy" | "pirate" | "straw" | "conductor" | "helmet" | "hardhat" | "crown" | "party" | "beanie" | "chef" | "santa" | "halo" | "toadstool" | "astronaut" | "elf" | "wizard"
+  | "police" | "nurse" | "viking" | "knight" | "pilot" | "safari" | "detective" | "miner" | "nightcap" | "clownwig" | "bandana" | "earflap" | "earmuffs" | "robot";
 export type NeckId = "none" | "bowtie" | "scarf";
+export type FaceId = "none" | "mustache" | "beard" | "nose" | "note" | "sparkle" | "bubbles";
 
 export interface Look {
   shape: ShapeId;
@@ -21,9 +26,11 @@ export interface Look {
   glasses: GlassesId;
   head: HeadId;
   neck: NeckId;
+  /** Yüz ve süs: bıyık, sakal, palyaço burnu; yanında nota, parıltı, baloncuk */
+  face: FaceId;
 }
 
-export const DEFAULT_LOOK: Look = { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none" };
+export const DEFAULT_LOOK: Look = { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none", face: "none" };
 
 /** CSS gövde (WebGL yoksa ya da Nook kutuya dönüşünce) */
 export interface BodyShape {
@@ -52,6 +59,38 @@ export const SHAPES: { id: ShapeId; label: string }[] = [
   { id: "star", label: tt("Yıldız") },
   { id: "cat", label: tt("Kedi") },
   { id: "bear", label: tt("Ayıcık") },
+  { id: "strawberry", label: tt("Çilek") },
+  { id: "mushroom", label: tt("Mantar") },
+  { id: "flame", label: tt("Alev") },
+  { id: "drop", label: tt("Damlacık") },
+  { id: "frog", label: tt("Kurbağa") },
+  { id: "panda", label: tt("Panda") },
+  { id: "fox", label: tt("Tilki") },
+  { id: "penguin", label: tt("Penguen") },
+  { id: "owl", label: tt("Baykuş") },
+  { id: "duck", label: tt("Ördek") },
+  { id: "bee", label: tt("Arı") },
+  { id: "crab", label: tt("Yengeç") },
+  { id: "dragon", label: tt("Ejderha") },
+  { id: "watermelon", label: tt("Karpuz") },
+  { id: "cupcake", label: tt("Cupcake") },
+  { id: "icecream", label: tt("Dondurma") },
+  { id: "candy", label: tt("Şeker") },
+  { id: "donut", label: tt("Donut") },
+  { id: "marshmallow", label: tt("Marşmelov") },
+  { id: "pineapple", label: tt("Ananas") },
+  { id: "acorn", label: tt("Palamut") },
+  { id: "orange", label: tt("Portakal") },
+  { id: "cherry", label: tt("Kiraz") },
+  { id: "raincloud", label: tt("Yağmur") },
+  { id: "storm", label: tt("Fırtına") },
+  { id: "crystal", label: tt("Kristal") },
+  { id: "leaf", label: tt("Yaprak") },
+  { id: "cactus", label: tt("Kaktüs") },
+  { id: "rock", label: tt("Kaya") },
+  { id: "stump", label: tt("Kütük") },
+  { id: "sun", label: tt("Güneş") },
+  { id: "moon", label: tt("Ay") },
   { id: "pumpkin", label: tt("Balkabağı") },
   { id: "ghost", label: tt("Hayalet") },
 ];
@@ -63,6 +102,20 @@ export const TEXTURES: { id: Texture; label: string }[] = [
   { id: "jelly", label: tt("Jöle") },
   { id: "metal", label: tt("Metalik") },
   { id: "spots", label: tt("Benekli") },
+  { id: "galaxy", label: tt("Galaksi") },
+  { id: "knit", label: tt("Örgü") },
+  { id: "lava", label: tt("Lav") },
+  { id: "camo", label: tt("Kamuflaj") },
+  { id: "marble", label: tt("Mermer") },
+  { id: "glass", label: tt("Cam") },
+  { id: "glow", label: tt("Işıltı") },
+  { id: "plaid", label: tt("Ekose") },
+  { id: "stripes", label: tt("Çizgili") },
+  { id: "denim", label: tt("Kot") },
+  { id: "pixel", label: tt("Piksel") },
+  { id: "fluffy", label: tt("Kabarık") },
+  { id: "gold", label: tt("Altın") },
+  { id: "chrome", label: tt("Krom") },
 ];
 
 export const EYE_STYLES: { id: EyeStyle; label: string }[] = [
@@ -71,6 +124,10 @@ export const EYE_STYLES: { id: EyeStyle; label: string }[] = [
   { id: "diamond", label: tt("Elmas") },
   { id: "sparkle", label: tt("Parlak") },
   { id: "calm", label: tt("Sakin") },
+  { id: "happy", label: tt("Mutlu") },
+  { id: "squint", label: tt("Sıkı") },
+  { id: "wink", label: tt("Göz kırp") },
+  { id: "led", label: tt("Robot") },
 ];
 
 export const GLASSES: { id: GlassesId; label: string }[] = [
@@ -81,6 +138,10 @@ export const GLASSES: { id: GlassesId; label: string }[] = [
   { id: "monocle", label: tt("Monokl") },
   { id: "goggles", label: tt("Koruyucu") },
   { id: "eyepatch", label: tt("Göz bandı") },
+  { id: "hero", label: tt("Kahraman") },
+  { id: "masquerade", label: tt("Balo") },
+  { id: "neon", label: tt("Neon") },
+  { id: "snorkel", label: tt("Şnorkel") },
 ];
 
 export const HEADS: { id: HeadId; label: string }[] = [
@@ -105,6 +166,30 @@ export const HEADS: { id: HeadId; label: string }[] = [
   { id: "conductor", label: tt("Kondüktör") },
   { id: "helmet", label: tt("Miğfer") },
   { id: "hardhat", label: tt("Baret") },
+  { id: "crown", label: tt("Taç") },
+  { id: "halo", label: tt("Hale") },
+  { id: "party", label: tt("Parti") },
+  { id: "beanie", label: tt("Ponponlu") },
+  { id: "chef", label: tt("Aşçı") },
+  { id: "toadstool", label: tt("Mantar") },
+  { id: "astronaut", label: tt("Astronot") },
+  { id: "wizard", label: tt("Büyücü") },
+  { id: "santa", label: tt("Noel") },
+  { id: "elf", label: tt("Cin") },
+  { id: "police", label: tt("Polis") },
+  { id: "nurse", label: tt("Hemşire") },
+  { id: "viking", label: tt("Viking") },
+  { id: "knight", label: tt("Şövalye") },
+  { id: "pilot", label: tt("Pilot") },
+  { id: "safari", label: tt("Kaşif") },
+  { id: "detective", label: tt("Dedektif") },
+  { id: "miner", label: tt("Madenci") },
+  { id: "nightcap", label: tt("Uyku") },
+  { id: "clownwig", label: tt("Palyaço") },
+  { id: "bandana", label: tt("Bandana") },
+  { id: "earflap", label: tt("Kulaklı bere") },
+  { id: "earmuffs", label: tt("Kar kulaklığı") },
+  { id: "robot", label: tt("Robot") },
 ];
 
 /** Kepin rengi: gövdeyle karışmasın diye mavi gövdede mercan, öbürlerinde koyu mavi (Dots'taki gibi) */
@@ -114,6 +199,16 @@ export const NECKS: { id: NeckId; label: string }[] = [
   { id: "none", label: tt("Yok") },
   { id: "bowtie", label: tt("Papyon") },
   { id: "scarf", label: tt("Atkı") },
+];
+
+export const FACES: { id: FaceId; label: string }[] = [
+  { id: "none", label: tt("Yok") },
+  { id: "mustache", label: tt("Bıyık") },
+  { id: "beard", label: tt("Sakal") },
+  { id: "nose", label: tt("Palyaço") },
+  { id: "note", label: tt("Nota") },
+  { id: "sparkle", label: tt("Parıltı") },
+  { id: "bubbles", label: tt("Baloncuk") },
 ];
 
 /** Gövde renkleri: Nook'un beyazı + Dots gibi canlı, doygun tonlar */
@@ -132,6 +227,7 @@ export function normalizeLook(raw: Partial<Look> | undefined): Look {
     glasses: ok(raw?.glasses, GLASSES, DEFAULT_LOOK.glasses),
     head: ok(raw?.head, HEADS, DEFAULT_LOOK.head),
     neck: ok(raw?.neck, NECKS, DEFAULT_LOOK.neck),
+    face: ok(raw?.face, FACES, DEFAULT_LOOK.face),
   };
 }
 
@@ -152,6 +248,7 @@ export function randomLook(): { look: Look; color: string } {
       glasses,
       head: slots.includes("head") ? pick(HEADS.slice(1)).id : "none",
       neck: slots.includes("neck") ? "bowtie" : "none",
+      face: Math.random() < 0.2 ? pick(FACES.slice(1)).id : "none",
     },
     color: pick(BODY_COLORS.slice(1)),
   };
@@ -228,9 +325,15 @@ const COLOR_NAMES: Record<string, string> = {
   "#8A8F99": tt("gümüş grisi"),
   "#1E3A8A": "lacivert",
 };
-const SHAPE_WORDS: Record<ShapeId, string> = { sphere: tt("yuvarlak bir küre"), cloud: tt("kabarık bir bulut"), heart: tt("tombul bir kalp"), triangle: tt("yumuşak bir üçgen"), flower: tt("tırtıklı bir çiçek"), bean: tt("fasulye biçimli"), blob: tt("damla biçimli, tombul"), pumpkin: tt("dilimli bir balkabağı"), ghost: tt("etekleri dalgalı bir hayalet"), cube: tt("yumuşak köşeli şeker küp"), egg: tt("yumurta biçimli"), star: tt("tombul bir yıldız"), cat: tt("kedi kulaklı yuvarlak"), bear: tt("ayıcık kulaklı yuvarlak") };
-const EYE_WORDS: Record<EyeStyle, string> = { pill: tt("iki siyah hap göz"), bead: tt("parlak boncuk gözler"), diamond: tt("elmas biçimli gözler"), sparkle: tt("iri, parıltılı gözler"), calm: tt("sakin, yarı kapalı gözler") };
-const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
+const SHAPE_WORDS: Record<ShapeId, string> = { sphere: tt("yuvarlak bir küre"), cloud: tt("kabarık bir bulut"), heart: tt("tombul bir kalp"), triangle: tt("yumuşak bir üçgen"), flower: tt("tırtıklı bir çiçek"), bean: tt("fasulye biçimli"), blob: tt("damla biçimli, tombul"), pumpkin: tt("dilimli bir balkabağı"), ghost: tt("etekleri dalgalı bir hayalet"), cube: tt("yumuşak köşeli şeker küp"), egg: tt("yumurta biçimli"), star: tt("tombul bir yıldız"), cat: tt("kedi kulaklı yuvarlak"), bear: tt("ayıcık kulaklı yuvarlak"), strawberry: tt("yapraklı bir çilek"), flame: tt("tombul bir alev"), mushroom: tt("benekli bir mantar"), drop: tt("bir su damlası"),
+  frog: tt("göz tümsekli bir kurbağa"), panda: tt("siyah kulaklı bir panda"), fox: tt("sivri kulaklı bir tilki"), penguin: tt("beyaz göbekli bir penguen"),
+  owl: tt("kulak tüylü bir baykuş"), duck: tt("gagalı bir ördek"), bee: tt("çizgili bir arı"), crab: tt("kıskaçlı bir yengeç"), dragon: tt("boynuzlu bir ejderha"),
+  watermelon: tt("bir karpuz dilimi"), cupcake: tt("kremalı bir cupcake"), icecream: tt("külahta dondurma"), candy: tt("ambalajlı bir şeker"), donut: tt("serpmeli bir donut"),
+  marshmallow: tt("yumuşak bir marşmelov"), pineapple: tt("yapraklı bir ananas"), acorn: tt("şapkalı bir palamut"), orange: tt("yapraklı bir portakal"), cherry: tt("saplı bir kiraz"),
+  raincloud: tt("yağmurlu bir bulut"), storm: tt("şimşekli bir bulut"), crystal: tt("parlak bir kristal"), leaf: tt("damarlı bir yaprak"), cactus: tt("kollu bir kaktüs"),
+  rock: tt("yamru yumru bir kaya"), stump: tt("dallı bir kütük"), sun: tt("ışınlı bir güneş"), moon: tt("kraterli bir ay") };
+const EYE_WORDS: Record<EyeStyle, string> = { pill: tt("iki siyah hap göz"), bead: tt("parlak boncuk gözler"), diamond: tt("elmas biçimli gözler"), sparkle: tt("iri, parıltılı gözler"), calm: tt("sakin, yarı kapalı gözler"), happy: tt("mutlulukla kapanmış gözler"), squint: tt("sımsıkı kapalı gözler"), wink: tt("göz kırpan gözler"), led: tt("ekran gibi robot gözler") };
+const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId | FaceId, string>> = {
   round: tt("yuvarlak tel gözlük"),
   bold: tt("kalın çerçeveli gözlük"),
   shades: tt("güneş gözlüğü"),
@@ -250,14 +353,48 @@ const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId, string>> = {
   witch: tt("sivri cadı şapkası"),
   horns: tt("kırmızı şeytan boynuzları"),
   bat: tt("yarasa tokası"),
+  crown: tt("altın taç"),
+  halo: tt("başının üstünde hale"),
+  party: tt("parti şapkası"),
+  beanie: tt("ponponlu örgü bere"),
+  chef: tt("aşçı şapkası"),
+  toadstool: tt("benekli mantar şapka"),
+  astronaut: tt("astronot kaskı"),
+  wizard: tt("yıldızlı büyücü şapkası"),
+  santa: tt("Noel Baba şapkası"),
+  elf: tt("cin şapkası"),
+  police: tt("polis şapkası"),
+  nurse: tt("hemşire başlığı"),
+  viking: tt("boynuzlu viking miğferi"),
+  knight: tt("şövalye miğferi"),
+  pilot: tt("pilot başlığı ve gözlüğü"),
+  safari: tt("kaşif şapkası"),
+  detective: tt("dedektif şapkası"),
+  miner: tt("lambalı madenci kaskı"),
+  nightcap: tt("yıldızlı uyku başlığı"),
+  clownwig: tt("palyaço peruğu"),
+  bandana: tt("korsan bandanası"),
+  earflap: tt("kulaklı örgü bere"),
+  earmuffs: tt("kar kulaklığı"),
+  robot: tt("robot anteni"),
+  hero: tt("kahraman maskesi"),
+  masquerade: tt("balo maskesi"),
+  neon: tt("neon gözlük"),
+  snorkel: tt("şnorkel"),
+  mustache: tt("kıvrık bıyık"),
+  beard: tt("gür sakal"),
+  nose: tt("palyaço burnu"),
+  note: tt("yanında nota"),
+  sparkle: tt("yanında parıltı"),
+  bubbles: tt("yanında baloncuklar"),
 };
 
 /** Sistem isteminde: "elektrik mavisi, peluş, kabarık bir bulut gövde, parlak boncuk gözler; üstünde siyah Fransız beresi" */
 export function describeLook(raw: Look, color = useNook.getState().settings.faceColor) {
   const look = normalizeLook(raw);
   const tone = COLOR_NAMES[color.toUpperCase()] ?? "renkli";
-  const wear = [look.glasses, look.head, look.neck].map((k) => WEAR_WORDS[k]).filter(Boolean);
-  const tex = { smooth: "", plush: tt(", peluş"), matte: tt(", mat kil"), jelly: tt(", jöle gibi parlak"), metal: ", metalik", spots: ", benekli" }[look.texture];
+  const wear = [look.glasses, look.head, look.neck, look.face].map((k) => WEAR_WORDS[k]).filter(Boolean);
+  const tex = { smooth: "", plush: tt(", peluş"), matte: tt(", mat kil"), jelly: tt(", jöle gibi parlak"), metal: ", metalik", spots: ", benekli", galaxy: tt(", galaksi desenli"), knit: tt(", örgü"), lava: tt(", lav çatlaklı"), camo: tt(", kamuflaj desenli"), marble: tt(", mermer"), glass: tt(", cam gibi saydam"), glow: tt(", ışıl ışıl parlayan"), plaid: tt(", ekose"), stripes: tt(", çizgili"), denim: tt(", kot kumaş"), pixel: tt(", pikselli"), fluffy: tt(", kabarık tüylü"), gold: tt(", altın"), chrome: tt(", krom") }[look.texture];
   return tt("{0}{1}, {2} gövde, {3}{4}", tone, tex, SHAPE_WORDS[look.shape], EYE_WORDS[look.eyes], wear.length ? tt("; üstünde {0}", wear.join(", ")) : "");
 }
 
@@ -283,6 +420,99 @@ export const SHOWCASE: { name: string; color: string; look: Look; x: number; y: 
   { name: tt("Kalp"), color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "heart", texture: "plush", glasses: "shades" }, x: 496, y: 364, size: 112 },
   { name: tt("Kiraz"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "plush" }, x: 572, y: 366, size: 100, mood: "wink" },
 ];
+
+/**
+ * Koleksiyon: Görünüm'de tek dokunuşla giyilen hazır Nook'lar (Gemini'yle çizilmiş Nook
+ * sayfalarından uyarlandı: astronot, kral, melek, kardan adam, mantar, alev, galaksi…).
+ */
+export const COLLECTION: { name: string; color: string; look: Look; cat: string }[] = [
+  { cat: tt("Öne çıkanlar"), name: tt("Astronot"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, head: "astronaut" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Kral"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, eyes: "bead", head: "crown" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Melek"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", eyes: "calm", head: "halo" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Kardan adam"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, texture: "matte", head: "beanie", neck: "scarf" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Noel Baba"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, eyes: "bead", head: "santa" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Cin"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, shape: "egg", head: "elf" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Aşçı"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, head: "chef", neck: "bowtie" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Büyücü"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "wizard" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Parti"), color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "triangle", eyes: "sparkle", head: "party" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Mantar"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "mushroom", eyes: "bead" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Mantarcık"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, head: "toadstool" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Çilek"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "strawberry" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Alev"), color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "flame", eyes: "bead" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Damlacık"), color: "#00B8FF", look: { ...DEFAULT_LOOK, shape: "drop", texture: "jelly" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Galaksi"), color: "#6B4BFF", look: { ...DEFAULT_LOOK, texture: "galaxy", head: "halo" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Lav"), color: "#FF6A3D", look: { ...DEFAULT_LOOK, shape: "blob", texture: "lava", eyes: "diamond" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Kazak"), color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "bear", texture: "knit" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Asker"), color: "#16C47F", look: { ...DEFAULT_LOOK, shape: "blob", texture: "camo", head: "helmet" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Altın ayı"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "bear", texture: "metal" } },
+  { cat: tt("Öne çıkanlar"), name: tt("Uzaylı"), color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "egg", eyes: "diamond", head: "antenna" } },
+  { cat: tt("Meslekler"), name: tt("Polis"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, head: "police" } },
+  { cat: tt("Meslekler"), name: tt("Hemşire"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, eyes: "happy", head: "nurse" } },
+  { cat: tt("Meslekler"), name: tt("Viking"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, head: "viking", face: "beard" } },
+  { cat: tt("Meslekler"), name: tt("Şövalye"), color: "#8A8F99", look: { ...DEFAULT_LOOK, head: "knight" } },
+  { cat: tt("Meslekler"), name: tt("Pilot"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, head: "pilot", neck: "scarf" } },
+  { cat: tt("Meslekler"), name: tt("Kaşif"), color: "#B5651D", look: { ...DEFAULT_LOOK, head: "safari" } },
+  { cat: tt("Meslekler"), name: tt("Dedektif"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, head: "detective", face: "mustache" } },
+  { cat: tt("Meslekler"), name: tt("Madenci"), color: "#B5651D", look: { ...DEFAULT_LOOK, head: "miner" } },
+  { cat: tt("Meslekler"), name: tt("Korsan"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, head: "bandana", glasses: "eyepatch" } },
+  { cat: tt("Meslekler"), name: tt("Palyaço"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, head: "clownwig", face: "nose" } },
+  { cat: tt("Meslekler"), name: tt("Kahraman"), color: "#2B8CFF", look: { ...DEFAULT_LOOK, glasses: "hero" } },
+  { cat: tt("Meslekler"), name: tt("Balo"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, glasses: "masquerade", neck: "bowtie" } },
+  { cat: tt("Meslekler"), name: tt("Dalgıç"), color: "#2FD4C0", look: { ...DEFAULT_LOOK, glasses: "snorkel" } },
+  { cat: tt("Meslekler"), name: tt("Neon"), color: "#1E3A8A", look: { ...DEFAULT_LOOK, texture: "galaxy", glasses: "neon" } },
+  { cat: tt("Meslekler"), name: tt("Robot"), color: "#8A8F99", look: { ...DEFAULT_LOOK, shape: "cube", texture: "chrome", eyes: "led", head: "robot" } },
+  { cat: tt("Meslekler"), name: tt("Uykucu"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, eyes: "happy", head: "nightcap" } },
+  { cat: tt("Meslekler"), name: tt("Kayakçı"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, texture: "knit", head: "earflap" } },
+  { cat: tt("Meslekler"), name: tt("Kar kulaklı"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, texture: "fluffy", head: "earmuffs" } },
+  { cat: tt("Meslekler"), name: tt("Şarkıcı"), color: "#FF5C8A", look: { ...DEFAULT_LOOK, eyes: "wink", face: "note" } },
+  { cat: tt("Meslekler"), name: tt("Yıldız"), color: "#FFD21F", look: { ...DEFAULT_LOOK, eyes: "sparkle", face: "sparkle" } },
+  { cat: tt("Meslekler"), name: tt("Köpük"), color: "#00B8FF", look: { ...DEFAULT_LOOK, texture: "jelly", eyes: "happy", face: "bubbles" } },
+  { cat: tt("Hayvanlar"), name: tt("Kurbağa"), color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "frog" } },
+  { cat: tt("Hayvanlar"), name: tt("Panda"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "panda", eyes: "bead" } },
+  { cat: tt("Hayvanlar"), name: tt("Tilki"), color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "fox", texture: "plush" } },
+  { cat: tt("Hayvanlar"), name: tt("Penguen"), color: "#1E3A8A", look: { ...DEFAULT_LOOK, shape: "penguin", eyes: "bead" } },
+  { cat: tt("Hayvanlar"), name: tt("Baykuş"), color: "#B5651D", look: { ...DEFAULT_LOOK, shape: "owl", eyes: "bead" } },
+  { cat: tt("Hayvanlar"), name: tt("Ördek"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "duck" } },
+  { cat: tt("Hayvanlar"), name: tt("Arı"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "bee" } },
+  { cat: tt("Hayvanlar"), name: tt("Yengeç"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "crab" } },
+  { cat: tt("Hayvanlar"), name: tt("Ejderha"), color: "#16C47F", look: { ...DEFAULT_LOOK, shape: "dragon" } },
+  { cat: tt("Yiyecekler"), name: tt("Karpuz"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "watermelon" } },
+  { cat: tt("Yiyecekler"), name: tt("Cupcake"), color: "#FF9EC4", look: { ...DEFAULT_LOOK, shape: "cupcake", eyes: "happy" } },
+  { cat: tt("Yiyecekler"), name: tt("Dondurma"), color: "#FF9EC4", look: { ...DEFAULT_LOOK, shape: "icecream" } },
+  { cat: tt("Yiyecekler"), name: tt("Şeker"), color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "candy" } },
+  { cat: tt("Yiyecekler"), name: tt("Donut"), color: "#FF9EC4", look: { ...DEFAULT_LOOK, shape: "donut" } },
+  { cat: tt("Yiyecekler"), name: tt("Marşmelov"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, shape: "marshmallow", eyes: "calm" } },
+  { cat: tt("Yiyecekler"), name: tt("Ananas"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "pineapple" } },
+  { cat: tt("Yiyecekler"), name: tt("Palamut"), color: "#B5651D", look: { ...DEFAULT_LOOK, shape: "acorn" } },
+  { cat: tt("Yiyecekler"), name: tt("Portakal"), color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "orange" } },
+  { cat: tt("Yiyecekler"), name: tt("Kiraz"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "cherry" } },
+  { cat: tt("Doğa"), name: tt("Yağmur"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "raincloud", eyes: "calm" } },
+  { cat: tt("Doğa"), name: tt("Fırtına"), color: "#8A8F99", look: { ...DEFAULT_LOOK, shape: "storm", eyes: "squint" } },
+  { cat: tt("Doğa"), name: tt("Kristal"), color: "#00B8FF", look: { ...DEFAULT_LOOK, shape: "crystal" } },
+  { cat: tt("Doğa"), name: tt("Yaprak"), color: "#16C47F", look: { ...DEFAULT_LOOK, shape: "leaf" } },
+  { cat: tt("Doğa"), name: tt("Kaktüs"), color: "#16C47F", look: { ...DEFAULT_LOOK, shape: "cactus" } },
+  { cat: tt("Doğa"), name: tt("Kaya"), color: "#8A8F99", look: { ...DEFAULT_LOOK, shape: "rock" } },
+  { cat: tt("Doğa"), name: tt("Kütük"), color: "#B5651D", look: { ...DEFAULT_LOOK, shape: "stump" } },
+  { cat: tt("Doğa"), name: tt("Güneş"), color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "sun", eyes: "happy" } },
+  { cat: tt("Doğa"), name: tt("Ay"), color: "#FFE3A8", look: { ...DEFAULT_LOOK, shape: "moon", eyes: "calm", head: "nightcap" } },
+  { cat: tt("Malzemeler"), name: tt("Mermer"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "bear", texture: "marble" } },
+  { cat: tt("Malzemeler"), name: tt("Cam"), color: "#00B8FF", look: { ...DEFAULT_LOOK, shape: "bear", texture: "glass" } },
+  { cat: tt("Malzemeler"), name: tt("Işıltı"), color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "bear", texture: "glow" } },
+  { cat: tt("Malzemeler"), name: tt("Ekose"), color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "bear", texture: "plaid" } },
+  { cat: tt("Malzemeler"), name: tt("Çizgili"), color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "bear", texture: "stripes" } },
+  { cat: tt("Malzemeler"), name: tt("Kot"), color: "#1E3A8A", look: { ...DEFAULT_LOOK, shape: "bear", texture: "denim" } },
+  { cat: tt("Malzemeler"), name: tt("Piksel"), color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cube", texture: "pixel" } },
+  { cat: tt("Malzemeler"), name: tt("Pamuk"), color: "#FF9EC4", look: { ...DEFAULT_LOOK, shape: "bear", texture: "fluffy" } },
+  { cat: tt("Malzemeler"), name: tt("Krom"), color: "#8A8F99", look: { ...DEFAULT_LOOK, shape: "bear", texture: "chrome" } },
+];
+
+/** Koleksiyon, kategorilerine göre (Görünüm'de ayrı başlıklar) */
+export const COLLECTION_GROUPS = COLLECTION.reduce<{ title: string; items: typeof COLLECTION }[]>((gs, o) => {
+  const g = gs.find((x) => x.title === o.cat);
+  if (g) g.items.push(o);
+  else gs.push({ title: o.cat, items: [o] });
+  return gs;
+}, []);
 
 /** Cadılar Bayramı parçaları Görünüm'de yalnızca kendi bölümünde (hazır kostümlerde) görünür */
 export const HALLOWEEN_PARTS = new Set<string>(["pumpkin", "ghost", "witch", "horns", "bat"]);

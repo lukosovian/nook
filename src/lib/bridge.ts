@@ -40,6 +40,7 @@ export const EVENTS = {
   downloadDone: "nook://download-done",
   notification: "nook://notification",
   voice: "nook://voice",
+  wakeHeard: "nook://wake-heard",
   voiceLevel: "nook://voice-level",
   askScreen: "nook://ask-screen",
   online: "nook://online",
@@ -124,6 +125,25 @@ export const fileIcon = (path: string, size = 48) => (inTauri ? invoke<string | 
 export const captureScreen = () => (inTauri ? invoke<string>("capture_screen") : Promise.reject(new Error(tt("yalnızca uygulamada"))));
 export const voiceStart = () => (inTauri ? invoke<boolean>("voice_start") : Promise.resolve(false));
 export const voiceStop = () => (inTauri ? invoke<string | null>("voice_stop") : Promise.resolve(null));
+
+/** "Hey Nook": kaç örnek tanıtılmış, dinleyici açık mı */
+export interface WakeStatus {
+  trained: number;
+  listening: boolean;
+}
+/** Dinleyicinin son duyduğu konuşmanın "Hey Nook"a benzerliği (Ayarlar'daki gösterge) */
+export interface WakeHeard {
+  score: number;
+  woke: boolean;
+}
+const WAKE_DEMO: WakeStatus = { trained: 0, listening: false };
+export const wakeConfig = (enabled: boolean, sensitivity: number) => (inTauri ? invoke<WakeStatus>("wake_config", { enabled, sensitivity }) : Promise.resolve(WAKE_DEMO));
+export const wakeStatus = () => (inTauri ? invoke<WakeStatus>("wake_status") : Promise.resolve(WAKE_DEMO));
+/** Bir "Hey Nook" örneği kaydeder; toplanan örnek sayısını döner */
+export const wakeEnroll = () => (inTauri ? invoke<number>("wake_enroll") : new Promise<number>((r) => setTimeout(() => r(1), 1500)));
+export const wakeEnrollReset = () => (inTauri ? invoke<void>("wake_enroll_reset") : noop());
+export const wakeEnrollSave = () => (inTauri ? invoke<WakeStatus>("wake_enroll_save") : Promise.resolve({ trained: 3, listening: true }));
+export const wakeForget = () => (inTauri ? invoke<WakeStatus>("wake_forget") : Promise.resolve(WAKE_DEMO));
 /** Claude Code kurulumu (bkz. src-tauri/src/claude.rs) */
 export interface ClaudeSetup {
   /** Bu bilgisayarda Claude Code var mı */
@@ -597,6 +617,8 @@ export const openPath = (path: string) =>
   inTauri ? invoke<void>("open_path", { path }) : Promise.resolve(void window.open(path, "_blank"));
 export const revealPath = (path: string) => (inTauri ? invoke<void>("reveal_path", { path }) : noop());
 export const listApps = () => (inTauri ? invoke<AppEntry[]>("list_apps") : Promise.resolve([]));
+/** Şarkı/videonun YouTube kimliği (ilk arama sonucu); bulunamazsa null */
+export const musicFind = (query: string) => (inTauri ? invoke<string | null>("music_find", { query }) : Promise.resolve(null));
 
 /** Windows açılışında başlatma — Rust eklentisi kayıt defterine yazar. */
 export async function syncAutostart(want: boolean) {

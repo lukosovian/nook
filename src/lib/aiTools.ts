@@ -5,7 +5,7 @@
  */
 import { playAntic } from "../hooks/useAntics";
 import { clock, REPEAT_LABEL, type Repeat } from "./alarm";
-import { listApps, mediaControl, openPath, quickSet, type QuickKey } from "./bridge";
+import { listApps, mediaControl, musicFind, openPath, quickSet, quickVolume, type QuickKey } from "./bridge";
 import { mmss, PHASE_LABEL, remaining, startFocus, stopFocus } from "./focus";
 import type { FunctionDecl } from "./ai";
 import { calendar, dayLabel, epLabel, findItem, markWatched, matchTitle, parseEpisode, pickPool, useArgus, watching, weekStats, type ArgusItem } from "./argus";
@@ -98,6 +98,22 @@ export const FUNCTIONS: FunctionDecl[] = [
   fn("media", "Çalan müziği/videoyu yönetir.", { action: { type: "string", enum: ["toggle", "next", "prev"] } }, ["action"]),
   fn("open_app", "Bilgisayardaki bir uygulamayı adıyla açar (ör. Spotify, Discord, Steam).", { name: { type: "string" } }, ["name"]),
   fn("web_search", "Tarayıcıda Google araması açar.", { query: { type: "string" } }, ["query"]),
+  fn(
+    "play_music",
+    "Bir şarkıyı, sanatçıyı ya da videoyu bulup hemen çalar. 'YouTube Music'ten X'i aç', 'Tarkan çal', 'YouTube'da şu videoyu aç' gibi isteklerde kullan. Kullanıcı yer söylemezse youtube_music.",
+    {
+      query: { type: "string", description: "Şarkı adı ve sanatçı, ör. 'Tarkan Kuzu Kuzu'" },
+      service: { type: "string", enum: ["youtube_music", "youtube", "spotify"] },
+    },
+    ["query"],
+  ),
+  fn(
+    "open_url",
+    "Bir web sitesini ya da sayfayı tarayıcıda açar (YouTube, Gmail, bir haber sitesi…). Adres bilinmiyorsa en olası resmi adresi yaz.",
+    { url: { type: "string", description: "Tam adres, ör. https://mail.google.com" } },
+    ["url"],
+  ),
+  fn("set_volume", "Bilgisayarın ses düzeyini ayarlar.", { percent: { type: "integer", description: "0-100" } }, ["percent"]),
   fn("set_user_name", "Kullanıcı adını söylerse (\"benim adım …\") kalıcı olarak kaydeder.", { name: { type: "string" } }, ["name"]),
   fn(
     "remember",
@@ -214,6 +230,37 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         await openPath(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
         playAntic("magnify");
         return { result: `Tarayıcıda "${query}" araması açıldı.`, note: { icon: "web", text: tt("\"{0}\" aranıyor", query) } };
+      }
+      case "play_music": {
+        const query = str(args.query).trim();
+        const service = str(args.service) || "youtube_music";
+        if (service === "spotify") {
+          await openPath(`spotify:search:${encodeURIComponent(query)}`);
+          return { result: `Spotify'da "${query}" araması açıldı (Spotify kendiliğinden çalmaz; kullanıcı ilk sonuca basmalı).`, note: { icon: "music", text: tt("Spotify'da \"{0}\"", query) } };
+        }
+        const id = await musicFind(query).catch(() => null);
+        const music = service === "youtube_music";
+        const url = id
+          ? music ? `https://music.youtube.com/watch?v=${id}` : `https://www.youtube.com/watch?v=${id}`
+          : music ? `https://music.youtube.com/search?q=${encodeURIComponent(query)}` : `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+        await openPath(url);
+        playAntic("hum");
+        return {
+          result: id ? `${music ? "YouTube Music" : "YouTube"}'da "${query}" açıldı ve çalıyor.` : `Şarkı bulunamadı; "${query}" araması açıldı.`,
+          note: { icon: "music", text: id ? tt("Çalıyor: {0}", query) : tt("\"{0}\" aranıyor", query) },
+        };
+      }
+      case "open_url": {
+        let url = str(args.url).trim();
+        if (!/^[a-z]+:/i.test(url)) url = `https://${url}`;
+        if (!/^https?:/i.test(url)) return { result: "Yalnızca web adresleri açılabilir.", note: { icon: "error", text: tt("Açılamadı") } };
+        await openPath(url);
+        return { result: `${url} açıldı.`, note: { icon: "web", text: tt("{0} açıldı", url.replace(/^https?:\/\//, "").replace(/\/$/, "")) } };
+      }
+      case "set_volume": {
+        const pct = Math.max(0, Math.min(100, Math.round(Number(args.percent) || 0)));
+        await quickVolume(pct / 100);
+        return { result: `Ses %${pct} yapıldı.`, note: { icon: "toggle", text: tt("Ses %{0}", pct) } };
       }
       case "set_user_name": {
         const name = str(args.name).trim();
