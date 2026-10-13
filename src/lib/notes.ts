@@ -114,6 +114,17 @@ export type DemoId =
   | "voicetools"
   | "geminimodels"
   | "voicefast"
+  | "phoneshelf"
+  | "argusyt"
+  | "wakeverify"
+  | "voiceen"
+  | "bigpos"
+  | "seek"
+  | "settingsgrid"
+  | "favorites"
+  | "explain"
+  | "claudesettle"
+  | "mobile060"
   | "wakeback"
   | "alarmgame"
   | "shuffle"
@@ -144,6 +155,68 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.60",
+    date: tt("13 Ekim 2026"),
+    headline: tt("“Hey Nook” yalnızca seslenince uyanıyor, İngilizce sesli komut, telefondan rafa"),
+    items: [
+      {
+        title: tt("“Hey Nook” artık yalnızca gerçekten seslenince uyanıyor"),
+        text: tt("Nook bazen sen seslenmeden (konuşurken, öksürünce, televizyon açıkken) dinlemeye geçiyor, seslendiğinde de bazen duymuyordu. Artık sesine benzeyen her şeyi bir de bu bilgisayardaki yazıya dökme modeline dinletiyor; yalnızca gerçekten “Nook” dendiyse uyanıyor. “Hey look”, “Hey Luke”, “Notebook” gibi benzer sözler ve gürültü elendiği için seslenmeni de daha kolay yakalıyor. Bunun için Ayarlar › Hey Nook › “Bilgisayarda yazıya dök” modeli indirilmiş olmalı."),
+        demo: "wakeverify",
+      },
+      {
+        title: tt("İngilizce sesli komut"),
+        text: tt("Nook İngilizceyken sesli komutlar da İngilizce anlaşılıyor: bilgisayarda yazıya dökme seçili dili kullanıyor, “Open Spotify”, “Play lo-fi on YouTube Music”, “Set the volume to 40”, “Next song”, “Turn off Wi-Fi”, “Set a timer for 10 minutes” gibi komutlar Gemini'ye sorulmadan anında yapılıyor. Türkçede de “Instagram'ı aç” gibi I ile başlayan adlar artık doğru açılıyor."),
+        demo: "voiceen",
+      },
+      {
+        title: tt("Telefondan paylaşılan dosya rafa düşüyor"),
+        text: tt("Nook Mobil'de bir fotoğrafı ya da dosyayı Paylaş › Nook ile gönderince dosya yine İndirilenler › Nook Mobil'e kaydediliyor, ayrıca adadaki rafa düşüyor. Oradan istediğin yere sürükleyip bırakabilirsin."),
+        demo: "phoneshelf",
+      },
+      {
+        title: tt("YouTube videoları için “Argus'ta yok” sorusu bitti"),
+        text: tt("15 dakikadan uzun bir YouTube videosunun başlığında bir filmin ya da dizinin adı geçince (inceleme, özet, tepki videosu) Nook onu film sanıp “Argus'ta yok, ekleyeyim mi?” diye soruyordu. Artık yalnızca başlık gerçekten o filmin ya da dizinin adıysa veya başlıkta bölüm numarası varsa soruyor."),
+        demo: "argusyt",
+      },
+      {
+        title: tt("Taşıdığın ada tam ekranda da yerinde açılıyor"),
+        text: tt("Adayı ekranın altına ya da kenarına taşıdıktan sonra açık adada sağ üstteki tam ekran düğmesine basınca ada ekranın üst ortasına kaçıyordu. Artık Nook neredeyse orada büyüyor (ekrandan taşmadan), küçülürken de yerinde kalıyor."),
+        demo: "bigpos",
+      },
+      {
+        title: tt("Şarkıyı istediğin saniyeye sar"),
+        text: tt("Medya'daki ilerleme çubuğuna tıklayınca ya da sürükleyince çalan şarkı veya video o ana atlıyor; sürüklerken süre yazısı gideceği yeri gösteriyor. Spotify, YouTube ve sarmaya izin veren her uygulamada çalışıyor; Nook Mobil'in Medya ekranından da yapılabiliyor."),
+        demo: "seek",
+      },
+      {
+        title: tt("Yeni Ayarlar: kategoriler ve arama"),
+        text: tt("Ayarlar tek uzun liste olmaktan çıktı. Açınca Genel, Ada ve Nook, Bildirimler, Sağlık, Oyun, Gizlilik, Asistan, Modüller, Kısayollar, Telefon ve Hakkında kartları geliyor; birine basınca yalnızca o konunun ayarları açılıyor. Üstteki kutuya yazınca (“su”, “kilit”, “alarm”) bütün ayarlarda arıyor. Satırların başlıkları kısaldı, altında ne işe yaradığı tek cümleyle yazıyor."),
+        demo: "settingsgrid",
+      },
+      {
+        title: tt("Ana sayfada sık kullandıkların üstte"),
+        text: tt("Ana sayfadaki bölümler artık iki kısım: en çok açtığın altı bölüm üstte büyük çip olarak, gerisi altta “Tümü”nde küçük çip olarak duruyor. Nook hangilerini sık açtığını kendisi öğreniyor; son zamanlarda açtıkların daha ağır basıyor, uzun süre açmadığın aşağı iniyor. Çalan müzik, bekleyen onay gibi bir şey olan bölüm hangi kısımda olursa olsun parlıyor. Düzenle'den sıralama ve gizleme eskisi gibi."),
+        demo: "favorites",
+      },
+      {
+        title: tt("Yeni gelene çipler ne olduğunu söylüyor"),
+        text: tt("Nook'u yeni kuranlar ana sayfada “Hum ne, Argus ne, Kontrol ne?” diye kalıyordu. İlk hafta henüz açmadığın bölümlerin çipinde ne işe yaradığı yazıyor (Hum: çalan şarkıyı bul, Argus: dizi ve film listen…); bir kez açınca canlı bilgisine dönüyor. Üstüne gelince açıklama herkese her zaman çıkıyor."),
+        demo: "explain",
+      },
+      {
+        title: tt("Claude'un sorusu terminalde cevaplanınca ada kapanıyor"),
+        text: tt("Claude Code birden çok soru sorduğunda adada çıkan kart, soruyu terminalden cevaplasan da adada kalıyor, ada da hiçbir şekilde kapanmıyordu. Artık Claude devam edince kart hemen kalkıyor, ada da eskisi gibi kapanıyor; arada kaçan bir istek olursa iki dakika içinde kendiliğinden temizleniyor."),
+        demo: "claudesettle",
+      },
+      {
+        title: tt("Nook Mobil: Raf, su hatırlatması, bildirim düzeltmesi"),
+        text: tt("Telefonda yeni Raf bölümü: PC'deki rafın dosyaları görünüyor, dokununca telefona inip açılıyor, + ile telefondan dosya gönderince PC'de rafa düşüyor. Su hatırlatması artık telefonda da çıkıyor; “İçtim” ya da “Sonra” hangi taraftan denirse ikisinde de kapanıyor, PC kapalıyken telefon kendisi hatırlatıyor. Güncellemeden sonra telefon bildirimlerinin PC'ye gelmemesi düzeldi; Bildirimler'deki “Deneme bildirimi gönder” ile çalışıp çalışmadığını görebilirsin. Medya ekranında da şarkıyı istediğin saniyeye sarabiliyorsun."),
+        demo: "mobile060",
+      },
+    ],
+  },
   {
     version: "0.2.59",
     date: tt("12 Ekim 2026"),

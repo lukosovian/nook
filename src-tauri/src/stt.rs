@@ -151,27 +151,70 @@ pub async fn stt_preload() -> Result<(), String> {
 }
 
 /// Base64 WAV (16 kHz, 16 bit, mono) → metin. `prompt`: geçebilecek adlar (uygulamalar…), tanımaya ipucu.
+/// `lang`: Nook'un dili (tr, en…); verilmezse Türkçe.
 #[tauri::command]
-pub async fn stt_transcribe(audio: String, prompt: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || transcribe(&audio, &prompt)).await.map_err(|e| e.to_string())?
+pub async fn stt_transcribe(audio: String, prompt: String, lang: Option<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || transcribe(&audio, &prompt, lang.as_deref().unwrap_or("tr"))).await.map_err(|e| e.to_string())?
 }
 
-fn transcribe(audio: &str, prompt: &str) -> Result<String, String> {
-    load()?;
+fn transcribe(audio: &str, prompt: &str, lang: &str) -> Result<String, String> {
     let bytes = base64::engine::general_purpose::STANDARD.decode(audio).map_err(|e| e.to_string())?;
     let data = bytes.windows(4).position(|w| w == b"data").map(|i| i + 8).ok_or("WAV değil")?;
-    let mut samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect();
+    let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect();
+    run(samples, prompt, lang)
+}
+
+/// Model indirilmiş mi ("Hey Nook" doğrulaması için)
+pub fn ready() -> bool {
+    installed()
+}
+
+/// "Hey Nook" doğrulaması: uyandırma sözüne benzeyen ses gerçekten "Nook" mu? Model indirilmemişse None
+/// (o zaman yalnızca ses örnekleriyle karşılaştırma geçerli). Kalıp benzerliği öksürüğü, "Hey Luko"yu,
+/// televizyondaki konuşmayı da yakalayabiliyordu; yazıya dökülünce "nuk/nook/nok" geçmeli.
+pub fn heard_nook(samples: &[f32]) -> Option<bool> {
+    if !installed() {
+        return None;
+    }
+    if load().is_err() {
+        return None;
+    }
+    // İpucusuz "Hey Nook" → "HENOK", "Hanyuk"; "Nook" ipucuyla doğru yazılıyor, "Hey look", "Hey Luke",
+    // "Notebook" yine olduğu gibi kalıyor ("Hey Nook!" ipucu ise "Hey now"u "Hey No!" yapıyordu)
+    let text = run(samples.to_vec(), "Nook", "tr").ok()?;
+    let ok = says_nook(&text);
+    crate::log::write("info", &format!("hey nook doğrulama: {text:?} → {}", if ok { "evet" } else { "hayır" }));
+    Some(ok)
+}
+
+/// Whisper "Nook"u çoğunlukla "Nook", "Nuk", "Nok", "Nug", "Nuuk" diye yazar; "Hey" ile bitişik de olabilir
+fn says_nook(text: &str) -> bool {
+    let low: String = text.to_lowercase().chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect();
+    low.split_whitespace().any(|w| {
+        let w = w.strip_prefix("hey").filter(|r| !r.is_empty()).unwrap_or(w);
+        let w = w.strip_prefix("hay").filter(|r| !r.is_empty()).unwrap_or(w);
+        // n + 1-2 sesli (o, u, ü, ö, 0) + k/g/q, ardından en fazla bir harf ("nook'u" → "nooku"; "nokta" değil)
+        let c: Vec<char> = w.chars().collect();
+        let vowel = |ch: char| "ouüö0".contains(ch);
+        let vowels = c.iter().skip(1).take_while(|ch| vowel(**ch)).count();
+        c.first() == Some(&'n') && (1..=2).contains(&vowels) && c.get(1 + vowels).is_some_and(|ch| "kgq".contains(*ch)) && c.len() <= vowels + 3
+    })
+}
+
+fn run(mut samples: Vec<f32>, prompt: &str, lang: &str) -> Result<String, String> {
     // Whisper en az 1 sn ister
     if samples.len() < 16_000 {
         samples.resize(16_000, 0.0);
     }
     let secs = samples.len() as f32 / 16_000.0;
 
+    load()?;
     let guard = CTX.lock().unwrap();
     let ctx = guard.as_ref().ok_or("model yok")?;
     let mut state = ctx.create_state().map_err(|e| e.to_string())?;
     let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-    p.set_language(Some("tr"));
+    // Whisper'ın bildiği dillerden biri (Nook'un dilleri hepsi öyle); değilse Türkçe
+    p.set_language(Some(if lang.len() == 2 { lang } else { "tr" }));
     // Fiziksel çekirdek kadar (SMT iş parçacıkları ggml'de hızlandırmıyor)
     p.set_n_threads((std::thread::available_parallelism().map_or(4, |n| n.get()) / 2).clamp(2, 8) as i32);
     p.set_translate(false);
@@ -205,6 +248,38 @@ pub fn init() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn says_nook_variants() {
+        for t in ["Hey Nook!", "hey nuk", "Heynuk.", "Hey, Nok", "Hey Nuuk", "Hey Nook, YouTube'da lo-fi aç", "nooku aç"] {
+            assert!(super::says_nook(t), "{t}");
+        }
+        for t in ["Hey Luko", "Tamam", "nokta koy", "Hey, ne oluyor?", "Bilmiyorum", "hey now", "Okay"] {
+            assert!(!super::says_nook(t), "{t}");
+        }
+    }
+
+    /// "Hey Nook" doğrulaması: NOOK_WAKE_VERIFY klasöründeki yes_*.wav kabul, no_*.wav ret edilmeli
+    #[test]
+    fn wake_verify() {
+        let Some(dir) = std::env::var_os("NOOK_WAKE_VERIFY") else { return };
+        let mut files: Vec<_> = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).collect();
+        files.sort();
+        for f in files {
+            let bytes = std::fs::read(&f).unwrap();
+            let data = bytes.windows(4).position(|w| w == b"data").unwrap() + 8;
+            let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect();
+            let t0 = std::time::Instant::now();
+            let ok = super::heard_nook(&samples);
+            let ms = t0.elapsed().as_millis();
+            let mut out = Vec::new();
+            for prompt in ["Nook"] {
+                let text = super::run(samples.clone(), prompt, "tr").unwrap_or_default();
+                out.push(format!("[{}] {text:?}", if super::says_nook(&text) { "+" } else { "-" }));
+            }
+            println!("{} → {ok:?} ({ms} ms) {}", f.file_name().unwrap().to_string_lossy(), out.join("  "));
+        }
+    }
+
     /// Hız ölçümü: NOOK_STT_TEST klasöründeki WAV'lar (model indirilmiş olmalı)
     #[test]
     fn stt_bench() {
@@ -215,7 +290,7 @@ mod tests {
         for p in files.iter().filter(|p| p.extension().is_some_and(|e| e == "wav")).take(6) {
             let b64 = base64::engine::general_purpose::STANDARD.encode(std::fs::read(p).unwrap());
             let t0 = std::time::Instant::now();
-            let text = super::transcribe(&b64, "Hey Nook, Argus'u aç. Spotify'ı aç.").unwrap();
+            let text = super::transcribe(&b64, "Hey Nook, Argus'u aç. Spotify'ı aç.", "tr").unwrap();
             println!("{:?} {} ms → {text}", p.file_name().unwrap(), t0.elapsed().as_millis());
         }
     }

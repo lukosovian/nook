@@ -60,6 +60,7 @@ export const EVENTS = {
   locked: "nook://locked",
   shelfShake: "nook://shelf-shake",
   shelfAdd: "nook://shelf-add",
+  shelfPhone: "nook://shelf-phone",
   share: "nook://share",
   shareToggle: "nook://share-toggle",
   claude: "nook://claude",
@@ -141,7 +142,7 @@ export const sttDownload = () => (inTauri ? invoke<void>("stt_download") : noop(
 export const sttDelete = () => (inTauri ? invoke<SttStatus>("stt_delete") : Promise.resolve(STT_DEMO));
 export const sttPreload = () => (inTauri ? invoke<void>("stt_preload") : noop());
 /** Base64 WAV → metin, bu bilgisayarda; `prompt`: tanımaya ipucu olan adlar */
-export const sttTranscribe = (audio: string, prompt: string) => (inTauri ? invoke<string>("stt_transcribe", { audio, prompt }) : Promise.resolve(""));
+export const sttTranscribe = (audio: string, prompt: string, lang: string) => (inTauri ? invoke<string>("stt_transcribe", { audio, prompt, lang }) : Promise.resolve(""));
 
 /** "Hey Nook": kaç örnek tanıtılmış, dinleyici açık mı */
 export interface WakeStatus {
@@ -669,6 +670,9 @@ export interface MediaPayload {
 }
 
 export type MediaAction = "toggle" | "next" | "prev";
+
+/** Çalanı verilen ana (ms) sarar */
+export const mediaSeek = (ms: number): Promise<void> => (inTauri ? invoke("media_seek", { ms: Math.max(0, Math.round(ms)) }) : Promise.resolve());
 
 export function mediaControl(action: MediaAction): Promise<void> {
   return inTauri ? invoke("media_control", { action }) : Promise.resolve();

@@ -195,6 +195,66 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
         act.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    // ------------------------------------------------------------ Raf
+
+    /**
+     * Raftaki dosyayı indirir (İndirilenler › Nook) ve açar: olaylar "download" {id, sent, size} / {id, done} /
+     * {id, error}. Açacak uygulama yoksa yalnızca kaydedilir.
+     */
+    @JavascriptInterface
+    fun downloadShelf(id: String, name: String) {
+        Thread {
+            try {
+                val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase()) ?: "application/octet-stream"
+                val uri: Uri
+                var file: File? = null
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, name)
+                        put(MediaStore.Downloads.MIME_TYPE, mime)
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Nook")
+                    }
+                    uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw Exception("İndirilenler'e yazılamadı")
+                } else {
+                    @Suppress("DEPRECATION")
+                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nook").apply { mkdirs() }
+                    file = File(dir, name)
+                    uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+                }
+                PcLink.getStream(ctx, "/v1/shelf/file?id=" + Uri.encode(id)) { input, size ->
+                    val out = file?.outputStream() ?: ctx.contentResolver.openOutputStream(uri) ?: throw Exception("Dosya yazılamadı")
+                    out.use {
+                        val buf = ByteArray(64 * 1024)
+                        var sent = 0L
+                        var last = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            it.write(buf, 0, n)
+                            sent += n
+                            if (sent - last > 256 * 1024) {
+                                last = sent
+                                emit("download", JSONObject().put("id", id).put("sent", sent).put("size", size))
+                            }
+                        }
+                    }
+                }
+                emit("download", JSONObject().put("id", id).put("done", true))
+                val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { act.startActivity(view) }
+            } catch (e: Exception) {
+                emit("download", JSONObject().put("id", id).put("error", e.message ?: "İndirilemedi"))
+            }
+        }.start()
+    }
+
+    /** Telefondan dosya seç: seçilenler "Paylaş › Nook" gibi gönderme sayfasına gelir (PC'de rafa düşer) */
+    @JavascriptInterface
+    fun pickFiles() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        act.runOnUiThread { act.startActivityForResult(i, MainActivity.PICK_FILES) }
+    }
+
     // ------------------------------------------------------------ Bildirimler
 
     @JavascriptInterface
@@ -214,7 +274,24 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
             .put("muted", runCatching { JSONArray(p.getString("notifMuted", "[]")) }.getOrDefault(JSONArray()))
             .put("apps", runCatching { JSONObject(p.getString("notifApps", null) ?: "{}") }.getOrDefault(JSONObject()))
             .put("queued", runCatching { JSONArray(p.getString("outbox", "[]")).length() }.getOrDefault(0))
+            .put("bound", p.getBoolean("notifBound", false))
+            .put("water", p.getBoolean("waterOn", true))
             .toString()
+    }
+
+    /** Deneme bildirimi PC'ye: sonuç "notiftest" {ok} olayıyla */
+    @JavascriptInterface
+    fun testNotif() {
+        NookNotifService.rebind(ctx)
+        PcLink.io.execute {
+            val body = JSONObject()
+                .put("app", "Nook Mobil")
+                .put("pkg", ctx.packageName)
+                .put("title", "Deneme bildirimi")
+                .put("text", "Telefondan gelen bildirimler burada görünecek")
+                .put("at", System.currentTimeMillis())
+            emit("notiftest", JSONObject().put("ok", PcLink.post(ctx, "/v1/notify", body.toString().toByteArray()) != null))
+        }
     }
 
     @JavascriptInterface
@@ -223,7 +300,9 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
         PcLink.prefs(ctx).edit()
             .putBoolean("notifOn", j.optBoolean("on", true))
             .putString("notifMuted", (j.optJSONArray("muted") ?: JSONArray()).toString())
+            .putBoolean("waterOn", j.optBoolean("water", true))
             .apply()
+        WaterReceiver.kick(ctx)
     }
 
     // ------------------------------------------------------------ Paylaşım (başka uygulamadan "Nook'a gönder")

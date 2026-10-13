@@ -323,7 +323,7 @@ export const getMedia = (p: Pairing) =>
         muted: false,
       })
     : request(p, "GET", "/v1/media").then((r) => r.json() as Promise<MediaState>);
-export const mediaAction = (p: Pairing, body: { action: "toggle" | "next" | "prev" } | { volume: number } | { muted: boolean }) =>
+export const mediaAction = (p: Pairing, body: { action: "toggle" | "next" | "prev" } | { volume: number } | { muted: boolean } | { seek: number }) =>
   request(p, "POST", "/v1/media", body).then(() => undefined);
 export const mediaArt = (p: Pairing) =>
   request(p, "GET", "/v1/media/art", undefined, 8000)
@@ -506,6 +506,39 @@ export const clipImage = (p: Pairing, id: string) =>
   request(p, "GET", `/v1/clips/image?id=${encodeURIComponent(id)}`, undefined, 15000)
     .then((r) => r.blob())
     .then((b) => URL.createObjectURL(b));
+
+// ---------------------------------------------------------------- Raf
+
+export interface ShelfItem {
+  id: string;
+  name: string;
+  ext: string;
+  size: number;
+  isDir: boolean;
+  isImage: boolean;
+  pinned: boolean;
+  addedAt: number;
+}
+
+export const getShelf = (p: Pairing) =>
+  DEMO(p)
+    ? Promise.resolve([
+        { id: "a", name: "sunum.pdf", ext: "pdf", size: 2_400_000, isDir: false, isImage: false, pinned: true, addedAt: Date.now() - 60_000 },
+        { id: "b", name: "IMG_2041.jpg", ext: "jpg", size: 3_100_000, isDir: false, isImage: true, pinned: false, addedAt: Date.now() - 600_000 },
+        { id: "c", name: "Projeler", ext: "", size: 0, isDir: true, isImage: false, pinned: false, addedAt: Date.now() - 3_600_000 },
+        { id: "d", name: "tablo.xlsx", ext: "xlsx", size: 84_000, isDir: false, isImage: false, pinned: false, addedAt: Date.now() - 7_200_000 },
+      ] as ShelfItem[])
+    : request(p, "GET", "/v1/shelf")
+        .then((r) => r.json().then((j: { items: ShelfItem[] | null }) => j.items ?? []))
+        .then((c) => (cache("shelf", c), c));
+
+/** Raftaki görselin küçük resmi (dosyanın kendisi) */
+export const shelfImage = (p: Pairing, id: string) =>
+  request(p, "GET", `/v1/shelf/file?id=${encodeURIComponent(id)}`, undefined, 15000)
+    .then((r) => r.blob())
+    .then((b) => URL.createObjectURL(b));
+
+export const removeShelf = (p: Pairing, id: string) => request(p, "POST", "/v1/shelf", { op: "remove", id }).then(() => undefined);
 
 /** Metni PC'nin panosuna yazar */
 export const sendToPcClipboard = (p: Pairing, text: string) => request(p, "POST", "/v1/clips", { text }).then(() => undefined);

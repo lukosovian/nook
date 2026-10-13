@@ -6,6 +6,7 @@
 import { appsCached as listApps, quickState } from "./bridge";
 import { openArgus, useArgus } from "./argus";
 import { runTool, type ToolNote } from "./aiTools";
+import { lang } from "./i18n";
 
 /** Sık açılan siteler: "Gmail'i aç" → adres */
 const SITES: Record<string, string> = {
@@ -39,7 +40,8 @@ const SITES: Record<string, string> = {
   "hava durumu": "https://www.google.com/search?q=hava+durumu",
 };
 
-const lower = (s: string) => s.toLocaleLowerCase("tr");
+/** Türkçe küçük harf; ama "Instagram", "Illustrator" gibi adlardaki I → i (ı değil) */
+const lower = (s: string) => s.replace(/I(?=[a-z])/g, "i").toLocaleLowerCase("tr");
 
 const ONES: Record<string, number> = { sıfır: 0, bir: 1, iki: 2, üç: 3, dört: 4, beş: 5, altı: 6, yedi: 7, sekiz: 8, dokuz: 9 };
 const TENS: Record<string, number> = { on: 10, yirmi: 20, otuz: 30, kırk: 40, elli: 50, altmış: 60, yetmiş: 70, seksen: 80, doksan: 90 };
@@ -142,8 +144,73 @@ async function openByName(name: string): Promise<{ result: string; note: ToolNot
   return null;
 }
 
+const EN_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, "a hundred": 100, "one hundred": 100 };
+
+/** İngilizce sık komutlar ("open Spotify", "play lo-fi on YouTube Music", "volume 50") */
+async function runEnglish(raw: string): Promise<{ result: string; note: ToolNote } | null> {
+  const t = raw
+    .toLowerCase()
+    .replace(/[.!?,;:"“”]/g, " ")
+    .replace(/^\s*(hey\s+)?nook\s*/, "")
+    .replace(/^(please|can you|could you)\s+/, "")
+    .replace(/\s+(please|now|for me)\s*$/, "")
+    .replace(/\b(a hundred|one hundred|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b/g, (w) => String(EN_NUMBERS[w]))
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return null;
+  let m: RegExpMatchArray | null;
+
+  // Ses düzeyi: "set the volume to 50", "volume 30 percent", "turn the volume up"
+  if ((m = t.match(/^(?:set |change |turn )?(?:the )?volume (?:to |at )?(\d{1,3})(?: ?%| percent)?$/))) return runTool("set_volume", { percent: Math.min(100, Number(m[1])) });
+  if (/^(?:turn (?:the )?volume all the way up|max(?:imum)? volume|volume (?:to )?max(?:imum)?)$/.test(t)) return runTool("set_volume", { percent: 100 });
+  if (/^(?:turn (?:the )?volume down|volume down|lower the volume|turn it down)$/.test(t)) return nudgeVolume(-20);
+  if (/^(?:turn (?:the )?volume up|volume up|raise the volume|turn it up)$/.test(t)) return nudgeVolume(20);
+  if (/^(?:mute|mute (?:the )?(?:sound|volume|audio|computer))$/.test(t)) return runTool("quick_set", { key: "mute", on: true });
+  if (/^unmute(?: (?:the )?(?:sound|volume|audio|computer))?$/.test(t)) return runTool("quick_set", { key: "mute", on: false });
+
+  // Müzik
+  if (/^(?:pause|stop|resume|play|continue)(?: (?:the )?(?:music|song|video|playback))?$/.test(t)) return runTool("media", { action: "toggle" });
+  if (/^(?:next|skip)(?: (?:this )?(?:song|track))?$|^(?:play the )?next (?:song|track)$/.test(t)) return runTool("media", { action: "next" });
+  if (/^(?:previous|go back|last)(?: (?:song|track))?$|^(?:play the )?previous (?:song|track)$/.test(t)) return runTool("media", { action: "prev" });
+
+  // Hızlı ayarlar: "turn off wifi", "turn bluetooth on", "mute the mic"
+  const quick = t.match(/^turn (on|off) (?:the )?(wi-?fi|bluetooth|dark mode|night mode)$/) ?? t.match(/^turn (?:the )?(wi-?fi|bluetooth|dark mode|night mode) (on|off)$/);
+  if (quick) {
+    const [on, what] = quick[1] === "on" || quick[1] === "off" ? [quick[1], quick[2]] : [quick[2], quick[1]];
+    const key = /blue/.test(what) ? "bluetooth" : /mode/.test(what) ? "dark" : "wifi";
+    return runTool("quick_set", { key, on: on === "on" });
+  }
+  if (/^(?:mute|turn off) (?:the |my )?mic(?:rophone)?$/.test(t)) return runTool("quick_set", { key: "mic", on: true });
+  if (/^(?:unmute|turn on) (?:the |my )?mic(?:rophone)?$/.test(t)) return runTool("quick_set", { key: "mic", on: false });
+
+  // Şarkı: "play tarkan on youtube music", "play lo-fi on spotify", "play some jazz"
+  if ((m = t.match(/^(?:play|put on) (.+?) on youtube music$/))) return runTool("play_music", { query: m[1], service: "youtube_music" });
+  if ((m = t.match(/^(?:play|put on|watch) (.+?) on youtube$/))) return runTool("play_music", { query: m[1], service: "youtube" });
+  if ((m = t.match(/^(?:play|put on) (.+?) on spotify$/))) return runTool("play_music", { query: m[1], service: "spotify" });
+  if ((m = t.match(/^(?:play|put on) (?:some )?(.+)$/))) return runTool("play_music", { query: m[1], service: "youtube_music" });
+
+  // Zamanlayıcı: "set a timer for 10 minutes", "10 minute timer"
+  if ((m = t.match(/^(?:set |start )?(?:a )?timer (?:for )?(\d{1,3}) (?:minutes?|mins?)$/) ?? t.match(/^(?:set |start )?(?:a )?(\d{1,3})[ -](?:minute|min) timer$/)))
+    return runTool("set_timer", { minutes: Number(m[1]) });
+
+  // Arama: "search google for the weather", "google the weather"
+  if ((m = t.match(/^(?:search (?:google |the web |the internet )?for|google|look up) (.+)$/))) return runTool("web_search", { query: m[1] });
+
+  // Uygulama ya da site: "open spotify", "launch discord", "open the youtube website"
+  if ((m = t.match(/^(?:open|launch|start|run) (?:the )?(.+?)(?: app| website| site| program)?$/))) {
+    if (m[1].split(" ").length <= 4) return openByName(m[1]);
+  }
+  return null;
+}
+
 /** Komutu yerelde yap; yapıldıysa sonucu, anlaşılmadıysa null döner */
 export async function runLocalCommand(raw: string): Promise<{ result: string; note: ToolNote } | null> {
+  // Nook'un dilindeki kalıplar önce ("google hava durumu ara" Türkçede İngilizce aramaya düşmesin)
+  if (lang === "tr") return (await runTurkish(raw)) ?? runEnglish(raw);
+  return (await runEnglish(raw)) ?? runTurkish(raw);
+}
+
+async function runTurkish(raw: string): Promise<{ result: string; note: ToolNote } | null> {
   const t = lower(raw)
     .replace(/[.!?,;:"“”]/g, " ")
     .replace(/^\s*(hey\s+)?nook\s*/, "")

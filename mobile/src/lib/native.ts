@@ -18,9 +18,12 @@ interface NookNativeApi {
   openNotifAccess(): void;
   notifPrefs(): string;
   setNotifPrefs(json: string): void;
+  testNotif(): void;
   peekShare(): string;
   clearShare(): void;
   uploadShared(host: string): void;
+  downloadShelf(id: string, name: string): void;
+  pickFiles(): void;
 }
 
 export const native: NookNativeApi | undefined = (window as unknown as { NookNative?: NookNativeApi }).NookNative;

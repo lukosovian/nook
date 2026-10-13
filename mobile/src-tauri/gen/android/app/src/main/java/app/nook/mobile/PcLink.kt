@@ -84,6 +84,63 @@ object PcLink {
         return null
     }
 
+    /** İmzalı GET; yanıt gövdesi ya da ulaşılamazsa null */
+    fun get(ctx: Context, path: String, timeoutMs: Int = 3000): String? {
+        val p = pairing(ctx) ?: return null
+        val order = listOfNotNull(p.lastHost) + p.hosts.filter { it != p.lastHost }
+        for (host in order) {
+            try {
+                val ts = System.currentTimeMillis().toString()
+                val c = URL("http://$host:${p.port}$path").openConnection() as HttpURLConnection
+                c.connectTimeout = timeoutMs
+                c.readTimeout = 8000
+                c.setRequestProperty("x-nook-ts", ts)
+                c.setRequestProperty("x-nook-sig", sign(p.key, ts, "GET", path, ByteArray(0)))
+                val code = c.responseCode
+                val text = (if (code < 400) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+                c.disconnect()
+                if (code in 200..299) return text
+                if (code == 401) return null
+            } catch (e: Exception) {
+                // sıradaki adres
+            }
+        }
+        return null
+    }
+
+    /** İmzalı GET'in gövdesini akışla okur (raftaki dosyayı indirmek): read(akış, boyut) */
+    fun getStream(ctx: Context, path: String, read: (InputStream, Long) -> Unit) {
+        val p = pairing(ctx) ?: throw Exception("PC eşleşmemiş")
+        val order = listOfNotNull(p.lastHost) + p.hosts.filter { it != p.lastHost }
+        var last: Exception = Exception("PC'ye ulaşılamadı")
+        for (host in order) {
+            val c = try {
+                val ts = System.currentTimeMillis().toString()
+                (URL("http://$host:${p.port}$path").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 3000
+                    readTimeout = 60000
+                    setRequestProperty("x-nook-ts", ts)
+                    setRequestProperty("x-nook-sig", sign(p.key, ts, "GET", path, ByteArray(0)))
+                    connect()
+                }
+            } catch (e: Exception) {
+                continue
+            }
+            try {
+                val code = c.responseCode
+                if (code !in 200..299) {
+                    last = Exception(runCatching { JSONObject(c.errorStream.bufferedReader().readText()).getString("error") }.getOrDefault("PC hata verdi ($code)"))
+                    continue
+                }
+                c.inputStream.use { read(it, c.contentLengthLong) }
+                return
+            } finally {
+                c.disconnect()
+            }
+        }
+        throw last
+    }
+
     /**
      * Büyük dosyayı akışla gönderir: imza için önce baştan sona okunur, sonra yeniden açılıp yollanır.
      * open() her çağrıda dosyayı yeniden açmalı. progress: gönderilen bayt.

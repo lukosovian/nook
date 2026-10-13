@@ -136,6 +136,7 @@ pub fn run() {
             shell::list_apps,
             shell::music_find,
             media::media_control,
+            media::media_seek,
             media::media_resync,
             quick::quick_state,
             quick::quick_set,

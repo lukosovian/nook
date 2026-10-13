@@ -47,12 +47,31 @@ export function useFocusTimer() {
 /** Son su içiminden bu yana geçen aktif dakika — "Sonra" bunu geri sarar */
 let waterMinutes = 0;
 const SNOOZE_MIN = 15;
+/** Son içilen an (telefon, PC kapalıyken ya da başında değilken kendi sayacını buradan sürdürür) */
+let waterLast = Date.now();
+
+/**
+ * Nook Mobil için su durumu: hatırlatma telefonda da çıkar, hangi taraftan cevaplanırsa iki tarafta da
+ * kapanır. `nextAt` tahmin (sayaç yalnızca bilgisayar başındayken ilerler); `away`: kullanıcı başında değil
+ */
+export function waterInfo() {
+  const s = useNook.getState();
+  const every = s.settings.waterEvery;
+  return {
+    every,
+    due: s.reminder?.kind === "water" && s.reminder.phase === "due",
+    nextAt: every > 0 ? Date.now() + Math.max(1, every - waterMinutes) * 60_000 : null,
+    last: waterLast,
+    away: isSleeping(s),
+  };
+}
 
 /** "İçtim": Nook da bardağıyla içer, sonra hatırlatma kapanır. Hatırlatma yokken de (Bugün'den) kaydedilebilir. */
 export function drankWater() {
   const s = useNook.getState();
   if (s.reminder?.phase === "drinking") return;
   waterMinutes = 0;
+  waterLast = Date.now();
   s.setReminder({ kind: "water", phase: "drinking" });
   s.track({ water: 1 });
   s.care(2);

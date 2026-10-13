@@ -107,7 +107,21 @@ useClaude.subscribe((s, prev) => {
   const head = s.asks[0];
   const card = !!head && !head.opened;
   if (useNook.getState().claudeCard !== card) useNook.getState().setClaudeCard(card);
+  // Büyük adada açılan soru(lar) nasıl biterse bitsin (terminalden cevap, süre dolması, oturum kapanması)
+  // ada sabit kalmasın: yoksa imleç çıkınca da kapanmıyordu
+  if (prev.asks.some((a) => a.opened) && !s.asks.some((a) => a.opened)) useNook.getState().setPinned(false);
 });
+
+/**
+ * Oturum ilerlediyse (araç çalıştı, yeni mesaj, bitti) bekleyen istek terminalde cevaplanmıştır:
+ * kart kapanır, köprü de beklemeyi bırakır (Claude Code onu kendisi kapatmıyor).
+ */
+function settleAsks(session: string, at: number) {
+  const done = useClaude.getState().asks.filter((a) => a.session === session && a.at < at);
+  if (!done.length) return;
+  for (const a of done) void claudeDecide(a.askId, "");
+  useClaude.setState((st) => ({ asks: st.asks.filter((a) => !done.includes(a)) }));
+}
 
 const base = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 const firstLine = (s: string, max = 140) => {
@@ -260,12 +274,15 @@ function handle(ev: HookEvent) {
       touch(id, ev, () => ({ state: "idle", action: tt("Hazır") }));
       break;
     case "UserPromptSubmit":
+      settleAsks(id, ev.at);
       touch(id, ev, () => ({ state: "working", action: tt("Düşünüyor"), prompt: firstLine(ev.prompt ?? "", 160), reply: "", turnAt: ev.at }));
       break;
     case "PreToolUse":
+      settleAsks(id, ev.at);
       touch(id, ev, () => ({ state: "working", action: actionOf(tool, input) }));
       break;
     case "PostToolUse":
+      settleAsks(id, ev.at);
       touch(id, ev, (s) => {
         const edit = ["Edit", "MultiEdit", "Write", "NotebookEdit"].includes(tool);
         const file = str(input.file_path) || str(input.notebook_path);
@@ -301,6 +318,7 @@ function handle(ev: HookEvent) {
       else if (ev.notification_type === "idle_prompt") touch(id, ev, () => ({ state: "idle", action: tt("Seni bekliyor") }));
       break;
     case "Stop": {
+      settleAsks(id, ev.at);
       const reply = firstParagraph(ev.last_assistant_message ?? "");
       touch(id, ev, () => ({ state: "done", action: tt("Bitti"), reply }));
       // Terminal öndeyse zaten görüyorsun; değilse adada haber ver
@@ -372,6 +390,9 @@ export function useClaudeFeed() {
     const t = window.setInterval(() => {
       const cutoff = Date.now() - 3 * 3600_000;
       const st = useClaude.getState();
+      // Köprü en çok ~2 dk bekler; ondan eski istek kalmışsa (olay kaçtıysa) temizle
+      const stale = st.asks.filter((a) => Date.now() - a.at > 130_000);
+      if (stale.length) useClaude.setState((x) => ({ asks: x.asks.filter((a) => !stale.includes(a)) }));
       if (Object.values(st.sessions).some((s) => s.updatedAt < cutoff)) {
         useClaude.setState({ sessions: Object.fromEntries(Object.entries(st.sessions).filter(([, s]) => s.updatedAt >= cutoff)) });
       }

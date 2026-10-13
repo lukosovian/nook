@@ -10,7 +10,7 @@ import { native } from "../lib/native";
 import { onOutbox, pending } from "../lib/outbox";
 import type { Conn } from "../App";
 
-export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify" | "look" | "claude";
+export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify" | "look" | "claude" | "shelf";
 
 interface Tile {
   id: Screen;
@@ -26,6 +26,7 @@ const TILES: Tile[] = [
   { id: "argus", nook: "argus", label: "Argus", color: "#2B8CFF" },
   { id: "media", nook: "media", label: "Medya", color: "#FF5C8A" },
   { id: "clips", nook: "clip", label: "Pano", color: "#9B7BFF" },
+  { id: "shelf", nook: "shelf", label: "Raf", color: "#2FD4C0" },
   { id: "notes", nook: "note", label: "Not", color: "#FF6A3D" },
   { id: "hum", nook: "hum", label: "Hum", color: "#9B7BFF" },
   { id: "notify", nook: "notify", label: "Bildirimler", color: "#9B7BFF" },
@@ -34,7 +35,7 @@ const TILES: Tile[] = [
 ];
 
 /** PC kapalıyken de açılanlar (son görülen veriyle; yapılanlar PC açılınca gider) */
-const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "notes", "hum", "notify", "claude"];
+const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "shelf", "notes", "hum", "notify", "claude"];
 
 function gb(bytes: number) {
   return (bytes / 1024 ** 3).toLocaleString("tr-TR", { maximumFractionDigits: 1 });
@@ -87,6 +88,7 @@ export function HomeScreen({
     if (t.id === "media") return !online ? "PC açılınca" : playing ? `${playing.title}${playing.artist ? ` · ${playing.artist}` : ""}` : "Çalan bir şey yok";
     if (t.id === "argus") return online ? "Ne izlesem? · Devam et" : "Son görülen liste";
     if (t.id === "clips") return online ? "Kopyalananlar, PC'ye gönder" : "PC açılınca gönderilir";
+    if (t.id === "shelf") return online ? "PC'deki dosyalar, telefondan gönder" : "Son görülen raf";
     if (t.id === "notes") return online ? "PC'deki notların" : "Yaz, PC açılınca gider";
     if (t.id === "hum") return online ? "Çalan şarkıyı bul" : "Dinle, PC açılınca bulunur";
     if (t.id === "notify") return "Telefonun bildirimleri PC'de";

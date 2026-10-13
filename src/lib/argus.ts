@@ -382,9 +382,12 @@ export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: s
   const known =
     snap.items.find((i) => i.tmdb === hit.key) ?? snap.items.find((i) => !i.tmdb && [i.title, i.original].some((n) => n && names.includes(norm(n))));
   if (known) return { sug: suggestFor(known, text), fresh: null };
-  // TMDB başka bir şey buldu: zayıf yerel eşleşme ("Avatar") yanlıştı. Listede olmayanı önermek için ad
-  // daha sıkı tutmalı ("Dune Part Two Review" gibi videolar sorulmasın)
-  return { sug: null, fresh: best.sim >= FRESH_SAME || (year && hit.year === year) ? hit : null };
+  // TMDB başka bir şey buldu: zayıf yerel eşleşme ("Avatar") yanlıştı. Listede olmayanı önermek için
+  // başlığın tamamı o ad olmalı ya da başlıkta bölüm yazmalı: YouTube'da adı geçen her uzun video
+  // ("Dune Part Two Review | Neden bu kadar iyi", "Interstellar 2014 bilimi") sorulmasın
+  const whole = Math.max(0, ...hit.names.map((n) => similarity(words(n), segs.flat())));
+  const episode = hit.mediaType === "tv" && !!parseEpisode(text);
+  return { sug: null, fresh: whole >= FRESH_SAME || (episode && best.sim >= FRESH_SAME) || (whole >= SAME && year && hit.year === year) ? hit : null };
 }
 
 // ------------------------------------------------------------------ yazma

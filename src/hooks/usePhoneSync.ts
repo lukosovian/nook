@@ -8,6 +8,7 @@ import { inTauri, isPrimary, subscribe } from "../lib/bridge";
 import { useNook, type Pad } from "../store/nook";
 import { normalizeColor, normalizeLook, type Look } from "../lib/look";
 import { useClaude } from "../lib/claude";
+import { drankWater, snoozeWater, waterInfo } from "./useFeatures";
 
 /** Telefona gönderilen geçmiş en fazla bu kadar */
 const MAX_CLIPS = 80;
@@ -21,7 +22,7 @@ interface NoteCmd {
 }
 
 function mirror() {
-  const { clips, pads, padId, hums } = useNook.getState();
+  const { clips, pads, padId, hums, shelf } = useNook.getState();
   void invoke("remote_mirror", {
     data: {
       clips: clips.slice(0, MAX_CLIPS).map((c) => ({
@@ -39,6 +40,8 @@ function mirror() {
       pads: pads.map((p) => ({ id: p.id, title: p.title, text: p.text, at: p.at })),
       padId,
       claude: claudeMirror(),
+      water: waterInfo(),
+      shelf: shelf.map((i) => ({ id: i.id, name: i.name, ext: i.ext, size: i.size, isDir: i.isDir, isImage: i.isImage, pinned: !!i.pinned, addedAt: i.addedAt, path: i.path })),
       hums: hums.slice(0, MAX_HUMS).map((h) => ({ id: h.id, title: h.title, artist: h.artist, cover: h.cover ?? null, url: h.url ?? null, at: h.at, phone: !!h.phone })),
     },
   }).catch(() => {});
@@ -95,8 +98,10 @@ export function usePhoneSync() {
     };
     mirror();
     const unsub = useNook.subscribe((st, prev) => {
-      if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums) schedule();
+      if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
     });
+    // Su sayacı dakikada bir ilerler: telefonun gördüğü tahmin tazelensin
+    const tick = window.setInterval(mirror, 60_000);
     // Claude'da onay isteği hemen telefona yansısın
     const unsubClaude = useClaude.subscribe((st, prev) => {
       if (st.asks !== prev.asks) {
@@ -104,8 +109,16 @@ export function usePhoneSync() {
         mirror();
       } else if (st.sessions !== prev.sessions || st.plan !== prev.plan || st.setup !== prev.setup) schedule();
     });
-    const off = subscribe<{ kind: string; cmd: NoteCmd; look?: Partial<Look>; color?: string | null }>("nook://remote", (e) => {
+    const off = subscribe<{ kind: string; cmd: NoteCmd; op?: string; own?: boolean; id?: string; look?: Partial<Look>; color?: string | null }>("nook://remote", (e) => {
       if (e.kind === "note") applyNote(e.cmd);
+      if (e.kind === "shelf" && e.op === "remove" && e.id) useNook.getState().removeShelf(e.id);
+      // Telefondaki su hatırlatmasına cevap: yalnızca PC'de de hatırlatma bekliyorsa (iki kez sayılmasın)
+      if (e.kind === "water") {
+        const due = waterInfo().due;
+        // Telefon kendi sayacıyla hatırlattıysa (PC'nin başında değilken) içilen yine sayılır
+        if (e.op === "drank" && (due || e.own)) drankWater();
+        if (e.op === "snooze" && due) snoozeWater();
+      }
       // Telefondan görünüm değişti
       if (e.kind === "look") {
         const s = useNook.getState();
@@ -114,6 +127,7 @@ export function usePhoneSync() {
     });
     return () => {
       window.clearTimeout(timer);
+      window.clearInterval(tick);
       unsub();
       unsubClaude();
       off();

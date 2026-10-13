@@ -46,7 +46,7 @@ async function ask(parts: Part[], system: string, slowOk: boolean, fastest = fal
 
 /** Base64 WAV → konuşmanın metni (boşsa ""). */
 /** Whisper'ın sessizlikte ya da gürültüde uydurduğu bilinen cümleler (altyazı kalıntıları) */
-const HALLUCINATION = /altyaz[ıi]|abone ol|izlediğiniz için|teşekkürler\.?$|^[\s.,!?…-]*$|^\[.*\]$|^\(.*\)$/i;
+const HALLUCINATION = /altyaz[ıi]|abone ol|izlediğiniz için|teşekkürler\.?$|thanks? (you )?for watching|subscribe|^[\s.,!?…-]*$|^\[.*\]$|^\(.*\)$|^\*.*\*$/i;
 
 /** Önce bu bilgisayarda (Whisper, açıksa), olmazsa Gemini ile */
 export async function transcribe(wavBase64: string): Promise<string> {
@@ -56,8 +56,15 @@ export async function transcribe(wavBase64: string): Promise<string> {
         .map((a) => a.name)
         .filter((n) => n.length <= 20 && !/(uninstall|kaldır|readme|help|yardım|setup)/i.test(n))
         .slice(0, 40);
-      const prompt = `Hey Nook, Argus'u aç. Spotify'ı aç. YouTube Music'ten Tarkan çal. Sesi yüzde 50 yap. ${apps.join(", ")}.`;
-      const text = (await sttTranscribe(wavBase64, prompt)).trim();
+      // Örnek cümleler Whisper'a hem adları hem dili gösterir
+      const sample =
+        lang === "tr"
+          ? "Hey Nook, Argus'u aç. Spotify'ı aç. YouTube Music'ten Tarkan çal. Sesi yüzde 50 yap."
+          : lang === "en"
+            ? "Hey Nook, open Argus. Open Spotify. Play Tarkan on YouTube Music. Set the volume to 50%."
+            : "Hey Nook. Argus. Spotify. YouTube Music.";
+      const prompt = `${sample} ${apps.join(", ")}.`;
+      const text = (await sttTranscribe(wavBase64, prompt, lang)).trim();
       if (text && !HALLUCINATION.test(text)) return text.replace(/^["“]|["”]$/g, "").trim();
       if (!text || HALLUCINATION.test(text)) return "";
     } catch (e) {
@@ -76,7 +83,7 @@ async function transcribeGemini(wavBase64: string): Promise<string> {
   const vocab = [...new Set(["Nook", "Argus", "YouTube", "YouTube Music", "Spotify", "Gmail", "Discord", "Chrome", ...apps])].join(", ");
   const text = await ask(
     [{ inlineData: { mimeType: "audio/wav", data: wavBase64 } }, { text: "Bu ses kaydındaki konuşmayı olduğu gibi yaz." }],
-    `Sen bir konuşma-yazı çevirmenisin. Bu, bilgisayara verilen kısa bir sesli komut; çoğunlukla Türkçe. Kayıt "Hey Nook" ile başlayabilir. Yalnızca söyleneni, söylendiği dilde ve noktalamasıyla yaz; yorum ekleme. Sayıları rakamla yaz ("yüzde yüz" → "%100", "yetmiş beş" → "75"). Kayıtta anlaşılır konuşma yoksa hiçbir şey yazma. Geçebilecek özel adlar (bunlara benzeyen bir ses duyarsan bu yazılışı kullan): ${vocab}.`,
+    `Sen bir konuşma-yazı çevirmenisin. Bu, bilgisayara verilen kısa bir sesli komut; çoğunlukla ${LANG_NAME_TR[lang]}. Kayıt "Hey Nook" ile başlayabilir. Yalnızca söyleneni, söylendiği dilde ve noktalamasıyla yaz; yorum ekleme. Sayıları rakamla yaz ("yüzde yüz" → "%100", "yetmiş beş" → "75", "fifty" → "50"). Kayıtta anlaşılır konuşma yoksa hiçbir şey yazma. Geçebilecek özel adlar (bunlara benzeyen bir ses duyarsan bu yazılışı kullan): ${vocab}.`,
     true,
     true,
   );

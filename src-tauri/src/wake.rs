@@ -23,6 +23,8 @@ const NMEL: usize = 26;
 const NCEP: usize = 12;
 /// Tanıtım için kaç örnek
 pub const NEED: usize = 3;
+/// Whisper doğrularken aday eşiği bu kadar gevşek (doğrulama yanlışları eler, kaçırma azalır)
+const LOOSE: f32 = 1.3;
 
 // ------------------------------------------------------------------ ayarlar ve örnekler
 
@@ -250,6 +252,8 @@ enum Phase {
     Collect { audio: Vec<f32>, silent: usize },
     /// Konuşma eşleşmedi; susana kadar bekle
     Skip { silent: usize },
+    /// Ses örneklere benziyor: Whisper "Nook" dendiğini doğrulayana kadar komut boşa gitmesin diye kayıt sürer
+    Verify { audio: Vec<f32>, silent: usize, spoke: bool, started: Instant, score: f32, answer: std::sync::mpsc::Receiver<bool> },
     /// Uyandı: komut kaydediliyor
     Command { audio: Vec<f32>, silent: usize, spoke: bool, started: Instant },
 }
@@ -294,24 +298,65 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
                     if silent >= 30 || enough {
                         let (dist, end) = compare(&store, &feats, &audio);
                         let thr = threshold(&store, CONFIG.lock().unwrap().sensitivity);
-                        let woke = dist <= thr;
-                        let _ = app.emit("nook://wake-heard", Heard { score: (thr / dist.max(1e-6)).min(1.5) / 1.5, woke });
-                        if woke {
+                        let score = (thr / dist.max(1e-6)).min(1.5) / 1.5;
+                        // Whisper doğrulayacaksa örneklere biraz daha uzak sesler de aday (kaçırmasın)
+                        let verify = crate::stt::ready();
+                        let candidate = dist <= if verify { thr * LOOSE } else { thr };
+                        let rest = audio.len().saturating_sub(end);
+                        // Uyandırma sözüyle komut bir solukta söylendiyse komutun başı zaten elde
+                        let spoke = rest > RATE / 3 && silent < 30;
+                        // Sözün bittiği yer kestirim: komutun ilk hecesi kesilmesin diye bütün ses gider
+                        // ("Hey Nook" yazıya dökülünce baştan atılır)
+                        let silent = if spoke { 0 } else { silent };
+                        if candidate && verify {
+                            let (tx, answer) = std::sync::mpsc::channel();
+                            let clip = audio[..audio.len().min(end + RATE / 4)].to_vec();
+                            std::thread::spawn(move || {
+                                let _ = tx.send(crate::stt::heard_nook(&clip).unwrap_or(true));
+                            });
+                            Phase::Verify { audio, silent, spoke, started: Instant::now(), score, answer }
+                        } else if candidate {
+                            let _ = app.emit("nook://wake-heard", Heard { score, woke: true });
                             let target = crate::shortcut::target(&app);
                             let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Start);
-                            let rest = audio.len().saturating_sub(end);
-                            // Uyandırma sözüyle komut bir solukta söylendiyse komutun başı zaten elde
-                            let spoke = rest > RATE / 3 && silent < 30;
-                            // Sözün bittiği yer kestirim: komutun ilk hecesi kesilmesin diye bütün ses gider
-                            // ("Hey Nook" yazıya dökülünce baştan atılır)
-                            Phase::Command { audio, silent: if spoke { 0 } else { silent }, spoke, started: Instant::now() }
-                        } else if silent >= 30 {
-                            Phase::Idle
+                            Phase::Command { audio, silent, spoke, started: Instant::now() }
                         } else {
-                            Phase::Skip { silent }
+                            let _ = app.emit("nook://wake-heard", Heard { score, woke: false });
+                            if silent >= 30 {
+                                Phase::Idle
+                            } else {
+                                Phase::Skip { silent }
+                            }
                         }
                     } else {
                         Phase::Collect { audio, silent }
+                    }
+                }
+                Phase::Verify { mut audio, mut silent, mut spoke, started, score, answer } => {
+                    audio.extend_from_slice(frame);
+                    if speech {
+                        spoke = true;
+                        silent = 0;
+                    } else {
+                        silent += 1;
+                    }
+                    match answer.try_recv() {
+                        Ok(true) => {
+                            let _ = app.emit("nook://wake-heard", Heard { score: score.max(0.7), woke: true });
+                            let target = crate::shortcut::target(&app);
+                            let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Start);
+                            Phase::Command { audio, silent, spoke, started }
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Empty) => Phase::Verify { audio, silent, spoke, started, score, answer },
+                        // "Nook" denmemiş: söz bitene kadar bekle, sonra yeniden dinle
+                        _ => {
+                            let _ = app.emit("nook://wake-heard", Heard { score: score.min(0.6), woke: false });
+                            if silent >= 30 {
+                                Phase::Idle
+                            } else {
+                                Phase::Skip { silent }
+                            }
+                        }
                     }
                 }
                 Phase::Skip { silent } => {

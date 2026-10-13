@@ -71,6 +71,13 @@ export function MediaScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
 
   const m = state?.media;
   const pos = m ? Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? now - fetchedAt.current : 0)) : 0;
+  // Sürüklenen konum (0–1)
+  const [dragPos, setDragPos] = useState<number | null>(null);
+  const frac = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  };
+  const shown = m && dragPos !== null ? dragPos * m.durationMs : pos;
   const vol = dragVol ?? state?.volume ?? null;
   const VolIcon = state?.muted || vol === 0 ? VolumeX : (vol ?? 0) < 0.5 ? Volume1 : Volume2;
 
@@ -107,11 +114,27 @@ export function MediaScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
 
         {m && m.durationMs > 0 && (
           <div className="w-full max-w-[340px]">
-            <div className="h-1.5 overflow-hidden rounded-full bg-well">
-              <div className="h-full rounded-full" style={{ width: `${(pos / m.durationMs) * 100}%`, background: PINK }} />
+            {/* Dokun ya da sürükle: şarkı o ana sarılır */}
+            <div
+              className="-my-3 py-3"
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setDragPos(frac(e));
+              }}
+              onPointerMove={(e) => dragPos !== null && setDragPos(frac(e))}
+              onPointerUp={(e) => {
+                if (dragPos === null) return;
+                const ms = Math.round(frac(e) * m.durationMs);
+                void act({ seek: ms }).finally(() => window.setTimeout(() => setDragPos(null), 400));
+              }}
+              onPointerCancel={() => setDragPos(null)}
+            >
+              <div className={`overflow-hidden rounded-full bg-well transition-[height] ${dragPos !== null ? "h-2.5" : "h-1.5"}`}>
+                <div className="h-full rounded-full" style={{ width: `${(shown / m.durationMs) * 100}%`, background: PINK }} />
+              </div>
             </div>
             <div className="mt-1.5 flex justify-between text-[11.5px] tabular-nums text-label-3">
-              <span>{mmss(pos)}</span>
+              <span>{mmss(shown)}</span>
               <span>{mmss(m.durationMs)}</span>
             </div>
           </div>

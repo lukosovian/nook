@@ -715,6 +715,9 @@ interface NookState {
   setYearShown: (y: string) => void;
   /** Ana sayfa düzenleniyor (sırala, gizle, profile bölüm seç) */
   homeEdit: boolean;
+  /** Ana sayfadan hangi bölüm ne sıklıkla açılıyor (sık kullanılanlar üstte): azalan puan + son açılış */
+  moduleUse: Record<string, { score: number; at: number }>;
+  noteModuleUse: (id: string) => void;
   setHomeEdit: (on: boolean) => void;
 
   setMood: (mood: Mood) => void;
@@ -916,6 +919,13 @@ export const useNook = create<NookState>()(
       setYearShown: (yearShown) => set({ yearShown }),
       homeEdit: false,
       setHomeEdit: (homeEdit) => set({ homeEdit }),
+      moduleUse: {},
+      noteModuleUse: (id) =>
+        set((s) => {
+          const now = Date.now();
+          const prev = s.moduleUse[id];
+          return { moduleUse: { ...s.moduleUse, [id]: { score: (prev ? moduleScore(prev, now) : 0) + 1, at: now } } };
+        }),
 
       setMood: (mood) => set({ mood }),
       setAntic: (antic) => set({ antic }),
@@ -1224,6 +1234,7 @@ export const useNook = create<NookState>()(
         affection: s.affection,
         lastCare: s.lastCare,
         notesSeen: s.notesSeen,
+        moduleUse: s.moduleUse,
         alarms: s.alarms,
         hums: s.hums,
         // Ekran görüntüleri büyük — kaydedilmez
@@ -1303,6 +1314,9 @@ export const SULK_BELOW = 25;
  * Nook gerçekten uyuyor mu: sistem boşta AMA bir şey çalmıyorsa.
  * Müzik/video dinlerken klavyeye dokunmamak normal — o sırada uyumaz.
  */
+/** Bölüm kullanım puanı şu an: iki haftada yarıya iner (eskiden çok açılan ama artık açılmayan geri düşer) */
+export const moduleScore = (u: { score: number; at: number }, now = Date.now()) => u.score * 0.5 ** ((now - u.at) / (14 * 86_400_000));
+
 export const isSleeping = (s: Pick<NookState, "asleep" | "media">) => s.asleep && !s.media?.playing;
 
 /** Yayın maskesi açık mı: elle açıldı/kapandıysa o, yoksa algılama (ayar açıksa) */

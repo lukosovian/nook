@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Ev ağında mı, Tailscale açık mı -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Su hatırlatması: telefonda bildirim, telefon yeniden başlayınca yeniden kurulur -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Eski Android'de ekran görüntüsünü galeriye kaydetmek -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
@@ -64,6 +67,11 @@
             </intent-filter>
         </service>
         <receiver android:name=".TailscaleOffReceiver" android:exported="false" />
+        <receiver android:name=".WaterReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <provider
           android:name="androidx.core.content.FileProvider"

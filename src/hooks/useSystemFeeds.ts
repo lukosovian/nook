@@ -457,9 +457,20 @@ export function useShelfFeed() {
       window.setTimeout(() => useNook.getState().mood === "happy" && useNook.getState().setMood("idle"), 900);
       st.pushToast({ kind: "shelf", title: tt("{0} öğe rafta", files.length), detail: files.map((f) => f.name).join(", "), ms: 3500 });
     });
+    // Telefondan Paylaş › Nook: dosya İndirilenler › Nook Mobil'e kaydedildi, rafa da düşer
+    const offPhone = subscribe<string[]>(EVENTS.shelfPhone, async (paths) => {
+      const files = await inspectPaths(paths).catch(() => []);
+      if (!files.length) return;
+      const st = useNook.getState();
+      st.addFiles(files);
+      st.setMood("happy");
+      window.setTimeout(() => useNook.getState().mood === "happy" && useNook.getState().setMood("idle"), 900);
+      st.pushToast({ kind: "shelf", title: tt("Telefondan rafa geldi"), detail: files.map((f) => f.name).join(", "), ms: 3500 });
+    });
     return () => {
       offShake();
       offAdd();
+      offPhone();
       window.clearTimeout(shelfHold);
     };
   }, []);

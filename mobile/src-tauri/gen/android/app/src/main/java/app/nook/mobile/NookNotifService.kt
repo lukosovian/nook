@@ -1,6 +1,8 @@
 package app.nook.mobile
 
 import android.app.Notification
+import android.content.ComponentName
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -21,6 +23,16 @@ class NookNotifService : NotificationListenerService() {
     private val icons = HashMap<String, String?>()
     /** Aynı bildirim art arda güncellenince (WhatsApp, indirmeler) bir kez gitsin */
     private val recent = LinkedHashMap<String, Long>()
+
+    override fun onListenerConnected() {
+        PcLink.prefs(this).edit().putBoolean("notifBound", true).apply()
+    }
+
+    /** Android servisi bıraktı (güncellemeden sonra sık olur): yeniden bağlanmayı iste */
+    override fun onListenerDisconnected() {
+        PcLink.prefs(this).edit().putBoolean("notifBound", false).apply()
+        rebind(this)
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         try {
@@ -103,6 +115,14 @@ class NookNotifService : NotificationListenerService() {
     }
 
     companion object {
+        /**
+         * Uygulama güncellenince Android bildirim dinleyicisini çoğu zaman yeniden bağlamıyor: izin açık
+         * görünür ama hiçbir bildirim gelmez (telefon yeniden başlayana kadar). Uygulama her açılışta ister.
+         */
+        fun rebind(ctx: Context) {
+            if (Build.VERSION.SDK_INT >= 24) runCatching { requestRebind(ComponentName(ctx, NookNotifService::class.java)) }
+        }
+
         private val SKIP_CATEGORIES = setOf(
             Notification.CATEGORY_TRANSPORT,
             Notification.CATEGORY_PROGRESS,

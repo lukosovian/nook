@@ -327,6 +327,11 @@ export function applyPreview(mode: string) {
       });
     }
     useNook.setState({ hovered: true, tab: mode as Tab });
+    // ?newcomer → ilk haftadaki kullanıcı (çiplerde açıklama)
+    if (params.has("newcomer")) useNook.setState({ days: {}, moduleUse: {} });
+    // ?pos=0.8,0.85 → ada taşınmış (ekranın oranı olarak)
+    const pos = params.get("pos")?.split(",").map(Number);
+    if (pos?.length === 2) useNook.getState().updateSettings({ islandPos: { fx: pos[0], fy: pos[1] } });
     // ?big → tam ekran
     if (params.has("big")) window.setTimeout(() => void import("../lib/big").then((m) => m.enterBig()), 100);
     // ?bigstate → büyük adanın düzeni doğrudan (tarayıcıda pencere büyütülemez)

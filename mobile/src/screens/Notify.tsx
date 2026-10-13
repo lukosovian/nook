@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { BellRing } from "lucide-react";
-import { native } from "../lib/native";
+import { native, onNative } from "../lib/native";
 import { tintBg, tintText, TopBar, useBackButton } from "../ui";
 
 const PURPLE = "#9B7BFF";
@@ -11,6 +11,10 @@ interface Prefs {
   muted: string[];
   apps: Record<string, string>;
   queued: number;
+  /** Android servisi bağlı (güncellemeden sonra kopabiliyor) */
+  bound?: boolean;
+  /** Su hatırlatması telefonda da */
+  water?: boolean;
 }
 
 const DEMO: Prefs = { on: true, muted: ["com.instagram.android"], apps: { "com.whatsapp": "WhatsApp", "com.instagram.android": "Instagram", "com.google.android.gm": "Gmail" }, queued: 0 };
@@ -44,9 +48,17 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
     };
   }, []);
 
+  // Deneme bildirimi: null bekliyor, true/false sonuç
+  const [test, setTest] = useState<"busy" | "ok" | "fail" | null>(null);
+  useEffect(() => onNative("notiftest", (d) => setTest(d.ok ? "ok" : "fail")), []);
+  const sendTest = () => {
+    setTest("busy");
+    native?.testNotif();
+  };
+
   const save = (p: Prefs) => {
     setPrefs(p);
-    native?.setNotifPrefs(JSON.stringify({ on: p.on, muted: p.muted }));
+    native?.setNotifPrefs(JSON.stringify({ on: p.on, muted: p.muted, water: p.water ?? true }));
   };
 
   const apps = Object.entries(prefs?.apps ?? {}).sort((a, b) => a[1].localeCompare(b[1], "tr"));
@@ -79,12 +91,36 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
         )}
       </section>
 
+      {prefs && (
+        <section className="rounded-3xl bg-card p-1.5">
+          <Row
+            label="Su hatırlatması"
+            sub={(prefs.water ?? true) ? "PC'deki Nook'la birlikte telefonda da; hangi taraftan “İçtim” dersen ikisinde de kapanır" : "Yalnızca PC'de"}
+            on={prefs.water ?? true}
+            onChange={(water) => save({ ...prefs, water })}
+          />
+        </section>
+      )}
+
       {access && prefs && (
         <>
           <section className="rounded-3xl bg-card p-1.5">
             <Row label="PC'ye gönder" sub={prefs.on ? "Açık" : "Kapalı"} on={prefs.on} onChange={(on) => save({ ...prefs, on })} />
           </section>
           {prefs.queued > 0 && <p className="-mt-2 px-2 text-[12px] text-label-3">{prefs.queued} bildirim PC açılınca gönderilecek.</p>}
+          <section className="rounded-3xl bg-card p-3">
+            <motion.button whileTap={{ scale: 0.97 }} disabled={test === "busy"} onClick={sendTest} className="w-full rounded-2xl bg-well py-3 text-[14.5px] font-semibold">
+              {test === "busy" ? "Gönderiliyor…" : "Deneme bildirimi gönder"}
+            </motion.button>
+            {test === "ok" && <p className="mt-2 px-1 text-[12.5px] leading-snug" style={{ color: tintText("#3CCF6E") }}>PC'ye ulaştı. Adada görünmediyse PC'de Bildirimler açık mı bak.</p>}
+            {test === "fail" && <p className="mt-2 px-1 text-[12.5px] leading-snug" style={{ color: tintText("#FF5C5C") }}>PC'ye ulaşılamadı. PC açık ve Nook çalışıyor mu, telefon aynı ağda ya da Tailscale açık mı?</p>}
+            {prefs.bound === false && (
+              <p className="mt-2 px-1 text-[12px] leading-snug text-label-3">
+                Android bildirimleri Nook'a iletmiyor gibi görünüyor (güncellemeden sonra olabiliyor). Nook yeniden bağlanmayı istedi; düzelmezse{" "}
+                <button className="underline" onClick={() => native?.openNotifAccess()}>bildirim erişimini</button> kapatıp yeniden aç.
+              </p>
+            )}
+          </section>
 
           {prefs.on && (
             <>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationFrame } from "motion/react";
 import { MicVocal, RotateCcw } from "lucide-react";
 import { lineAt, lyricOffset, shiftLyrics, useLyrics } from "../../lib/lyrics";
-import { mediaControl, type MediaAction } from "../../lib/bridge";
+import { mediaControl, mediaSeek, type MediaAction } from "../../lib/bridge";
 import { appName, formatTime, livePosition } from "../../lib/media";
 import { spring } from "../../lib/motion";
 import { useNook, type NowPlaying } from "../../store/nook";
@@ -218,18 +218,25 @@ function LyricsView({ media }: { media: NowPlaying }) {
   );
 }
 
-/** İlerleme çubuğu: React render'ı yok, her karede doğrudan DOM'a yazar. */
+/**
+ * İlerleme çubuğu: React render'ı yok, her karede doğrudan DOM'a yazar. Tıklayınca ya da sürükleyince
+ * şarkı o ana sarılır (sürüklerken süre yazısı gideceği yeri gösterir).
+ */
 function Progress({ media }: { media: NowPlaying }) {
+  const track = useRef<HTMLDivElement>(null);
   const fill = useRef<HTMLDivElement>(null);
   const current = useRef<HTMLSpanElement>(null);
   const remaining = useRef<HTMLSpanElement>(null);
   const lastText = useRef("");
   const latest = useRef(media);
   latest.current = media;
+  /** Sürüklenen konum (0–1); bırakılınca sarılır */
+  const drag = useRef<number | null>(null);
+  const [active, setActive] = useState(false);
 
   useAnimationFrame(() => {
     const m = latest.current;
-    const pos = livePosition(m);
+    const pos = drag.current !== null ? drag.current * m.durationMs : livePosition(m);
     if (fill.current) fill.current.style.transform = `scaleX(${pos / m.durationMs})`;
     const text = formatTime(pos);
     if (text !== lastText.current) {
@@ -239,14 +246,52 @@ function Progress({ media }: { media: NowPlaying }) {
     }
   });
 
+  const frac = (x: number) => {
+    const r = track.current!.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (x - r.left) / r.width));
+  };
+  const seek = (f: number) => {
+    const m = latest.current;
+    const ms = f * m.durationMs;
+    // Hemen oraya geçsin; uygulamanın yeni konumu birazdan gelir
+    useNook.setState((s) => (s.media ? { media: { ...s.media, positionMs: ms, at: performance.now() } } : {}));
+    mediaSeek(ms).catch((e) => useNook.getState().pushToast({ kind: "play", title: tt("Sarılamadı"), detail: String(e), ms: 3500 }));
+  };
+
   return (
     <div className="mt-2.5">
-      <div className="h-[3px] overflow-hidden rounded-full bg-white/[0.1]">
-        <div
-          ref={fill}
-          className="h-full origin-left rounded-full"
-          style={{ transform: "scaleX(0)", background: ACCENT.pink, boxShadow: `0 0 8px ${ACCENT.pink}` }}
-        />
+      <div
+        ref={track}
+        className="-my-1.5 cursor-pointer py-1.5"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = frac(e.clientX);
+          setActive(true);
+        }}
+        onPointerMove={(e) => {
+          if (drag.current !== null) drag.current = frac(e.clientX);
+        }}
+        onPointerUp={(e) => {
+          if (drag.current === null) return;
+          const f = frac(e.clientX);
+          drag.current = null;
+          setActive(false);
+          seek(f);
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+          setActive(false);
+        }}
+      >
+        <div className={`overflow-hidden rounded-full bg-white/[0.1] transition-[height] ${active ? "h-[6px]" : "h-[3px]"}`}>
+          <div
+            ref={fill}
+            className="h-full origin-left rounded-full"
+            style={{ transform: "scaleX(0)", background: ACCENT.pink, boxShadow: `0 0 8px ${ACCENT.pink}` }}
+          />
+        </div>
       </div>
       <div className="mt-1 flex justify-between text-[10px] font-medium tabular-nums text-label-3">
         <span ref={current}>0:00</span>

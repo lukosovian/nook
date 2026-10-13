@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion } from "motion/react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { Check, Eye, EyeOff, HelpCircle, Lock, Play, X } from "lucide-react";
+import { AudioLines, Bell, Check, ChevronLeft, Eye, EyeOff, Gamepad2, HeartPulse, HelpCircle, Info, Keyboard, LayoutGrid, Lock, Play, Search, Settings2, ShieldCheck, Smartphone, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
 import { refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
@@ -76,283 +76,420 @@ const WATER: { id: number; label: string }[] = [
   { id: 90, label: tt("90 dk") },
 ];
 
+type CatId = "general" | "island" | "notify" | "health" | "game" | "privacy" | "voice" | "modules" | "shortcuts" | "phone" | "about";
+
+/** Ayarların kategorileri: önce ızgara, birine basınca kendi sayfası. `sections`: içindeki bölüm başlıkları (atlama için) */
+const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; color: string; sections: string[] }[] = [
+  { id: "general", title: tt("Genel"), hint: tt("Dil, görünüm, ekran, boyut"), icon: Settings2, color: ACCENT.blue, sections: ["Nook", tt("Ekran"), tt("Erişilebilirlik")] },
+  { id: "island", title: tt("Ada ve Nook"), hint: tt("Uyku, gezinti, animasyonlar"), icon: Sparkles, color: ACCENT.pink, sections: [tt("Ada"), tt("Animasyonlar")] },
+  { id: "notify", title: tt("Bildirimler"), hint: tt("Bildirim kartları, uyarılar"), icon: Bell, color: ACCENT.purple, sections: [tt("Bildirimler")] },
+  { id: "health", title: tt("Sağlık"), hint: tt("Su, göz molası, odak bekçisi"), icon: HeartPulse, color: ACCENT.teal, sections: [tt("Mola hatırlatıcıları"), tt("Odak bekçisi")] },
+  { id: "game", title: tt("Oyun"), hint: tt("Tam ekran, oyun özeti, mola"), icon: Gamepad2, color: ACCENT.orange, sections: [tt("Oyun")] },
+  { id: "privacy", title: tt("Gizlilik"), hint: tt("Kalkan, parola, yayın, hassas veri"), icon: ShieldCheck, color: ACCENT.red, sections: [tt("Yayın ve hassas veri"), tt("Gizlilik kalkanı"), tt("Parola kilidi")] },
+  { id: "voice", title: tt("Asistan"), hint: tt("Gemini, Hey Nook, sesler"), icon: AudioLines, color: ACCENT.yellow, sections: [tt("Yapay zekâ"), "Hey Nook", tt("Ses")] },
+  { id: "modules", title: tt("Modüller"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
+  { id: "shortcuts", title: tt("Kısayollar"), hint: tt("Klavye kısayolları"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Kısayollar")] },
+  { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.green, sections: [tt("Telefon")] },
+  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, destekçiler"), icon: Info, color: ACCENT.purple, sections: [tt("Hakkında"), tt("Destekçiler")] },
+];
+
+/** Bölüm başlığından kategorisi ("Ayarlar › Kısayollar"a gönderme gibi) */
+const catOf = (section: string) => CATS.find((c) => c.sections.some((t) => t === section || t.startsWith(section) || section.startsWith(t)))?.id ?? null;
+
 export function SettingsPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("settings", scroller);
-  const s = useNook((st) => st.settings);
-  const update = useNook((st) => st.updateSettings);
-  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-  useEffect(() => void listMonitors().then(setMonitors), []);
-  // Önizleme: ?sec=Pano → o bölüme kaydır (ekran görüntüsü için)
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    const sec = new URLSearchParams(location.search).get("sec");
-    if (!sec) return;
-    const t = window.setTimeout(() => {
-      const el = scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${sec}"]`);
-      if (el && scroller.current) scroller.current.scrollTop = topIn(el, scroller.current) - 36;
-    }, 300);
-    return () => window.clearTimeout(t);
-  }, []);
-  // Başka bir yerden "Ayarlar › Kısayollar"a gönderildiyse o bölüme kaydır
+  const [cat, setCat] = useState<CatId | null>(() => {
+    // Önizleme: ?sec=Pano → o bölümün kategorisi (ekran görüntüsü için)
+    const sec = import.meta.env.DEV ? new URLSearchParams(location.search).get("sec") : null;
+    return sec ? catOf(sec) : null;
+  });
+  const [query, setQuery] = useState(() => (import.meta.env.DEV ? new URLSearchParams(location.search).get("find") ?? "" : ""));
+  const q = query.trim().toLocaleLowerCase("tr");
+  const [empty, setEmpty] = useState(false);
+
+  // Başka bir yerden "Ayarlar › Kısayollar"a gönderildiyse o kategoriyi aç, bölüme kaydır
   const jump = useNook((st) => st.settingsJump);
   useEffect(() => {
     if (!jump) return;
+    const c = catOf(tt(jump));
+    setQuery("");
+    if (c) setCat(c);
     const t = window.setTimeout(() => {
       const el = scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${tt(jump)}"]`);
-      if (el && scroller.current) scroller.current.scrollTo({ top: topIn(el, scroller.current) - 36, behavior: "smooth" });
+      if (el && scroller.current) scroller.current.scrollTo({ top: topIn(el, scroller.current) - 40, behavior: "smooth" });
       useNook.getState().setSettingsJump(null);
     }, 250);
     return () => window.clearTimeout(t);
   }, [jump]);
+
+  // Kategori değişince başa
+  useEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = 0;
+  }, [cat]);
+
+  // Arama: bütün kategoriler alt alta çizilir, eşleşmeyen satırlar ve bölümler gizlenir
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !q) return;
+    const filter = () => {
+      let total = false;
+      el.querySelectorAll<HTMLElement>("[data-cat]").forEach((catEl) => {
+        let catHit = false;
+        catEl.querySelectorAll<HTMLElement>("section[data-sec]").forEach((sec) => {
+          const secHit = (sec.dataset.sec ?? "").toLocaleLowerCase("tr").includes(q);
+          let any = false;
+          sec.querySelectorAll<HTMLElement>("[data-row]").forEach((row) => {
+            const hit = secHit || (row.dataset.row ?? "").includes(q);
+            row.style.display = hit ? "" : "none";
+            any ||= hit;
+          });
+          // Satır dışındaki açıklamalar ve özel içerik yalnızca bölüm adı tutuyorsa
+          sec.querySelectorAll<HTMLElement>(":scope > div > *").forEach((x) => {
+            if (!x.matches("[data-row]") && !x.querySelector("[data-row]")) x.style.display = secHit ? "" : "none";
+          });
+          sec.style.display = any || secHit ? "" : "none";
+          catHit ||= any || secHit;
+        });
+        catEl.style.display = catHit ? "" : "none";
+        total ||= catHit;
+      });
+      setEmpty(!total);
+    };
+    filter();
+    // Geç yüklenen satırlar (destekçiler, ekranlar) için bir kez daha
+    const t = window.setTimeout(filter, 150);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const current = CATS.find((c) => c.id === cat);
+  const shown = q ? CATS : current ? [current] : [];
+
+  return (
+    <div ref={scroller} className="h-full overflow-y-auto pr-1.5">
+      <div className="sticky top-0 z-10 flex items-center gap-1.5 bg-[#1c1c1f] pb-2" style={{ boxShadow: "0 8px 10px -6px #1c1c1f" }}>
+        {current && !q && (
+          <button onClick={() => setCat(null)} className="flex h-[26px] shrink-0 items-center gap-1 rounded-full bg-well pl-1.5 pr-2.5 text-[11.5px] font-semibold text-label hover:bg-well-hi">
+            <ChevronLeft size={14} />
+            <current.icon size={12} style={{ color: tintText(current.color) }} />
+            {current.title}
+          </button>
+        )}
+        <label className="flex h-[26px] min-w-0 flex-1 items-center gap-1.5 rounded-full bg-well px-2.5 text-label-3 focus-within:ring-1 focus-within:ring-white/15">
+          <Search size={12} className="shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && query) {
+                setQuery("");
+                e.stopPropagation();
+              }
+            }}
+            placeholder={tt("Ayarlarda ara…")}
+            className="min-w-0 flex-1 bg-transparent text-[11.5px] text-label outline-none placeholder:text-label-3"
+          />
+          {query && (
+            <button onClick={() => setQuery("")} className="text-label-3 hover:text-label" aria-label={tt("Temizle")}>
+              <X size={12} />
+            </button>
+          )}
+        </label>
+      </div>
+
+      {!q && !current && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {CATS.map((c) => (
+            <motion.button
+              key={c.id}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setCat(c.id)}
+              className="flex min-h-[46px] min-w-0 items-center gap-2 rounded-[14px] px-2 py-1.5 text-left transition-[filter] hover:brightness-125"
+              style={{ background: tintBg(c.color, 10), border: `1px solid ${tintBg(c.color, 22)}` }}
+            >
+              <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full" style={{ background: tintBg(c.color, 24), color: tintText(c.color) }}>
+                <c.icon size={13} />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[11.5px] font-semibold" style={{ color: tintText(c.color) }}>
+                  {c.title}
+                </span>
+                <span className="line-clamp-2 text-[9.5px] leading-[1.25] text-label-3">{c.hint}</span>
+              </span>
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {shown.map((c) => (
+        <div key={c.id} data-cat={c.id} className="space-y-3 pb-2">
+          {q && (
+            <h2 className="flex items-center gap-1.5 pt-1 text-[11px] font-semibold" style={{ color: tintText(c.color) }}>
+              <c.icon size={12} /> {c.title}
+            </h2>
+          )}
+          <CategoryBody id={c.id} />
+        </div>
+      ))}
+      {q && empty && <p className="py-6 text-center text-[11px] text-label-3">{tt("Bulunamadı")}</p>}
+    </div>
+  );
+}
+
+/** Bir kategorinin bölümleri */
+function CategoryBody({ id }: { id: CatId }) {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
+  useEffect(() => {
+    if (id === "general") void listMonitors().then(setMonitors);
+  }, [id]);
   // Önizleme sahneleri: ilk oynatışta açılır, her basışta baştan oynar
   const [preview, setPreview] = useState({ move: 0, intro: 0 });
   const replay = (k: "move" | "intro") => setPreview((p) => ({ ...p, [k]: p[k] + 1 }));
 
-  return (
-    <div ref={scroller} className="h-full space-y-3 overflow-y-auto pr-1.5">
-      <SectionIndex scroller={scroller} />
-      <Section title="Nook">
-        <Row label={tt("Dil") + (tt("Dil") === "Language" ? "" : " · Language")}>
-          <LangDropdown />
-        </Row>
-        <Affection />
-        <Row label={tt("Adı ve görünümü")}>
-          <TextButton onClick={() => useNook.getState().setTab("look")}>{tt("Düzenle")}</TextButton>
-        </Row>
-        <Row label={tt("Uyuma süresi")}>
-          <Segmented id="sleep" options={SLEEP} value={s.sleepAfterSec} onChange={(v) => update({ sleepAfterSec: v })} />
-        </Row>
-        <Row label={tt("Ara sıra dışarı çıksın (pencereye tüner, iple sarkar, balık tutar)")}>
-          <Toggle on={s.outings} onChange={(v) => update({ outings: v })} />
-        </Row>
-        <Row label={tt("Nook nedir? Nasıl kullanılır?")}>
-          <TextButton onClick={() => void startTour()}>{tt("Tanıtımı aç")}</TextButton>
-        </Row>
-        <UpdateRow />
-        <Row label="Instagram">
-          <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
-        </Row>
-      </Section>
-
-      <SupportersSection />
-
-      <ShortcutsSection />
-
-      <Section title={tt("Erişilebilirlik")}>
-        <Row label={tt("Arayüz boyutu")}>
-          <Segmented id="scale" options={SCALES} value={s.uiScale} onChange={(v) => update({ uiScale: v })} />
-        </Row>
-        <Row label={tt("Renk körlüğü paleti")}>
-          <Dropdown options={VISION} value={s.colorVision} onChange={(v) => update({ colorVision: v })} />
-        </Row>
-        <PalettePreview />
-      </Section>
-
-      <Section title={tt("Mola hatırlatıcıları")}>
-        <Row label={tt("Göz molası (20-20-20)")}>
-          <Toggle on={s.eyeBreak} onChange={(v) => update({ eyeBreak: v })} />
-        </Row>
-        <Row label={tt("Su hatırlatıcısı")}>
-          <Segmented id="settings-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
-        </Row>
-        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Odak modundan bağımsız, her zaman çalışır. Oyunda ve tam ekranda susar.")}</p>
-      </Section>
-
-      <Section title={tt("Odak bekçisi")}>
-        <Row label={tt("Pomodoro'da dikkat dağıtan siteye girince uyar")}>
-          <Toggle on={s.focusGuard} onChange={(v) => update({ focusGuard: v })} color={ACCENT.red} />
-        </Row>
-        {s.focusGuard && (
-          <Row label={tt("Siteler / uygulamalar (virgülle)")}>
-            <TextInput
-              value={s.focusSites.join(", ")}
-              placeholder={tt("YouTube, X, Discord")}
-              onChange={(v) => update({ focusSites: v.split(",").map((x) => x.trim()).filter(Boolean) })}
-            />
+  switch (id) {
+    case "general":
+      return (
+        <>
+          <Section title="Nook">
+            <Row label={tt("Dil") + (tt("Dil") === "Language" ? "" : " · Language")}>
+              <LangDropdown />
+            </Row>
+            <Affection />
+            <Row label={tt("Adı ve görünümü")} hint={tt("Şekli, gözleri, şapkası, rengi")}>
+              <TextButton onClick={() => useNook.getState().setTab("look")}>{tt("Düzenle")}</TextButton>
+            </Row>
+            <Row label={tt("Windows açılınca başlat")}>
+              <Toggle on={s.autostart} onChange={(v) => update({ autostart: v })} />
+            </Row>
+          </Section>
+          <Section title={tt("Ekran")}>
+            <Row label={tt("Hangi ekranda")} hint={tt("Ana ekran, imlecin olduğu, hepsi ya da seçtiğin")}>
+              <Segmented id="monitor" options={MONITOR_MODES} value={s.monitorMode} onChange={(v) => update({ monitorMode: v })} color={ACCENT.blue} />
+            </Row>
+            {s.monitorMode === "fixed" && (
+              <Row label={tt("Hangi ekran")}>
+                <Dropdown
+                  value={s.monitorName ?? ""}
+                  onChange={(v) => update({ monitorName: v || null })}
+                  maxWidth={150}
+                  color={ACCENT.blue}
+                  options={[{ id: "", label: tt("Ana ekran") }, ...monitors.map((m, i) => ({ id: m.name, label: `${i + 1}. ekran · ${m.width}×${m.height}` }))]}
+                />
+              </Row>
+            )}
+            <Row label={tt("Adanın yeri")} hint={s.islandPos ? tt("Taşındı · üstteki ✥ ile sürükle") : tt("Üst orta · üstteki ✥ ile sürükle")}>
+              <TextButton disabled={!s.islandPos} onClick={() => update({ islandPos: null })}>{tt("Ortala")}</TextButton>
+            </Row>
+          </Section>
+          <Section title={tt("Erişilebilirlik")}>
+            <Row label={tt("Arayüz boyutu")}>
+              <Segmented id="scale" options={SCALES} value={s.uiScale} onChange={(v) => update({ uiScale: v })} />
+            </Row>
+            <Row label={tt("Renk körlüğü paleti")}>
+              <Dropdown options={VISION} value={s.colorVision} onChange={(v) => update({ colorVision: v })} />
+            </Row>
+            <PalettePreview />
+          </Section>
+        </>
+      );
+    case "island":
+      return (
+        <>
+          <Section title={tt("Ada")}>
+            <Row label={tt("Uyuma süresi")} hint={tt("Bu kadar dokunulmazsa Nook uyur")}>
+              <Segmented id="sleep" options={SLEEP} value={s.sleepAfterSec} onChange={(v) => update({ sleepAfterSec: v })} />
+            </Row>
+            <Row label={tt("Ara sıra dışarı çıksın")} hint={tt("Pencereye tüner, iple sarkar, balık tutar")}>
+              <Toggle on={s.outings} onChange={(v) => update({ outings: v })} />
+            </Row>
+            <Row label={tt("Ses kartı")} hint={tt("Ada açılınca solunda ses düzeyi kartı")}>
+              <Toggle on={s.soundCard} onChange={(v) => update({ soundCard: v })} color={ACCENT.green} />
+            </Row>
+            <Row label={tt("Pilde yavaşla")} hint={tt("Pildeyken ve tasarruf modunda animasyonlar azalır")}>
+              <Toggle on={s.powerSaver} onChange={(v) => update({ powerSaver: v })} />
+            </Row>
+            <Row label={tt("Günün ilk açılışında özet")} hint={tt("Hava, takvim, yeni bölümler")}>
+              <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
+            </Row>
+            <Row label={tt("Dönünce karşıla")} hint={tt("Bu kadar süre yokken dönünce Nook sevinir")}>
+              <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
+            </Row>
+            <Row label={tt("Sıkılınca oyun teklif etsin")}>
+              <Toggle on={s.playOffers} onChange={(v) => update({ playOffers: v })} />
+            </Row>
+          </Section>
+          <Section title={tt("Animasyonlar")}>
+            <Row label={tt("Ekranlar arası geçiş")}>
+              <div className="flex items-center gap-1.5">
+                <Dropdown
+                  value={s.moveStyle}
+                  onChange={(v) => {
+                    update({ moveStyle: v });
+                    replay("move");
+                  }}
+                  color={ACCENT.blue}
+                  options={[{ id: "random" as const, label: tt("Her seferinde farklı") }, ...MOVE_KINDS]}
+                />
+                <PreviewButton color={ACCENT.blue} onClick={() => replay("move")} />
+              </div>
+            </Row>
+            {preview.move > 0 && <MovePreview style={s.moveStyle} run={preview.move} />}
+            <Row label={tt("Açılış animasyonu")}>
+              <div className="flex items-center gap-1.5">
+                <Dropdown
+                  value={s.introStyle}
+                  onChange={(v) => {
+                    update({ introStyle: v });
+                    replay("intro");
+                  }}
+                  color={ACCENT.yellow}
+                  options={[{ id: "random" as const, label: tt("Her seferinde farklı") }, ...INTRO_KINDS]}
+                />
+                <PreviewButton color={ACCENT.yellow} onClick={() => replay("intro")} />
+              </div>
+            </Row>
+            {preview.intro > 0 && <IntroPreview style={s.introStyle} run={preview.intro} />}
+          </Section>
+        </>
+      );
+    case "notify":
+      return (
+        <Section title={tt("Bildirimler")}>
+          <Row label={tt("Windows bildirimleri")} hint={tt("Gelen bildirimler adada kart olarak görünür")}>
+            <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} />
           </Row>
-        )}
-      </Section>
-
-      <ClipSection />
-
-      <ShelfSection />
-
-      <SoundSection />
-
-      <CalendarSection />
-
-      <Section title="Hum">
-        <Row label={tt("Otomatik Hum: arkada dinle, bulduklarını kaydet")}>
-          <Toggle on={s.humAuto} onChange={(v) => update({ humAuto: v })} color={ACCENT.purple} />
-        </Row>
-        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
-          {tt("Mikrofon değil, bilgisayarın kendi sesi dinlenir. Sesin kendisi gönderilmez, yalnızca şarkıyı tanımaya yeten parmak izi Shazam'a gider. Otomatik Hum oyundayken ve görüşmedeyken dinlemez.")}
-        </p>
-      </Section>
-
-      <Section title={tt("Yayın")}>
-        <Row label={tt("Ekran paylaşınca / yayında hassas bölümleri gizle")}>
-          <Toggle on={s.liveMask} onChange={(v) => update({ liveMask: v })} color={ACCENT.red} />
-        </Row>
-        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
-          {tt("Teams, Zoom, Meet ya da tarayıcıdan ekran paylaşınca, OBS açıkken Not, Pano, Bildirimler, Sohbet ve Takvim buzlanır; bildirim kartlarında içerik görünmez. Üstteki CANLI rozetine tıklayınca o yayın için kapanır.")}
-        </p>
-      </Section>
-
-      <ShieldSection />
-
-      <LockSection />
-
-      <AiSection />
-      <WakeSection />
-
-      <ArgusSection />
-
-      <PhoneSection />
-
-      <Section title={tt("Davranış")}>
-        <Row label={tt("Windows açılınca başlat")}>
-          <Toggle on={s.autostart} onChange={(v) => update({ autostart: v })} />
-        </Row>
-        <Row label={tt("Oyunda / tam ekranda gizlen")}>
-          <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
-        </Row>
-        <Row label={tt("Pilde / tasarrufta yavaşla")}>
-          <Toggle on={s.powerSaver} onChange={(v) => update({ powerSaver: v })} />
-        </Row>
-        <Row label={tt("Ada açılınca solunda ses kartı")}>
-          <Toggle on={s.soundCard} onChange={(v) => update({ soundCard: v })} color={ACCENT.green} />
-        </Row>
-        <Row label={tt("Hassas veri koruyucu (kart, IBAN, anahtar, şifre)")}>
-          <Toggle on={s.sensitiveGuard} onChange={(v) => update({ sensitiveGuard: v })} />
-        </Row>
-        <Row label={tt("Ekran")}>
-          <Segmented id="monitor" options={MONITOR_MODES} value={s.monitorMode} onChange={(v) => update({ monitorMode: v })} color={ACCENT.blue} />
-        </Row>
-        {s.monitorMode === "fixed" && (
-          <Row label={tt("Hangi ekran")}>
-            <Dropdown
-              value={s.monitorName ?? ""}
-              onChange={(v) => update({ monitorName: v || null })}
-              maxWidth={150}
-              color={ACCENT.blue}
-              options={[{ id: "", label: tt("Ana ekran") }, ...monitors.map((m, i) => ({ id: m.name, label: `${i + 1}. ekran · ${m.width}×${m.height}` }))]}
-            />
+          <Row label={tt("Olay kartları")} hint={tt("Şarj, USB, kulaklık, internet gibi olaylar")}>
+            <Toggle on={s.events} onChange={(v) => update({ events: v })} />
           </Row>
-        )}
-        <Row label={tt("Adanın yeri")}>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-label-3">{s.islandPos ? tt("Taşındı") : tt("Üst orta")}{" "}{tt("· üstteki ✥ ile sürükle")}</span>
-            <TextButton disabled={!s.islandPos} onClick={() => update({ islandPos: null })}>{tt("Ortala")}</TextButton>
-          </div>
-        </Row>
-      </Section>
-
-      <Section title={tt("Bildirimler")}>
-        <Row label={tt("Ses / parlaklık göstergesi")}>
-          <Toggle on={s.osd} onChange={(v) => update({ osd: v })} />
-        </Row>
-        <Row label={tt("Olay kartları")}>
-          <Toggle on={s.events} onChange={(v) => update({ events: v })} />
-        </Row>
-        <Row label={tt("Ekran görüntülerini rafa ekle")}>
-          <Toggle on={s.autoScreenshots} onChange={(v) => update({ autoScreenshots: v })} />
-        </Row>
-        <Row label={tt("Windows bildirimlerini göster")}>
-          <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} />
-        </Row>
-        <Row label={tt("Uzun süre yüksek işlemci / bellek, dolan disk için uyar")}>
-          <Toggle on={s.sysAlerts} onChange={(v) => update({ sysAlerts: v })} color={ACCENT.orange} />
-        </Row>
-        <Row label={tt("Kopyalanan yabancı metni çevir")}>
-          <Toggle on={s.translate} onChange={(v) => update({ translate: v })} />
-        </Row>
-        {s.translate && !s.geminiKey.trim() && (
-          <>
-            <Row label={tt("Gemini anahtarı yokken MyMemory ile çevir")}>
+          <Row label={tt("Ses / parlaklık göstergesi")}>
+            <Toggle on={s.osd} onChange={(v) => update({ osd: v })} />
+          </Row>
+          <Row label={tt("Sistem uyarıları")} hint={tt("Uzun süre yüksek işlemci / bellek, dolan disk")}>
+            <Toggle on={s.sysAlerts} onChange={(v) => update({ sysAlerts: v })} color={ACCENT.orange} />
+          </Row>
+          <Row label={tt("Kopyalanan yabancı metni çevir")}>
+            <Toggle on={s.translate} onChange={(v) => update({ translate: v })} />
+          </Row>
+          {s.translate && !s.geminiKey.trim() && (
+            <Row label={tt("Gemini anahtarı yokken MyMemory ile çevir")} hint={tt("Açıksa metin ücretsiz çeviri servisi MyMemory'ye gider")}>
               <Toggle on={s.freeTranslate === true} onChange={(v) => update({ freeTranslate: v })} color={ACCENT.purple} />
             </Row>
-            <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Açıksa kopyaladığın yabancı metin ücretsiz çeviri servisi MyMemory'ye gönderilir. Gemini anahtarı girersen çeviri Google'a gider.")}</p>
-          </>
-        )}
-        <Row label={tt("Günün ilk açılışında özet")}>
-          <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
-        </Row>
-        <Row label={tt("Ekranlar arası geçiş")}>
-          <div className="flex items-center gap-1.5">
-            <Dropdown
-              value={s.moveStyle}
-              onChange={(v) => {
-                update({ moveStyle: v });
-                replay("move");
-              }}
-              color={ACCENT.blue}
-              options={[{ id: "random" as const, label: tt("Her seferinde farklı") }, ...MOVE_KINDS]}
-            />
-            <PreviewButton color={ACCENT.blue} onClick={() => replay("move")} />
-          </div>
-        </Row>
-        {preview.move > 0 && <MovePreview style={s.moveStyle} run={preview.move} />}
-        <Row label={tt("Açılış animasyonu")}>
-          <div className="flex items-center gap-1.5">
-            <Dropdown
-              value={s.introStyle}
-              onChange={(v) => {
-                update({ introStyle: v });
-                replay("intro");
-              }}
-              color={ACCENT.yellow}
-              options={[{ id: "random" as const, label: tt("Her seferinde farklı") }, ...INTRO_KINDS]}
-            />
-            <PreviewButton color={ACCENT.yellow} onClick={() => replay("intro")} />
-          </div>
-        </Row>
-        {preview.intro > 0 && <IntroPreview style={s.introStyle} run={preview.intro} />}
-        <Row label={tt("Uzun süre yokken dönünce karşıla")}>
-          <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
-        </Row>
-        <Row label={tt("Oyun açılınca özet")}>
-          <Toggle on={s.gameIntro} onChange={(v) => update({ gameIntro: v })} />
-        </Row>
-        <Row label={tt("Oyundan çıkınca özet")}>
-          <Toggle on={s.gameSummary} onChange={(v) => update({ gameSummary: v })} />
-        </Row>
-        <Row label={tt("Oyun molası hatırlat")}>
-          <Segmented id="settings-game-break" options={GAME_BREAK} value={s.breakReminderMin} onChange={(v) => update({ breakReminderMin: v })} color={ACCENT.orange} />
-        </Row>
-        <Row label={tt("Sıkılınca oyun teklif etsin")}>
-          <Toggle on={s.playOffers} onChange={(v) => update({ playOffers: v })} />
-        </Row>
-        <Row label={tt("Alarm sesi")}>
-          <div className="flex items-center gap-1">
-            <Dropdown
-              value={s.alarmSound}
-              onChange={(v) => update({ alarmSound: v })}
-              color={ACCENT.orange}
-              options={[{ id: 0, label: tt("Sessiz") }, ...Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Alarm ${i + 1}` }))]}
-            />
-            <button
-              disabled={s.alarmSound === 0}
-              onClick={() => void alarmRing(true, s.alarmSound, true)}
-              title={tt("Dinle")}
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-well text-label-2 hover:bg-well-hi hover:text-label"
-            >
-              <Play size={9} strokeWidth={3} fill="currentColor" />
-            </button>
-          </div>
-        </Row>
-        <Row label={tt("Hava durumu")}>
-          <Toggle on={s.weather} onChange={(v) => update({ weather: v })} />
-        </Row>
-        {s.weather && (
-          <Row label={tt("Şehir")}>
-            <TextInput value={s.weatherCity} placeholder={tt("Otomatik")} onChange={(v) => update({ weatherCity: v })} />
+          )}
+        </Section>
+      );
+    case "health":
+      return (
+        <>
+          <Section title={tt("Mola hatırlatıcıları")}>
+            <Row label={tt("Su hatırlatıcısı")} hint={tt("Oyunda ve tam ekranda susar; telefonda da çıkar")}>
+              <Segmented id="settings-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
+            </Row>
+            <Row label={tt("Göz molası")} hint={tt("20 dakikada bir 20 saniye uzağa bak")}>
+              <Toggle on={s.eyeBreak} onChange={(v) => update({ eyeBreak: v })} />
+            </Row>
+          </Section>
+          <Section title={tt("Odak bekçisi")}>
+            <Row label={tt("Dikkat dağıtana girince uyar")} hint={tt("Pomodoro sürerken aşağıdaki sitelere / uygulamalara girersen")}>
+              <Toggle on={s.focusGuard} onChange={(v) => update({ focusGuard: v })} color={ACCENT.red} />
+            </Row>
+            {s.focusGuard && (
+              <Row label={tt("Siteler / uygulamalar")} hint={tt("Virgülle ayır")}>
+                <TextInput
+                  value={s.focusSites.join(", ")}
+                  placeholder={tt("YouTube, X, Discord")}
+                  onChange={(v) => update({ focusSites: v.split(",").map((x) => x.trim()).filter(Boolean) })}
+                />
+              </Row>
+            )}
+          </Section>
+        </>
+      );
+    case "game":
+      return (
+        <Section title={tt("Oyun")}>
+          <Row label={tt("Oyunda / tam ekranda gizlen")}>
+            <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
           </Row>
-        )}
-      </Section>
-    </div>
-  );
+          <Row label={tt("Oyun açılınca özet")} hint={tt("Kısa süre oyunun üstünde merhaba der")}>
+            <Toggle on={s.gameIntro} onChange={(v) => update({ gameIntro: v })} />
+          </Row>
+          <Row label={tt("Oyundan çıkınca özet")} hint={tt("Ne kadar oynadın, bilgisayar ne kadar yoruldu")}>
+            <Toggle on={s.gameSummary} onChange={(v) => update({ gameSummary: v })} />
+          </Row>
+          <Row label={tt("Oyun molası")} hint={tt("Bu kadar oynayınca mola hatırlatır")}>
+            <Segmented id="settings-game-break" options={GAME_BREAK} value={s.breakReminderMin} onChange={(v) => update({ breakReminderMin: v })} color={ACCENT.orange} />
+          </Row>
+        </Section>
+      );
+    case "privacy":
+      return (
+        <>
+          <Section title={tt("Yayın ve hassas veri")}>
+            <Row label={tt("Yayında hassas bölümleri gizle")} hint={tt("Ekran paylaşınca ya da OBS açıkken Not, Pano, Bildirimler buzlanır")}>
+              <Toggle on={s.liveMask} onChange={(v) => update({ liveMask: v })} color={ACCENT.red} />
+            </Row>
+            <Row label={tt("Hassas veri koruyucu")} hint={tt("Kopyalanan kart, IBAN, anahtar, şifre için uyarır")}>
+              <Toggle on={s.sensitiveGuard} onChange={(v) => update({ sensitiveGuard: v })} />
+            </Row>
+          </Section>
+          <ShieldSection />
+          <LockSection />
+        </>
+      );
+    case "voice":
+      return (
+        <>
+          <AiSection />
+          <WakeSection />
+          <SoundSection />
+        </>
+      );
+    case "modules":
+      return (
+        <>
+          <ClipSection />
+          <ShelfSection />
+          <CalendarSection />
+          <Section title={tt("Hava durumu")}>
+            <Row label={tt("Hava durumu")} hint={tt("Bugün kartında ve günün özetinde")}>
+              <Toggle on={s.weather} onChange={(v) => update({ weather: v })} />
+            </Row>
+            {s.weather && (
+              <Row label={tt("Şehir")}>
+                <TextInput value={s.weatherCity} placeholder={tt("Otomatik")} onChange={(v) => update({ weatherCity: v })} />
+              </Row>
+            )}
+          </Section>
+          <Section title="Hum">
+            <Row label={tt("Otomatik Hum")} hint={tt("Bilgisayarda çalan şarkıları arkada tanıyıp kaydeder; mikrofon kullanmaz")}>
+              <Toggle on={s.humAuto} onChange={(v) => update({ humAuto: v })} color={ACCENT.purple} />
+            </Row>
+          </Section>
+          <ArgusSection />
+        </>
+      );
+    case "shortcuts":
+      return <ShortcutsSection />;
+    case "phone":
+      return <PhoneSection />;
+    case "about":
+      return (
+        <>
+          <Section title={tt("Hakkında")}>
+            <Row label={tt("Nook nedir? Nasıl kullanılır?")}>
+              <TextButton onClick={() => void startTour()}>{tt("Tanıtımı aç")}</TextButton>
+            </Row>
+            <UpdateRow />
+            <Row label="Instagram">
+              <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
+            </Row>
+          </Section>
+          <SupportersSection />
+        </>
+      );
+  }
 }
 
 /** Argus (dizi/film arşivi) — yalnızca bu bilgisayarda varsa görünür. */
@@ -846,29 +983,6 @@ function SupportersSection() {
   );
 }
 
-/** Bölümler arası hızlı geçiş: üstte yapışık kalan ince sekme şeridi; kaydırdıkça bulunulan bölüm parlar */
-const INDEX: { label: string; title: string }[] = [
-  { label: "Nook", title: "Nook" },
-  { label: tt("Destekçiler"), title: tt("Destekçiler") },
-  { label: tt("Kısayollar"), title: tt("Kısayollar") },
-  { label: tt("Erişilebilirlik"), title: tt("Erişilebilirlik") },
-  { label: tt("Molalar"), title: tt("Mola hatırlatıcıları") },
-  { label: tt("Bekçi"), title: tt("Odak bekçisi") },
-  { label: tt("Pano"), title: tt("Pano ve notlar") },
-  { label: tt("Raf"), title: tt("Raf") },
-  { label: tt("Ses"), title: tt("Ses") },
-  { label: tt("Takvim"), title: tt("Takvim") },
-  { label: "Hum", title: "Hum" },
-  { label: tt("Yayın"), title: tt("Yayın") },
-  { label: tt("Kalkan"), title: tt("Gizlilik kalkanı") },
-  { label: tt("Kilit"), title: tt("Parola kilidi") },
-  { label: tt("Yapay zekâ"), title: tt("Yapay zekâ") },
-  { label: "Hey Nook", title: "Hey Nook" },
-  { label: "Argus", title: "Argus" },
-  { label: tt("Davranış"), title: tt("Davranış") },
-  { label: tt("Bildirimler"), title: tt("Bildirimler") },
-];
-
 /**
  * Bölümün kaydırılan kutunun içeriğindeki yeri. offsetTop en yakın konumlu ataya göredir; kaydırılan
  * kutu konumlu olmadığından kutunun kendi yeri de içindeydi ve sekme bir önceki bölümde parlıyordu.
@@ -878,99 +992,6 @@ function topIn(sec: HTMLElement, el: HTMLElement) {
   if (sec.offsetParent === el) return sec.offsetTop;
   if (sec.offsetParent === el.offsetParent) return sec.offsetTop - el.offsetTop - el.clientTop;
   return sec.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-}
-
-function SectionIndex({ scroller }: { scroller: React.RefObject<HTMLDivElement | null> }) {
-  const [current, setCurrent] = useState(0);
-  const strip = useRef<HTMLDivElement>(null);
-  // Sekmeye tıklayınca kayma bitene kadar aradaki bölümler parlamasın: hedef sabit kalır
-  const jumping = useRef<{ i: number; timer: number } | null>(null);
-  const find = (title: string) => scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${title}"]`) ?? null;
-  // Bu bilgisayarda olmayan bölümün (ör. Argus) sekmesi de görünmesin
-  const [present, setPresent] = useState<boolean[]>(() => INDEX.map(() => true));
-  useEffect(() => setPresent(INDEX.map((it) => !!find(it.title))), []);
-
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const onScroll = () => {
-      const j = jumping.current;
-      if (j) {
-        // Kayma durunca (son olaydan 140 ms sonra) kilit kalkar
-        window.clearTimeout(j.timer);
-        j.timer = window.setTimeout(() => (jumping.current = null), 140);
-        return;
-      }
-      const y = el.scrollTop + 44;
-      let at = 0;
-      INDEX.forEach((it, i) => {
-        const sec = find(it.title);
-        if (sec && topIn(sec, el) <= y) at = i;
-      });
-      // En alta gelindiyse son bölüm
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) at = INDEX.length - 1;
-      setCurrent(at);
-    };
-    onScroll();
-    // Kullanıcı kendisi kaydırmaya başlarsa kilit hemen kalkar
-    const release = () => {
-      if (jumping.current) window.clearTimeout(jumping.current.timer);
-      jumping.current = null;
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    el.addEventListener("wheel", release, { passive: true });
-    el.addEventListener("pointerdown", release);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("wheel", release);
-      el.removeEventListener("pointerdown", release);
-      release();
-    };
-  }, [scroller]);
-
-  // Seçili sekme şeridin ortasında dursun ki iki yanındaki (önceki/sonraki) sekmeler görünsün ve
-  // tıklanabilsin; uçlarda şerit kendiliğinden sınıra dayanır. scrollIntoView dikey kaydırıcıya da
-  // dokunup sekme tıklamasıyla başlayan yumuşak kaymayı kesiyordu; yalnızca şerit yatayda kaydırılır.
-  useEffect(() => {
-    const s = strip.current;
-    const b = s?.querySelector<HTMLElement>(`[data-i="${current}"]`);
-    if (!s || !b) return;
-    const sr = s.getBoundingClientRect();
-    const br = b.getBoundingClientRect();
-    const delta = br.left + br.width / 2 - (sr.left + sr.width / 2);
-    if (Math.abs(delta) > 2) s.scrollBy({ left: delta, behavior: "smooth" });
-  }, [current]);
-
-  const go = (i: number) => {
-    const sec = find(INDEX[i].title);
-    const el = scroller.current;
-    if (!sec || !el) return;
-    setCurrent(i);
-    const top = Math.max(0, Math.min(topIn(sec, el) - 36, el.scrollHeight - el.clientHeight));
-    if (Math.abs(top - el.scrollTop) < 1) return;
-    if (jumping.current) window.clearTimeout(jumping.current.timer);
-    // Hiç scroll olayı gelmezse de kilit kalksın
-    jumping.current = { i, timer: window.setTimeout(() => (jumping.current = null), 1200) };
-    el.scrollTo({ top, behavior: "smooth" });
-  };
-
-  return (
-    <div className="sticky top-0 z-10 -mb-1 bg-[#1c1c1f] pb-2" style={{ boxShadow: "0 8px 10px -6px #1c1c1f" }}>
-      <div ref={strip} className="no-scrollbar flex gap-1 overflow-x-auto">
-        {INDEX.map((it, i) => present[i] && (
-          <button
-            key={it.label}
-            data-i={i}
-            onClick={() => go(i)}
-            className={`relative shrink-0 rounded-full px-2.5 py-[3px] text-[10.5px] font-medium transition-colors ${i === current ? "text-label" : "text-label-3 hover:text-label-2"}`}
-          >
-            {i === current && <motion.span layoutId="set-idx" className="absolute inset-0 rounded-full bg-white/[0.09]" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
-            <span className="relative">{it.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -996,11 +1017,15 @@ function PreviewButton({ color, onClick }: { color: string; onClick: () => void 
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** Ayar satırı: kısa başlık, altında isteğe bağlı tek satır açıklama; aramada ikisi de aranır */
+function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[30px] items-center justify-between gap-2 py-1">
-      <span className="text-[12px] text-label">{label}</span>
-      {children}
+    <div data-row={`${label} ${hint ?? ""}`.toLocaleLowerCase("tr")} className="flex min-h-[30px] items-center justify-between gap-2 py-1">
+      <span className="min-w-0">
+        <span className="block text-[12px] text-label">{label}</span>
+        {hint && <span className="block text-[10px] leading-snug text-label-3">{hint}</span>}
+      </span>
+      <span className="flex shrink-0 items-center">{children}</span>
     </div>
   );
 }
@@ -1176,6 +1201,9 @@ function ShelfSection() {
   const update = useNook((st) => st.updateSettings);
   return (
     <Section title={tt("Raf")}>
+      <Row label={tt("Ekran görüntülerini rafa ekle")} hint={tt("Aldığın ekran görüntüsü hemen rafta olur")}>
+        <Toggle on={s.autoScreenshots} onChange={(v) => update({ autoScreenshots: v })} />
+      </Row>
       <Row label={tt("Dosya sürüklerken fareyi sallayınca raf açılsın")}>
         <Toggle on={s.shelfShake} onChange={(v) => update({ shelfShake: v })} />
       </Row>
@@ -1224,6 +1252,24 @@ function SoundSection() {
           </div>
         </Row>
       )}
+      <Row label={tt("Alarm sesi")}>
+        <div className="flex items-center gap-1">
+          <Dropdown
+            value={s.alarmSound}
+            onChange={(v) => update({ alarmSound: v })}
+            color={ACCENT.orange}
+            options={[{ id: 0, label: tt("Sessiz") }, ...Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Alarm ${i + 1}` }))]}
+          />
+          <button
+            disabled={s.alarmSound === 0}
+            onClick={() => void alarmRing(true, s.alarmSound, true)}
+            title={tt("Dinle")}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-well text-label-2 hover:bg-well-hi hover:text-label"
+          >
+            <Play size={9} strokeWidth={3} fill="currentColor" />
+          </button>
+        </div>
+      </Row>
       <Row label={tt("Şarkı sözleri (lrclib.net)")}>
         <Toggle on={s.lyrics} onChange={(v) => update({ lyrics: v })} color={ACCENT.pink} />
       </Row>

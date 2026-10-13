@@ -57,9 +57,28 @@ class MainActivity : TauriActivity() {
     return true
   }
 
+  /** Raf › Telefondan ekle: seçilen dosyalar gönderme sayfasına (paylaşımla aynı yol) */
+  @Deprecated("startActivityForResult")
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    super.onActivityResult(requestCode, resultCode, data)
+    if (requestCode != PICK_FILES || resultCode != RESULT_OK || data == null) return
+    val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
+    if (uris.isEmpty()) return
+    sharedUris = uris
+    shared = JSONObject().put("files", NookBridge.describe(this, uris))
+    bridge?.emit("share")
+  }
+
+  companion object {
+    const val PICK_FILES = 31
+  }
+
   override fun onStart() {
     super.onStart()
     alarm(false)
+    if (androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)) NookNotifService.rebind(this)
+    WaterReceiver.kick(this)
+    askNotifyPermission()
     bridge?.emit("resume")
   }
 
@@ -81,6 +100,16 @@ class MainActivity : TauriActivity() {
   override fun onDestroy() {
     if (isFinishing) NookBridge.tailscaleOff(this)
     super.onDestroy()
+  }
+
+  /** Android 13+: su hatırlatmasını telefonda gösterebilmek için bir kez izin iste (eşleştikten sonra) */
+  private fun askNotifyPermission() {
+    if (Build.VERSION.SDK_INT < 33 || PcLink.pairing(this) == null) return
+    val p = PcLink.prefs(this)
+    if (p.getBoolean("askedNotify", false)) return
+    if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) return
+    p.edit().putBoolean("askedNotify", true).apply()
+    requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7)
   }
 
   private fun alarm(on: Boolean) {

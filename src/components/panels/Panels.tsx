@@ -5,7 +5,7 @@ import { animate, AnimatePresence, motion, PresenceContext, useMotionValue } fro
 import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { easeOut } from "../../lib/motion";
-import { dayKey, isLive, useNook, type Tab } from "../../store/nook";
+import { dayKey, isLive, moduleScore, useNook, type Tab } from "../../store/nook";
 import { allProfiles, userProfiles, type ProfileDef } from "../../lib/profiles";
 import { ACCENT, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { AlarmPanel } from "./AlarmPanel";
@@ -44,28 +44,29 @@ import { isTurkish, tt, locale } from "../../lib/i18n";
 
 type Module = Exclude<Tab, "home">;
 
-const MODULES: { id: Module; label: string; color: string }[] = [
-  { id: "today", label: tt("Bugün"), color: ACCENT.yellow },
-  { id: "media", label: tt("Medya"), color: ACCENT.pink },
-  { id: "hum", label: "Hum", color: ACCENT.purple },
-  { id: "argus", label: "Argus", color: ARGUS_BLUE },
-  { id: "claude", label: "Claude", color: CLAUDE_COLOR },
-  { id: "focus", label: "Pomodoro", color: ACCENT.red },
-  { id: "shelf", label: tt("Raf"), color: ACCENT.teal },
-  { id: "clip", label: tt("Pano"), color: ACCENT.purple },
-  { id: "note", label: tt("Not"), color: ACCENT.orange },
-  { id: "alarm", label: tt("Alarm"), color: ACCENT.yellow },
-  { id: "calendar", label: tt("Takvim"), color: ACCENT.blue },
-  { id: "apps", label: tt("Kısayollar"), color: ACCENT.blue },
-  { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple },
-  { id: "control", label: tt("Kontrol"), color: ACCENT.green },
-  { id: "devices", label: "Lukonnect", color: ACCENT.blue },
-  { id: "stats", label: tt("Sistem"), color: ACCENT.red },
-  { id: "play", label: tt("Oyun"), color: ACCENT.pink },
-  { id: "report", label: tt("Karne"), color: ACCENT.teal },
-  { id: "look", label: tt("Görünüm"), color: ACCENT.pink },
-  { id: "notes", label: tt("Yama notları"), color: ACCENT.orange },
-  { id: "year", label: tt("Yıl özeti"), color: ACCENT.yellow },
+/** `desc`: ne işe yaradığı (ilk hafta açılmamış çipin alt yazısı, her zaman üstüne gelince) */
+const MODULES: { id: Module; label: string; color: string; desc: string }[] = [
+  { id: "today", label: tt("Bugün"), color: ACCENT.yellow, desc: tt("Hava, alarm, günün özeti") },
+  { id: "media", label: tt("Medya"), color: ACCENT.pink, desc: tt("Çalan müzik, şarkı sözleri") },
+  { id: "hum", label: "Hum", color: ACCENT.purple, desc: tt("Çalan şarkıyı bul") },
+  { id: "argus", label: "Argus", color: ARGUS_BLUE, desc: tt("Dizi ve film listen") },
+  { id: "claude", label: "Claude", color: CLAUDE_COLOR, desc: tt("Claude Code oturumların") },
+  { id: "focus", label: "Pomodoro", color: ACCENT.red, desc: tt("Odaklanma sayacı") },
+  { id: "shelf", label: tt("Raf"), color: ACCENT.teal, desc: tt("Bana bıraktığın dosyalar") },
+  { id: "clip", label: tt("Pano"), color: ACCENT.purple, desc: tt("Kopyaladıkların, çevirisi") },
+  { id: "note", label: tt("Not"), color: ACCENT.orange, desc: tt("Hızlı karalama") },
+  { id: "alarm", label: tt("Alarm"), color: ACCENT.yellow, desc: tt("Alarm ve hatırlatıcı") },
+  { id: "calendar", label: tt("Takvim"), color: ACCENT.blue, desc: tt("Etkinlikler, geri sayım") },
+  { id: "apps", label: tt("Kısayollar"), color: ACCENT.blue, desc: tt("Sık açtığın uygulamalar") },
+  { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple, desc: tt("Windows ve telefon bildirimleri") },
+  { id: "control", label: tt("Kontrol"), color: ACCENT.green, desc: tt("Wi-Fi, uygulama bazlı ses") },
+  { id: "devices", label: "Lukonnect", color: ACCENT.blue, desc: tt("Mouse, kulaklık pili") },
+  { id: "stats", label: tt("Sistem"), color: ACCENT.red, desc: tt("İşlemci, bellek, ağ") },
+  { id: "play", label: tt("Oyun"), color: ACCENT.pink, desc: tt("Benimle mini oyunlar") },
+  { id: "report", label: tt("Karne"), color: ACCENT.teal, desc: tt("Haftalık istatistik") },
+  { id: "look", label: tt("Görünüm"), color: ACCENT.pink, desc: tt("Beni giydir") },
+  { id: "notes", label: tt("Yama notları"), color: ACCENT.orange, desc: tt("Yeni gelenler") },
+  { id: "year", label: tt("Yıl özeti"), color: ACCENT.yellow, desc: tt("Yılın nasıl geçti") },
 ];
 
 /** Lukonnect bu bilgisayarda hiç yoksa (ör. arkadaşının bilgisayarı) Cihazlar bölümü gizlenir. */
@@ -415,6 +416,66 @@ function ModuleGrid() {
 
   const ghost = dragId ? modules.find((m) => m.id === dragId) : null;
 
+  // Sık kullanılanlar üstte büyük, gerisi altta küçük ("Tümü"). Az bölüm varsa ikiye bölmeye gerek yok.
+  const use = useNook((s) => s.moduleUse);
+  // İlk hafta bütün çipler büyük ve açıklamalı (sık kullanılanlar için henüz veri de yok)
+  const newcomer = useNook((s) => Object.keys(s.days).length <= NEWCOMER_DAYS);
+  if (!editing && !newcomer && modules.length > FAVORITES + 2) {
+    const now = Date.now();
+    const score = (id: string) => (use[id] ? moduleScore(use[id], now) : 0);
+    // Eşit puanda (hiç açılmamışlar) kullanıcının dizdiği sıra
+    const favs = modules
+      .map((m, i) => ({ m, i, sc: score(m.id) }))
+      .sort((a, b) => b.sc - a.sc || a.i - b.i)
+      .slice(0, FAVORITES)
+      .sort((a, b) => b.sc - a.sc || a.i - b.i)
+      .map((x) => x.m);
+    const rest = modules.filter((m) => !favs.includes(m));
+    const open = (id: Tab) => {
+      useNook.getState().noteModuleUse(id);
+      setTab(id);
+    };
+    return (
+      <div ref={scroller} className="relative -mr-1.5 h-full overflow-y-auto pr-1.5" style={{ overflowAnchor: "none" }}>
+        <p className="mb-1 px-1 text-[9.5px] font-medium uppercase tracking-[0.12em] text-label-3">{tt("Sık kullandıkların")}</p>
+        <div className="grid auto-rows-[41px] grid-cols-2 gap-1.5">
+          {favs.map((m, i) => {
+            const st = sub[m.id];
+            const state: ChipState = st?.state ?? "idle";
+            return (
+              <div key={m.id} className="relative min-w-0">
+                {(state === "active" || state === "alert") && <Breath color={m.color} alert={state === "alert"} />}
+                <Chip m={m} st={st} state={state} dim={false} editing={false} delay={Math.min(i, 8) * 0.02} onClick={() => open(m.id)} />
+              </div>
+            );
+          })}
+        </div>
+        <p className="mb-1 mt-2.5 px-1 text-[9.5px] font-medium uppercase tracking-[0.12em] text-label-3">{tt("Tümü")}</p>
+        <div className="grid auto-rows-[30px] grid-cols-3 gap-1.5">
+          {rest.map((m, i) => {
+            const st = sub[m.id];
+            const state: ChipState = st?.state ?? "idle";
+            return (
+              <div key={m.id} className="relative min-w-0">
+                {(state === "active" || state === "alert") && <Breath color={m.color} alert={state === "alert"} />}
+                <SmallChip m={m} st={st} state={state} delay={Math.min(i + FAVORITES, 14) * 0.015} onClick={() => open(m.id)} />
+              </div>
+            );
+          })}
+          <motion.button
+            onClick={() => setEditing(() => true)}
+            whileTap={{ scale: 0.95 }}
+            title={tt("Sürükleyip sırala, istemediğini gizle")}
+            className="flex items-center justify-center gap-1 rounded-full border border-dashed border-white/[0.12] text-[10.5px] font-medium text-label-3 transition-colors hover:border-white/25 hover:text-label-2"
+          >
+            <SlidersHorizontal size={10} strokeWidth={2.4} />
+            {tt("Düzenle")}
+          </motion.button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={scroller} className="relative -mr-1.5 grid h-full auto-rows-[41px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5" style={{ overflowAnchor: "none" }}>
       {modules.map((m, i) => {
@@ -456,7 +517,11 @@ function ModuleGrid() {
                   dim={editing && off}
                   editing={editing}
                   delay={Math.min(i, 8) * 0.02}
-                  onClick={() => !editing && setTab(m.id)}
+                  onClick={() => {
+                    if (editing) return;
+                    useNook.getState().noteModuleUse(m.id);
+                    setTab(m.id);
+                  }}
                 />
                 {editing && (
                   <button
@@ -549,6 +614,58 @@ function ProfileEditor({ profile }: { profile: ProfileDef }) {
   );
 }
 
+/**
+ * İlk hafta (Nook'un kullanıldığı ilk 7 gün): henüz açılmamış bölümün çipinde canlı bilgi yerine ne işe
+ * yaradığı yazar; bir kez açılınca normale döner. Yeni gelen "Hum ne, Argus ne?" diye kalmasın.
+ */
+function useExplain(id: string) {
+  return useNook((s) => Object.keys(s.days).length <= NEWCOMER_DAYS && !s.moduleUse[id]);
+}
+
+/** Nook'un kullanıldığı ilk bu kadar gün "yeni gelen" sayılır */
+const NEWCOMER_DAYS = 7;
+
+/** Ana sayfada en çok açılanlar bu kadar (üstte büyük çip) */
+const FAVORITES = 6;
+
+/** Meşgul bölüm kendi renginde yavaşça "nefes alır" */
+function Breath({ color, alert }: { color: string; alert: boolean }) {
+  return (
+    <motion.span
+      className="pointer-events-none absolute inset-0 rounded-full"
+      style={{ boxShadow: `0 0 16px -3px ${color}, inset 0 0 8px -4px ${color}` }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0.25, 1, 0.25] }}
+      transition={{ duration: alert ? 1.2 : 2.6, repeat: Infinity, ease: "easeInOut" }}
+    />
+  );
+}
+
+/** "Tümü"ndeki küçük çip: küçük Nook ve ad; canlı bilgi üstüne gelince */
+function SmallChip({ m, st, state, delay, onClick }: { m: (typeof MODULES)[number]; st: Status | undefined; state: ChipState; delay: number; onClick: () => void }) {
+  const on = state === "active" || state === "alert";
+  return (
+    <motion.button
+      onClick={onClick}
+      title={st?.text ? `${m.label}: ${m.desc} · ${st.text}` : `${m.label}: ${m.desc}`}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: state === "empty" ? 0.7 : 1, scale: 1 }}
+      whileHover={{ scale: 1.04 }}
+      whileTap={{ scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30, delay }}
+      className="flex h-full w-full min-w-0 items-center gap-1 rounded-full border py-0.5 pl-0.5 pr-2 text-left"
+      style={{ background: tintBg(m.color, on ? 16 : 8), borderColor: tintBg(m.color, on ? 55 : 22) }}
+    >
+      <span className="flex h-[24px] w-[24px] shrink-0 items-center justify-center [&>*]:scale-[0.82]">
+        <ChipNook id={m.id} color={m.color} state={state} soon={!!st?.soon} />
+      </span>
+      <span className="truncate text-[11px] font-medium" style={{ color: tintText(m.color) }}>
+        {m.label}
+      </span>
+    </motion.button>
+  );
+}
+
 /** Tek çip: renkli hap, solda giyinik Nook, yanında ad ve canlı bilgi */
 function Chip({
   m,
@@ -568,9 +685,11 @@ function Chip({
   onClick?: () => void;
 }) {
   const on = state === "active" || state === "alert";
+  const explain = useExplain(m.id) && !editing && !on;
   return (
     <motion.button
       onClick={onClick}
+      title={st?.text && !explain ? `${m.desc} · ${st.text}` : m.desc}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: dim ? 0.35 : state === "empty" ? 0.62 : 1, scale: 1 }}
       whileHover={editing ? undefined : { scale: 1.03 }}
@@ -584,7 +703,11 @@ function Chip({
         <span className="block truncate text-[12px] font-medium" style={{ color: tintText(m.color) }}>
           {m.label}
         </span>
-        {st?.text && <span className={`block truncate text-[10px] ${state === "active" ? "text-label-2" : "text-label-3"}`}>{st.text}</span>}
+        {explain ? (
+          <span className="block truncate text-[10px] text-label-2">{m.desc}</span>
+        ) : (
+          st?.text && <span className={`block truncate text-[10px] ${state === "active" ? "text-label-2" : "text-label-3"}`}>{st.text}</span>
+        )}
       </span>
     </motion.button>
   );

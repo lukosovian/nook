@@ -74,6 +74,17 @@ pub fn media_control(action: String) -> Result<(), String> {
     imp::control(&action)
 }
 
+/// Çalan şarkıyı/videoyu verilen ana (ms) sar. Uygulama izin vermiyorsa hata
+#[tauri::command]
+pub async fn media_seek(ms: u64) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || imp::seek(ms)).await.map_err(|e| e.to_string())?
+}
+
+/// Telefondan sarma (köprü zaten kendi iş parçacığında)
+pub fn imp_seek(ms: u64) -> Result<(), String> {
+    imp::seek(ms)
+}
+
 /// Çalan bütün medya oturumlarını duraklat (gizlilik kalkanı). Duraklatılan oldu mu döner.
 pub fn pause_all() -> bool {
     imp::pause_all()
@@ -245,6 +256,23 @@ mod imp {
         run().unwrap_or(false)
     }
 
+    pub fn seek(ms: u64) -> Result<(), String> {
+        let run = || -> windows::core::Result<bool> {
+            let session = Manager::RequestAsync()?.join()?.GetCurrentSession()?;
+            // Konum, zaman çizelgesinin verdiği değerle aynı ölçekte (100 ns)
+            let ok = session.TryChangePlaybackPositionAsync(ms as i64 * 10_000)?.join()?;
+            if ok {
+                RESEND.store(true, Ordering::Relaxed);
+            }
+            Ok(ok)
+        };
+        match run() {
+            Ok(true) => Ok(()),
+            Ok(false) => Err("Bu uygulama ileri geri sarmaya izin vermiyor".into()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
     pub fn control(action: &str) -> Result<(), String> {
         let run = || -> windows::core::Result<()> {
             let session = Manager::RequestAsync()?.join()?.GetCurrentSession()?;
@@ -268,6 +296,9 @@ mod imp {
         false
     }
     pub fn control(_action: &str) -> Result<(), String> {
+        Err("yalnızca Windows'ta destekleniyor".into())
+    }
+    pub fn seek(_ms: u64) -> Result<(), String> {
         Err("yalnızca Windows'ta destekleniyor".into())
     }
 }

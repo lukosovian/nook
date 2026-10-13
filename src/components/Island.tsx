@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { normalizeColor, normalizeLook } from "../lib/look";
 import { AnimatePresence, motion, useAnimationControls, type TargetAndTransition } from "motion/react";
 import { playAntic } from "../hooks/useAntics";
@@ -180,6 +180,18 @@ export function Island() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [bigOn]);
+  // Tam ekranda pencere bütün ekranı kaplar: ada taşındıysa büyük hâli de Nook'un olduğu yerde açılsın
+  // (ekrandan taşmadan), üst ortaya kaçmasın
+  const pos = settings.islandPos;
+  const liveShift = bigOn && big && pos ? shiftToward(pos, ex.width, ex.height) : null;
+  // Küçülürken de (pencere küçülene kadar) yerinde kalsın, üst ortaya sıçramasın
+  const [heldShift, setHeldShift] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (liveShift) return setHeldShift(liveShift);
+    const t = window.setTimeout(() => setHeldShift(null), 750);
+    return () => window.clearTimeout(t);
+  }, [liveShift?.x, liveShift?.y]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bigShift = liveShift ?? heldShift;
   const playing = !!media?.playing;
   // Görünüm düzenlenirken dans etmesin: seçilen gözler görünsün
   const lookTab = useNook((s) => s.tab === "look");
@@ -220,7 +232,10 @@ export function Island() {
   );
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 flex justify-center" style={{ paddingTop: ISLAND_TOP }}>
+    <div
+      className="pointer-events-none fixed inset-x-0 top-0 flex justify-center"
+      style={{ paddingTop: ISLAND_TOP + (bigShift?.y ?? 0), transform: bigShift?.x ? `translateX(${bigShift.x}px)` : undefined }}
+    >
       <AnimatePresence>{move && <MoveFx key={`${move.kind}-${move.phase}`} move={move} />}</AnimatePresence>
       <motion.div
         className="pointer-events-auto"
@@ -376,4 +391,14 @@ function skipIntro() {
   } catch {
     return false;
   }
+}
+
+/** Taşınmış adanın tam ekran hâlini Nook'un yerine kaydırma (sayfa = ekran; kenarlarda pay kalır) */
+function shiftToward(pos: { fx: number; fy: number }, w: number, h: number) {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const PAD = 24;
+  const left = Math.min(Math.max(PAD, pos.fx * W - w / 2), Math.max(PAD, W - w - PAD));
+  const top = Math.min(Math.max(ISLAND_TOP, pos.fy * H), Math.max(ISLAND_TOP, H - h - PAD));
+  return { x: Math.round(left + w / 2 - W / 2), y: Math.round(top - ISLAND_TOP) };
 }

@@ -244,8 +244,32 @@ fn handle(mut req: Request) {
     }
     let url = req.url().to_owned();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
+    // Raftaki dosya telefona: büyük olabilir, belleğe alınmadan akışla
+    if *req.method() == Method::Get && path == "/v1/shelf/file" {
+        let id = query_param(query, "id").unwrap_or("").to_owned();
+        let _ = match shelf_path(&id).and_then(|p| std::fs::File::open(p).ok()) {
+            Some(f) => {
+                let mut r = Response::from_file(f);
+                for (k, v) in [("Content-Type", "application/octet-stream"), ("Access-Control-Allow-Origin", "*"), ("Cache-Control", "no-store")] {
+                    r.add_header(Header::from_bytes(k, v).unwrap());
+                }
+                req.respond(r)
+            }
+            None => req.respond(err(404, "dosya rafta yok")),
+        };
+        return;
+    }
     let res = route(req.method(), path, query, &body);
     let _ = req.respond(res);
+}
+
+/// Raftaki öğenin dosyası (yalnızca raftakiler; klasör değil — keyfi dosya okunamasın)
+fn shelf_path(id: &str) -> Option<String> {
+    MIRROR.lock().unwrap()["shelf"]
+        .as_array()?
+        .iter()
+        .find(|i| i["id"].as_str() == Some(id) && !i["isDir"].as_bool().unwrap_or(false))
+        .and_then(|i| i["path"].as_str().map(str::to_owned))
 }
 
 fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
@@ -299,6 +323,8 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             let b = body_json(body);
             let r = if let Some(a) = b["action"].as_str() {
                 crate::media::media_control(a.to_owned())
+            } else if let Some(ms) = b["seek"].as_u64() {
+                crate::media::imp_seek(ms)
             } else if let Some(v) = b["volume"].as_f64() {
                 crate::quick::set_volume(v as f32)
             } else if let Some(m) = b["muted"].as_bool() {
@@ -432,6 +458,57 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             }
             json_res(200, json!(out))
         }
+        // Raf: PC'deki raftaki öğeler (dosya yolları telefona gitmez)
+        (Method::Get, "/v1/shelf") => {
+            let items: Vec<Value> = MIRROR.lock().unwrap()["shelf"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .map(|i| json!({ "id": i["id"], "name": i["name"], "ext": i["ext"], "size": i["size"], "isDir": i["isDir"], "isImage": i["isImage"], "pinned": i["pinned"], "addedAt": i["addedAt"] }))
+                        .collect()
+                })
+                .unwrap_or_default();
+            json_res(200, json!({ "items": items }))
+        }
+        // { op: remove, id }
+        (Method::Post, "/v1/shelf") => {
+            let b = body_json(body);
+            let id = b["id"].as_str().unwrap_or("").to_owned();
+            if b["op"].as_str() != Some("remove") || id.is_empty() {
+                return err(400, "bilinmeyen raf işlemi");
+            }
+            if let Some(a) = MIRROR.lock().unwrap()["shelf"].as_array_mut() {
+                a.retain(|i| i["id"].as_str() != Some(&id));
+            }
+            match APP.lock().unwrap().as_ref() {
+                Some(app) => {
+                    use tauri::Emitter;
+                    let _ = app.emit_to(crate::window::ISLAND, "nook://remote", json!({ "kind": "shelf", "op": "remove", "id": id }));
+                    json_res(200, json!({ "ok": true }))
+                }
+                None => err(503, "Nook hazır değil"),
+            }
+        }
+        // Su hatırlatması: telefon PC'nin sayacını izler, cevap iki tarafta da kapatır
+        (Method::Get, "/v1/water") => json_res(200, MIRROR.lock().unwrap()["water"].clone()),
+        // { op: drank | snooze, own?: telefon kendi sayacıyla hatırlattı }
+        (Method::Post, "/v1/water") => {
+            let b = body_json(body);
+            let op = b["op"].as_str().unwrap_or("");
+            if !matches!(op, "drank" | "snooze") {
+                return err(400, "bilinmeyen işlem");
+            }
+            match APP.lock().unwrap().as_ref() {
+                Some(app) => {
+                    use tauri::Emitter;
+                    let _ = app.emit_to(crate::window::ISLAND, "nook://remote", json!({ "kind": "water", "op": op, "own": b["own"].as_bool().unwrap_or(false) }));
+                    // Ayna ön yüz cevabı işleyene kadar eski kalmasın
+                    MIRROR.lock().unwrap()["water"]["due"] = Value::Bool(false);
+                    json_res(200, json!({ "ok": true }))
+                }
+                None => err(503, "Nook hazır değil"),
+            }
+        }
         (Method::Get, "/v1/hum") => json_res(200, json!({ "hums": MIRROR.lock().unwrap()["hums"].clone() })),
         // Uzaktan açma ve bağlantı hazırlığının tamamı: telefon saklar, PC kapalıyken de gösterir
         (Method::Get, "/v1/setup") => json_res(200, crate::outside::setup_report()),
@@ -445,6 +522,7 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             }
             use tauri::Emitter;
             let name = s("app");
+            crate::log::write("info", &format!("telefon bildirimi: {}", if name.is_empty() { "?" } else { &name }));
             let _ = app.emit(
                 "nook://notification",
                 json!({
@@ -467,8 +545,14 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             let name = query_param(query, "name").map(url_decode).unwrap_or_default();
             match save_file(&app, &name, query_param(query, "to") == Some("shots"), body) {
                 Ok(path) => {
-                    let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                    crate::system::emit_event(&app, "phone", "Telefondan dosya geldi", file);
+                    if query_param(query, "to") == Some("shots") {
+                        let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        crate::system::emit_event(&app, "phone", "Telefondan dosya geldi", file);
+                    } else {
+                        // Paylaş › Nook ile gelen dosya rafa da düşer (oradan sürüklenip bırakılır)
+                        use tauri::Emitter;
+                        let _ = app.emit_to(crate::shortcut::target(&app).as_str(), "nook://shelf-phone", vec![path.to_string_lossy().into_owned()]);
+                    }
                     json_res(200, json!({ "ok": true, "path": path.to_string_lossy() }))
                 }
                 Err(e) => err(500, &e),
