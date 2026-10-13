@@ -1,8 +1,8 @@
-/** Yalnızca geliştirme: ?preview=poster&slide=1..6&lang=tr|en — Instagram gönderisi (1080×1350) */
+/** Yalnızca geliştirme: ?preview=poster&slide=1..8&lang=tr|en — Instagram gönderisi (1080×1350) */
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { NookFigure } from "../components/mascot/Figure";
 import { Paw } from "../components/outings/Parts";
-import { DEFAULT_LOOK, type Look } from "../lib/look";
+import { CHIP_NOOKS, DEFAULT_LOOK, type Look } from "../lib/look";
 
 const W = 1080;
 const H = 1350;
@@ -38,6 +38,28 @@ const TEXT = {
     planToastSub: "%80'de ve dolunca bir kez haber verir",
     newTag: "YENİ · Claude Code",
     pctFirst: true,
+    voiceTag: "YENİ · Sesli komut",
+    voice1: "“Hey Nook” demen yeter.",
+    voiceSub: "Sesin bilgisayarında yazıya dökülür: hızlı ve gizli.",
+    listening: "Dinliyor…",
+    heard: "YouTube Music'te lo-fi aç",
+    voicePills: ["Şarkı çal", "Site aç", "Alarm kur", "Sesi ayarla"],
+    mobTag: "YENİ · Nook Mobil",
+    mob1: "Bilgisayarın cebinde.",
+    mobSub: "Android için Nook Mobil · evden uzakta da",
+    pcOn: "PC açık",
+    nooks: "NOOK'LAR",
+    pcTile: "Bilgisayar",
+    pcSub: "Kapat, uyut, ekran görüntüsü",
+    stats: [["3 sa 25 dk", "Açık"], ["%18", "İşlemci"], ["11,4 GB", "Bellek"]] as [string, string][],
+    mobFeat: [
+      ["media", "Medya", "Çalanı yönet"],
+      ["clip", "Pano", "Yazıyı iki yöne gönder"],
+      ["notify", "Bildirimler", "Telefonun bildirimleri PC'de"],
+      ["control", "Uzaktan aç", "PC'yi her yerden aç"],
+      ["claude", "Claude", "Onayı telefondan ver"],
+    ] as [string, string, string][],
+    tiles: [["media", "Medya", "Blinding Lights"], ["clip", "Pano", "PC'ye gönder"], ["note", "Not", "PC'deki notlar"], ["hum", "Hum", "Çalan şarkıyı bul"], ["notify", "Bildirimler", "Telefondan PC'ye"], ["claude", "Claude", "1 onay bekliyor"]] as [string, string, string][],
   },
   en: {
     hero1: "A tiny blob lives",
@@ -69,6 +91,28 @@ const TEXT = {
     planToastSub: "One heads-up at 80% and when it's full",
     newTag: "NEW · Claude Code",
     pctFirst: false,
+    voiceTag: "NEW · Voice",
+    voice1: "Just say “Hey Nook.”",
+    voiceSub: "Your voice turns into text right on your PC: fast and private.",
+    listening: "Listening…",
+    heard: "Play lo-fi on YouTube Music",
+    voicePills: ["Play a song", "Open a site", "Set an alarm", "Change volume"],
+    mobTag: "NEW · Nook Mobile",
+    mob1: "Your PC, in your pocket.",
+    mobSub: "Nook Mobile for Android · works away from home too",
+    pcOn: "PC is on",
+    nooks: "NOOKS",
+    pcTile: "Computer",
+    pcSub: "Shut down, sleep, screenshot",
+    stats: [["3 h 25 min", "Uptime"], ["18%", "CPU"], ["11.4 GB", "Memory"]] as [string, string][],
+    mobFeat: [
+      ["media", "Media", "Control what's playing"],
+      ["clip", "Clipboard", "Send text both ways"],
+      ["notify", "Notifications", "Phone alerts on your PC"],
+      ["control", "Wake PC", "Turn it on from anywhere"],
+      ["claude", "Claude", "Approve from your phone"],
+    ] as [string, string, string][],
+    tiles: [["media", "Media", "Blinding Lights"], ["clip", "Clipboard", "Send to PC"], ["note", "Notes", "Notes on your PC"], ["hum", "Hum", "Find the song"], ["notify", "Alerts", "Phone to PC"], ["claude", "Claude", "1 approval waiting"]] as [string, string, string][],
   },
 };
 
@@ -385,6 +429,166 @@ function ClaudePlan({ t }: { t: (typeof TEXT)["tr"] }) {
   );
 }
 
+const VOICE = "#2FD4C0";
+const COOL = "radial-gradient(90% 60% at 50% 36%, #123a44 0%, #0b1d26 55%, #070d12 100%)";
+
+function Pill({ text, color }: { text: string; color: string }) {
+  return <div style={{ padding: "10px 22px", borderRadius: 999, background: "rgba(255,255,255,0.06)", border: `2px solid ${color}55`, fontSize: 25, fontWeight: 600, color: "rgba(236,240,242,0.92)", whiteSpace: "nowrap" }}>{text}</div>;
+}
+
+function NewTag({ text, top, color }: { text: string; top: number; color: string }) {
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, top, display: "flex", justifyContent: "center" }}>
+      <div style={{ padding: "10px 26px", borderRadius: 999, background: `${color}22`, border: `2px solid ${color}88`, color: `color-mix(in srgb, ${color} 45%, white)`, fontSize: 26, fontWeight: 700, letterSpacing: 2 }}>{text}</div>
+    </div>
+  );
+}
+
+/** 7: "Hey Nook": adada dinleme kartı, ses halkaları içinde konuşan Nook */
+function Voice({ t }: { t: (typeof TEXT)["tr"] }) {
+  const IW = 940;
+  const IH = 150;
+  const S = 380;
+  const cy = 300 + S / 2;
+  const bars = [0.35, 0.7, 1, 0.55, 0.85, 0.4, 0.95, 0.6, 0.3, 0.75, 0.5];
+  return (
+    <Frame bg={COOL}>
+      <ScreenTop width={IW} height={IH}>
+        <div style={{ position: "relative", width: 104, height: 104, marginLeft: 22, flexShrink: 0 }}>
+          <NookFigure look={DEFAULT_LOOK} color="#F4F4F6" size={92} res={300} expression="happy" style={{ position: "absolute", left: 6, top: 6 }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0, marginLeft: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 23, fontWeight: 700, color: "#8EEBDD" }}>
+            <span style={{ width: 12, height: 12, borderRadius: 6, background: VOICE, boxShadow: `0 0 12px ${VOICE}` }} />
+            {t.listening}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 33, fontWeight: 700, whiteSpace: "nowrap" }}>“{t.heard}”</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginRight: 34, height: 70 }}>
+          {bars.map((b, i) => (
+            <div key={i} style={{ width: 8, height: 70 * b, borderRadius: 4, background: VOICE, opacity: 0.55 + b * 0.45, boxShadow: `0 0 10px ${VOICE}88` }} />
+          ))}
+        </div>
+      </ScreenTop>
+
+      {/* Ses halkaları */}
+      <div style={{ position: "absolute", left: W / 2 - 420, top: cy - 420, width: 840, height: 840, borderRadius: "50%", background: `radial-gradient(circle, ${VOICE}38, transparent 60%)` }} />
+      {[290, 370].map((r, i) => (
+        <div key={r} style={{ position: "absolute", left: W / 2 - r, top: cy - r, width: r * 2, height: r * 2, borderRadius: "50%", border: `3px solid ${VOICE}`, opacity: 0.34 - i * 0.14 }} />
+      ))}
+      <Nook size={S} style={{ left: W / 2 - S / 2, top: 300, transform: "rotate(-3deg)" }} />
+
+      <NewTag text={t.voiceTag} top={800} color={VOICE} />
+      <Title lines={[t.voice1]} top={872} size={82} sub={t.voiceSub} />
+      <div style={{ position: "absolute", left: 60, right: 60, top: 1110, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14 }}>
+        {t.voicePills.map((c) => <Pill key={c} text={c} color={VOICE} />)}
+      </div>
+    </Frame>
+  );
+}
+
+const MOB = "#8FE03A";
+const MOB_BG = "radial-gradient(90% 60% at 40% 45%, #1f2f1a 0%, #111a10 55%, #080b08 100%)";
+
+function ChipFace({ id, size }: { id: string; size: number }) {
+  const n = CHIP_NOOKS[id];
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <NookFigure look={n.look} color={n.color} size={size} res={Math.round(size * 3)} />
+    </div>
+  );
+}
+
+/** Telefondaki ana sayfa (Nook Mobil'in gerçek düzeni, İngilizce) */
+function Phone({ t, x, y, w }: { t: (typeof TEXT)["tr"]; x: number; y: number; w: number }) {
+  const k = w / 412;
+  const h = 690 * k;
+  const tile = (id: string, label: string, sub: string) => {
+    const c = CHIP_NOOKS[id].color;
+    return (
+      <div key={id} style={{ display: "flex", alignItems: "center", gap: 10 * k, height: 64 * k, padding: `0 ${12 * k}px`, borderRadius: 999, background: `color-mix(in srgb, ${c} 14%, #050505)`, border: `${1.5 * k}px solid ${c}66`, minWidth: 0 }}>
+        <ChipFace id={id} size={38 * k} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15.5 * k, fontWeight: 700, color: `color-mix(in srgb, ${c} 70%, white)` }}>{label}</div>
+          <div style={{ fontSize: 11.5 * k, color: "rgba(230,230,240,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, borderRadius: 64 * k, background: "#1b1b1f", padding: 10 * k, boxSizing: "border-box", boxShadow: "0 50px 110px rgba(0,0,0,0.7), 0 0 0 3px rgba(255,255,255,0.08), inset 0 0 0 2px rgba(255,255,255,0.05)" }}>
+      <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 54 * k, background: "#000", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
+        {/* Kamera deliği */}
+        <div style={{ position: "absolute", left: "50%", top: 14 * k, width: 16 * k, height: 16 * k, marginLeft: -8 * k, borderRadius: "50%", background: "#111", boxShadow: "inset 0 0 0 2px #222" }} />
+        <div style={{ position: "absolute", left: 0, right: 0, top: 54 * k, display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ position: "relative", width: 86 * k, height: 86 * k }}>
+            <NookFigure look={DEFAULT_LOOK} color="#F4F4F6" size={86 * k} res={360} expression="happy" />
+          </div>
+          <div style={{ marginTop: 8 * k, display: "flex", alignItems: "center", gap: 7 * k, fontSize: 14 * k, color: "rgba(230,230,240,0.8)" }}>
+            <span style={{ width: 8 * k, height: 8 * k, borderRadius: "50%", background: "#3DDC84" }} />
+            {t.pcOn}
+          </div>
+        </div>
+        <div style={{ position: "absolute", left: 18 * k, right: 18 * k, top: 200 * k }}>
+          <div style={{ fontSize: 12 * k, fontWeight: 600, letterSpacing: 2.5 * k, color: "rgba(150,160,190,0.7)", marginBottom: 10 * k }}>{t.nooks}</div>
+          {/* Bilgisayar: tam genişlik */}
+          <div style={{ borderRadius: 26 * k, padding: 14 * k, background: `color-mix(in srgb, ${MOB} 12%, #050505)`, border: `${1.5 * k}px solid ${MOB}66` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 * k }}>
+              <ChipFace id="control" size={40 * k} />
+              <div>
+                <div style={{ fontSize: 16 * k, fontWeight: 700, color: `color-mix(in srgb, ${MOB} 75%, white)` }}>{t.pcTile}</div>
+                <div style={{ fontSize: 12 * k, color: "rgba(230,230,240,0.55)" }}>{t.pcSub}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14 * k }}>
+              {t.stats.map(([v, l], i) => (
+                <div key={l} style={{ width: "30%" }}>
+                  <div style={{ fontSize: 15 * k, fontWeight: 700 }}>{v}</div>
+                  <div style={{ fontSize: 11 * k, color: "rgba(230,230,240,0.5)" }}>{l}</div>
+                  {i > 0 && <div style={{ marginTop: 6 * k, height: 4 * k, borderRadius: 2 * k, background: "rgba(255,255,255,0.08)" }}><div style={{ width: i === 1 ? "18%" : "36%", height: "100%", borderRadius: 2 * k, background: i === 1 ? "#2B8CFF" : "#9B7BFF" }} /></div>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 * k, marginTop: 10 * k }}>
+            {t.tiles.map(([id, l, s]) => tile(id, l, s))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 8: Nook Mobil: telefonda ana sayfa, yanda özellikler; telefonun tepesine tünemiş Nook */
+function Mobile({ t }: { t: (typeof TEXT)["tr"] }) {
+  const PW = 450;
+  const PX = 70;
+  const PY = 455;
+  return (
+    <Frame bg={MOB_BG}>
+      <NewTag text={t.mobTag} top={90} color={MOB} />
+      <Title lines={[t.mob1]} top={160} size={80} sub={t.mobSub} />
+
+      <div style={{ position: "absolute", left: PX - 200, top: PY - 60, width: PW + 400, height: 1000, borderRadius: "50%", background: `radial-gradient(circle, ${MOB}2a, transparent 62%)` }} />
+      <Phone t={t} x={PX} y={PY} w={PW} />
+      {/* Telefonun köşesine tünemiş Nook */}
+      <Nook size={130} color={MOB} look={CHIP_NOOKS.control.look} style={{ left: PX + PW - 104, top: PY - 92, transform: "rotate(8deg)" }} />
+
+      <div style={{ position: "absolute", left: 580, right: 50, top: PY + 50, display: "flex", flexDirection: "column", gap: 34 }}>
+        {t.mobFeat.map(([id, label, sub]) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <ChipFace id={id} size={78} />
+            <div>
+              <div style={{ fontSize: 33, fontWeight: 800, color: `color-mix(in srgb, ${CHIP_NOOKS[id].color} 55%, white)` }}>{label}</div>
+              <div style={{ marginTop: 4, fontSize: 24, color: "rgba(225,232,225,0.66)", lineHeight: 1.2 }}>{sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
 export function Poster() {
   const q = new URLSearchParams(location.search);
   const t = TEXT[q.get("lang") === "en" ? "en" : "tr"];
@@ -392,5 +596,5 @@ export function Poster() {
   useEffect(() => {
     document.body.style.margin = "0";
   }, []);
-  return slide === 2 ? <All t={t} lang={q.get("lang") === "en" ? "en" : "tr"} /> : slide === 3 ? <Wardrobe t={t} /> : slide === 4 ? <Cta t={t} /> : slide === 5 ? <ClaudeAsk t={t} /> : slide === 6 ? <ClaudePlan t={t} /> : <Hero t={t} />;
+  return slide === 2 ? <All t={t} lang={q.get("lang") === "en" ? "en" : "tr"} /> : slide === 3 ? <Wardrobe t={t} /> : slide === 4 ? <Cta t={t} /> : slide === 5 ? <ClaudeAsk t={t} /> : slide === 6 ? <ClaudePlan t={t} /> : slide === 7 ? <Voice t={t} /> : slide === 8 ? <Mobile t={t} /> : <Hero t={t} />;
 }
