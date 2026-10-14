@@ -107,6 +107,11 @@ pub fn capture_monitor_jpeg(index: Option<usize>, max: u32, quality: u8) -> Resu
     encode_jpeg(w as u16, h as u16, &rgb, quality).ok_or_else(|| "görüntü kodlanamadı".into())
 }
 
+/// Masaüstünün bir bölgesi (sanal masaüstü koordinatlarında), uzun kenarı en fazla `max`: genişlik, yükseklik, RGB
+pub fn capture_rect_rgb(rect: (i32, i32, i32, i32), max: u32) -> Option<(u32, u32, Vec<u8>)> {
+    imp::capture_rect_rgb(rect, max)
+}
+
 /// İmlecin olduğu ekranın görüntüsü, ham JPEG (telefona gönderilen ekran görüntüsü)
 pub fn capture_jpeg(max: u32, quality: u8) -> Result<Vec<u8>, String> {
     let (w, h, rgb) = imp::capture_rgb(max).ok_or("ekran görüntüsü alınamadı")?;

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Camera, Download, Lock, Monitor, MonitorOff, Moon, Power, RefreshCw, RotateCcw, Share2, Upload, X, type LucideIcon } from "lucide-react";
+import { Camera, Download, Lock, Monitor, MonitorOff, MonitorSmartphone, Moon, Power, RefreshCw, RotateCcw, Share2, Upload, X, type LucideIcon } from "lucide-react";
 import { power, screenshot, sendFile, wakePc, type Pairing, type PowerAction, type ShotTarget, type Status } from "../lib/pc";
 import { blobBase64, native } from "../lib/native";
 import { Ball, errText, Sheet, TopBar, useBackButton, useToast } from "../ui";
 import { ZoomImage } from "../Zoom";
 import { SetupView } from "./Setup";
+import { RemoteView } from "./Remote";
 import type { Conn } from "../App";
 
 interface Action {
-  id: PowerAction | "shot";
+  id: PowerAction | "shot" | "remote";
   label: string;
   icon: LucideIcon;
   color: string;
@@ -21,6 +22,7 @@ const SCREEN_OFF: Action = { id: "screen-off", label: "Ekranı kapat", icon: Mon
 const SCREEN_ON: Action = { id: "screen-on", label: "Ekranı aç", icon: Monitor, color: "#8f6bff" };
 
 const ACTIONS: Action[] = [
+  { id: "remote", label: "Uzaktan kontrol", icon: MonitorSmartphone, color: "#2b8cff" },
   { id: "shot", label: "Ekran görüntüsü", icon: Camera, color: "#3fbfa5" },
   { id: "lock", label: "Kilitle", icon: Lock, color: "#ffd23f" },
   SCREEN_OFF,
@@ -46,6 +48,7 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
   const [shooting, setShooting] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
+  const [remote, setRemote] = useState(() => import.meta.env.DEV && new URLSearchParams(location.search).has("rc"));
   // Ekranı kapattıktan sonra PC'nin durumu gelene kadar düğme hemen "Ekranı aç" olsun
   const [screenOff, setScreenOff] = useState<boolean | null>(null);
   useEffect(() => setScreenOff(null), [status?.screenOff]);
@@ -70,6 +73,12 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
 
   const run = async (a: Action) => {
     setAsk(null);
+    if (a.id === "remote") {
+      if (status?.control === undefined) say("Önce PC'deki Nook'u güncelle");
+      else if (!status.control) say("PC'de Nook › Ayarlar › Telefon › “Telefondan uzaktan kontrol”ü aç");
+      else setRemote(true);
+      return;
+    }
     if (a.id === "shot") {
       // Birden çok ekran varsa hangisi olduğunu sor
       if (monitors.length > 1) setPickShot(true);
@@ -165,7 +174,7 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
               whileTap={{ scale: 0.95 }}
               disabled={!online || (a.id === "shot" && shooting)}
               onClick={() => (a.confirm ? setAsk(a) : void run(a))}
-              className="flex items-center gap-3 rounded-3xl bg-card p-3.5 text-left disabled:opacity-40"
+              className={`flex items-center gap-3 rounded-3xl bg-card p-3.5 text-left disabled:opacity-40 ${a.id === "remote" ? "col-span-2" : ""}`}
             >
               <Ball color={a.color} icon={a.icon} />
               <span className="text-[14px] font-medium leading-tight">{a.id === "shot" && shooting ? "Alınıyor…" : a.label}</span>
@@ -175,7 +184,7 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
       </section>
 
       <h2 className="-mb-2 mt-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Uzaktan açma ve bağlantı</h2>
-      <SetupView pairing={pairing} online={online} />
+      <SetupView pairing={pairing} online={online} mac={status?.mac} />
 
       <AnimatePresence>
         {ask && (
@@ -236,6 +245,7 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
           </motion.div>
         )}
       </AnimatePresence>
+      <AnimatePresence>{remote && <RemoteView key="rc" pairing={pairing} status={status} onClose={() => setRemote(false)} />}</AnimatePresence>
       {toast}
     </div>
   );

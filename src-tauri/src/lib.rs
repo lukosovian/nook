@@ -8,6 +8,7 @@ mod claude;
 pub mod claude_hook;
 mod clipboard;
 mod commands;
+mod control;
 mod disks;
 mod downloads;
 mod focus;
@@ -176,6 +177,7 @@ pub fn run() {
             remote::remote_info,
             remote::remote_set,
             remote::remote_reset,
+            remote::remote_control_set,
             remote::remote_profile,
             remote::remote_mirror,
             wol::wol_status,

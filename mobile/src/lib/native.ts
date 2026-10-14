@@ -14,6 +14,8 @@ interface NookNativeApi {
   installApk(url: string): void;
   saveImage(b64: string, name: string): string;
   shareImage(b64: string, name: string): void;
+  /** Uzaktan kontrol: yatay, tam ekran, ekran açık kalsın (eski uygulama sürümlerinde yok) */
+  remoteMode?(on: boolean): void;
   notifAccess(): boolean;
   openNotifAccess(): void;
   notifPrefs(): string;

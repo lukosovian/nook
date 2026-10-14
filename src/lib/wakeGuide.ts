@@ -38,6 +38,10 @@ export interface SetupReport {
     error: string | null;
     router?: string | null;
     gateway?: string | null;
+    /** Modemin kabul ettiği dış portlar (eski PC sürümlerinde yok) */
+    ports?: number[];
+    /** Telefondan yapılan son "dışarıdan açmayı sına" */
+    test?: { at: number; listening: boolean; arrived: number[] } | null;
   };
 }
 
@@ -236,5 +240,44 @@ export function setupItems(r: SetupReport): { connect: SetupItem[]; wake: SetupI
   else if (k.cgnat) wake.push({ id: "outside", ok: false, text: "Operatör ortak adres veriyor: dışarıdan açma çalışmaz", guide: { steps: ["İnternet sağlayıcını arayıp “statik IP” ya da “CGNAT'tan çıkarılma” iste.", "Sonra PC'de ayarı kapatıp aç."] } });
   else if (k.target) wake.push({ id: "outside", ok: true, text: `Modem ayarlandı${k.router ? ` (${k.router})` : ""}` });
   else wake.push({ id: "outside", ok: false, text: k.upnp === false ? "Modem otomatik ayarlanamadı (UPnP kapalı)" : (k.error ?? "Modem ayarlanamadı"), guide: routerGuide(k, o.lanIp, o.mac) });
+  if (k.on && k.test && !k.test.listening) wake.push(wakeTestItem(k, o.lanIp, o.mac));
   return { connect, wake };
+}
+
+/** "Dışarıdan açmayı sına" sonucu: paket hangi yoldan PC'ye ulaştı, ulaşmadıysa ne yapılmalı */
+export function wakeTestItem(k: SetupReport["wake"], ip: string | null, mac: string | null): SetupItem {
+  const a = k.test?.arrived ?? [];
+  const pc = ip ?? "PC'nin adresi";
+  const card = mac ?? "PC'nin ağ kartı";
+  const broadcast = (k.target ?? "").endsWith(".255");
+  if (a.includes(1))
+    return { id: "test", ok: null, text: "Sınama ev ağından yapıldı", guide: { steps: ["Telefonda Wi-Fi'ı kapat, mobil veriyle yeniden sına."] } };
+  if (broadcast && (a.includes(9) || a.includes(40009))) return { id: "test", ok: true, text: "Sınandı: uyandırma evin dışından PC'ye ulaşıyor" };
+  if (a.some((x) => x > 1))
+    return {
+      id: "test",
+      ok: false,
+      text: "Paket PC'ye ulaşıyor ama PC kapanınca modem onu unutabilir",
+      guide: {
+        steps: [
+          `Modemde DHCP adres ayırma: ${card} ağ kartına hep ${pc} verilsin.`,
+          `Modemde IP ve MAC bağlama (ARP binding): ${pc} ↔ ${card}. TP-Link: Advanced › Security › IP & MAC Binding.`,
+          "Sonra PC'yi kapatıp telefondan mobil veriyle aç.",
+        ],
+        note: "Modem PC'nin kartına giden yolu ancak bu bağlamayla, PC kapalıyken de hatırlar.",
+      },
+    };
+  return {
+    id: "test",
+    ok: false,
+    text: "Sınandı: paket modemden PC'ye geçmedi",
+    guide: {
+      steps: [
+        "Modemi yeniden başlat, PC'de Nook açıkken birkaç dakika bekle ve yeniden sına (Nook yönlendirmeyi yeniden kurar).",
+        `Olmazsa modemde elle yönlendir: UDP 40009 → ${pc}, iç port 9.`,
+        "Yine olmazsa operatör dışarıdan gelen bu paketleri kesiyor olabilir: operatörü arayıp “gelen bağlantılar için statik/genel IP” iste.",
+      ],
+      note: k.cgnat ? "Operatör ortak adres veriyor; bu durumda dışarıdan açma çalışmaz." : undefined,
+    },
+  };
 }

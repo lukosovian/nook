@@ -11,6 +11,9 @@ use serde::Serialize;
 /// Güvenlik duvarı kuralının adı (yoksa Düzelt ekler)
 #[cfg(windows)]
 const RULE: &str = "Nook Mobil";
+/// Dışarıdan açmayı sınarken uyandırma paketinin PC'ye ulaşıp ulaşmadığını görmek için (UDP 9)
+#[cfg(windows)]
+const RULE_WAKE: &str = "Nook Mobil uyandırma testi";
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -111,7 +114,11 @@ mod fw {
     /// Kural var mı (okumak için yönetici gerekmez)
     pub fn has_rule() -> bool {
         // COM bu iş parçacığında başka biçimde açılmış olabilir: ayrı iş parçacığında sor
-        std::thread::spawn(|| unsafe { policy().and_then(|p| p.Rules()).and_then(|r| r.Item(&BSTR::from(super::RULE))).is_ok() }).join().unwrap_or(false)
+        std::thread::spawn(|| unsafe {
+            policy().and_then(|p| p.Rules()).is_ok_and(|r| r.Item(&BSTR::from(super::RULE)).is_ok() && r.Item(&BSTR::from(super::RULE_WAKE)).is_ok())
+        })
+        .join()
+        .unwrap_or(false)
     }
 
     /// Yönetici olarak açılmış Nook'ta: köprünün portuna yalnızca ev ağı ve Tailscale'den gelen bağlantıya izin
@@ -128,6 +135,22 @@ mod fw {
             rule.SetProtocol(NET_FW_IP_PROTOCOL_TCP.0)?;
             rule.SetLocalPorts(&BSTR::from(crate::remote::PORT.to_string()))?;
             rule.SetRemoteAddresses(&BSTR::from("LocalSubnet,100.64.0.0/255.192.0.0"))?;
+            rule.SetDirection(NET_FW_RULE_DIR_IN)?;
+            rule.SetAction(NET_FW_ACTION_ALLOW)?;
+            rule.SetProfiles(NET_FW_PROFILE2_ALL.0)?;
+            rule.SetEnabled(VARIANT_TRUE)?;
+            rules.Add(&rule)?;
+            // Uyandırma testi: modemin ilettiği paket evin dışından (herhangi bir adresten) gelir. Nook bu
+            // portu yalnızca telefondan "Sına" denince birkaç saniye dinler.
+            let _ = rules.Remove(&BSTR::from(super::RULE_WAKE));
+            let rule: INetFwRule = CoCreateInstance(&NetFwRule, None, CLSCTX_INPROC_SERVER)?;
+            rule.SetName(&BSTR::from(super::RULE_WAKE))?;
+            rule.SetDescription(&BSTR::from("Nook Mobil: dışarıdan açmayı sınarken uyandırma paketinin modemden geçtiğini görme"))?;
+            if let Ok(exe) = std::env::current_exe() {
+                rule.SetApplicationName(&BSTR::from(exe.to_string_lossy().as_ref()))?;
+            }
+            rule.SetProtocol(NET_FW_IP_PROTOCOL_UDP.0)?;
+            rule.SetLocalPorts(&BSTR::from("9"))?;
             rule.SetDirection(NET_FW_RULE_DIR_IN)?;
             rule.SetAction(NET_FW_ACTION_ALLOW)?;
             rule.SetProfiles(NET_FW_PROFILE2_ALL.0)?;
@@ -294,10 +317,15 @@ pub async fn outside_fix_firewall() -> Result<OutsideStatus, String> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Dışarıdan açma: modemde UPnP ile UDP 9 yönlendirmesi. Yayın adresine (x.x.x.255) yönlendirilir ki
+// Dışarıdan açma: modemde UPnP ile UDP yönlendirmesi. Yayın adresine (x.x.x.255) yönlendirilir ki
 // modem kapalı PC'yi unutmuş olsa da (ARP kaydı silinmiş) paket ağdaki herkese, PC'nin kartına da gitsin.
-// Modem yayın adresini kabul etmezse PC'nin kendi adresine yönlendirilir. Kural modem yeniden
-// başlayınca silinebildiği için PC açık kaldıkça yarım saatte bir tazelenir.
+// Modem yayın adresini kabul etmezse PC'nin kendi adresine yönlendirilir. Bazı operatörler 9 gibi düşük
+// portları dışarıdan keser, bazı modemler de yayın adresine kuralı kabul edip paketi iletmez: bu yüzden
+// üç yol kurulur (ROUTES), telefon hepsine gönderir. Kural modem yeniden başlayınca silinebildiği için PC
+// açık kaldıkça yarım saatte bir tazelenir.
+
+/// (dış port, yayın adresine mi); iç port hep 9. 40010 PC'nin kendi adresine gider (yayını iletmeyen modemler için).
+pub const ROUTES: [(u16, bool); 3] = [(9, true), (40009, true), (40010, false)];
 
 #[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -317,6 +345,20 @@ pub struct WakeOutside {
     router: Option<String>,
     /// Modemin adresi (arayüzü buradan açılır)
     gateway: Option<String>,
+    /// Modemin kabul ettiği dış portlar (ROUTES'tan)
+    ports: Vec<u16>,
+    /// Telefondan yapılan son "dışarıdan açmayı sına" sonucu
+    test: Option<WakeTest>,
+}
+
+#[derive(Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WakeTest {
+    /// unix ms
+    at: u64,
+    listening: bool,
+    /// PC'ye ulaşan paketlerin telefonun gönderdiği dış portları (0: işaretsiz paket)
+    arrived: Vec<u16>,
 }
 
 /// UPnP kapalıyken modemi arayüz sayfasından (başlık, sunucu adı) tanır
@@ -474,12 +516,12 @@ mod upnp {
         }
 
         /// Önce süresiz; IGD v2 modemler süresiz kaydı reddeder, onlara bir haftalık (yarım saatte bir tazeleniyor)
-        pub fn forward(&self, target: Ipv4Addr) -> Result<(), String> {
+        pub fn forward(&self, external: u16, target: Ipv4Addr) -> Result<(), String> {
             let add = |lease: u32| {
                 self.soap(
                     "AddPortMapping",
                     &format!(
-                        "<NewRemoteHost></NewRemoteHost><NewExternalPort>9</NewExternalPort><NewProtocol>UDP</NewProtocol><NewInternalPort>9</NewInternalPort><NewInternalClient>{target}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>Nook WoL</NewPortMappingDescription><NewLeaseDuration>{lease}</NewLeaseDuration>"
+                        "<NewRemoteHost></NewRemoteHost><NewExternalPort>{external}</NewExternalPort><NewProtocol>UDP</NewProtocol><NewInternalPort>9</NewInternalPort><NewInternalClient>{target}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>Nook WoL</NewPortMappingDescription><NewLeaseDuration>{lease}</NewLeaseDuration>"
                     ),
                 )
                 .map(|_| ())
@@ -487,8 +529,8 @@ mod upnp {
             add(0).or_else(|_| add(604_800))
         }
 
-        pub fn remove(&self) {
-            let _ = self.soap("DeletePortMapping", "<NewRemoteHost></NewRemoteHost><NewExternalPort>9</NewExternalPort><NewProtocol>UDP</NewProtocol>");
+        pub fn remove(&self, external: u16) {
+            let _ = self.soap("DeletePortMapping", &format!("<NewRemoteHost></NewRemoteHost><NewExternalPort>{external}</NewExternalPort><NewProtocol>UDP</NewProtocol>"));
         }
     }
 }
@@ -516,21 +558,81 @@ fn refresh_wake() -> WakeOutside {
         ip.is_private() || (o[0] == 100 && (o[1] & 0xC0) == 64)
     });
     if !on {
-        gw.remove();
+        for (port, _) in ROUTES {
+            gw.remove(port);
+        }
         return store_wake(st);
     }
     let o = lan.octets();
     let broadcast = std::net::Ipv4Addr::new(o[0], o[1], o[2], 255);
-    match gw.forward(broadcast).map(|_| broadcast).or_else(|_| gw.forward(lan).map(|_| lan)) {
-        Ok(t) => st.target = Some(t.to_string()),
-        Err(e) => st.error = Some(format!("Modem yönlendirmeyi kabul etmedi: {e}")),
+    let mut last_err = None;
+    for (port, to_broadcast) in ROUTES {
+        let r = if to_broadcast {
+            gw.forward(port, broadcast).map(|_| broadcast).or_else(|_| gw.forward(port, lan).map(|_| lan))
+        } else {
+            gw.forward(port, lan).map(|_| lan)
+        };
+        match r {
+            Ok(t) => {
+                st.ports.push(port);
+                st.target.get_or_insert(t.to_string());
+            }
+            Err(e) => last_err = Some(e),
+        }
+    }
+    if st.ports.is_empty() {
+        st.error = last_err.map(|e| format!("Modem yönlendirmeyi kabul etmedi: {e}"));
     }
     store_wake(st)
 }
 
-fn store_wake(st: WakeOutside) -> WakeOutside {
+fn store_wake(mut st: WakeOutside) -> WakeOutside {
+    st.test = TEST.lock().unwrap().clone();
     *WAKE.lock().unwrap() = Some(st.clone());
     st
+}
+
+static TEST: std::sync::Mutex<Option<WakeTest>> = std::sync::Mutex::new(None);
+
+/// Dışarıdan açmayı sına: PC açıkken UDP 9'u birkaç saniye dinler. Telefon (mobil veride) uyandırma
+/// paketini evin internet adresinin her yol portuna gönderir; paketin sonundaki "NOOK"+port işaretinden
+/// hangi yolun modemden geçip PC'ye ulaştığı anlaşılır.
+pub fn wake_test_start() -> Result<(), String> {
+    if TEST.lock().unwrap().as_ref().is_some_and(|t| t.listening) {
+        return Ok(());
+    }
+    let sock = std::net::UdpSocket::bind(("0.0.0.0", 9)).map_err(|e| format!("Uyandırma portu dinlenemedi: {e}"))?;
+    let _ = sock.set_read_timeout(Some(std::time::Duration::from_millis(400)));
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+    *TEST.lock().unwrap() = Some(WakeTest { at, listening: true, arrived: Vec::new() });
+    std::thread::Builder::new()
+        .name("nook-wake-test".into())
+        .spawn(move || {
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(25);
+            let mut buf = [0u8; 512];
+            while std::time::Instant::now() < until {
+                let Ok((n, _)) = sock.recv_from(&mut buf) else { continue };
+                let port = buf[..n].windows(6).find(|w| &w[..4] == b"NOOK").map(|w| u16::from_be_bytes([w[4], w[5]])).unwrap_or(0);
+                if let Some(t) = TEST.lock().unwrap().as_mut() {
+                    if !t.arrived.contains(&port) {
+                        t.arrived.push(port);
+                    }
+                }
+            }
+            let done = TEST.lock().unwrap().as_mut().map(|t| {
+                t.listening = false;
+                t.clone()
+            });
+            if let Some(w) = WAKE.lock().unwrap().as_mut() {
+                w.test = done;
+            }
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn wake_test_result() -> Option<WakeTest> {
+    TEST.lock().unwrap().clone()
 }
 
 /// Evin internet adresi: önce modemin söylediği (UPnP), yoksa Tailscale'inki

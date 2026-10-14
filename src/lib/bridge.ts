@@ -431,6 +431,8 @@ export interface RemoteInfo {
   qr: string | null;
   /** Nook Mobil'i indirme QR kodu (SVG) */
   appQr: string | null;
+  /** Telefondan uzaktan kontrol (ekran, fare, klavye) açık mı */
+  control?: boolean;
 }
 export const remoteInfo = () =>
   inTauri
@@ -506,6 +508,7 @@ export const wakeOutsideStatus = () =>
     : Promise.resolve<WakeOutside | null>(import.meta.env.DEV ? { on: true, upnp: true, target: "192.168.1.255", externalIp: "213.14.176.118", cgnat: false, error: null } : null);
 export const wakeOutsideSet = (on: boolean) => invoke<WakeOutside>("wake_outside_set", { on });
 export const remoteSet = (enabled: boolean) => invoke<RemoteInfo>("remote_set", { enabled });
+export const remoteControlSet = (on: boolean) => invoke<RemoteInfo>("remote_control_set", { on });
 export const remoteReset = () => invoke<RemoteInfo>("remote_reset");
 /** Telefona gösterilecek Nook (renk, ad, görünüm) ve kullanılacak Argus profili */
 export const remoteProfile = (profile: { color: string; name: string; look: unknown; argusProfile: string }) =>

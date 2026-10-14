@@ -54,6 +54,8 @@ export interface Status {
   screenOff?: boolean;
   /** PC'de Claude Code varsa: bekleyen onay ve çalışan oturum sayısı (eski PC sürümlerinde yok) */
   claude?: { asks: number; working: number; sessions: number } | null;
+  /** Uzaktan kontrol PC'de açılmış mı (eski PC sürümlerinde yok) */
+  control?: boolean;
 }
 
 /** Ekran görüntüsü hedefi: ekranın sırası ya da hepsi birlikte */
@@ -283,6 +285,7 @@ const DEMO_STATUS: Status = {
   ],
   stats: { cpu: 18, memUsed: 11.4 * 1024 ** 3, memTotal: 32 * 1024 ** 3, netDown: 0, netUp: 0, diskUsed: 610 * 1024 ** 3, diskTotal: 1000 * 1024 ** 3, battery: null },
   claude: { asks: 1, working: 1, sessions: 2 },
+  control: true,
 };
 
 export const getStatus = (p: Pairing) =>
@@ -465,6 +468,87 @@ export async function wakePc(p: Pairing, mac?: string | null) {
   if (!m) throw new Error("PC'nin ağ kartı adresi bilinmiyor: PC açıkken uygulamayı bir kez aç.");
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke<number>("wake_pc", { mac: m, hosts: p.hosts, wan: p.wan ?? null });
+}
+
+export interface WakeTestResult {
+  at: number;
+  listening: boolean;
+  /** PC'ye ulaşan paketlerin yolu: 1 ev ağı, diğerleri evin internet adresindeki dış port */
+  arrived: number[];
+}
+
+/**
+ * Dışarıdan açmayı sınar (PC açıkken, telefon mobil verideyken): PC uyandırma portunu dinlemeye başlar,
+ * telefon paketi her yoldan gönderir, birkaç saniye sonra hangi yolun PC'ye ulaştığı sorulur.
+ */
+export async function wakeTest(p: Pairing, mac?: string | null): Promise<WakeTestResult | null> {
+  await request(p, "POST", "/v1/wake/test", {});
+  await wakePc(p, mac);
+  await new Promise((r) => setTimeout(r, 3000));
+  return request(p, "GET", "/v1/wake/test").then((r) => r.json() as Promise<WakeTestResult | null>);
+}
+
+// ---------------------------------------------------------------- Uzaktan kontrol
+
+export interface RcFrame {
+  /** Ekran değişmediyse yok */
+  blob: Blob | null;
+  hash: string;
+  /** İmlecin bu ekrandaki yeri (0–1); başka ekrandaysa yok */
+  cursor: [number, number] | null;
+  locked: boolean;
+}
+
+/** Sıradaki kare: ekran değişene kadar (en çok ~1 sn) bekler; değişmediyse görüntüsüz döner */
+export async function rcFrame(p: Pairing, m: number, w: number, q: number, last: string): Promise<RcFrame> {
+  if (DEMO(p)) return demoFrame(m, last);
+  const r = await request(p, "GET", `/v1/rc/frame?m=${m}&w=${w}&q=${q}&h=${last || 0}`, undefined, 8000);
+  const c = (r.headers.get("x-nook-cursor") ?? "").split(",").map(Number);
+  return {
+    blob: r.status === 200 ? await r.blob() : null,
+    hash: r.headers.get("x-nook-hash") ?? "",
+    cursor: c.length === 2 && c.every((n) => Number.isFinite(n)) ? [c[0], c[1]] : null,
+    locked: r.headers.get("x-nook-locked") === "1",
+  };
+}
+
+export type RcEvent =
+  | { t: "move"; x: number; y: number }
+  | { t: "down" | "up"; b: "l" | "r" | "m" }
+  | { t: "wheel"; dy?: number; dx?: number }
+  | { t: "text"; s: string }
+  | { t: "key"; k: string; mods?: string[] };
+
+export const rcInput = (p: Pairing, m: number, ev: RcEvent[]) =>
+  DEMO(p) ? (console.log("[rc]", m, JSON.stringify(ev)), Promise.resolve(new Response("{}"))) : request(p, "POST", "/v1/rc/input", { m, ev }, 5000);
+
+/** Önizleme: masaüstüne benzeyen sahte bir kare, sonra "değişmedi" */
+async function demoFrame(m: number, last: string): Promise<RcFrame> {
+  if (last) {
+    await new Promise((r) => setTimeout(r, 1000));
+    return { blob: null, hash: last, cursor: [0.42, 0.37], locked: false };
+  }
+  const c = new OffscreenCanvas(1280, 720);
+  const g = c.getContext("2d")!;
+  const bg = g.createLinearGradient(0, 0, 1280, 720);
+  bg.addColorStop(0, m ? "#3a1f5c" : "#0b3d6e");
+  bg.addColorStop(1, "#091018");
+  g.fillStyle = bg;
+  g.fillRect(0, 0, 1280, 720);
+  g.fillStyle = "#f3f3f3";
+  g.fillRect(180, 90, 760, 470);
+  g.fillStyle = "#2b2b2b";
+  g.fillRect(180, 90, 760, 34);
+  g.fillStyle = "#222";
+  g.font = "28px sans-serif";
+  g.fillText("Belge.txt - Not Defteri", 200, 170);
+  g.fillStyle = "#1e1e1e";
+  g.fillRect(0, 672, 1280, 48);
+  for (let i = 0; i < 6; i++) {
+    g.fillStyle = ["#3d8bff", "#ffd23f", "#3fbfa5", "#f0545c", "#8f6bff", "#f2a33a"][i];
+    g.fillRect(520 + i * 42, 680, 32, 32);
+  }
+  return { blob: await c.convertToBlob({ type: "image/jpeg", quality: 0.8 }), hash: "demo", cursor: [0.42, 0.37], locked: false };
 }
 
 // ---------------------------------------------------------------- Pano ve Not

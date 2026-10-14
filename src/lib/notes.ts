@@ -125,6 +125,8 @@ export type DemoId =
   | "explain"
   | "claudesettle"
   | "mobile060"
+  | "remotectl"
+  | "waketest"
   | "wakeback"
   | "alarmgame"
   | "shuffle"
@@ -155,6 +157,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.2.61",
+    date: tt("14 Ekim 2026"),
+    headline: tt("Nook Mobil: telefondan uzaktan kontrol, evden uzaktayken açma düzeltmesi"),
+    items: [
+      {
+        title: tt("Telefondan uzaktan kontrol"),
+        text: tt("Nook Mobil › Bilgisayar › Uzaktan kontrol: PC'nin ekranı telefonda canlı görünüyor, telefon yatay ve tam ekran oluyor. Fare kipinde parmağını kaydırınca imleç gidiyor, dokununca tıklıyor, iki kez dokunup sürükleyince sürüklüyor, iki parmakla sayfayı kaydırıyor, iki parmakla dokununca ya da basılı tutunca sağ tıklıyor; iki parmağı açınca yakınlaşıyor. Dokun kipinde parmağın değdiği yere tıklıyor. Klavye düğmesiyle telefon klavyesinden yazıyorsun; Ctrl, Alt, Shift, Win, Esc, Tab, ok ve F tuşları da var. Birden çok ekran varsa üstten seçiliyor. Güvenlik için PC'de Ayarlar › Telefon › “Telefondan uzaktan kontrol”den açılıyor; kontrol başlayınca adada görünüyor."),
+        demo: "remotectl",
+      },
+      {
+        title: tt("Evden uzaktayken açma: üç yol ve “Sına” düğmesi"),
+        text: tt("Bazı modemler uyandırma paketini evdeki ağa iletmiyor, bazı operatörler de 9 numaralı portu dışarıdan kesiyor; bu yüzden telefon mobil verideyken PC açılmayabiliyordu. Nook artık modemde üç ayrı yol kuruyor ve telefon hepsine gönderiyor. Nook Mobil › Bilgisayar'daki “Dışarıdan açmayı sına”ya PC açıkken, telefon mobil verideyken basınca paketin modemden geçip PC'ye ulaşıp ulaşmadığı, ulaşmıyorsa modemde ne yapman gerektiği yazıyor. Sınama için PC'de Ayarlar › Telefon'daki güvenlik duvarı iznini bir kez daha vermen gerekiyor."),
+        demo: "waketest",
+      },
+    ],
+  },
   {
     version: "0.2.60",
     date: tt("13 Ekim 2026"),

@@ -36,6 +36,9 @@ struct Config {
     enabled: bool,
     /// base64url, 32 bayt
     secret: String,
+    /// Telefondan uzaktan kontrol (ekranı görme, fare ve klavye); ayrıca açılır
+    #[serde(default)]
+    control: bool,
 }
 
 static CONFIG: Mutex<Option<Config>> = Mutex::new(None);
@@ -161,6 +164,7 @@ fn cors(mut res: Response<std::io::Cursor<Vec<u8>>>) -> Response<std::io::Cursor
         ("Access-Control-Allow-Origin", "*"),
         ("Access-Control-Allow-Headers", "content-type, x-nook-ts, x-nook-sig"),
         ("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"),
+        ("Access-Control-Expose-Headers", "x-nook-hash, x-nook-cursor, x-nook-locked"),
         ("Cache-Control", "no-store"),
     ] {
         res.add_header(Header::from_bytes(k, v).unwrap());
@@ -298,6 +302,44 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             }
             Err(e) => err(500, &e),
         },
+        // Uzaktan kontrol: ?m=ekran&w=uzun kenar&q=kalite&h=son karenin özeti
+        (Method::Get, "/v1/rc/frame") => {
+            if !load().control {
+                return err(403, "Uzaktan kontrol kapalı: PC'de Nook › Ayarlar › Telefon'dan aç");
+            }
+            let num = |k: &str, d: u64| query_param(query, k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
+            let app = APP.lock().unwrap().clone();
+            match crate::control::frame(app.as_ref(), num("m", 0) as usize, num("w", 1280).clamp(320, 2560) as u32, num("q", 60).clamp(20, 90) as u8, num("h", 0)) {
+                Ok(f) => {
+                    let changed = f.jpeg.is_some();
+                    let mut r = Response::from_data(f.jpeg.unwrap_or_default()).with_status_code(if changed { 200 } else { 204 });
+                    r.add_header(Header::from_bytes("Content-Type", "image/jpeg").unwrap());
+                    r.add_header(Header::from_bytes("x-nook-hash", f.hash.to_string()).unwrap());
+                    r.add_header(Header::from_bytes("x-nook-cursor", f.cursor.map(|(x, y)| format!("{x:.4},{y:.4}")).unwrap_or_default()).unwrap());
+                    r.add_header(Header::from_bytes("x-nook-locked", if f.locked { "1" } else { "0" }).unwrap());
+                    cors(r)
+                }
+                Err(e) => err(500, &e),
+            }
+        }
+        (Method::Post, "/v1/rc/input") => {
+            if !load().control {
+                return err(403, "Uzaktan kontrol kapalı: PC'de Nook › Ayarlar › Telefon'dan aç");
+            }
+            match serde_json::from_slice::<crate::control::Input>(body) {
+                Ok(inp) => match crate::control::input(inp) {
+                    Ok(()) => json_res(200, json!({ "ok": true })),
+                    Err(e) => err(400, &e),
+                },
+                Err(e) => err(400, &format!("geçersiz istek: {e}")),
+            }
+        }
+        // Dışarıdan açmayı sına: PC birkaç saniye uyandırma paketini dinler, telefon evin adresine gönderir
+        (Method::Post, "/v1/wake/test") => match crate::outside::wake_test_start() {
+            Ok(()) => json_res(200, json!({ "ok": true })),
+            Err(e) => err(500, &e),
+        },
+        (Method::Get, "/v1/wake/test") => json_res(200, json!(crate::outside::wake_test_result())),
         (Method::Post, "/v1/power") => {
             let action = serde_json::from_slice::<Value>(body).ok().and_then(|v| v["action"].as_str().map(str::to_owned)).unwrap_or_default();
             match power(&action) {
@@ -732,6 +774,8 @@ fn status() -> Value {
         "wan": crate::outside::home_ip(),
         "nook": *PROFILE.lock().unwrap(),
         "screenOff": screen_off(),
+        // Uzaktan kontrol PC'de açılmış mı (kapalıysa telefon nasıl açılacağını söyler)
+        "control": load().control,
         // Ana ekrandaki Claude çipi: kaç onay bekliyor, kaç oturum çalışıyor
         "claude": claude_summary(),
         // Soldan sağa; ekran görüntüsünde ?m= bu sırayla
@@ -800,6 +844,8 @@ pub struct Info {
     qr: Option<String>,
     /// Nook Mobil'i indirme bağlantısının QR kodu (en son sürümün APK'sı)
     app_qr: Option<String>,
+    /// Telefondan uzaktan kontrol açık mı
+    control: bool,
 }
 
 fn pair_url(cfg: &Config, hosts: &[String], mac: Option<&str>) -> String {
@@ -835,7 +881,17 @@ pub fn remote_info() -> Info {
         mac,
         qr,
         app_qr: qr_svg("https://github.com/lukosovian/nook/releases/latest/download/NookMobil.apk"),
+        control: cfg.control,
     }
+}
+
+#[tauri::command]
+pub fn remote_control_set(on: bool) -> Info {
+    let mut cfg = load();
+    cfg.control = on;
+    store(cfg);
+    crate::log::write("info", &format!("telefondan uzaktan kontrol {}", if on { "açıldı" } else { "kapandı" }));
+    remote_info()
 }
 
 #[tauri::command]
@@ -1135,7 +1191,7 @@ mod tests {
 
     #[test]
     fn pair_url_has_hosts_port_key() {
-        let cfg = super::Config { enabled: true, secret: "k".repeat(43) };
+        let cfg = super::Config { enabled: true, secret: "k".repeat(43), control: false };
         let url = super::pair_url(&cfg, &["100.64.1.2".into(), "192.168.1.5".into()], Some("AA:BB:CC:DD:EE:FF"));
         assert!(url.starts_with("nook://pair?v=1&n="));
         assert!(url.contains("&h=100.64.1.2,192.168.1.5&p=47391&k="));

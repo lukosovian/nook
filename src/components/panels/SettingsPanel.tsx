@@ -6,7 +6,7 @@ import { useGemini } from "../../hooks/useGemini";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
 import { refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
 import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
-import { alarmRing, listMonitors, openPath, quickState, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
+import { alarmRing, listMonitors, openPath, quickState, remoteControlSet, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
 import { syncFeeds } from "../../lib/ics";
 import { shortName } from "./ControlPanel";
@@ -611,6 +611,14 @@ function PhoneSection() {
               </p>
             </div>
           )}
+          <Row label={tt("Telefondan uzaktan kontrol")}>
+            <Toggle on={!!info.control} onChange={(v) => void remoteControlSet(v).then(setInfo)} color={ACCENT.blue} />
+          </Row>
+          <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+            {info.control
+              ? tt("Telefondan bu PC'nin ekranını görüp fare ve klavyeyle kullanabilirsin. Kontrol başlayınca adada görünür.")
+              : tt("Açınca eşleştirdiğin telefondan bu PC'nin ekranını görüp fareyi ve klavyeyi kullanabilirsin.")}
+          </p>
           <OutsideSetup />
           <WakeSetup />
           <Row label={tt("Eşleşmeyi sıfırla (telefonun bağlantısı kopar)")}>
