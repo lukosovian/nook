@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { AlarmClock, Bell, BellOff, Check, ChevronDown, ChevronUp, Pencil, Repeat2, X } from "lucide-react";
@@ -15,7 +15,13 @@ const REPEATS = Object.keys(REPEAT_LABEL) as Repeat[];
 export function AlarmPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("alarm", scroller);
-  const alarms = useNook((s) => s.alarms);
+  // Hatırlatmaların alarmları Hatırlatıcı'da listelenir, burada yalnızca alarmlar
+  const all = useNook((s) => s.alarms);
+  const events = useNook((s) => s.events);
+  const alarms = useMemo(() => {
+    const reminders = new Set(events.map((e) => e.alarmId).filter(Boolean));
+    return all.filter((a) => !reminders.has(a.id));
+  }, [all, events]);
   const addAlarm = useNook((s) => s.addAlarm);
   const now = useNow();
 
@@ -60,125 +66,148 @@ export function AlarmPanel() {
     addAlarm({ hour: d.getHours(), minute: d.getMinutes(), label: tt("{0} sonra", min >= 60 ? tt("{0} saat", min / 60) : tt("{0} dakika", min)), repeat: "once", oneShot: true, at, silent });
   };
 
+  const next = alarms.filter((x) => x.enabled && x.next).sort((x, y) => x.next! - y.next!)[0];
+
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="flex shrink-0 items-center gap-2.5">
-        <div className="flex items-center rounded-[14px] bg-well px-1.5">
+    <div className="flex h-full gap-3">
+      {/* Yeni alarm (ya da düzenlenen) */}
+      <div className="relative flex w-[186px] shrink-0 flex-col gap-1.5 rounded-[16px] border p-2.5" style={{ background: tintBg(ACCENT.yellow, editing ? 12 : 6), borderColor: tintBg(ACCENT.yellow, editing ? 50 : 20) }}>
+        <p className="text-[9.5px] font-bold uppercase tracking-[0.12em]" style={{ color: tintText(ACCENT.yellow) }}>
+          {editing ? tt("Alarmı düzenle") : tt("Yeni alarm")}
+        </p>
+        <div className="flex items-center justify-center rounded-[12px] bg-black/30 py-0.5">
           <Digit value={hour} max={23} onChange={setHour} />
-          <span className="pb-0.5 font-display text-[24px] font-medium text-label-3">:</span>
+          <span className="pb-0.5 font-display text-[28px] font-medium text-label-3">:</span>
           <Digit value={minute} max={59} onChange={setMinute} />
         </div>
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onKeyDown={(e) => (e.key === "Enter" ? add() : e.key === "Escape" && editing && cancel())}
-            placeholder={tt("İsim (ör. Toplantı)")}
-            spellCheck={false}
-            className="h-7 w-full rounded-full bg-well px-3 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-well-hi"
-          />
-          <div className="flex gap-1">
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => (e.key === "Enter" ? add() : e.key === "Escape" && editing && cancel())}
+          placeholder={tt("İsim (ör. Toplantı)")}
+          spellCheck={false}
+          className="h-7 w-full rounded-[10px] bg-black/30 px-2.5 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-black/45"
+        />
+        <div className="flex gap-1">
           {/* Tekrar: tıkladıkça sıradaki seçenek */}
           <button
             onClick={() => setRepeat(REPEATS[(REPEATS.indexOf(repeat) + 1) % REPEATS.length])}
             title={tt("Değiştirmek için tıkla")}
-            className="flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-medium"
+            className="flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-2 text-[11px] font-semibold"
             style={{ background: tintBg(ACCENT.yellow, 10), borderColor: tintBg(ACCENT.yellow, 30), color: tintText(ACCENT.yellow) }}
           >
-            <Repeat2 size={12} strokeWidth={2.4} />
+            <Repeat2 size={12} strokeWidth={2.4} className="shrink-0" />
             <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span key={repeat} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.12 }}>
+              <motion.span key={repeat} className="truncate" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.12 }}>
                 {REPEAT_LABEL[repeat]}
               </motion.span>
             </AnimatePresence>
           </button>
           <BellToggle silent={silent} onChange={setSilent} />
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          transition={spring.pop}
+          onClick={add}
+          className="mt-auto flex h-8 items-center justify-center gap-1.5 rounded-[11px] text-[12px] font-bold text-black"
+          style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${ACCENT.yellow} 85%, white), ${ACCENT.yellow})`, boxShadow: `0 6px 14px -8px ${ACCENT.yellow}` }}
+        >
+          {editing ? <Check size={14} strokeWidth={2.8} /> : <AlarmClock size={14} strokeWidth={2.6} />}
+          {editing ? tt("Kaydet") : tt("Kur")}
+        </motion.button>
+        {/* Düzenlemeden vazgeç */}
+        <AnimatePresence>
+          {editing && (
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={spring.pop}
+              onClick={cancel}
+              title={tt("Vazgeç")}
+              aria-label={tt("Vazgeç")}
+              className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-well-hi text-label-2 hover:text-label"
+            >
+              <X size={10} strokeWidth={3} />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {/* Sıradaki alarm ve hızlı geri sayımlar */}
+        <div className="flex shrink-0 items-center gap-3 rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-label-3">{tt("Sıradaki")}</p>
+            {next ? (
+              <>
+                <p className="font-round text-[24px] font-extrabold tabular-nums" style={{ color: tintText(ACCENT.yellow) }}>
+                  {clock(next)}
+                </p>
+                <p className="truncate text-[10.5px] text-label-2">
+                  {next.label || REPEAT_LABEL[next.repeat]} · {until(next.next!, now)}
+                </p>
+              </>
+            ) : (
+              <p className="pt-1 text-[12px] text-label-3">{tt("Kurulu alarm yok")}</p>
+            )}
+          </div>
+          <div className="grid shrink-0 grid-cols-2 gap-1">
+            {QUICK.map((m) => (
+              <button
+                key={m}
+                onClick={() => quick(m)}
+                title={tt("Şimdiden {0} sonraya alarm", m >= 60 ? tt("{0} saat", m / 60) : tt("{0} dakika", m))}
+                className="rounded-[9px] bg-white/[0.06] px-2 py-[3px] text-[10.5px] font-semibold text-label-2 transition-colors hover:bg-white/[0.12] hover:text-label"
+              >
+                +{m >= 60 ? tt("{0} sa", m / 60) : tt("{0} dk", m)}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="relative shrink-0">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            transition={spring.pop}
-            onClick={add}
-            className="flex h-[62px] w-12 flex-col items-center justify-center gap-0.5 rounded-[14px] border text-[11px] font-medium"
-            style={{ background: tintBg(ACCENT.yellow, editing ? 26 : 16), borderColor: tintBg(ACCENT.yellow, editing ? 60 : 40), color: tintText(ACCENT.yellow) }}
-          >
-            {editing ? <Check size={16} strokeWidth={2.6} /> : <AlarmClock size={16} strokeWidth={2.4} />}
-            {editing ? tt("Kaydet") : tt("Kur")}
-          </motion.button>
-          {/* Düzenlemeden vazgeç */}
-          <AnimatePresence>
-            {editing && (
-              <motion.button
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
+
+        <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+          <AnimatePresence initial={false}>
+            {alarms.map((a) => (
+              <motion.div
+                key={a.id}
+                layout
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: 20 }}
                 transition={spring.pop}
-                onClick={cancel}
-                title={tt("Vazgeç")}
-                aria-label={tt("Vazgeç")}
-                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-well-hi text-label-2 hover:text-label"
+                className="flex h-10 items-center gap-2 rounded-[13px] border pl-1.5 pr-1.5"
+                style={{
+                  background: editing === a.id ? tintBg(ACCENT.yellow, 18) : a.enabled ? tintBg(ACCENT.yellow, 9) : "rgb(255 255 255 / 0.03)",
+                  borderColor: editing === a.id ? tintBg(ACCENT.yellow, 60) : a.enabled ? tintBg(ACCENT.yellow, 26) : "rgb(255 255 255 / 0.05)",
+                }}
               >
-                <X size={9} strokeWidth={3} />
-              </motion.button>
-            )}
+                {/* Saate/isme tıklayınca soldaki kartta düzenlenir */}
+                <button onClick={() => edit(a)} title={tt("Düzenle")} className="group flex min-w-0 flex-1 items-center gap-2 text-left">
+                  <MiniNook color={a.enabled ? ACCENT.yellow : "#5a5a62"} size={24} eyes={a.enabled ? "open" : "closed"} />
+                  <span className="font-round text-[16px] font-extrabold tabular-nums" style={{ color: a.enabled ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}>
+                    {clock(a)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-label-3">
+                    <span className="text-label-2">{a.label || REPEAT_LABEL[a.repeat]}</span>
+                    {a.enabled && a.next ? ` · ${until(a.next, now)}` : ""}
+                  </span>
+                  <Pencil size={10} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-opacity ${editing === a.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
+                </button>
+                <BellToggle silent={!!a.silent} small onChange={(v) => useNook.getState().setAlarmSilent(a.id, v)} />
+                <Toggle on={a.enabled} onChange={(v) => useNook.getState().toggleAlarm(a.id, v)} color={ACCENT.yellow} />
+                <button
+                  onClick={() => useNook.getState().removeAlarm(a.id)}
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label"
+                  aria-label={tt("Sil")}
+                >
+                  <X size={11} strokeWidth={2.6} />
+                </button>
+              </motion.div>
+            ))}
           </AnimatePresence>
+          {!alarms.length && <p className="pt-3 text-center text-[11px] text-label-3">{tt("Soldan bir saat seç, Kur'a bas")}</p>}
         </div>
-      </div>
-
-      <div className="flex shrink-0 gap-1">
-        {QUICK.map((m) => (
-          <button
-            key={m}
-            onClick={() => quick(m)}
-            className="rounded-full bg-well px-2.5 py-0.5 text-[11px] font-medium text-label-2 transition-colors hover:bg-well-hi hover:text-label"
-          >
-            +{m >= 60 ? tt("{0} sa", m / 60) : tt("{0} dk", m)}
-          </button>
-        ))}
-      </div>
-
-      <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-        {!alarms.length && <p className="pt-3 text-center text-[11px] text-label-3">{tt("Kurulu alarm yok")}</p>}
-        <AnimatePresence initial={false}>
-          {alarms.map((a) => (
-            <motion.div
-              key={a.id}
-              layout
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={spring.pop}
-              className="flex h-9 items-center gap-2 rounded-full border pl-1 pr-1.5"
-              style={{
-                background: editing === a.id ? tintBg(ACCENT.yellow, 18) : a.enabled ? tintBg(ACCENT.yellow, 9) : "rgb(255 255 255 / 0.03)",
-                borderColor: editing === a.id ? tintBg(ACCENT.yellow, 60) : a.enabled ? tintBg(ACCENT.yellow, 26) : "rgb(255 255 255 / 0.05)",
-              }}
-            >
-              {/* Saate/isme tıklayınca üstteki seçicide düzenlenir */}
-              <button onClick={() => edit(a)} title={tt("Düzenle")} className="group flex min-w-0 flex-1 items-center gap-2 text-left">
-                <MiniNook color={a.enabled ? ACCENT.yellow : "#5a5a62"} size={26} eyes={a.enabled ? "open" : "closed"} />
-                <span className="font-display text-[15px] font-medium tabular-nums" style={{ color: a.enabled ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}>
-                  {clock(a)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-label-3">
-                  <span className="text-label-2">{a.label || REPEAT_LABEL[a.repeat]}</span>
-                  {a.enabled && a.next ? ` · ${until(a.next, now)}` : ""}
-                </span>
-                <Pencil size={10} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-opacity ${editing === a.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
-              </button>
-              <BellToggle silent={!!a.silent} small onChange={(v) => useNook.getState().setAlarmSilent(a.id, v)} />
-              <Toggle on={a.enabled} onChange={(v) => useNook.getState().toggleAlarm(a.id, v)} color={ACCENT.yellow} />
-              <button
-                onClick={() => useNook.getState().removeAlarm(a.id)}
-                className="flex h-5 w-5 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label"
-                aria-label={tt("Sil")}
-              >
-                <X size={11} strokeWidth={2.6} />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
       </div>
     </div>
   );
@@ -219,14 +248,14 @@ function Digit({ value, max, onChange }: { value: number; max: number; onChange:
             else if (e.key === "Escape") setDraft(null);
           }}
           onFocus={(e) => e.target.select()}
-          className="w-8 rounded-[6px] bg-white/10 text-center font-display text-[24px] font-medium leading-none tabular-nums text-label outline-none"
+          className="w-10 rounded-[6px] bg-white/10 text-center font-display text-[30px] font-semibold leading-none tabular-nums text-label outline-none"
         />
       ) : (
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.button
             key={value}
             onClick={() => setDraft(pad(value))}
-            className="w-8 text-center font-display text-[24px] font-medium leading-none tabular-nums text-label"
+            className="w-10 text-center font-display text-[30px] font-semibold leading-none tabular-nums text-label"
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}

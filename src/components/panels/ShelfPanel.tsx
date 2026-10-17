@@ -39,17 +39,21 @@ export function ShelfPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] text-label-3">{tt("{0} öğe · sürükle, çift tıkla, sağ tıkla", shelf.length)}</span>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-[12px] font-bold text-label">
+          {tt("{0} dosya", shelf.length)}
+          <span className="ml-1.5 text-[10.5px] font-medium text-label-3">{formatSize(shelf.reduce((a, i) => a + i.size, 0))}</span>
+        </span>
         {shelf.some((i) => !i.pinned) && <TextButton tone="danger" onClick={clearShelf}>{tt("Temizle")}</TextButton>}
       </div>
-      <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden pb-1" onWheel={(e) => (e.currentTarget.scrollLeft += e.deltaY)}>
+      <div className="flex min-h-0 flex-1 items-center gap-2 overflow-x-auto overflow-y-hidden pb-1" onWheel={(e) => (e.currentTarget.scrollLeft += e.deltaY)}>
         <AnimatePresence initial={false}>
           {shelf.map((item) => (
             <ShelfCard key={item.id} item={item} />
           ))}
         </AnimatePresence>
       </div>
+      <p className="mt-1.5 truncate px-0.5 text-[10px] text-label-3">{tt("Sürükle, çift tıkla aç, sağ tıkla klasörde göster · telefondan gönderilenler de buraya düşer")}</p>
     </div>
   );
 }
@@ -92,7 +96,7 @@ function ShelfCard({ item }: { item: ShelfItem }) {
         e.preventDefault();
         void revealPath(item.path);
       }}
-      className="group relative flex h-full w-[92px] shrink-0 flex-col gap-1.5 rounded-[14px] bg-well p-1.5 transition-colors hover:bg-well-hi"
+      className="group relative flex h-full max-h-[210px] w-[104px] shrink-0 flex-col gap-1.5 rounded-[16px] border border-white/[0.06] bg-white/[0.035] p-1.5 transition-colors hover:bg-well-hi"
       style={item.pinned ? { boxShadow: `inset 0 0 0 1px ${tintBg(ACCENT.yellow, 35)}` } : undefined}
     >
       <Thumb item={item} />
@@ -159,13 +163,13 @@ const KINDS: { exts: string[]; icon: LucideIcon; color: string }[] = [
 function Thumb({ item }: { item: ShelfItem }) {
   const src = thumbnailSrc(item);
   if (src) {
-    return <img src={src} alt="" draggable={false} loading="lazy" decoding="async" className="h-[96px] w-full rounded-[10px] object-cover" />;
+    return <img src={src} alt="" draggable={false} loading="lazy" decoding="async" className="min-h-0 w-full flex-1 rounded-[11px] object-cover" />;
   }
   const kind = item.isDir ? { icon: Folder, color: ACCENT.blue } : (KINDS.find((k) => k.exts.includes(item.ext)) ?? { icon: File, color: ACCENT.gray });
   const Icon = kind.icon;
   return (
     <div
-      className="flex h-[96px] w-full flex-col items-center justify-center gap-1 rounded-[10px] border"
+      className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-1 rounded-[11px] border"
       style={{ background: `color-mix(in srgb, ${kind.color} 12%, transparent)`, borderColor: `color-mix(in srgb, ${kind.color} 25%, transparent)` }}
     >
       <Icon size={24} strokeWidth={1.8} style={{ color: kind.color }} />

@@ -18,7 +18,7 @@ function useNow(ms: number) {
 }
 
 /** Solda dolan halka + ikon, sağda yazı (kapalı adadaki öbür göstergelerle aynı düzen) */
-function Mini({ p, color, icon: Icon, text, blink }: { p: number; color: string; icon: typeof Timer; text: string; blink?: boolean }) {
+export function Mini({ p, color, icon: Icon, text, blink }: { p: number; color: string; icon: typeof Timer; text: string; blink?: boolean }) {
   const size = 22;
   const r = 9;
   const c = 2 * Math.PI * r;

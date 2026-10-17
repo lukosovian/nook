@@ -1,3 +1,4 @@
+import { usePowerTimerFeed } from "./lib/powerTimer";
 import { useSupportersFeed } from "./lib/supporters";
 import { useEffect } from "react";
 import { CHIP_NOOKS } from "./lib/look";
@@ -55,6 +56,7 @@ import {
   useStorageSync,
 } from "./hooks/useSystemFeeds";
 import { usePhoneSync } from "./hooks/usePhoneSync";
+import { useDiary } from "./lib/diary";
 
 export default function App() {
   useSettingsSync();
@@ -71,6 +73,7 @@ export default function App() {
   useIdleFeed();
   useClipboardFeed();
   useMediaFeed();
+  usePowerTimerFeed();
   useStatsFeed();
   useDevicesFeed();
   useClaudeFeed();
@@ -100,6 +103,7 @@ export default function App() {
   useYearEnd();
   useFocusTimer();
   useDayTracker();
+  useDiary();
   useNotificationFeed();
   useVoiceFeed();
   useAskScreenFeed();

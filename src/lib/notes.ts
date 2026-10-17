@@ -1,11 +1,11 @@
 /**
  * Yama notları: her sürümde neler geldi, görseli ve animasyonuyla. Güncellemeden sonraki ilk açılışta
- * ada büyüyüp en yeni notu bir kez gösterir (görülen bir daha kendiliğinden açılmaz); eskilere
- * "Yama notları" çipinden bakılır. Yeni sürümde NOTES'un başına bir kayıt eklemek yeter.
+ * Nook Studio en yeni notla bir kez açılır (görülen bir daha kendiliğinden açılmaz); eskilere
+ * Studio › Yama notları'ndan bakılır. Yeni sürümde NOTES'un başına bir kayıt eklemek yeter.
  */
 import { playAntic } from "../hooks/useAntics";
-import { isPrimary, setWindowSize } from "./bridge";
-import { TOUR_WINDOW } from "./layout";
+import { isPrimary } from "./bridge";
+import { openStudio } from "./studio";
 import { useNook } from "../store/nook";
 import { tt } from "./i18n";
 
@@ -140,7 +140,37 @@ export type DemoId =
   | "errors"
   | "tourkeys"
   | "flash"
-  | "fixes";
+  | "fixes"
+  | "island03"
+  | "sizes"
+  | "grid03"
+  | "humnote"
+  | "argusblue"
+  | "cards03"
+  | "clipcards"
+  | "deck"
+  | "capsules"
+  | "splitpill"
+  | "campfire"
+  | "studio"
+  | "reportweeks"
+  | "powertimer"
+  | "media03"
+  | "look03"
+  | "fixes03"
+  | "remind03"
+  | "tour03"
+  | "big03"
+  | "capsulecfg"
+  | "update03"
+  | "studiohome03"
+  | "karne03"
+  | "settings03"
+  | "argus03"
+  | "updateanims03"
+  | "diary03"
+  | "fixes03b"
+  | "mobile03";
 
 export interface NoteItem {
   title: string;
@@ -153,10 +183,170 @@ export interface PatchNote {
   date: string;
   /** Sürümün tek satırlık özeti (listede görünür) */
   headline: string;
+  /** Büyük sürüm (0.3.0 gibi): notlarda kocaman ve renkli görünür */
+  major?: boolean;
   items: NoteItem[];
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.0",
+    date: tt("16 Ekim 2026"),
+    major: true,
+    headline: tt("Nook 0.3: yepyeni ada, her modülün kendi boyutu, kapalı ada kapsülleri ve Nook Studio"),
+    items: [
+      {
+        title: tt("Nook Studio: ayarların ve büyük sayfaların yeni evi"),
+        text: tt("Nook artık bir masaüstü uygulaması da: Nook Studio. Adanın sol çubuğundaki Nook Studio düğmesine, dişliye ya da tepsideki “Nook Studio”ya basınca ada kapanıp Studio açılıyor. Solda bölümler var (sürüm, sol alttaki Nook kutunun içinde): Ana sayfa (selam veren büyük Nook, bu haftanın günlük grafiği, bugünün sayıları düne göre, yenilikler, karnen, tuşların), Görünüm, Kısayollar, Modüller, Karne, Yıl özeti, Yama notları ve Ayarlar. Bütün ayarlar kategori kategori, kart kart burada; soldaki kategoriye basınca oraya kayıyor, üstten arayabiliyorsun. Ada hafifledi: hızlı işler adada, ayar ve büyük sayfalar Studio'da."),
+        demo: "studio",
+      },
+      {
+        title: tt("Yeni ada: sol çubuk, durum çubuğu, bento"),
+        text: tt("Açık ada baştan tasarlandı. Solda dikey bir çubuk var: Ana sayfa, Tüm modüller, Sohbet ve Ara; seçili olan kendi renginde (başlığın yanındaki noktayla aynı). Altta Nook Studio, Görünüm ve Ayarlar düğmeleri Studio'yu açar. Üstte profiller; sağda mikrofonu kullanan uygulama, hava, kurulu alarm varsa çan ve saati, tarih ve kalın saat. Bir modüle girince sol üstteki geri okuyla girdiğin yere (ana sayfa ya da modüller) dönüyorsun. Ada açılınca Nook başının üstündeki balonda kısa bir selam veriyor (Merhaba!, Naber?, Gece kuşu!…). Ana sayfada solda Nook ve şu anki iki işin, sağda en çok açtığın iki modül büyük kartlarda, sonraki dördü küçük kartlarda, altta hızlı çipler ve “Tüm modüller”."),
+        demo: "island03",
+      },
+      {
+        title: tt("Her modülün kendi ada boyutu"),
+        text: tt("Bütün modüller aynı kalıba sıkıştırılmıyor artık: Argus geniş, Pomodoro kompakt, Medya orta boy… Bir modülden ötekine geçince ada yayla esneyerek yeni boyutuna geçiyor; yanındaki ses ve Argus kartları da ona göre kayıyor."),
+        demo: "sizes",
+      },
+      {
+        title: tt("Tüm modüller tek ızgarada"),
+        text: tt("Soldaki ızgara simgesi bütün modülleri kaydırma çubuğu olmadan, hep üç sıra hâlinde renkli karelerde gösteriyor (yeni modül gelince sütun artıyor), her biri giyinik küçük Nook'uyla. “Düzenle” ile sürükleyip sıralıyor, göz simgesiyle ana sayfadan gizliyorsun; bir profil seçiliyse o profile ekleyip çıkarıyorsun."),
+        demo: "grid03",
+      },
+      {
+        title: tt("Hum ve Not baştan"),
+        text: tt("Hum'da en son bulunan şarkı büyük kapağıyla solda (Spotify, YouTube, kopyala), sağda “Şimdi dinlet”, otomatik Hum ve geçmiş. Not bir deftere döndü: solda sayfalar ve ilk satırları, sağda çizgili kâğıt; başlık, kalın, liste, görev, alıntı ve kod düğmeleri var. Biçimli önizlemede görev kutularına tıklayınca işaretleniyor."),
+        demo: "humnote",
+      },
+      {
+        title: tt("Argus kendi renginde"),
+        text: tt("Argus modülü (bilgisayarda da telefonda da) turuncu değil, Argus'un kendi camgöbeği-mavisinde. İzlediğin diziler yan yana kartlarda: afiş, tür, sıradaki bölüm, ilerleme ve tek tıkla “+1 bölüm izledim”."),
+        demo: "argusblue",
+      },
+      {
+        title: tt("Pomodoro, Sistem, Lukonnect, Kontrol ve Alarm yenilendi"),
+        text: tt("Pomodoro'da kocaman sayaç, ilerleme çubuğu ve büyük düğme; odak bekçisi, bildirim yok, göz molası ve su tek dokunuşluk çiplerde. Sistem'de işlemci (son 40 sn'nin grafiğiyle), ekran kartı ve bellek ayrı kartlarda. Lukonnect'te kulaklık, mouse ve vantilatör yan yana büyük kartlarda. Kontrol'de yatay ses ve parlaklık kaydırıcıları, altında büyük aç/kapa kareleri. Alarm'da solda büyük rakamlı yeni alarm kartı, sağda sıradaki alarmın geri sayımı ve hızlı “+5 dk” düğmeleri."),
+        demo: "cards03",
+      },
+      {
+        title: tt("Pano türüne göre, Bildirimler uygulama renginde"),
+        text: tt("Pano iki sütunlu kartlarda: her kaydın türü (Metin, Kod, Bağlantı, Renk, Görsel, Dosya) rozetinde yazıyor, görseller kartın arka planında. Bildirimler'de her uygulama kendi renginde, tek tek silinebiliyor. Raf'ta toplam boyut görünüyor."),
+        demo: "clipcards",
+      },
+      {
+        title: tt("Kısayollar artık bir Stream Deck"),
+        text: tt("Kısayollar modülü, ana sayfanın kartlarıyla aynı görünen basılabilir tuşlara döndü: mikrofonu ya da sesi aç/kapa (tuşun ışığı hâlini gösterir), karanlık mod, masaüstünü göster (her şeyi küçült), kilitle, ekranı kapat, oynat/sonraki, Pomodoro, gizlilik kalkanı, Hum, uyku, yeniden başlat, kapat. Kapatma, yeniden başlatma ve uyku yanlışlıkla basılmasın diye ikinci basışta çalışır. Nook Studio › Kısayollar'da tuşun adını, simgesini, rengini seçiyor, tek basışta birkaç işi sırayla yapan rutinler kuruyorsun (ör. “Oyun modu”: Discord'u aç, mikrofonu aç, masaüstünü temizle)."),
+        demo: "deck",
+      },
+      {
+        title: tt("Kapalı ada kapsülleri"),
+        text: tt("Kapalı ada o an ne oluyorsa onun kapsülüne dönüşüyor: müzikte dönen plak, ritim tutan Nook, şarkı adı ve dalga; Pomodoro'da “Derin odak”, kalın süre ve yüzde; Claude Code çalışırken projesi ve yaptığı iş; Nook uyurken süzülen “z”ler. Boştayken Nook'un yanında kalın saat ve hava duruyor (Studio › Modüller › Kapalı ada'dan kapatılır)."),
+        demo: "capsules",
+      },
+      {
+        title: tt("Bölünmüş ada"),
+        text: tt("İki iş aynı anda sürerken (müzik çalarken Pomodoro, Claude çalışırken müzik gibi) ikincisi adanın yanında küçük bir baloncukta duruyor. Baloncuğun üstüne gelince ada o işin modülüyle açılıyor."),
+        demo: "splitpill",
+      },
+      {
+        title: tt("Gece kamp ateşi, balık tutma düzeldi"),
+        text: tt("Gece bilgisayar boştayken Nook adada kamp ateşi yakıp marshmallow kızartıyor; bazen biri yanıyor, dönünce kaç tane kızarttığını anlatıyor. Gündüz balık tutarken Nook artık adanın altındaki boşlukta değil, adanın sağ ucunda oturuyor; olta adanın kenarından uzanıyor, misina masaüstüne sarkıyor."),
+        demo: "campfire",
+      },
+      {
+        title: tt("Karne, Yıl özeti ve Yama notları Studio'da"),
+        text: tt("Karne Studio'da geniş bir sayfa: harf notu, haftalık grafik, notun dökümü, sayaçlar ve son 8 haftanın gidişatı; geçmiş haftalara tek tek bakabiliyorsun. Yıl özeti bütün sayfalarıyla tek bir kart duvarında. Yama notları solda zaman çizgisi ve arama, sağda içindekiler ve her yenilik büyük görseliyle yan yana; güncellemeden sonra Studio yeni notla bir kez kendiliğinden açılıyor."),
+        demo: "reportweeks",
+      },
+      {
+        title: tt("Zamanlı kapatma"),
+        text: tt("Kontrol › Zamanlı kapat: bilgisayar 15 dk, yarım saat, 1-3 saat sonra ya da seçtiğin saatte kapansın, yeniden başlasın ya da uyusun. Kuruluyken adanın sağ üstünde kırmızı bir geri sayım duruyor; son dakikada Nook uyarıyor, “+15 dk” ya da “Vazgeç” ile değiştiriyorsun. Nook Mobil › Bilgisayar'dan da kurulur, uzatılır, iptal edilir; telefondan gizlilik kalkanını da açabiliyorsun."),
+        demo: "powertimer",
+      },
+      {
+        title: tt("Medya yenilendi"),
+        text: tt("Kapağın renkleri bütün kartı boyuyor; kapak büyüdü, şarkı adı daha belirgin, ilerleme çubuğu kalın. Ortada beyaz, yuvarlak bir oynat/duraklat düğmesi var (oynat üçgeni tam ortada); çalarken çevresinde pembe bir hale nefes alıyor, basınca simge dönerek değişiyor."),
+        demo: "media03",
+      },
+      {
+        title: tt("Görünüm sekmeli ve donmuyor"),
+        text: tt("Studio › Görünüm artık sekmeli: Koleksiyon (Öne çıkanlar, Karakterler, Meslekler, Tarzlar, Hayvanlar…), Gövde, Doku, Renk, Gözler, Gözlük, Başlık, Boyun, Yüz. Koleksiyon'un hazır Nook'ları uygulamayla birlikte geliyor, ilk açılışta da beklemeden anında görünüyor; öbür sekmelerin Nook'ları sen bakarken arkada hazırlanıyor, sekmeye geçince dolu geliyor; bir kez çizilen bir daha hiç beklemiyor. Sayfa açılırken donmuyor. Bir şey seçince soldaki Nook sevinip zıplıyor, pırıltı saçıyor. Şapkalar her gövdenin tepesine oturuyor (yumurta, küp, üçgen gibi gövdelerde havada kalmıyor), polis ve hemşire başlığı başa iniyor, uzaylı anteni belirginleşti. Koleksiyonda mesleği olmayanlar (Neon, Uykucu…) Tarzlar'a taşındı."),
+        demo: "look03",
+      },
+      {
+        title: tt("Düzeltmeler"),
+        text: tt("Ekran görüntüsü alırken ekran alıntısı aracı oyun sanılıp “ScreenClippingHost başlıyor · iyi oyunlar” denmiyor (ShareX, Lightshot gibi araçlar ve Windows'un kendi tam ekran katmanları da). Argus, izlediğin fragmanı, klibi, incelemeyi ya da çok kısa videoyu bölüm sanıp “işaretleyeyim mi?” diye sormuyor. Kopyaladığın yabancı metnin çevirisi çok daha hızlı: en hızlı Gemini modeli düşünmeden hemen çeviriyor, 2 saniyede cevap gelmezse ikinci model de devreye giriyor ve hangisi önce biterse o geliyor; yine olmazsa Pano'daki kartta “Tekrar dene” çıkıyor. Studio › Ayarlar'da en alttaki Hakkında'ya basınca soldaki seçim artık Telefon'da kalmıyor. Studio ana sayfasındaki selam balonu Nook'un arkasında kalmıyor; Studio'daki Kısayollar tuşları adadakilerle aynı renkli kartlar oldu; Studio'nun menü simgeleri yenilendi (seçili olan kendi renginde dolu). Sürüm numarası Kur'dan sonra da her yerde 0.3.0 yazıyor."),
+        demo: "fixes03",
+      },
+      {
+        title: tt("Hatırlatıcı kendi modülünde"),
+        text: tt("Hatırlatıcı Takvim'den çıktı, kendi modülü oldu. Neyi hatırlatacağımı yaz, ne zaman olacağını seç (10 dk, 30 dk, 1 saat, 3 saat, bu akşam, yarın sabah ya da bir saat) ve ekle; “çamaşırı as 20 dk” ya da “toplantı 14:30” diye yazarsan süreyi kendim anlarım. Vakti gelince alarm gibi çalarım. Sağda yaklaşanlar (takvim etkinliklerinin hatırlatmaları da “Takvimden” diye) ve geçenler; Takvim artık yalnızca etkinlikler, Alarm yalnızca alarmlar."),
+        demo: "remind03",
+      },
+      {
+        title: tt("Tanıtım yenilendi, Studio'da da"),
+        text: tt("“Nook nedir?” tanıtımı 0.3'e göre baştan anlatıyor: yeni ada (dikey çubuk, ana sayfa kartları, geri oku, tam ekran), Nook Studio, Hatırlatıcı ve zamanlı kapatma, Studio › Görünüm'deki koleksiyon. Studio › Ayarlar › Hakkında'dan ya da Studio ana sayfasındaki “Nook'u tanı”dan Studio'nun içinde de açılıyor: solda Nook ve anlatım, sağda canlandırma; oklarla geziliyor."),
+        demo: "tour03",
+      },
+      {
+        title: tt("Tam ekranda modüller bozulmuyor"),
+        text: tt("Ada tam ekran olunca modüllerin içi artık boşluğa yayılmıyor: her modül kendi düzenini koruyup ekrana sığacak kadar büyüyor. Takvim'in günleri uzayıp bozulmuyor, Hatırlatıcı'nın düğmesi kaybolmuyor; yazılar, düğmeler, listeler birlikte büyüyor."),
+        demo: "big03",
+      },
+      {
+        title: tt("Kapalı ada ayarları gelişti"),
+        text: tt("Studio › Modüller › Kapalı ada'da her kapsülün kartında kendi canlı önizlemesi var: hangisini ayarlıyorsan onun kapalı adası hemen orada değişiyor. Her kapsülü (müzik, Pomodoro, Claude Code, yaklaşan etkinlik, kronometre, indirme, dinliyor, uyku, saat ve hava) tek tek açıp kapatıyorsun; içlerinde neyin görüneceğini de seçiyorsun: müzikte kapak, şarkı adı, sanatçı, dalga (şarkı adını kapatınca sanatçı üste çıkıyor, ikisini de kapatınca yalnızca dönen plak, Nook ve dalga kalıyor); saatte saniye, hava, tarih; Pomodoro'da yüzde ve ilerleme çizgisi; Claude'da yaptığı iş. Kapattığın parça yer kaplamıyor, kapsül küçülüyor. Bölünmüş adayı ve baloncuğun üstüne gelince açılmasını da ayrı ayrı kapatabiliyorsun."),
+        demo: "capsulecfg",
+      },
+      {
+        title: tt("Güncelleme adada, kurulum penceresi yok"),
+        text: tt("Güncellerken arkada kurulum penceresi açılmıyor. Kapalı ada güncelleme kapsülüne dönüşüp indirmeyi animasyonla gösteriyor (on çeşidi var, aşağıda), bitince Nook sessizce kapanıp yeni sürümle kendiliğinden geri geliyor. Studio'dan “Güncelle”ye bassan da kurulumu ada yapıyor, ilerleme Studio'da da görünüyor."),
+        demo: "update03",
+      },
+      {
+        title: tt("Studio'da arama çubuğu ve sohbet"),
+        text: tt("Studio'nun ana sayfasında Nook'un yanında gerçek bir arama çubuğu var: yazdıkça sonuçlar hemen altında açılıyor (hesap, birim, döviz, çeviri, emoji, uygulama, web, not), Enter'la çalışıyor; hesap ve çeviri gibi sonuçlar kopyalanınca satırda “Kopyalandı” yazıyor. Aşağıda kocaman bir sohbet kartı var: Nook'la orada, geniş ekranda konuşuyorsun. Hiçbiri adaya atmıyor. Sağ üstteki kart artık ne olduğunu söylüyor: “Bilgisayar başında”, yani son 7 günde Nook'un seni bilgisayarda gördüğü süre (o uyurken sayılmıyor), altında günlük ortalaması. Bugünün kutularında Pomodoro yerine Nook'la ilgilenme var."),
+        demo: "studiohome03",
+      },
+      {
+        title: tt("Karne Pomodoro'ya bakmıyor"),
+        text: tt("Haftalık karne artık Pomodoro'yu kullanmayanları cezalandırmıyor. Not dört şeyden çıkıyor: Nook'la kaç gün birlikteydiniz, günde kaç bardak su içtin, Nook'la ne kadar ilgilendin ve onun keyfi. Grafikte çubuk bilgisayar başında geçen süre, içindeki dolu kısım müzikle geçen; kutularda Pomodoro yerine birlikte geçen gün ve keyif. Hiç açılmamış haftalar boş görünüyor. Karne sayfası da ferahladı: grafik genişledi, döküm ve sayılar yan yana."),
+        demo: "karne03",
+      },
+      {
+        title: tt("Ayarlar menü menü, Hakkında'da büyük sürüm"),
+        text: tt("Studio'daki Ayarlar artık bütün kategorileri alt alta kaydırmıyor: soldan hangisine basarsan sağda yalnızca o görünüyor. Ararken bütün kategorilerde arıyor. Hakkında'da, telefonlardaki gibi büyük Nook'un yanında kocaman, renkli sürüm numarası duruyor (büyük sürümse “Büyük güncelleme” rozetiyle); güncel olup olmadığın ve denetle düğmesi yanında. Yama notlarında da 0.3.0 gibi büyük sürümler listede renkli, iri bir kartla ve başlıkta dev sürüm numarasıyla görünüyor."),
+        demo: "settings03",
+      },
+      {
+        title: tt("Argus Studio'da"),
+        text: tt("Studio'nun solunda Argus da var, Argus'un kendi renkleriyle: izlediğin diziler sıradaki bölümü ve ne kadarını izlediğinle (“İzledim”e basınca bölüm işaretleniyor), bu hafta kaç bölüm ve film izlediğin, yayın takvimi ve “Ne izlesem?” önerisi. Profil, yeni bölüm haberleri ve izlediğini fark etme ayarları da aynı sayfada. Argus bu bilgisayarda yoksa orada Argus'un tanıtımı ve kurulumu çıkıyor."),
+        demo: "argus03",
+      },
+      {
+        title: tt("Güncelleme animasyonları: on çeşit, sen seç"),
+        text: tt("Güncellenirken kapalı adada artık on farklı animasyondan biri oynuyor: Halka, Roket (pistte yol alıp bitince fırlıyor), Kargo (bantta kayan paket eve varınca açılıp konfeti saçıyor), Pil (dolup şimşek çakıyor), Filiz (büyüyüp çiçek açıyor), Kahve (fincan dolup tütüyor), Retro (piksel çubuk, sonunda LEVEL UP), Yörünge, Balon (şişip patlıyor) ve Dalga (bütün kapsül suyla doluyor). Ayarlar › Ada ve Nook › Animasyonlar'da hepsi küçük kapsüllerde canlı oynuyor; hep birini seçebilir, “Sırayla” ya da “Karışık” diyebilirsin. “Adada dene” ile seçtiğin animasyon hemen kapalı adada baştan sona oynuyor. Bitiş anı da biraz uzadı, artık rahatça görülüyor."),
+        demo: "updateanims03",
+      },
+      {
+        title: tt("Nook'un günlüğü"),
+        text: tt("Nook gün boyu hangi programda ne kadar kaldığını, imlecin ekranda kaç metre yürüdüğünü, kablosuz farenin pilinin nereye kadar düştüğünü, Argus'ta ne izlediğini, müziği, suyu ve odağı aklında tutuyor; gece 22.30'dan sonra (ya da ertesi sabah ilk açılışta) Gemini ile günü kendi ağzından 3-4 cümlelik mizahi bir günlüğe yazıyor. Günlük Studio ana sayfasında (oklarla önceki günler, “Bugünü şimdi yaz” ile hemen), sabahki günün özetinde ve Nook Mobil'in ana ekranında. Ayarlar › Ada ve Nook'tan kapatılabiliyor; yalnızca sayılar Gemini'ye gidiyor."),
+        demo: "diary03",
+      },
+      {
+        title: tt("Çeviri ve telefon bağlantısı düzeltmeleri"),
+        text: tt("Kopyalanan yabancı metnin çevirisi bazen hiç gelmiyordu: Gemini boş cevap verince “çeviri yok” sayılıyordu, artık öbür model deneniyor. ö, ü, ç'li Almanca ve Fransızca metinler Türkçe sanılıp çevrilmiyordu; artık iki dilin ipuçları tartılıyor, kelime kelime ipucu olmayan kısa İngilizce cümleler de çevriliyor. Evden uzaktayken telefonun PC'ye ulaşamamasının bir sebebi de bulundu: Tailscale kapanınca Nook onu yeniden bağlamaya çalışıyor ama Tailscale bir ayar eksik dediği için her seferinde reddediyordu; artık Tailscale'in istediği tam komutla bağlanıyor. Telefondan gelen bildirimler de böylece yeniden yolda."),
+        demo: "fixes03b",
+      },
+      {
+        title: tt("Nook Mobil 0.3"),
+        text: tt("Nook Mobil › Bilgisayar'dan zamanlı kapatmayı kurup uzatabiliyor, iptal edebiliyor, gizlilik kalkanını açıp kapatabiliyorsun. Ana ekranda Nook'un günlüğü var; dokununca önceki günler de açılıyor. Argus ekranı artık Argus'un kendi renginde. Bildirimler ekranında “Pil kısıtlamasını kaldır” ve “Otomatik başlatmayı aç” düğmeleri var: telefon Nook'u arka planda durdurmasın, bildirimler PC'ye topluca değil anında gitsin. PC'ye ulaşılamayan bildirimler de artık bekletilip kendiliğinden yeniden gönderiliyor."),
+        demo: "mobile03",
+      },
+    ],
+  },
   {
     version: "0.2.61",
     date: tt("14 Ekim 2026"),
@@ -1117,6 +1307,8 @@ export interface DayNote {
   /** En yeniden eskiye */
   versions: string[];
   headline: string;
+  /** Günün sürümlerinden biri büyük sürüm */
+  major: boolean;
   items: (NoteItem & { version: string })[];
 }
 
@@ -1126,21 +1318,13 @@ export const DAYS: DayNote[] = NOTES.reduce<DayNote[]>((days, n) => {
   if (day) {
     day.versions.push(n.version);
     day.items.push(...items);
-  } else days.push({ date: n.date, versions: [n.version], headline: n.headline, items });
+    day.major ||= !!n.major;
+  } else days.push({ date: n.date, versions: [n.version], headline: n.headline, major: !!n.major, items });
   return days;
 }, []);
 
 /** Sürümün bulunduğu gün */
 export const dayOf = (version: string) => DAYS.find((d) => d.versions.includes(version)) ?? DAYS[0];
-
-/** Ada küçülme animasyonu bitmeden pencere küçülmesin */
-const SHRINK_AFTER_MS = 700;
-/** Hiç dokunulmazsa açık kalma süresi */
-const AUTO_CLOSE_MS = 30_000;
-
-let shrinkTimer = 0;
-let closeTimer = 0;
-let unsub: (() => void) | null = null;
 
 /** En yeni not henüz kendiliğinden gösterilmedi mi */
 export function notesDue() {
@@ -1148,57 +1332,15 @@ export function notesDue() {
   return isPrimary && s.toured && s.notesSeen !== latestNote().version;
 }
 
-/** Yama notlarını aç; `version` verilirse o sürümün notuyla */
-export async function openNotes(version?: string) {
+/**
+ * Yama notlarını Nook Studio'da aç; `version` verilirse o sürümün notuyla. Güncellemeden sonraki
+ * ilk açılışta bir kez kendiliğinden açılır (görülen not bir daha açılmaz).
+ */
+export function openNotes(version?: string) {
   if (!isPrimary) return;
   const s = useNook.getState();
   if (s.tour) return;
-  if (version) pendingVersion = version;
-  if (s.notes) return;
-  window.clearTimeout(shrinkTimer);
-  s.setSearching(false);
-  if (s.brief) s.setBrief(false);
-  if (s.report) s.setReport(false);
-  // Bir kez görülen not bir daha kendiliğinden açılmaz
   s.setNotesSeen(latestNote().version);
-  await setWindowSize(TOUR_WINDOW.width, TOUR_WINDOW.height).catch(() => undefined);
-  const wasInside = useNook.getState().hovered;
-  useNook.getState().setNotes(true);
   playAntic("hop");
-
-  // İmleç içerideyken açıldıysa (çip) ya da sonradan girdiyse: çıkınca kapan
-  let entered = wasInside;
-  window.clearTimeout(closeTimer);
-  if (!entered) closeTimer = window.setTimeout(closeNotes, AUTO_CLOSE_MS);
-  unsub?.();
-  unsub = useNook.subscribe((st, prev) => {
-    if (!st.notes) return;
-    if (st.hovered && !prev.hovered) {
-      entered = true;
-      window.clearTimeout(closeTimer);
-    } else if (!st.hovered && prev.hovered && entered && !st.holds.length) closeNotes();
-    if (st.fullscreen || st.ringing || st.searching) closeNotes();
-  });
-}
-
-/** Açılışta gösterilecek sürüm (çipten açılınca en yenisi) */
-let pendingVersion: string | null = null;
-export const takePendingVersion = () => {
-  const v = pendingVersion;
-  pendingVersion = null;
-  return v;
-};
-
-export function closeNotes() {
-  window.clearTimeout(closeTimer);
-  unsub?.();
-  unsub = null;
-  const s = useNook.getState();
-  if (!s.notes) return;
-  s.setNotes(false);
-  window.clearTimeout(shrinkTimer);
-  shrinkTimer = window.setTimeout(() => {
-    const st = useNook.getState();
-    if (!st.brief && !st.tour && !st.notes && !st.report && !st.big) void setWindowSize().catch(() => undefined);
-  }, SHRINK_AFTER_MS);
+  openStudio(version ? `notes:${version}` : "notes");
 }

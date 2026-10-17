@@ -33,6 +33,12 @@ const NOT_GAMES: &[&str] = &[
     "chrome", "msedge", "firefox", "opera", "opera_gx", "brave", "vivaldi", "arc", "zen", "vlc", "mpc-hc", "mpc-hc64", "mpc-be", "mpc-be64",
     "potplayer", "potplayermini", "potplayermini64", "wmplayer", "video.ui", "microsoft.media.player", "spotify", "netflix", "explorer",
     "applicationframehost", "powerpnt", "obs64", "mpv", "kmplayer", "discord", "code", "windowsterminal", "nook",
+    // Ekran görüntüsü araçları ekranı bir anlığına tam ekran bir katmanla kaplar ("ScreenClippingHost başlıyor · iyi oyunlar")
+    "screenclippinghost", "snippingtool", "screensketch", "sharex", "lightshot", "greenshot", "flameshot", "snagit32", "snagiteditor",
+    "gyazo", "screentogif", "picpick", "monosnap",
+    // Windows'un kendi tam ekran katmanları ve tam ekran açılabilen iş uygulamaları
+    "lockapp", "searchhost", "startmenuexperiencehost", "shellexperiencehost", "textinputhost", "photos", "microsoft.photos",
+    "ms-teams", "teams", "zoom", "acrord32", "acrobat", "winword", "excel",
 ];
 
 /// Hep en üstte durması gereken pencereler (etiket önekleri).
@@ -75,6 +81,23 @@ fn pretty(exe: &str) -> String {
         stem.to_string()
     } else {
         cut
+    }
+}
+
+/// Öndeki pencerenin uygulaması ("chrome", "Code", "Figma"); Nook'un günlüğü dakikada bir sorar
+#[tauri::command]
+pub fn foreground_app() -> Option<String> {
+    #[cfg(windows)]
+    {
+        let h = imp::foreground();
+        if h == 0 {
+            return None;
+        }
+        imp::exe_of(h as _).map(|(_, path)| pretty(&path))
+    }
+    #[cfg(not(windows))]
+    {
+        None
     }
 }
 

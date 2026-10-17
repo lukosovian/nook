@@ -1,7 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-import { motion } from "motion/react";
-import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { AudioLines, Bell, Check, ChevronLeft, Eye, EyeOff, Gamepad2, HeartPulse, HelpCircle, Info, Keyboard, LayoutGrid, Lock, Play, Search, Settings2, ShieldCheck, Smartphone, Sparkles, X, type LucideIcon } from "lucide-react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { AudioLines, Bell, Check, Eye, EyeOff, Gamepad2, HeartPulse, HelpCircle, Info, Keyboard, LayoutGrid, Lock, Play, Settings2, ShieldCheck, Smartphone, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
 import { refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
@@ -12,13 +10,18 @@ import { syncFeeds } from "../../lib/ics";
 import { shortName } from "./ControlPanel";
 import { checkPassword, hashPassword } from "../../lib/lock";
 import { startTour } from "../../lib/tour";
+import { openStudio, isStudio, studioGo } from "../../lib/studio";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
 import { chooseArgusDir, installArgus, openArgus, useArgus } from "../../lib/argus";
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
+import { latestNote, NOTES } from "../../lib/notes";
+import { normalizeColor, normalizeLook } from "../../lib/look";
+import { NookFigure } from "../mascot/Figure";
+import { motion } from "motion/react";
 import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle, Dropdown, tintBg, tintText } from "../ui/primitives";
 import { INTRO_KINDS } from "../overlays/Intro";
 import { MOVE_KINDS } from "../../lib/moveFx";
-import { IntroPreview, MovePreview } from "./EffectPreview";
+import { IntroPreview, MovePreview, UpdateAnimGallery } from "./EffectPreview";
 import { LangDropdown } from "../ui/LangPicker";
 import { isTurkish, tt } from "../../lib/i18n";
 import { playSfx, type Sfx } from "../../lib/sfx";
@@ -76,10 +79,10 @@ const WATER: { id: number; label: string }[] = [
   { id: 90, label: tt("90 dk") },
 ];
 
-type CatId = "general" | "island" | "notify" | "health" | "game" | "privacy" | "voice" | "modules" | "shortcuts" | "phone" | "about";
+export type CatId = "general" | "island" | "notify" | "health" | "game" | "privacy" | "voice" | "modules" | "shortcuts" | "phone" | "about";
 
 /** Ayarların kategorileri: önce ızgara, birine basınca kendi sayfası. `sections`: içindeki bölüm başlıkları (atlama için) */
-const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; color: string; sections: string[] }[] = [
+export const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; color: string; sections: string[] }[] = [
   { id: "general", title: tt("Genel"), hint: tt("Dil, görünüm, ekran, boyut"), icon: Settings2, color: ACCENT.blue, sections: ["Nook", tt("Ekran"), tt("Erişilebilirlik")] },
   { id: "island", title: tt("Ada ve Nook"), hint: tt("Uyku, gezinti, animasyonlar"), icon: Sparkles, color: ACCENT.pink, sections: [tt("Ada"), tt("Animasyonlar")] },
   { id: "notify", title: tt("Bildirimler"), hint: tt("Bildirim kartları, uyarılar"), icon: Bell, color: ACCENT.purple, sections: [tt("Bildirimler")] },
@@ -89,49 +92,27 @@ const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; color: s
   { id: "voice", title: tt("Asistan"), hint: tt("Gemini, Hey Nook, sesler"), icon: AudioLines, color: ACCENT.yellow, sections: [tt("Yapay zekâ"), "Hey Nook", tt("Ses")] },
   { id: "modules", title: tt("Modüller"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
   { id: "shortcuts", title: tt("Kısayollar"), hint: tt("Klavye kısayolları"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Kısayollar")] },
-  { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.green, sections: [tt("Telefon")] },
-  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, destekçiler"), icon: Info, color: ACCENT.purple, sections: [tt("Hakkında"), tt("Destekçiler")] },
+  { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.teal, sections: [tt("Telefon")] },
+  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Destekçiler")] },
 ];
 
 /** Bölüm başlığından kategorisi ("Ayarlar › Kısayollar"a gönderme gibi) */
-const catOf = (section: string) => CATS.find((c) => c.sections.some((t) => t === section || t.startsWith(section) || section.startsWith(t)))?.id ?? null;
+export const catOf = (section: string) => CATS.find((c) => c.sections.some((t) => t === section || t.startsWith(section) || section.startsWith(t)))?.id ?? null;
 
-export function SettingsPanel() {
-  const scroller = useRef<HTMLDivElement>(null);
-  useScrollMemory("settings", scroller);
-  const [cat, setCat] = useState<CatId | null>(() => {
-    // Önizleme: ?sec=Pano → o bölümün kategorisi (ekran görüntüsü için)
-    const sec = import.meta.env.DEV ? new URLSearchParams(location.search).get("sec") : null;
-    return sec ? catOf(sec) : null;
-  });
-  const [query, setQuery] = useState(() => (import.meta.env.DEV ? new URLSearchParams(location.search).get("find") ?? "" : ""));
-  const q = query.trim().toLocaleLowerCase("tr");
-  const [empty, setEmpty] = useState(false);
-
-  // Başka bir yerden "Ayarlar › Kısayollar"a gönderildiyse o kategoriyi aç, bölüme kaydır
-  const jump = useNook((st) => st.settingsJump);
-  useEffect(() => {
-    if (!jump) return;
-    const c = catOf(tt(jump));
-    setQuery("");
-    if (c) setCat(c);
-    const t = window.setTimeout(() => {
-      const el = scroller.current?.querySelector<HTMLElement>(`section[data-sec^="${tt(jump)}"]`);
-      if (el && scroller.current) scroller.current.scrollTo({ top: topIn(el, scroller.current) - 40, behavior: "smooth" });
-      useNook.getState().setSettingsJump(null);
-    }, 250);
-    return () => window.clearTimeout(t);
-  }, [jump]);
-
-  // Kategori değişince başa
-  useEffect(() => {
-    if (scroller.current) scroller.current.scrollTop = 0;
-  }, [cat]);
-
-  // Arama: bütün kategoriler alt alta çizilir, eşleşmeyen satırlar ve bölümler gizlenir
+/**
+ * Ayarlarda arama: kategoriler alt alta çizilmişken eşleşmeyen satırlar ve bölümler gizlenir
+ * (ada ve Studio aynı süzgeci kullanır). `setEmpty`: hiçbir şey eşleşmedi mi.
+ */
+export function useSettingsFilter(scroller: React.RefObject<HTMLElement | null>, q: string, setEmpty: (v: boolean) => void) {
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !q) return;
+    if (!el) return;
+    if (!q) {
+      // Arama silinince gizlenen her şey geri gelsin
+      el.querySelectorAll<HTMLElement>("[data-cat], section[data-sec], [data-row], section[data-sec] > div > *").forEach((x) => (x.style.display = ""));
+      setEmpty(false);
+      return;
+    }
     const filter = () => {
       let total = false;
       el.querySelectorAll<HTMLElement>("[data-cat]").forEach((catEl) => {
@@ -160,84 +141,14 @@ export function SettingsPanel() {
     // Geç yüklenen satırlar (destekçiler, ekranlar) için bir kez daha
     const t = window.setTimeout(filter, 150);
     return () => window.clearTimeout(t);
-  }, [q]);
-
-  const current = CATS.find((c) => c.id === cat);
-  const shown = q ? CATS : current ? [current] : [];
-
-  return (
-    <div ref={scroller} className="h-full overflow-y-auto pr-1.5">
-      <div className="sticky top-0 z-10 flex items-center gap-1.5 bg-[#1c1c1f] pb-2" style={{ boxShadow: "0 8px 10px -6px #1c1c1f" }}>
-        {current && !q && (
-          <button onClick={() => setCat(null)} className="flex h-[26px] shrink-0 items-center gap-1 rounded-full bg-well pl-1.5 pr-2.5 text-[11.5px] font-semibold text-label hover:bg-well-hi">
-            <ChevronLeft size={14} />
-            <current.icon size={12} style={{ color: tintText(current.color) }} />
-            {current.title}
-          </button>
-        )}
-        <label className="flex h-[26px] min-w-0 flex-1 items-center gap-1.5 rounded-full bg-well px-2.5 text-label-3 focus-within:ring-1 focus-within:ring-white/15">
-          <Search size={12} className="shrink-0" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && query) {
-                setQuery("");
-                e.stopPropagation();
-              }
-            }}
-            placeholder={tt("Ayarlarda ara…")}
-            className="min-w-0 flex-1 bg-transparent text-[11.5px] text-label outline-none placeholder:text-label-3"
-          />
-          {query && (
-            <button onClick={() => setQuery("")} className="text-label-3 hover:text-label" aria-label={tt("Temizle")}>
-              <X size={12} />
-            </button>
-          )}
-        </label>
-      </div>
-
-      {!q && !current && (
-        <div className="grid grid-cols-3 gap-1.5">
-          {CATS.map((c) => (
-            <motion.button
-              key={c.id}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setCat(c.id)}
-              className="flex min-h-[46px] min-w-0 items-center gap-2 rounded-[14px] px-2 py-1.5 text-left transition-[filter] hover:brightness-125"
-              style={{ background: tintBg(c.color, 10), border: `1px solid ${tintBg(c.color, 22)}` }}
-            >
-              <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full" style={{ background: tintBg(c.color, 24), color: tintText(c.color) }}>
-                <c.icon size={13} />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-[11.5px] font-semibold" style={{ color: tintText(c.color) }}>
-                  {c.title}
-                </span>
-                <span className="line-clamp-2 text-[9.5px] leading-[1.25] text-label-3">{c.hint}</span>
-              </span>
-            </motion.button>
-          ))}
-        </div>
-      )}
-
-      {shown.map((c) => (
-        <div key={c.id} data-cat={c.id} className="space-y-3 pb-2">
-          {q && (
-            <h2 className="flex items-center gap-1.5 pt-1 text-[11px] font-semibold" style={{ color: tintText(c.color) }}>
-              <c.icon size={12} /> {c.title}
-            </h2>
-          )}
-          <CategoryBody id={c.id} />
-        </div>
-      ))}
-      {q && empty && <p className="py-6 text-center text-[11px] text-label-3">{tt("Bulunamadı")}</p>}
-    </div>
-  );
+  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+/** Ayarlar nerede çiziliyor: adada sıkı, Studio'da geniş kartlar */
+export const SettingsLook = createContext<"island" | "studio">("island");
+
 /** Bir kategorinin bölümleri */
-function CategoryBody({ id }: { id: CatId }) {
+export function CategoryBody({ id }: { id: CatId }) {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
@@ -258,7 +169,7 @@ function CategoryBody({ id }: { id: CatId }) {
             </Row>
             <Affection />
             <Row label={tt("Adı ve görünümü")} hint={tt("Şekli, gözleri, şapkası, rengi")}>
-              <TextButton onClick={() => useNook.getState().setTab("look")}>{tt("Düzenle")}</TextButton>
+              <TextButton onClick={() => openStudio("look")}>{tt("Düzenle")}</TextButton>
             </Row>
             <Row label={tt("Windows açılınca başlat")}>
               <Toggle on={s.autostart} onChange={(v) => update({ autostart: v })} />
@@ -313,6 +224,9 @@ function CategoryBody({ id }: { id: CatId }) {
             <Row label={tt("Günün ilk açılışında özet")} hint={tt("Hava, takvim, yeni bölümler")}>
               <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
             </Row>
+            <Row label={tt("Nook'un günlüğü")} hint={tt("Gece günün mizahi bir özetini kendi ağzından yazar (Gemini ile)")}>
+              <Toggle on={s.diary} onChange={(v) => update({ diary: v })} color={ACCENT.purple} />
+            </Row>
             <Row label={tt("Dönünce karşıla")} hint={tt("Bu kadar süre yokken dönünce Nook sevinir")}>
               <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
             </Row>
@@ -351,6 +265,10 @@ function CategoryBody({ id }: { id: CatId }) {
               </div>
             </Row>
             {preview.intro > 0 && <IntroPreview style={s.introStyle} run={preview.intro} />}
+            <Row label={tt("Güncelleme animasyonu")} hint={tt("Güncellenirken kapalı adada oynar; “Adada dene” ile hemen gör")}>
+              {null}
+            </Row>
+            <UpdateAnimGallery />
           </Section>
         </>
       );
@@ -477,11 +395,19 @@ function CategoryBody({ id }: { id: CatId }) {
     case "about":
       return (
         <>
+          {isStudio && <AboutHero />}
           <Section title={tt("Hakkında")}>
             <Row label={tt("Nook nedir? Nasıl kullanılır?")}>
-              <TextButton onClick={() => void startTour()}>{tt("Tanıtımı aç")}</TextButton>
+              {isStudio ? (
+                <span className="flex gap-1.5">
+                  <TextButton onClick={() => studioGo("tour")}>{tt("Burada aç")}</TextButton>
+                  <TextButton onClick={() => void startTour()}>{tt("Adada aç")}</TextButton>
+                </span>
+              ) : (
+                <TextButton onClick={() => void startTour()}>{tt("Tanıtımı aç")}</TextButton>
+              )}
             </Row>
-            <UpdateRow />
+            {!isStudio && <UpdateRow />}
             <Row label="Instagram">
               <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
             </Row>
@@ -492,8 +418,65 @@ function CategoryBody({ id }: { id: CatId }) {
   }
 }
 
+/**
+ * Studio › Ayarlar › Hakkında'nın başı: telefonların "Hakkında" ekranı gibi büyük Nook, kocaman ve renkli
+ * sürüm numarası, büyük sürümse rozeti; altında güncelleme durumu ve düğmesi.
+ */
+function AboutHero() {
+  const { current, available, progress, status } = useUpdate();
+  const look = normalizeLook(useNook((s) => s.settings.look));
+  const color = normalizeColor(useNook((s) => s.settings.faceColor));
+  const version = current || latestNote().version;
+  const note = NOTES.find((n) => n.version === version);
+  const grad = `linear-gradient(100deg, ${ACCENT.purple}, ${ACCENT.pink} 45%, ${ACCENT.orange})`;
+  return (
+    <section className="nook-card relative overflow-hidden rounded-[28px] px-8 py-7">
+      <div className="pointer-events-none absolute -left-20 -top-28 h-[320px] w-[380px] rounded-full opacity-80" style={{ background: `radial-gradient(circle, ${tintBg(ACCENT.purple, 36)}, transparent 65%)` }} />
+      <div className="pointer-events-none absolute -bottom-32 right-[-40px] h-[300px] w-[380px] rounded-full opacity-70" style={{ background: `radial-gradient(circle, ${tintBg(ACCENT.pink, 30)}, transparent 65%)` }} />
+      <div className="relative flex items-center gap-7">
+        <motion.div className="shrink-0" animate={{ y: [0, -6, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}>
+          <NookFigure look={look} color={color} size={112} expression="happy" />
+        </motion.div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-extrabold tracking-tight text-label-2">Nook</p>
+          <p className="font-round text-[64px] font-extrabold leading-[0.95] tracking-[-0.04em] tabular-nums" style={{ background: grad, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+            {version}
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {note?.major && (
+              <span className="rounded-full px-2.5 py-[3px] text-[10.5px] font-extrabold uppercase tracking-[0.08em] text-white" style={{ background: grad, boxShadow: `0 6px 18px -8px ${ACCENT.pink}` }}>
+                {tt("Büyük güncelleme")}
+              </span>
+            )}
+            {note && <span className="text-[12px] text-label-3">{note.date}</span>}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {progress !== null ? (
+            <span className="text-[12.5px] font-bold tabular-nums" style={{ color: tintText(ACCENT.green) }}>
+              {tt("İndiriliyor %{0}", progress)}
+            </span>
+          ) : available ? (
+            <motion.button whileTap={{ scale: 0.96 }} onClick={() => void installUpdate()} className="rounded-[13px] px-4 py-2 text-[13px] font-bold text-black" style={{ background: ACCENT.green }}>
+              {tt("{0} sürümüne güncelle", available)}
+            </motion.button>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: tintText(ACCENT.green) }}>
+                <Check size={14} strokeWidth={3} /> {status || tt("Nook güncel")}
+              </span>
+              <TextButton onClick={() => void checkUpdate(true)}>{tt("Güncellemeleri denetle")}</TextButton>
+            </>
+          )}
+          <TextButton onClick={() => studioGo("notes")}>{tt("Yama notları")}</TextButton>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** Argus (dizi/film arşivi) — yalnızca bu bilgisayarda varsa görünür. */
-function ArgusSection() {
+export function ArgusSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const snap = useArgus((st) => st.snap);
@@ -991,18 +974,15 @@ function SupportersSection() {
   );
 }
 
-/**
- * Bölümün kaydırılan kutunun içeriğindeki yeri. offsetTop en yakın konumlu ataya göredir; kaydırılan
- * kutu konumlu olmadığından kutunun kendi yeri de içindeydi ve sekme bir önceki bölümde parlıyordu.
- * (getBoundingClientRect kullanılmaz: ada açılırken ölçeklenir, yerler küçük çıkar.)
- */
-function topIn(sec: HTMLElement, el: HTMLElement) {
-  if (sec.offsetParent === el) return sec.offsetTop;
-  if (sec.offsetParent === el.offsetParent) return sec.offsetTop - el.offsetTop - el.clientTop;
-  return sec.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const look = useContext(SettingsLook);
+  if (look === "studio")
+    return (
+      <section data-sec={title} className="nook-card rounded-[20px] px-5 pb-2 pt-4">
+        <h3 className="mb-1 text-[14px] font-bold tracking-tight text-label">{title}</h3>
+        <div className="divide-y divide-white/[0.05] [&_button]:text-[12px]">{children}</div>
+      </section>
+    );
   return (
     <section data-sec={title}>
       <h3 className="mb-1 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">{title}</h3>
@@ -1027,11 +1007,12 @@ function PreviewButton({ color, onClick }: { color: string; onClick: () => void 
 
 /** Ayar satırı: kısa başlık, altında isteğe bağlı tek satır açıklama; aramada ikisi de aranır */
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  const studio = useContext(SettingsLook) === "studio";
   return (
-    <div data-row={`${label} ${hint ?? ""}`.toLocaleLowerCase("tr")} className="flex min-h-[30px] items-center justify-between gap-2 py-1">
+    <div data-row={`${label} ${hint ?? ""}`.toLocaleLowerCase("tr")} className={`flex items-center justify-between gap-2 ${studio ? "min-h-[46px] gap-6 py-2.5" : "min-h-[30px] py-1"}`}>
       <span className="min-w-0">
-        <span className="block text-[12px] text-label">{label}</span>
-        {hint && <span className="block text-[10px] leading-snug text-label-3">{hint}</span>}
+        <span className={`block text-label ${studio ? "text-[13.5px] font-semibold" : "text-[12px]"}`}>{label}</span>
+        {hint && <span className={`block leading-snug text-label-3 ${studio ? "text-[11.5px]" : "text-[10px]"}`}>{hint}</span>}
       </span>
       <span className="flex shrink-0 items-center">{children}</span>
     </div>

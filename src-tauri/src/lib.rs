@@ -22,6 +22,7 @@ mod mixer;
 mod net;
 mod notify;
 pub mod outside;
+mod powertimer;
 mod privacy;
 mod quick;
 mod remote;
@@ -30,6 +31,7 @@ mod shell;
 mod shield;
 mod shortcut;
 mod state;
+mod studio;
 mod system;
 mod tracker;
 mod verify;
@@ -93,6 +95,12 @@ pub fn run() {
             commands::apply_settings,
             commands::list_monitors,
             commands::set_window_size,
+            studio::open_studio,
+            fullscreen::foreground_app,
+            tracker::mouse_travel,
+            powertimer::power_timer_get,
+            powertimer::power_timer_set,
+            studio::studio_take_section,
             commands::clear_background,
             commands::island_drag,
             clipboard::clipboard_clear_if,
@@ -225,6 +233,7 @@ pub fn run() {
             net::spawn(handle.clone());
             share::spawn(handle.clone());
             remote::spawn(handle.clone());
+            powertimer::spawn(handle.clone());
             outside::spawn();
             brightness::spawn(handle);
 

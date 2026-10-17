@@ -340,6 +340,33 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             Err(e) => err(500, &e),
         },
         (Method::Get, "/v1/wake/test") => json_res(200, json!(crate::outside::wake_test_result())),
+        // Zamanlı kapatma: { at: ms | null, action: shutdown | restart | sleep }
+        (Method::Get, "/v1/power/timer") => json_res(200, json!({ "timer": crate::powertimer::get() })),
+        (Method::Post, "/v1/power/timer") => {
+            let v = serde_json::from_slice::<Value>(body).unwrap_or(Value::Null);
+            let t = v["at"].as_i64().map(|at| crate::powertimer::PowerTimer {
+                at,
+                action: v["action"].as_str().unwrap_or("shutdown").to_owned(),
+                from: "phone".into(),
+            });
+            match crate::powertimer::set(t) {
+                Ok(t) => json_res(200, json!({ "timer": t })),
+                Err(e) => err(400, &e),
+            }
+        }
+        // Gizlilik kalkanı: { on: true } açar, { on: false } kapatır (kilitliyse parolasız kapanmaz)
+        (Method::Post, "/v1/shield") => {
+            let on = serde_json::from_slice::<Value>(body).ok().and_then(|v| v["on"].as_bool()).unwrap_or(true);
+            let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
+            crate::log::write("info", &format!("telefon: kalkan {}", if on { "aç" } else { "kapat" }));
+            if on {
+                crate::shield::shield_on(app.clone(), false);
+                crate::system::emit_event(&app, "phone", "Telefondan kalkan açıldı", "Nook Mobil");
+            } else {
+                crate::shield::shield_off(app);
+            }
+            json_res(200, json!({ "ok": true }))
+        }
         (Method::Post, "/v1/power") => {
             let action = serde_json::from_slice::<Value>(body).ok().and_then(|v| v["action"].as_str().map(str::to_owned)).unwrap_or_default();
             match power(&action) {
@@ -552,6 +579,8 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             }
         }
         (Method::Get, "/v1/hum") => json_res(200, json!({ "hums": MIRROR.lock().unwrap()["hums"].clone() })),
+        // Nook'un günlüğü (en yeni önce)
+        (Method::Get, "/v1/diary") => json_res(200, json!({ "diary": MIRROR.lock().unwrap()["diary"].clone() })),
         // Uzaktan açma ve bağlantı hazırlığının tamamı: telefon saklar, PC kapalıyken de gösterir
         (Method::Get, "/v1/setup") => json_res(200, crate::outside::setup_report()),
         // Telefona gelen bildirim → Nook'un bildirimleri (Windows'unkilerle aynı akış)
@@ -779,6 +808,9 @@ fn status() -> Value {
         // Ana ekrandaki Claude çipi: kaç onay bekliyor, kaç oturum çalışıyor
         "claude": claude_summary(),
         // Soldan sağa; ekran görüntüsünde ?m= bu sırayla
+        // Zamanlı kapatma ve kalkan (telefonun PC ekranında)
+        "powerTimer": crate::powertimer::get(),
+        "shield": APP.lock().unwrap().as_ref().is_some_and(crate::shield::is_on),
         "monitors": crate::imaging::monitors().iter().map(|((_, _, w, h), primary)| json!({ "width": w, "height": h, "primary": primary })).collect::<Vec<_>>(),
     })
 }
@@ -957,7 +989,7 @@ pub fn remote_reset() -> Info {
 // ---------------------------------------------------------------- Güç
 
 #[cfg(windows)]
-mod power {
+pub(crate) mod power {
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, LUID};
     use windows_sys::Win32::Security::{AdjustTokenPrivileges, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY};
     use windows_sys::Win32::System::Shutdown::{ExitWindowsEx, EWX_POWEROFF, EWX_REBOOT, EWX_SHUTDOWN, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OTHER};
@@ -1006,7 +1038,7 @@ mod power {
 }
 
 #[cfg(not(windows))]
-mod power {
+pub(crate) mod power {
     pub fn exit(_restart: bool) -> Result<(), String> {
         Err("yalnızca Windows".into())
     }

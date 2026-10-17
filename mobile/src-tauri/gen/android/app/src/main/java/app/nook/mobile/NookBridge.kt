@@ -10,6 +10,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.PowerManager
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -316,6 +317,38 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
             emit("notiftest", JSONObject().put("ok", PcLink.post(ctx, "/v1/notify", body.toString().toByteArray()) != null))
         }
     }
+
+    /** Android pil tasarrufu Nook'u arka planda kısıtlamıyor mu (kısıtlarsa bildirimler PC'ye gidemez) */
+    @JavascriptInterface
+    fun batteryFree(): Boolean = (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(ctx.packageName)
+
+    /** "Pil kısıtlamasını kaldır" sorusu; olmazsa uygulamanın pil ayarları */
+    @JavascriptInterface
+    fun askBatteryFree() {
+        val ask = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        act.runOnUiThread { runCatching { act.startActivity(ask) }.onFailure { runCatching { act.startActivity(details) } } }
+    }
+
+    /** Xiaomi/HyperOS gibi telefonlarda "Otomatik başlatma" izni; yoksa uygulama bilgisi sayfası */
+    @JavascriptInterface
+    fun openAutostart() {
+        val tries = listOf(
+            Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+            Intent().setComponent(ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")),
+            Intent().setComponent(ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")),
+        )
+        act.runOnUiThread {
+            for (i in tries) {
+                if (runCatching { act.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) break
+            }
+        }
+    }
+
+    /** Otomatik başlatma ayarı olan bir telefon mu (Xiaomi, Oppo, Huawei…) */
+    @JavascriptInterface
+    fun hasAutostart(): Boolean = Build.MANUFACTURER.lowercase() in setOf("xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "huawei", "honor", "vivo")
 
     @JavascriptInterface
     fun setNotifPrefs(json: String) {

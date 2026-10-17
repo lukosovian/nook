@@ -37,7 +37,9 @@ function parseTime(v: string): string | null {
  * Saatli etkinliğe hatırlatma kurulursa o an alarm gibi çalar (sesi Ayarlar › Alarm sesi).
  */
 export function CalendarPanel() {
-  const events = useNook((s) => s.events);
+  // Hatırlatıcı modülünün tek başına hatırlatmaları takvimde etkinlik sayılmaz
+  const all = useNook((s) => s.events);
+  const events = useMemo(() => all.filter((e) => !e.reminder), [all]);
   const ext = useNook((s) => s.extEvents);
   const today = dayKey();
   const [day, setDay] = useState(today);
@@ -72,7 +74,7 @@ export function CalendarPanel() {
     <div className="flex h-full flex-col gap-1.5">
     <div className="flex min-h-0 flex-1 gap-3">
       {/* Ay */}
-      <div className="flex w-[176px] shrink-0 flex-col">
+      <div className="flex w-[36%] min-w-[176px] max-w-[300px] shrink-0 flex-col">
         <div className="mb-1 flex items-center justify-between">
           <button onClick={() => go(-1)} className="flex h-5 w-5 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" aria-label={tt("Önceki ay")}>
             <ChevronLeft size={12} strokeWidth={2.6} />
@@ -105,7 +107,9 @@ export function CalendarPanel() {
             const isToday = k === today;
             return (
               <button key={k} onClick={() => pick(c)} className="relative flex items-center justify-center">
-                {sel && <motion.span layoutId="cal-sel" className="absolute inset-[1px] rounded-full" style={{ background: tintBg(COLOR, 30) }} transition={spring.pop} />}
+                {/* Hücre ne kadar büyürse büyüsün (tam ekran) seçim yuvarlak kalır, noktalar sayının altında */}
+                <span className="relative flex h-[22px] w-[22px] items-center justify-center">
+                {sel && <motion.span layoutId="cal-sel" className="absolute inset-0 rounded-full" style={{ background: tintBg(COLOR, 30) }} transition={spring.pop} />}
                 <span
                   className={`relative text-[10.5px] tabular-nums ${other ? "text-label-3/50" : sel ? "font-semibold" : "text-label-2"}`}
                   style={isToday ? { color: tintText(COLOR), fontWeight: 700 } : sel ? { color: "var(--color-label)" } : undefined}
@@ -118,6 +122,7 @@ export function CalendarPanel() {
                     {extDays.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(EXT, 40) : EXT }} />}
                   </span>
                 )}
+                </span>
               </button>
             );
           })}
@@ -226,7 +231,7 @@ function AddRow({ day }: { day: string }) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && add()}
-        placeholder={tt("Etkinlik ya da hatırlatıcı")}
+        placeholder={tt("Etkinlik ekle")}
         spellCheck={false}
         className="h-7 min-w-0 flex-1 rounded-full bg-well px-3 text-[11.5px] text-label outline-none placeholder:text-label-3 focus:bg-well-hi"
       />

@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useReducer } from "react";
 import shader from "./nook3d.glsl?raw";
 import { capColor, type Look } from "./look";
+import { BAKED, BAKED_TAG } from "./bakedLooks";
 
 /** Resmin kapsadığı alan, yüz çapının (2 birim) kaç katı: şapka, kulaklık, papyon sığsın */
 export const SPAN = 3.2;
@@ -23,6 +24,21 @@ const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1, scarf: 2 };
 const FACE_ID: Record<Look["face"], number> = { none: 0, mustache: 1, beard: 2, nose: 3, note: 4, sparkle: 5, bubbles: 6 };
 
 /** Gözlerin yeri (birim; yüz yarıçapı 1): y yukarı +, gap merkezden yana, z yüzün önü (gözlük için) */
+/**
+ * Başlıklar küre (tepesi y=1) için çizildi. Tepesi alçak ya da dar gövdelerde şapka havada kalıyordu:
+ * gövdenin tepesine göre aşağı (ya da yukarı) kaydırılır. Dar tepeli gövdelerde biraz daha aşağı, ki
+ * şapkanın bandı başa otursun.
+ */
+const HAT_Y: Partial<Record<Look["shape"], number>> = {
+  heart: -0.2, triangle: -0.18, flower: -0.12, pumpkin: -0.24, cube: -0.12, egg: -0.12, star: -0.08, cat: -0.14, bear: -0.14,
+  strawberry: -0.06, mushroom: -0.1, drop: -0.14, frog: -0.26, panda: -0.14, fox: -0.14, penguin: -0.08, owl: -0.12, duck: -0.1,
+  bee: -0.08, crab: -0.44, dragon: -0.14, watermelon: -0.18, cupcake: -0.16, candy: -0.24, marshmallow: -0.18, pineapple: -0.2,
+  acorn: -0.26, orange: -0.12, cherry: -0.16, crystal: -0.06, rock: -0.3, stump: -0.32, sun: -0.24, moon: -0.12,
+};
+/** Başı saran ya da yanlara takılan başlıklar kaymaz (kulaklık, astronot kaskı, kulaklar, salyangoz gözü, kar kulaklığı, robot) */
+const HAT_FIXED = new Set<Look["head"]>(["none", "headphones", "astronaut", "ears", "stalks", "earmuffs", "robot"]);
+const hatY = (look: Look) => (HAT_FIXED.has(look.head) ? 0 : (HAT_Y[look.shape] ?? 0));
+
 export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number }> = {
   sphere: { y: -0.08, gap: 0.33, z: 0.76 },
   cloud: { y: -0.06, gap: 0.31, z: 0.72 },
@@ -231,7 +247,7 @@ function poll() {
   else polling = false;
 }
 
-function draw(c: Ctx, p: Prog, look: Look, color: string, size: number) {
+function draw(c: Ctx, p: Prog, look: Look, color: string, size: number, type = "image/png") {
   const { gl, canvas } = c;
   gl.useProgram(p.prog);
   const u = (n: string) => {
@@ -263,13 +279,14 @@ function draw(c: Ctx, p: Prog, look: Look, color: string, size: number) {
   gl.uniform3fv(u("uColor"), rgb(color));
   gl.uniform3fv(u("uAcc"), rgb(capColor(color)));
   gl.uniform4f(u("uEye"), a.y, eyeGap(look), a.z, 0);
+  gl.uniform1f(u("uHatY"), hatY(look));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   const { out, out2d } = c;
   out.width = out.height = size;
   out2d.clearRect(0, 0, size, size);
   out2d.imageSmoothingQuality = "high";
   out2d.drawImage(canvas, 0, 0, size, size);
-  return out.toDataURL("image/png");
+  return out.toDataURL(type);
 }
 
 const cache = new Map<string, string | null>();
@@ -294,7 +311,9 @@ const MAX_CACHE = 400;
  */
 const TAG = (() => {
   let h = 2166136261;
-  for (let i = 0; i < shader.length; i++) h = Math.imul(h ^ shader.charCodeAt(i), 16777619);
+  // Başlık hizaları da çizimi değiştirir: tablo değişince eski resimler atılsın
+  const src = shader + JSON.stringify(HAT_Y);
+  for (let i = 0; i < src.length; i++) h = Math.imul(h ^ src.charCodeAt(i), 16777619);
   return (h >>> 0).toString(36);
 })();
 const DISK_MAX = 800;
@@ -357,10 +376,10 @@ function save(key: string, url: string) {
   }
 }
 
-/** Resim bellekte ya da diskte var mı (diskteyse belleğe alınır) */
+/** Resim bellekte ya da diskte var mı (diskteyse belleğe alınır). Paketle gelen hazır resimler de sayılır. */
 function hasImage(key: string) {
   if (cache.has(key)) return true;
-  const d = disk?.get(key);
+  const d = (BAKED_TAG === TAG && BAKED[key] ? `/looks/${BAKED[key]}` : undefined) ?? disk?.get(key);
   if (!d) return false;
   if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
   cache.set(key, d);
@@ -428,7 +447,9 @@ export function useBodyImage(look: Look, color: string, size: number) {
  * Programı derlenmekte olan iş beklerken programı hazır olanlar öne geçer.
  */
 const STILL = import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.search).has("still");
-const queue: { key: string; look: Look; color: string; size: number }[] = [];
+const queue: { key: string; look: Look; color: string; size: number; pre?: boolean }[] = [];
+/** Sıralı çizimde aynı anda derlenen en fazla program */
+const MAX_COMPILING = 3;
 const waiting = new Map<string, Set<() => void>>();
 let pumping = false;
 
@@ -439,24 +460,50 @@ function pump() {
   }
   // Diskteki resimler okunmadan derlemeye başlama (çoğu zaten orada)
   if (!disk) return void diskReady.then(() => later(pump, 0));
-  const k = queue.findIndex((j) => hasImage(j.key));
-  if (k >= 0) {
+  // Diskte/pakette olanların hepsi tek turda: her birine ayrı tur beklemek uzun listelerde saniyeler sürüyordu
+  let fromDisk = false;
+  for (let k = queue.length - 1; k >= 0; k--) {
+    if (!hasImage(queue[k].key)) continue;
     const [job] = queue.splice(k, 1);
     waiting.get(job.key)?.forEach((fn) => fn());
     waiting.delete(job.key);
+    fromDisk = true;
+  }
+  if (fromDisk) return void later(pump, 0);
+  // Programı hazır (ya da derlenemeyen) ilk iş çizilsin. Derlemeler sırayla başlar, aynı anda en fazla
+  // birkaçı: Görünüm gibi yüzlerce farklı gövdenin aynı anda istendiği sayfada hepsini birden derlemek
+  // GPU'yu ve sayfayı saniyelerce donduruyordu.
+  if (!setup()) {
+    // WebGL yok: hepsi düz küreye düşer (resim null), sıradaki turda boşalır
+    queue.forEach((j) => bodyImage(j.look, j.color, j.size));
     return void later(pump, 0);
   }
-  // Sıradakilerin hepsinin programı derlenmeye başlasın (paralel), hazır olan ilk iş çizilsin
-  const i = queue.findIndex((j) => readiness(j.look) !== "wait");
+  let i = queue.findIndex((j) => {
+    const st = progs.get(progKey(j.look))?.state;
+    return st === "ready" || st === "failed";
+  });
   if (i < 0) {
-    // Hepsi derleniyor: ilk biten programda devam
+    let busy = [...progs.values()].filter((p) => p.state === "pending").length;
+    for (const j of queue) {
+      if (busy >= MAX_COMPILING) break;
+      const pk = progKey(j.look);
+      if (progs.has(pk)) continue;
+      readiness(j.look);
+      // Eklentisiz derleme anında (sayfayı bekleterek) biter: o turda bir tane yeter
+      if (progs.get(pk)?.state !== "pending") break;
+      busy++;
+    }
+    i = queue.findIndex((j) => progs.get(progKey(j.look))?.state !== "pending" && progs.has(progKey(j.look)));
+  }
+  if (i < 0) {
+    // Derlenenlerden ilki bitince devam
     let resumed = false;
     const resume = () => {
       if (resumed) return;
       resumed = true;
       later(pump, 16);
     };
-    new Set(queue.map((j) => progKey(j.look))).forEach((k) => whenReady(k, resume));
+    new Set(queue.map((j) => progKey(j.look))).forEach((k) => progs.get(k)?.state === "pending" && whenReady(k, resume));
     return;
   }
   const [job] = queue.splice(i, 1);
@@ -473,7 +520,10 @@ function request(look: Look, color: string, size: number, done?: () => void) {
     if (!waiting.has(key)) waiting.set(key, new Set());
     waiting.get(key)!.add(done);
   }
-  if (!queue.some((j) => j.key === key)) queue.push({ key, look, color, size });
+  // Ekrandaki (bekleyeni olan) iş öne: sekme değişince yeni sekmenin Nook'ları eskilerin arkasında beklemesin
+  const at = queue.findIndex((j) => j.key === key);
+  if (at >= 0 && done) queue.unshift(...queue.splice(at, 1));
+  else if (at < 0) (done ? queue.unshift : queue.push).call(queue, { key, look, color, size });
   if (!pumping) {
     pumping = true;
     later(pump, 16);
@@ -481,7 +531,17 @@ function request(look: Look, color: string, size: number, done?: () => void) {
 }
 
 /** Önceden çiz (ör. tanıtım açılırken): sonra ekrana girdiklerinde beklemeden hazır olurlar */
-export const prefetchBodies = (items: { look: Look; color: string; size: number }[]) => items.forEach((i) => request(i.look, i.color, i.size));
+export const prefetchBodies = (items: { look: Look; color: string; size: number }[]) =>
+  items.forEach((i) => {
+    request(i.look, i.color, i.size);
+    const j = queue.find((x) => x.key === keyOf(i.look, i.color, i.size));
+    if (j) j.pre = true;
+  });
+
+/** Bekleyeni olmayan önceden çizim isteklerini sıradan at (ör. renk değişti, eski renkteki seçenekler gereksiz) */
+export function cancelPrefetch() {
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i].pre && !waiting.get(queue[i].key)?.size) queue.splice(i, 1);
+}
 
 /** Sıralı çizimle resim: hazır değilse null döner, hazır olunca bileşen yenilenir */
 export function useBodyImageQueued(look: Look, color: string, size: number): string | null {
@@ -494,10 +554,34 @@ export function useBodyImageQueued(look: Look, color: string, size: number): str
   useEffect(() => {
     if (hasImage(key)) return;
     request(look, color, size, bump);
-    return () => void waiting.get(key)?.delete(bump);
+    return () => {
+      const w = waiting.get(key);
+      w?.delete(bump);
+      // Ekrandan çıktı ve bekleyen kalmadı: sıradan düşsün (önceden çizim isteği değilse)
+      if (w && !w.size) {
+        waiting.delete(key);
+        const i = queue.findIndex((j) => j.key === key && !j.pre);
+        if (i >= 0) queue.splice(i, 1);
+      }
+    };
   }, [key, has]); // eslint-disable-line react-hooks/exhaustive-deps
   return has ? touch(key) : null;
 }
+
+/**
+ * Yalnızca geliştirme: hazır resim üretimi (?preview=wardrobe&set=bake). Programı bekleyerek derler
+ * ve resmi WebP olarak döndürür; scripts/bake-looks.py bunları public/looks'a yazar.
+ */
+export const __bake = import.meta.env.DEV
+  ? (look: Look, color: string, size: number) => {
+      const c = setup();
+      if (!c) return null;
+      const pk = progKey(look);
+      const p = program(c, pk);
+      if (p.state === "pending") finish(c, pk, p);
+      return p.state === "ready" ? { key: keyOf(look, color, size), url: draw(c, p, look, color, size, "image/webp"), tag: TAG } : null;
+    }
+  : undefined;
 
 // Yalnızca geliştirme: video çekimi (dev/Reel) kare almadan önce Nook'ların çizilmesini bekler
 if (import.meta.env.DEV && typeof window !== "undefined") (window as { __nook3dBusy?: () => boolean }).__nook3dBusy = bodiesBusy;

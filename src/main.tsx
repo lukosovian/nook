@@ -8,6 +8,7 @@ import { Shield } from "./components/Shield";
 import { SoundCard } from "./components/SoundCard";
 import { Perch } from "./components/outings/Perch";
 import { windowLabel } from "./lib/bridge";
+import { isStudio } from "./lib/studio";
 import { installLogging } from "./lib/log";
 import "./styles.css";
 import { useColorVision } from "./lib/palette";
@@ -37,10 +38,12 @@ async function boot() {
   const Wardrobe = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "wardrobe" ? (await import("./dev/Wardrobe")).Wardrobe : null;
   // Yalnızca geliştirme: ?preview=reel ile Instagram tanıtım videosu (dev/Reel)
   const Reel = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "reel" ? (await import("./dev/Reel")).Reel : null;
+  // Nook Studio penceresi (önizlemede ?preview=studio#bölüm)
+  const StudioApp = isStudio ? (await import("./studio/Studio")).Studio : null;
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ColorVision />
-      {cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : Reel ? <Reel /> : <App />}
+      {StudioApp ? <StudioApp /> : cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : Reel ? <Reel /> : <App />}
     </StrictMode>,
   );
 }

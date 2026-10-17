@@ -202,6 +202,19 @@ mod ts {
         }
     }
 
+    /// `tailscale up`: önceden açılmış bir ayar (ör. --unattended) yazılmazsa Tailscale reddeder ve
+    /// tam komutu önerir ("tailscale up --timeout=20s --unattended"); o önerilen komutla bir kez daha dener.
+    fn ts_up() -> bool {
+        let Some(out) = ts_cli(&["up", "--timeout=20s"]) else { return false };
+        if out.status.success() {
+            return true;
+        }
+        let err = String::from_utf8_lossy(&out.stderr).into_owned() + &String::from_utf8_lossy(&out.stdout);
+        let Some(line) = err.lines().map(str::trim).find(|l| l.starts_with("tailscale up ")) else { return false };
+        let args: Vec<&str> = line.split_whitespace().skip(1).collect();
+        ts_cli(&args).is_some_and(|o| o.status.success())
+    }
+
     pub fn state() -> TsState {
         *STATE.lock().unwrap()
     }
@@ -219,7 +232,7 @@ mod ts {
                     let due = LAST_UP.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(5 * 60));
                     if due {
                         *LAST_UP.lock().unwrap() = Some(Instant::now());
-                        let ok = ts_cli(&["up", "--timeout=20s"]).is_some_and(|o| o.status.success());
+                        let ok = ts_up();
                         crate::log::write("info", &format!("tailscale kapalıydı, yeniden bağlanma: {}", if ok { "tamam" } else { "olmadı" }));
                         if ok {
                             ensure_unattended();

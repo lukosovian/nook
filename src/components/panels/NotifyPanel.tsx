@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { useNook, type NookNotif, type NotifItem } from "../../store/nook";
-import { ACCENT, EmptyState, MiniNook, Segmented, TextButton, Toggle, tintText } from "../ui/primitives";
+import { X } from "lucide-react";
+import { ACCENT, EmptyState, MiniNook, Segmented, TextButton, Toggle, tintBg, tintText } from "../ui/primitives";
 import { STYLE } from "../overlays/ToastView";
 import { tt, locale } from "../../lib/i18n";
 import { notifyStatus } from "../../lib/bridge";
@@ -74,7 +75,8 @@ function NookRow({ n }: { n: NookNotif }) {
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="flex items-start gap-2.5 rounded-[12px] bg-well px-2.5 py-1.5"
+      className="flex items-start gap-2.5 rounded-[14px] border px-2.5 py-2"
+      style={{ background: tintBg(st.color, 6), borderColor: tintBg(st.color, 18) }}
     >
       {n.icon ? (
         <img src={n.icon} alt="" draggable={false} className="mt-0.5 h-6 w-6 shrink-0 rounded-[6px] object-cover" />
@@ -152,30 +154,55 @@ const ago = (at: number) => {
   return h < 24 ? tt("{0} sa", h) : new Date(at).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 };
 
+/** Uygulamanın adına göre sabit bir renk (Discord hep aynı renkte) */
+const APP_COLORS = [ACCENT.purple, ACCENT.blue, ACCENT.green, ACCENT.pink, ACCENT.orange, ACCENT.teal, ACCENT.yellow, ACCENT.red];
+const appColor = (app: string) => {
+  const known: Record<string, string> = { discord: "#5865f2", whatsapp: "#25d366", telegram: "#2aabee", outlook: "#0a84ff", mail: "#0a84ff", gmail: "#ea4335", spotify: "#1ed760", steam: "#66c0f4", teams: "#6264a7", slack: "#e01e5a", instagram: "#e1306c" };
+  const k = app.toLowerCase();
+  const hit = Object.keys(known).find((x) => k.includes(x));
+  if (hit) return known[hit];
+  let h = 0;
+  for (const c of k) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return APP_COLORS[h % APP_COLORS.length];
+};
+
 function Row({ n }: { n: NotifItem }) {
+  const c = appColor(n.app);
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="flex items-start gap-2.5 rounded-[12px] bg-well px-2.5 py-1.5"
+      className="group relative flex items-start gap-2.5 rounded-[14px] border px-2.5 py-2"
+      style={{ background: tintBg(c, 6), borderColor: tintBg(c, 18) }}
     >
       {n.icon ? (
-        <img src={n.icon} alt="" draggable={false} className="mt-0.5 h-6 w-6 shrink-0 rounded-[6px] object-contain" />
+        <img src={n.icon} alt="" draggable={false} className="mt-0.5 h-7 w-7 shrink-0 rounded-[8px] object-contain" />
       ) : (
-        <span className="mt-0.5">
-          <MiniNook color={ACCENT.purple} size={24} />
+        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] text-[12px] font-extrabold" style={{ background: tintBg(c, 25), color: tintText(c) }}>
+          {n.app.slice(0, 1).toUpperCase()}
         </span>
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-[12px] font-medium text-label">{n.title}</span>
-          <span className="shrink-0 text-[10px] tabular-nums text-label-3">{ago(n.at)}</span>
+          <span className="min-w-0 truncate text-[12px] font-bold text-label">
+            {n.title}
+            <span className="ml-1.5 text-[10px] font-medium" style={{ color: tintText(c) }}>
+              {n.app}
+            </span>
+          </span>
+          <span className="shrink-0 text-[10px] tabular-nums text-label-3 transition-opacity group-hover:opacity-0">{ago(n.at)}</span>
         </div>
-        <p className="line-clamp-2 text-[11px] leading-snug text-label-2">{n.body || n.app}</p>
-        {n.body && <p className="mt-0.5 truncate text-[10px] text-label-3">{n.app}</p>}
+        {n.body && <p className="line-clamp-2 text-[11px] leading-snug text-label-2">{n.body}</p>}
       </div>
+      <button
+        onClick={() => useNook.getState().removeNotification(n.id)}
+        title={tt("Kaldır")}
+        className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-label-3 opacity-0 transition-opacity hover:bg-white/10 hover:text-label group-hover:opacity-100"
+      >
+        <X size={11} strokeWidth={2.6} />
+      </button>
     </motion.div>
   );
 }

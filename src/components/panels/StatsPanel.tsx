@@ -7,12 +7,13 @@ import { useNook } from "../../store/nook";
 import { ACCENT, Bar, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { dec, pct as fmtPct, tt } from "../../lib/i18n";
 
-/** CPU, GPU, bellek, pil; ağ grafiği ve ayrıntıları; bütün diskler. Rust saniyede bir günceller. */
+/** Üstte işlemci, ekran kartı, bellek (ve pil) kartları; altında ağ (grafik, hız testi), bütün diskler. Rust saniyede bir günceller. */
 export function StatsPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("stats", scroller);
   const stats = useNook((s) => s.stats);
   const netHistory = useNook((s) => s.netHistory);
+  const cpuHistory = useNook((s) => s.cpuHistory);
   if (!stats) return <div className="flex h-full items-center justify-center text-[12px] text-label-3">{tt("Ölçülüyor…")}</div>;
 
   const memPct = stats.memTotal ? (stats.memUsed / stats.memTotal) * 100 : 0;
@@ -20,11 +21,11 @@ export function StatsPanel() {
 
   return (
     <div ref={scroller} className="-mr-1.5 h-full space-y-2.5 overflow-y-auto pr-1.5">
-      <div className="space-y-2">
-        <Row label={tt("İşlemci")} pct={stats.cpu} value={fmtPct(Math.round(stats.cpu))} />
-        {stats.gpu != null && <Row label={tt("Ekran kartı")} pct={stats.gpu} value={fmtPct(Math.round(stats.gpu))} />}
-        <Row label={tt("Bellek")} pct={memPct} value={`${gb(stats.memUsed)} / ${gb(stats.memTotal)} GB`} />
-        {b && <Row label={tt("Pil")} pct={100 - b.percent} value={`${fmtPct(b.percent)}${b.charging ? tt(" · şarjda") : ""}`} color={b.charging ? ACCENT.green : levelColor(b.percent)} />}
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${2 + (stats.gpu != null ? 1 : 0) + (b ? 1 : 0)}, minmax(0, 1fr))` }}>
+        <Meter tag="CPU" label={tt("İşlemci")} pct={stats.cpu} value={fmtPct(Math.round(stats.cpu))} history={cpuHistory} />
+        {stats.gpu != null && <Meter tag="GPU" label={tt("Ekran kartı")} pct={stats.gpu} value={fmtPct(Math.round(stats.gpu))} />}
+        <Meter tag="RAM" label={tt("Bellek")} pct={memPct} value={`${gb(stats.memUsed)} / ${gb(stats.memTotal)}`} unit="GB" />
+        {b && <Meter tag={tt("PİL")} label={b.charging ? tt("Şarjda") : tt("Pil")} pct={b.percent} value={fmtPct(b.percent)} color={b.charging ? ACCENT.green : levelColor(b.percent)} />}
       </div>
 
       <Network down={stats.netDown} up={stats.netUp} history={netHistory} />
@@ -38,16 +39,28 @@ export function StatsPanel() {
 const gb = (bytes: number, digits = 1) => dec(bytes / 1024 ** 3, digits);
 const rate = (bps: number) => (bps < 1024 ? `${bps} B/s` : `${formatSize(bps)}/s`);
 
-function Row({ label, pct, value, color }: { label: string; pct: number; value: string; color?: string }) {
+/** Ölçer kartı: sol üstte etiket, sağda değer, ortada (varsa) son 40 sn'nin grafiği, altta çubuk */
+function Meter({ tag, label, pct, value, unit, color, history }: { tag: string; label: string; pct: number; value: string; unit?: string; color?: string; history?: number[] }) {
   const c = color ?? levelColor(pct, true);
   return (
-    <div className="flex items-center gap-2.5">
-      <MiniNook color={c} size={18} eyes={pct > 85 ? "closed" : "open"} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between text-[11.5px]">
-          <span className="font-medium text-label">{label}</span>
-          <span className="tabular-nums text-label-2">{value}</span>
+    <div className="relative flex h-[96px] min-w-0 flex-col overflow-hidden rounded-[14px] border px-2.5 pb-2 pt-2" style={{ background: tintBg(c, 7), borderColor: tintBg(c, 24) }}>
+      <div className="flex items-center justify-between gap-1">
+        <span className="rounded-[6px] px-1.5 py-[1px] text-[9px] font-bold tracking-wider" style={{ background: tintBg(c, 20), color: tintText(c) }}>
+          {tag}
+        </span>
+        <MiniNook color={c} size={14} eyes={pct > 85 ? "closed" : "open"} />
+      </div>
+      {history && history.length > 2 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[52px] top-7 opacity-70">
+          <Spark values={history} color={c} max={100} fill />
         </div>
+      )}
+      <div className="relative mt-auto">
+        <p className="truncate text-[10px] text-label-3">{label}</p>
+        <p className="truncate font-round text-[17px] font-extrabold leading-tight tabular-nums text-label">
+          {value}
+          {unit && <span className="ml-0.5 text-[10px] font-semibold text-label-3">{unit}</span>}
+        </p>
         <Bar pct={pct} color={c} className="mt-1" />
       </div>
     </div>
@@ -75,9 +88,9 @@ function Network({ down, up, history }: { down: number; up: number; history: num
   return (
     <div>
       <Title>{tt("Ağ")}</Title>
-      <div className="rounded-[14px] bg-well px-3 py-2">
+      <div className="rounded-[14px] border px-3 py-2" style={{ background: tintBg(ACCENT.teal, 6), borderColor: tintBg(ACCENT.teal, 20) }}>
         <div className="flex items-center gap-3">
-          <div className="shrink-0 space-y-0.5 text-[11.5px] font-medium tabular-nums">
+          <div className="shrink-0 space-y-0.5 text-[12.5px] font-bold tabular-nums">
             <p className="flex items-center gap-1" style={{ color: tintText(ACCENT.teal) }}>
               <ArrowDown size={11} strokeWidth={2.8} />
               {rate(down)}
@@ -206,23 +219,24 @@ function Uptime() {
 }
 
 /** Ağ hızı çizgi grafiği (son 40 sn), kendi maksimumuna göre ölçekli. */
-function Spark({ values }: { values: number[] }) {
+function Spark({ values, color = ACCENT.teal, max: fixed, fill }: { values: number[]; color?: string; max?: number; fill?: boolean }) {
   const W = 100;
   const H = 26;
+  const id = useRef(`spark-${Math.random().toString(36).slice(2)}`).current;
   if (values.length < 2) return <div className="h-[26px] flex-1" />;
-  const max = Math.max(1, ...values);
+  const max = fixed ?? Math.max(1, ...values);
   const step = W / (values.length - 1);
   const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(H - (v / max) * (H - 3) - 1.5).toFixed(1)}`);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[26px] min-w-0 flex-1">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={fill ? "h-full w-full" : "h-[26px] min-w-0 flex-1"}>
       <defs>
-        <linearGradient id="net-fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor={ACCENT.teal} stopOpacity="0.35" />
-          <stop offset="1" stopColor={ACCENT.teal} stopOpacity="0" />
+        <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor={color} stopOpacity="0.35" />
+          <stop offset="1" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polygon points={`0,${H} ${pts.join(" ")} ${W},${H}`} fill="url(#net-fill)" />
-      <polyline points={pts.join(" ")} fill="none" stroke={ACCENT.teal} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      <polygon points={`0,${H} ${pts.join(" ")} ${W},${H}`} fill={`url(#${id})`} />
+      <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
     </svg>
   );
 }

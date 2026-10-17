@@ -22,7 +22,7 @@ interface NoteCmd {
 }
 
 function mirror() {
-  const { clips, pads, padId, hums, shelf } = useNook.getState();
+  const { clips, pads, padId, hums, shelf, diary } = useNook.getState();
   void invoke("remote_mirror", {
     data: {
       clips: clips.slice(0, MAX_CLIPS).map((c) => ({
@@ -42,6 +42,11 @@ function mirror() {
       claude: claudeMirror(),
       water: waterInfo(),
       shelf: shelf.map((i) => ({ id: i.id, name: i.name, ext: i.ext, size: i.size, isDir: i.isDir, isImage: i.isImage, pinned: !!i.pinned, addedAt: i.addedAt, path: i.path })),
+      // Nook'un günlüğü: son iki hafta, en yeni önce
+      diary: Object.keys(diary)
+        .sort()
+        .reverse()
+        .map((day) => ({ day, text: diary[day].text, at: diary[day].at })),
       hums: hums.slice(0, MAX_HUMS).map((h) => ({ id: h.id, title: h.title, artist: h.artist, cover: h.cover ?? null, url: h.url ?? null, at: h.at, phone: !!h.phone })),
     },
   }).catch(() => {});
@@ -98,7 +103,7 @@ export function usePhoneSync() {
     };
     mirror();
     const unsub = useNook.subscribe((st, prev) => {
-      if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
+      if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.diary !== prev.diary || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
     });
     // Su sayacı dakikada bir ilerler: telefonun gördüğü tahmin tazelensin
     const tick = window.setInterval(mirror, 60_000);

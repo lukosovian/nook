@@ -34,8 +34,7 @@ import {
   Inbox,
   Radio,
   Bot,
-  Smartphone,
-} from "lucide-react";
+  Smartphone, Power } from "lucide-react";
 import type { SysEventKind } from "../../lib/bridge";
 import { isLive, useNook } from "../../store/nook";
 import { tt } from "../../lib/i18n";
@@ -82,6 +81,7 @@ export const STYLE: Record<SysEventKind, { icon: LucideIcon; color: string }> = 
   live: { icon: Radio, color: ACCENT.red },
   claude: { icon: Bot, color: CLAUDE_COLOR },
   phone: { icon: Smartphone, color: ACCENT.blue },
+  power: { icon: Power, color: ACCENT.red },
 };
 
 /** Sistem olayı kartı: solda Nook (rozetli), ortada metin, sağda renkli mini avatar. */

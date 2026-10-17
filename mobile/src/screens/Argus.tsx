@@ -5,7 +5,8 @@ import { argusAdd, argusEpisodes, argusMark, argusSearch, argusSetEpisodes, argu
 import { pickSomething, type Pick } from "../lib/neIzlesem";
 import { Cover, errText, Sheet, tintBg, TopBar, useBackButton, useToast } from "../ui";
 
-const ORANGE = "#f2a33a";
+/** Argus'un kendi rengi (logodaki camgöbeği → mavi geçişin açık ucu) */
+const ARGUS = "#00c0fa";
 type Tab = "pick" | "continue" | "log";
 
 const fold = (s: string) => s.toLocaleLowerCase("tr").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ı/g, "i");
@@ -161,7 +162,7 @@ function PickTab({
     <div className="flex flex-1 flex-col items-center gap-5 pt-2">
       <div className="relative flex h-[330px] w-[220px] items-center justify-center">
         {shownPick ? (
-          <motion.div key={shownPick.key} initial={{ scale: flash ? 0.92 : 0.8, opacity: 0.4 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: flash ? 0.08 : 0.4, type: flash ? "tween" : "spring" }} className="h-full w-full overflow-hidden rounded-[22px] shadow-2xl" style={{ boxShadow: winner && !flash ? `0 0 50px -12px ${ORANGE}` : undefined }}>
+          <motion.div key={shownPick.key} initial={{ scale: flash ? 0.92 : 0.8, opacity: 0.4 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: flash ? 0.08 : 0.4, type: flash ? "tween" : "spring" }} className="h-full w-full overflow-hidden rounded-[22px] shadow-2xl" style={{ boxShadow: winner && !flash ? `0 0 50px -12px ${ARGUS}` : undefined }}>
             <Cover pairing={pairing} src={shownPick.cover} className="h-full w-full object-cover" />
           </motion.div>
         ) : (
@@ -211,7 +212,7 @@ function PickTab({
           disabled={busy}
           onClick={() => void go()}
           className="flex items-center justify-center gap-2.5 rounded-3xl py-4 text-[16px] font-bold text-black disabled:opacity-60"
-          style={{ background: ORANGE, boxShadow: `0 0 26px -8px ${ORANGE}` }}
+          style={{ background: ARGUS, boxShadow: `0 0 26px -8px ${ARGUS}` }}
         >
           <Shuffle size={20} strokeWidth={2.6} />
           {busy ? "Seçiyorum…" : winner ? "Başka bir şey" : "Ne izlesem?"}
@@ -254,7 +255,7 @@ function ContinueTab({
             <div className="flex min-w-0 flex-1 flex-col self-stretch">
               <p className="flex items-center gap-1.5 truncate text-[14.5px] font-semibold">
                 <span className="truncate">{i.title}</span>
-                {fresh && <span className="shrink-0 rounded-full px-1.5 py-[1px] text-[10px] font-bold text-black" style={{ background: ORANGE }}>YENİ</span>}
+                {fresh && <span className="shrink-0 rounded-full px-1.5 py-[1px] text-[10px] font-bold text-black" style={{ background: ARGUS }}>YENİ</span>}
               </p>
               <p className="truncate text-[12.5px] text-label-2">
                 {epLabel(next.season, next.episode)}
@@ -262,7 +263,7 @@ function ContinueTab({
               </p>
               <div className="mt-auto flex items-center gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-well">
-                  <div className="h-full rounded-full" style={{ width: `${s.aired ? (s.seen / s.aired) * 100 : 0}%`, background: ORANGE }} />
+                  <div className="h-full rounded-full" style={{ width: `${s.aired ? (s.seen / s.aired) * 100 : 0}%`, background: ARGUS }} />
                 </div>
                 <span className="text-[11px] tabular-nums text-label-3">
                   {s.seen}/{s.aired}
@@ -280,7 +281,7 @@ function ContinueTab({
               }}
               className="flex w-[58px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl bg-well text-[11px] font-semibold text-label-2 disabled:opacity-50"
             >
-              <Check size={20} style={{ color: ORANGE }} />
+              <Check size={20} style={{ color: ARGUS }} />
               {busy === i.id ? "…" : "İzledim"}
             </motion.button>
           </div>
@@ -421,7 +422,7 @@ function MarkSheet({
             setBusy(false);
           }}
           className="mt-5 w-full rounded-2xl py-3.5 font-bold text-black disabled:opacity-60"
-          style={{ background: ORANGE }}
+          style={{ background: ARGUS }}
         >
           {busy ? "İşaretleniyor…" : "Bugün izledim"}
         </button>
@@ -513,7 +514,7 @@ function EpisodeList({ pairing, item, onSaved }: { pairing: Pairing; item: Argus
               key={x.season}
               onClick={() => setSeason(x.season)}
               className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold ${x.season === cur.season ? "text-black" : "bg-well text-label-2"}`}
-              style={x.season === cur.season ? { background: ORANGE } : undefined}
+              style={x.season === cur.season ? { background: ARGUS } : undefined}
             >
               {x.season === 0 ? "Özel" : `${x.season}. Sezon`}
               {full && x.season !== cur.season && <Check size={12} className="ml-1 inline" strokeWidth={3} />}
@@ -545,11 +546,11 @@ function EpisodeList({ pairing, item, onSaved }: { pairing: Pairing; item: Argus
               disabled={future}
               onClick={() => toggle(key)}
               className="flex items-center gap-3 rounded-2xl px-2 py-2 text-left disabled:opacity-35"
-              style={{ background: changed ? tintBg(ORANGE, 10) : undefined }}
+              style={{ background: changed ? tintBg(ARGUS, 10) : undefined }}
             >
               <span
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2"
-                style={{ borderColor: on ? ORANGE : "rgb(255 255 255 / 0.18)", background: on ? ORANGE : "transparent" }}
+                style={{ borderColor: on ? ARGUS : "rgb(255 255 255 / 0.18)", background: on ? ARGUS : "transparent" }}
               >
                 {on && <Check size={15} strokeWidth={3} className="text-black" />}
               </span>
@@ -567,7 +568,7 @@ function EpisodeList({ pairing, item, onSaved }: { pairing: Pairing; item: Argus
         disabled={!draft.size || saving}
         onClick={() => void save()}
         className="sticky bottom-0 mt-3 w-full rounded-2xl py-3.5 font-bold text-black disabled:opacity-40"
-        style={{ background: ORANGE }}
+        style={{ background: ARGUS }}
       >
         {saving ? "Kaydediliyor…" : draft.size ? `Kaydet (${draft.size} değişiklik)` : "Bölümlere dokunarak işaretle"}
       </button>

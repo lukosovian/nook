@@ -128,6 +128,8 @@ pub struct Settings {
 #[serde(rename_all = "camelCase", default)]
 pub struct TrayLabels {
     pub open: String,
+    #[serde(default)]
+    pub studio: String,
     pub center: String,
     pub tour: String,
     pub quiet: String,

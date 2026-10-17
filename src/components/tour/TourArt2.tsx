@@ -5,7 +5,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  AlarmClock,
+  BellRing,
   CalendarClock,
   Check,
   History,
@@ -320,7 +320,7 @@ export function DayArt() {
       <div className="flex gap-2">
         <Tip icon={CalendarClock} color={ACCENT.blue}>{tt("Etkinlik yaklaşınca")}{" "}<b className="font-medium text-label">{tt("geri sayarım")}</b>
         </Tip>
-        <Tip icon={AlarmClock} color={ACCENT.yellow}>{tt("Alarm,")}{" "}<b className="font-medium text-label">{tt("sen kapatana kadar")}</b>{" "}{tt("bekler")}</Tip>
+        <Tip icon={BellRing} color={ACCENT.orange}>{tt("Hatırlatıcı:")}{" "}<b className="font-medium text-label">{tt("“20 dk” yaz")}</b>{", "}{tt("vaktinde çalarım")}</Tip>
         <Tip icon={Target} color={ACCENT.red}>{tt("Pomodoro'da")}{" "}<b className="font-medium text-label">{tt("dikkatini toplarım")}</b>
         </Tip>
       </div>

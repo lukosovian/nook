@@ -52,12 +52,18 @@ fn pretty(name: &str, non_packaged: bool) -> String {
     }
 }
 
+/// Kayıt defterindeki yol ("C:#Users#…#nook.exe") bu uygulamanın kendisi mi
+fn is_self(name: &str) -> bool {
+    let Ok(exe) = std::env::current_exe() else { return false };
+    name.replace('#', "\\").eq_ignore_ascii_case(&exe.to_string_lossy())
+}
+
 #[cfg(windows)]
 mod imp {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
 
-    use super::pretty;
+    use super::{is_self, pretty};
 
     const BASE: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore";
 
@@ -78,6 +84,11 @@ mod imp {
     fn scan(key: &RegKey, non_packaged: bool, out: &mut Vec<String>) {
         for name in key.enum_keys().flatten() {
             if name == "NonPackaged" {
+                continue;
+            }
+            // Nook'un kendisi ("Hey Nook", otomatik Hum mikrofonu dinler) sayılmaz: "mikrofonu kullanıyor" göstergesi
+            // ve görüşme algılaması yalnızca başka uygulamalar içindir
+            if non_packaged && is_self(&name) {
                 continue;
             }
             let Ok(sub) = key.open_subkey(&name) else { continue };

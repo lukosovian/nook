@@ -9,14 +9,13 @@ import { useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
 import { useSoundCard } from "../lib/soundCard";
 import { isPrimary } from "../lib/bridge";
-import { FACE, ISLAND, ISLAND_TOP, MEDIA_COLLAPSED_WIDTH, mascotPose, tourPose } from "../lib/layout";
+import { FACE, ISLAND, ISLAND_TOP, mascotPose, tourPose, viewOf } from "../lib/layout";
 import { spring } from "../lib/motion";
 import { startTour } from "../lib/tour";
 import { exitBig } from "../lib/big";
 import { useExpanded } from "../hooks/useExpanded";
 import { expressionOf, statusOf, useNook, type Mood, type Outing } from "../store/nook";
 import { Nook, STATUS_COLOR } from "./mascot/Nook";
-import { MiniPlayer } from "./media/MiniPlayer";
 import { AlarmView } from "./overlays/AlarmView";
 import { GuardView } from "./overlays/GuardView";
 import { GateView } from "./overlays/GateView";
@@ -24,8 +23,9 @@ import { Dangle } from "./outings/Dangle";
 import { Fishing } from "./outings/Fishing";
 import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
-import { FocusMini } from "./overlays/FocusMini";
-import { EventMini, StopwatchMini, useEventSoon } from "./overlays/TimeMini";
+import { EventMini, StopwatchMini } from "./overlays/TimeMini";
+import { ClaudeCapsule, UpdateCapsule, FishCapsule, FocusCapsule, InfoCapsule, MusicCapsule, SleepCapsule, SplitBubble, useCapsule } from "./overlays/Capsules";
+import { Campfire } from "./outings/Campfire";
 import { ListenMini } from "./overlays/ListenMini";
 import { MoveFx } from "./overlays/MoveFx";
 import { moveTarget } from "../lib/moveFx";
@@ -38,8 +38,6 @@ import { HumView, HumWave } from "./overlays/HumView";
 import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
 import { Brief } from "./brief/Brief";
-import { PatchNotes } from "./notes/PatchNotes";
-import { Report } from "./report/Report";
 import { SearchPanel } from "./search/SearchPanel";
 import { Tour, useTourSteps } from "./tour/Tour";
 
@@ -92,7 +90,8 @@ function awayPose(outing: Outing | null): TargetAndTransition {
     case "hang":
       return { x: 0, y: 18, scale: 0.8, opacity: 0, transition: { duration: 0.22, ease: "easeIn" } };
     case "fish":
-      return { x: 44, y: 12, scale: 0.8, opacity: 0, transition: { duration: 0.3, ease: "easeIn" } };
+    case "camp":
+      return { x: 0, y: 0, scale: 0.8, opacity: 0, transition: { duration: 0.25, ease: "easeIn" } };
     case "perch":
       return { x: 0, y: [0, -9, 22], scale: [1, 1.12, 0.6], opacity: [1, 1, 0], transition: { duration: 0.45, times: [0, 0.4, 1] } };
     default:
@@ -136,11 +135,6 @@ export function Island() {
   const humListening = useNook((s) => s.hum?.phase === "listening" && isPrimary);
   // Üst kenardan ayrı bir yere taşındıysa ada çentik değil, dört köşesi yuvarlak bir hap
   const detached = useNook((s) => (s.settings.islandPos?.fy ?? 0) > 0);
-  const downloading = useNook((s) => s.downloads.length > 0);
-  const focusing = useNook((s) => !!s.focus);
-  const timing = useNook((s) => !!s.stopwatch);
-  const eventSoon = useEventSoon();
-  const listening = useNook((s) => s.listening);
   const intro = useNook((s) => s.intro);
   const outing = useNook((s) => s.outing);
 
@@ -195,21 +189,22 @@ export function Island() {
   const playing = !!media?.playing;
   // Görünüm düzenlenirken dans etmesin: seçilen gözler görünsün
   const lookTab = useNook((s) => s.tab === "look");
-  // Kapalı adada solda/sağda yer isteyenler: dinleme > indirme > odak > etkinlik > kronometre > müzik
-  const collapsed = mode === "collapsed";
-  const miniListen = collapsed && listening;
-  const miniDownload = collapsed && downloading && !miniListen;
-  const miniFocus = collapsed && focusing && !miniListen && !miniDownload;
-  const miniEvent = collapsed && eventSoon.soon && (!playing || eventSoon.urgent) && !miniListen && !miniDownload && !miniFocus;
-  const miniWatch = collapsed && timing && !miniListen && !miniDownload && !miniFocus && !miniEvent;
-  const miniPlayer = collapsed && playing && !miniListen && !miniDownload && !miniFocus && !miniEvent && !miniWatch;
+  // Kapalı ada bir işin kapsülüne dönüşür (müzik, odak, Claude…); iki iş varsa yanda baloncuk
+  const cap = useCapsule(mode === "collapsed");
   const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail));
-  const width = miniPlayer || miniDownload || miniFocus || miniListen || miniEvent || miniWatch ? MEDIA_COLLAPSED_WIDTH : mode === "toast" ? toastWidth : shape.width;
+  const width = cap ? cap.width : mode === "toast" ? toastWidth : shape.width;
+  const height = cap ? cap.height : shape.height;
+  const radius = cap ? Math.round(cap.height * 0.45) : shape.radius;
   const transition = mode === "feeding" ? spring.stretch : spring.island;
-  const view = useNook((s) => (s.tab === "home" ? "home" : "module"));
+  const view = useNook((s) => viewOf(s.tab, s.searching));
   const tourStep = useNook((s) => s.tourStep);
   const tourSteps = useTourSteps();
-  const pose = mode === "tour" ? tourPose(!!tourSteps[tourStep]?.centered) : mascotPose(mode, width, view, ex);
+  const pose =
+    mode === "tour"
+      ? tourPose(!!tourSteps[tourStep]?.centered)
+      : cap?.nook
+        ? { left: cap.nook.x - FACE / 2, top: cap.height / 2 - FACE / 2, scale: cap.nook.scale }
+        : mascotPose(mode, width, view, ex);
 
   const ref = useRef<HTMLDivElement>(null);
   useHitRect(ref);
@@ -246,6 +241,8 @@ export function Island() {
         {/* Hum dinlerken adanın kenarında sese duyarlı dalga (adanın arkasında) */}
         <div className="relative">
         <AnimatePresence>{humListening && <HumWave key="humwave" island={ref} detached={detached} />}</AnimatePresence>
+        {/* Bölünmüş ada: ikinci iş sağda baloncukta */}
+        <AnimatePresence>{cap?.second && <SplitBubble key={`b-${cap.second}`} kind={cap.second} height={cap.height} islandWidth={width} detached={detached} />}</AnimatePresence>
         {/* Ekrana yapışık çentik: saf siyah, üst köşeler düz, yalnızca alt köşeler yuvarlak (taşınınca hepsi) */}
         <motion.div
           ref={ref}
@@ -254,11 +251,11 @@ export function Island() {
           initial={false}
           animate={{
             width,
-            height: shape.height,
-            borderTopLeftRadius: detached ? shape.radius : 0,
-            borderTopRightRadius: detached ? shape.radius : 0,
-            borderBottomLeftRadius: shape.radius,
-            borderBottomRightRadius: shape.radius,
+            height,
+            borderTopLeftRadius: detached ? radius : 0,
+            borderTopRightRadius: detached ? radius : 0,
+            borderBottomLeftRadius: radius,
+            borderBottomRightRadius: radius,
             boxShadow: SHADOW,
           }}
           transition={transition}
@@ -268,8 +265,6 @@ export function Island() {
             {mode === "search" && <SearchPanel key="search" />}
             {mode === "tour" && <Tour key="tour" />}
             {mode === "brief" && <Brief key="brief" />}
-            {mode === "notes" && <PatchNotes key="notes" />}
-            {mode === "report" && <Report key="report" />}
           </AnimatePresence>
 
           {/* Nook'un arkasındaki parıltı: yalnızca durum varken, durumun renginde */}
@@ -294,12 +289,20 @@ export function Island() {
           </motion.div>
 
           <AnimatePresence>{intro && <Intro key="intro" />}</AnimatePresence>
-          <AnimatePresence>{miniPlayer && <MiniPlayer key="mini" media={media!} />}</AnimatePresence>
-          <AnimatePresence>{miniDownload && <DownloadMini key="dl" />}</AnimatePresence>
-          <AnimatePresence>{miniFocus && <FocusMini key="focus" />}</AnimatePresence>
-          <AnimatePresence>{miniEvent && <EventMini key="event" />}</AnimatePresence>
-          <AnimatePresence>{miniWatch && <StopwatchMini key="watch" />}</AnimatePresence>
-          <AnimatePresence>{miniListen && <ListenMini key="listen" />}</AnimatePresence>
+          <AnimatePresence>
+            {cap?.kind === "update" && <UpdateCapsule key="update" />}
+            {cap?.kind === "music" && media && <MusicCapsule key="music" media={media} />}
+            {cap?.kind === "download" && <DownloadMini key="dl" />}
+            {cap?.kind === "focus" && <FocusCapsule key="focus" />}
+            {cap?.kind === "claude" && <ClaudeCapsule key="claude" />}
+            {cap?.kind === "event" && <EventMini key="event" />}
+            {cap?.kind === "watch" && <StopwatchMini key="watch" />}
+            {cap?.kind === "listen" && <ListenMini key="listen" />}
+            {cap?.kind === "sleep" && <SleepCapsule key="sleep" />}
+            {cap?.kind === "info" && <InfoCapsule key="info" />}
+            {cap?.kind === "camp" && <Campfire key="camp" width={width} height={height} />}
+            {cap?.kind === "fish" && <FishCapsule key="fishcap" />}
+          </AnimatePresence>
           <PrivacyDots mode={mode} />
           <ContextMenu bounds={ref} refreshOnly={mode === "gate"} />
 
@@ -318,7 +321,7 @@ export function Island() {
         {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}
         <AnimatePresence>
           {outing === "hang" && <Dangle key="hang" />}
-          {outing === "fish" && <Fishing key="fish" width={width} />}
+          {outing === "fish" && <Fishing key="fish" width={width} height={height} />}
         </AnimatePresence>
       </motion.div>
     </div>

@@ -56,6 +56,17 @@ export interface Status {
   claude?: { asks: number; working: number; sessions: number } | null;
   /** Uzaktan kontrol PC'de açılmış mı (eski PC sürümlerinde yok) */
   control?: boolean;
+  /** Zamanlı kapatma kuruluysa ne zaman ve ne yapacağı (eski PC sürümlerinde yok) */
+  powerTimer?: PowerTimer | null;
+  /** Gizlilik kalkanı şu an açık mı (eski PC sürümlerinde yok) */
+  shield?: boolean;
+}
+
+export type TimerAction = "shutdown" | "restart" | "sleep";
+export interface PowerTimer {
+  at: number;
+  action: TimerAction;
+  from: "pc" | "phone";
 }
 
 /** Ekran görüntüsü hedefi: ekranın sırası ya da hepsi birlikte */
@@ -286,12 +297,24 @@ const DEMO_STATUS: Status = {
   stats: { cpu: 18, memUsed: 11.4 * 1024 ** 3, memTotal: 32 * 1024 ** 3, netDown: 0, netUp: 0, diskUsed: 610 * 1024 ** 3, diskTotal: 1000 * 1024 ** 3, battery: null },
   claude: { asks: 1, working: 1, sessions: 2 },
   control: true,
+  powerTimer: null,
+  shield: false,
 };
 
 export const getStatus = (p: Pairing) =>
   import.meta.env.DEV && p.key === "demo" ? Promise.resolve(DEMO_STATUS) : request(p, "GET", "/v1/status").then((r) => r.json() as Promise<Status>);
 
 export const power = (p: Pairing, action: PowerAction) => request(p, "POST", "/v1/power", { action }).then(() => undefined);
+
+/** Zamanlı kapatma: `at` (ms) ile kur, null ile iptal et */
+export const setPowerTimer = (p: Pairing, at: number | null, action: TimerAction = "shutdown") =>
+  import.meta.env.DEV && p.key === "demo"
+    ? Promise.resolve(at ? ({ at, action, from: "phone" } as PowerTimer) : null)
+    : request(p, "POST", "/v1/power/timer", { at, action }).then((r) => r.json() as Promise<{ timer: PowerTimer | null }>).then((j) => j.timer);
+
+/** Gizlilik kalkanını aç / kapat */
+export const setShield = (p: Pairing, on: boolean) =>
+  import.meta.env.DEV && p.key === "demo" ? Promise.resolve() : request(p, "POST", "/v1/shield", { on }).then(() => undefined);
 
 /** Ekran görüntüsü (JPEG) */
 export const screenshot = (p: Pairing, target?: ShotTarget) =>
@@ -769,3 +792,20 @@ export const getHums = (p: Pairing) =>
     : request(p, "GET", "/v1/hum")
         .then((r) => r.json().then((j: { hums: PcHum[] | null }) => j.hums ?? []))
         .then((h) => (cache("hums", h), h));
+
+/** Nook'un günlüğü: PC her gece yazar, en yeni önce */
+export interface PcDiary {
+  day: string;
+  text: string;
+  at: number;
+}
+
+export const getDiary = (p: Pairing) =>
+  DEMO(p)
+    ? Promise.resolve<PcDiary[]>([
+        { day: today(), text: "Bugün Luko Figma'ya öyle bir daldı ki farenin pili %7'ye kadar düştü. Araya iki bölüm Mehmed sıkıştırdı, sonra dört saat VS Code'a gömüldü. İmleç tam 1,3 km yürüdü; ben olsam yorulurdum. Neyse ki beş bardak suyu unutmadı.", at: Date.now() - 600_000 },
+        { day: "2026-10-16", text: "Sabah Spotify, öğlen Discord, akşam yine Figma: günü bir üçgen gibiydi. Ben de köşemde oturup su hatırlattım, iki kez dinledi.", at: Date.now() - 86_400_000 },
+      ])
+    : request(p, "GET", "/v1/diary")
+        .then((r) => r.json().then((j: { diary: PcDiary[] | null }) => j.diary ?? []))
+        .then((d) => (cache("diary", d), d));

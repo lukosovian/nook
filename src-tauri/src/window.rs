@@ -19,8 +19,8 @@ pub const ISLAND: &str = "island";
 /// Ek ekranlardaki adaların etiket öneki ("island-1", "island-2"…)
 const EXTRA_PREFIX: &str = "island-";
 /// Varsayılan pencere boyutu (mantıksal px); ada bu şeffaf tuvalin içinde animasyonla büyür.
-pub const WIN_W: f64 = 680.0;
-pub const WIN_H: f64 = 350.0;
+pub const WIN_W: f64 = 840.0;
+pub const WIN_H: f64 = 440.0;
 /// Ana pencerenin şu anki genişliği ve yüksekliği, sayfanın gördüğü (CSS) px olarak (f64 bitleri). Tanıtımda büyür.
 static CUR_W: AtomicU64 = AtomicU64::new(WIN_W.to_bits());
 static CUR_H: AtomicU64 = AtomicU64::new(WIN_H.to_bits());
@@ -292,8 +292,9 @@ pub fn relocate(app: &AppHandle, shared: Arc<Shared>, label: String, monitor: Mo
 }
 
 /// Tepsi menüsünün öğeleri: (kimlik, Türkçe yazı). Yazılar ayarlarla seçili dile çevrilir.
-const TRAY_ITEMS: [(&str, &str); 6] = [
+const TRAY_ITEMS: [(&str, &str); 7] = [
     ("open", "Adayı aç"),
+    ("studio", "Nook Studio"),
     ("center", "Adayı ortala"),
     ("tour", "Nook nedir?"),
     ("quiet", "1 saat sessiz"),
@@ -306,7 +307,7 @@ static TRAY_MENU: std::sync::OnceLock<Vec<MenuItem<tauri::Wry>>> = std::sync::On
 /// Tepsi menüsünün yazıları seçili dilde ("1 saat sessiz" ↔ "Sessizliği bitir" de buradan)
 pub fn set_tray_labels(labels: &TrayLabels) {
     let Some(items) = TRAY_MENU.get() else { return };
-    let texts = [&labels.open, &labels.center, &labels.tour, &labels.quiet, &labels.update, &labels.quit];
+    let texts = [&labels.open, &labels.studio, &labels.center, &labels.tour, &labels.quiet, &labels.update, &labels.quit];
     for (item, text) in items.iter().zip(texts) {
         if !text.is_empty() {
             let _ = item.set_text(text);
@@ -338,6 +339,13 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "quit" => app.exit(0),
             "open" => open_from_tray(app),
+            "studio" => {
+                // Menü olayının içinde değil, ayrı görevde: pencere oluştururken WebView2 kilitlenmesin
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = crate::studio::open(&app, None);
+                });
+            }
             // Diğerleri arayüzde yapılır (ana ada)
             id => {
                 let _ = app.emit_to(ISLAND, "nook://tray", id.to_string());

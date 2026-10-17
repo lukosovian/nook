@@ -2236,7 +2236,7 @@ dependencies = [
 
 [[package]]
 name = "nook-mobile"
-version = "0.2.61"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",

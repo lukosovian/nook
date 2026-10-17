@@ -2,7 +2,8 @@
  * Nook'un adadan dışarı çıkışları:
  *  - Tüneme: ara sıra öndeki pencerenin başlık çubuğuna atlayıp oturur (ayrı, tıklama-geçirgen pencere)
  *  - Sarkma: ekranın altında uzun süre çalışınca adanın altından iple sarkıp izler (Outings/Dangle)
- *  - Balık: bilgisayar boştayken adanın kenarında masaüstüne olta sallar (Outings/Fishing)
+ *  - Balık: bilgisayar boştayken adanın ucunda oturup masaüstüne olta sallar (Outings/Fishing)
+ *  - Kamp: gece boştayken adada kamp ateşi yakıp marshmallow kızartır (Outings/Campfire)
  * Ada açılınca, bir kart gelince ya da sen dönünce Nook hemen yerine döner.
  */
 import { emit } from "@tauri-apps/api/event";
@@ -12,8 +13,8 @@ import { isWorking, useNook, type Outing } from "../store/nook";
 import { tt } from "./i18n";
 
 /** Son dışarı çıkış (her biri için) — sık sık olmasın */
-const last: Record<Outing, number> = { perch: Date.now(), hang: 0, fish: 0 };
-export const COOLDOWN: Record<Outing, number> = { perch: 14 * 60_000, hang: 6 * 60_000, fish: 0 };
+const last: Record<Outing, number> = { perch: Date.now(), hang: 0, fish: 0, camp: 0 };
+export const COOLDOWN: Record<Outing, number> = { perch: 14 * 60_000, hang: 6 * 60_000, fish: 0, camp: 0 };
 
 let perchTimer = 0;
 
@@ -84,3 +85,9 @@ export function haulText() {
   const parts = [haul.stars && tt("{0} parlak yıldız", haul.stars), haul.trash && tt("{0} eski dosya", haul.trash)].filter(Boolean);
   return parts.join(", ");
 }
+
+/** Gece kampında kızartılan marshmallow'lar — dönünce anlatır */
+export const camp = { mallows: 0 };
+
+/** Gece mi (kamp ateşi saati) */
+export const isNight = (d = new Date()) => d.getHours() >= 21 || d.getHours() < 5;

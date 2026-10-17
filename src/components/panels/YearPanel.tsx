@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, ChevronRight, Clock, Droplet, Gamepad2, Heart, Music, Target } from "lucide-react";
+import { Clock, Droplet, Gamepad2, Heart, Music, Target } from "lucide-react";
 import { isPrimary } from "../../lib/bridge";
-import { useNookName } from "../../lib/look";
-import { spring } from "../../lib/motion";
 import { emptyYear, useNook, type YearStats } from "../../store/nook";
-import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { ACCENT } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
 const COLOR = ACCENT.yellow;
@@ -27,7 +24,7 @@ function longestStreak(days: string[]) {
 
 const GAME_NAMES: Record<string, string> = { catch: tt("Yakala"), simon: tt("Hafıza"), whack: tt("Köstebek"), pairs: tt("Eşleştir"), jump: tt("Zıpla"), aim: tt("Nişan") };
 
-interface Slide {
+export interface Slide {
   id: string;
   icon: typeof Clock;
   color: string;
@@ -40,17 +37,15 @@ interface Slide {
  * Yıl özeti: "Bu yıl seninle şu kadar saat geçirdik" — birkaç sayfalık kart. Sayfalar arasında
  * oklarla, noktalarla ya da karta tıklayarak geçilir. Kayıt 0.2.42'den itibaren tutulur.
  */
-export function YearPanel() {
+/** Yıl özetinin sayfaları (ada ve Studio aynı veriyi gösterir) */
+export function useYearSlides() {
   const all = useNook((s) => s.year);
   const scores = useNook((s) => s.scores);
   const affection = useNook((s) => s.affection);
-  const name = useNookName();
   const userName = useNook((s) => s.settings.userName.trim());
   const years = Object.keys(all).sort();
   const [year, setYear] = useState(() => years[years.length - 1] ?? String(new Date().getFullYear()));
   const y: YearStats = { ...emptyYear(), ...all[year] };
-  const [i, setI] = useState(0);
-
   const slides = useMemo<Slide[]>(() => {
     const streak = longestStreak(y.days);
     const peak = y.hours.indexOf(Math.max(...y.hours));
@@ -137,79 +132,11 @@ export function YearPanel() {
       },
     ];
   }, [y, year, scores, affection, userName]);
-
-  const s = slides[Math.min(i, slides.length - 1)];
-  const go = (d: number) => setI((v) => (v + d + slides.length) % slides.length);
-
-  return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-label-3">{tt("{0} ile {1}", name, year)}</span>
-        {years.length > 1 && (
-          <div className="flex gap-0.5 rounded-full bg-well p-[2px]">
-            {years.map((yy) => (
-              <button key={yy} onClick={() => (setYear(yy), setI(0))} className="rounded-full px-2 py-[1px] text-[10px] font-medium" style={yy === year ? { background: tintBg(COLOR, 20), color: tintText(COLOR) } : { color: "var(--color-label-3)" }}>
-                {yy}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <button onClick={() => go(1)} className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] border text-left" style={{ background: tintBg(s.color, 8), borderColor: tintBg(s.color, 24) }}>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={`${year}-${s.id}`}
-            className="absolute inset-0 flex gap-3 p-3.5"
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -16 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: tintBg(s.color, 22), color: s.color }}>
-                <s.icon size={14} strokeWidth={2.4} />
-              </span>
-              <motion.p
-                className="mt-2 font-display text-[30px] font-semibold leading-none tracking-tight tabular-nums"
-                style={{ color: tintText(s.color) }}
-                initial={{ scale: 0.85, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ ...spring.pop, delay: 0.05 }}
-              >
-                {s.big}
-              </motion.p>
-              <p className="mt-1.5 text-[12px] leading-snug text-label">{s.line}</p>
-              {s.extra && <div className="mt-auto pt-2">{s.extra}</div>}
-            </div>
-            {s.id !== "hours" && (
-              <div className="flex shrink-0 items-center">
-                <MiniNook color={s.color} size={54} eyes={s.id === "end" ? "happy" : "open"} />
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </button>
-
-      <div className="flex items-center justify-between">
-        <button onClick={() => go(-1)} className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" aria-label={tt("Önceki")}>
-          <ChevronLeft size={13} strokeWidth={2.6} />
-        </button>
-        <div className="flex gap-1.5">
-          {slides.map((x, k) => (
-            <button key={x.id} onClick={() => setI(k)} className="h-1.5 rounded-full transition-all" style={{ width: k === i ? 14 : 6, background: k === i ? x.color : "rgb(255 255 255 / 0.15)" }} aria-label={String(k + 1)} />
-          ))}
-        </div>
-        <button onClick={() => go(1)} className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" aria-label={tt("Sonraki")}>
-          <ChevronRight size={13} strokeWidth={2.6} />
-        </button>
-      </div>
-    </div>
-  );
+  return { slides, years, year, setYear, y };
 }
 
 /** Saat saat bilgisayar başında geçen süre: tek renk ince çubuklar, en yoğun saat etiketli */
-function HourChart({ hours: h }: { hours: number[] }) {
+export function HourChart({ hours: h }: { hours: number[] }) {
   const max = Math.max(1, ...h);
   const peak = h.indexOf(max);
   const W = 24 * 9;

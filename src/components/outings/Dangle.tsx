@@ -12,7 +12,7 @@ import { Paw, useMyLook } from "./Parts";
 
 const SIZE = 34;
 const K = SIZE / 24;
-/** İpin en uzun hâli (pencere 350 px; ada 34) */
+/** İpin en uzun hâli (pencere 440 px; ada 34) */
 const DROP = 188;
 /** İmleç bu kadar yaklaşınca fark eder, bu kadar yaklaşınca kaçar */
 const NOTICE = 230;

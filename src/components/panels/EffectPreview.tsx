@@ -6,6 +6,10 @@ import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
 import { MoveFx } from "../overlays/MoveFx";
 import { birthMotion, INTRO_KINDS, introDuration, IntroEffect, randomIntro, type IntroKind } from "../overlays/Intro";
+import { UPDATE_ANIMS, UpdateBody, useFakeUpdate, type UpdateAnimPref } from "../overlays/UpdateAnims";
+import { playUpdateDemo } from "../../lib/update";
+import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { tt } from "../../lib/i18n";
 
 /** Ayarlardaki önizleme sahneleri: efekt gerçek adayla aynı bileşenlerle, küçük bir ekranda oynar. */
 
@@ -123,6 +127,83 @@ export function MovePreview({ style, run }: { style: "random" | MoveKind; run: n
         ))}
       </div>
       <Caption label={MOVE_KINDS.find((k) => k.id === step.kind)?.label ?? ""} />
+    </div>
+  );
+}
+
+/**
+ * Güncelleme animasyonları: hepsi küçük kapsüllerde sürekli oynar; birine basınca o seçilir.
+ * Üstte "Sırayla / Karışık" ve seçili olanı adada denemek için düğme.
+ */
+export function UpdateAnimGallery() {
+  const face = useFace();
+  const pref = useNook((s) => s.settings.updateAnim);
+  const set = (updateAnim: UpdateAnimPref) => useNook.getState().updateSettings({ updateAnim });
+  const fake = useFakeUpdate();
+  const fixed = UPDATE_ANIMS.some((a) => a.id === pref);
+  return (
+    <div className="pb-2">
+      <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
+        {(
+          [
+            { id: "cycle", label: tt("Sırayla"), hint: tt("Her güncellemede sıradaki") },
+            { id: "random", label: tt("Karışık"), hint: tt("Her güncellemede rastgele") },
+          ] as const
+        ).map((o) => {
+          const on = pref === o.id;
+          return (
+            <button
+              key={o.id}
+              onClick={() => set(o.id)}
+              title={o.hint}
+              className="rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors"
+              style={on ? { background: tintBg(ACCENT.blue, 18), borderColor: tintBg(ACCENT.blue, 45), color: tintText(ACCENT.blue) } : { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-2)" }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+        <span className="text-[11px] text-label-3">{fixed ? tt("ya da hep aynısı: aşağıda seçili olan") : tt("ya da aşağıdan birini seç")}</span>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(318px,1fr))] gap-2">
+        {UPDATE_ANIMS.map((a) => {
+          const on = pref === a.id;
+          return (
+            <div
+              key={a.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => set(a.id)}
+              className="group relative flex cursor-pointer flex-col items-center gap-1.5 rounded-[16px] border px-2 pb-2 pt-0 transition-colors"
+              style={{ background: on ? tintBg(a.color, 10) : "rgb(255 255 255 / 0.02)", borderColor: on ? tintBg(a.color, 45) : "rgb(255 255 255 / 0.06)" }}
+            >
+              <span className="h-px w-full bg-white/[0.08]" />
+              {/* Kapalı ada: güncelleme kapsülü */}
+              <div className="relative h-10 w-[300px] overflow-hidden rounded-b-[18px] bg-black shadow-[0_10px_26px_-8px_rgba(0,0,0,0.95)]">
+                <div className="absolute left-[13px] top-1/2 -translate-y-1/2">
+                  <NookFigure look={face.look} color={face.color} size={26} expression={fake.done ? "happy" : "downloading"} />
+                </div>
+                <UpdateBody anim={a.id} p={fake.p} done={fake.done} version="0.3.1" />
+              </div>
+              <div className="flex w-full items-center gap-2 px-1">
+                <span className="h-2 w-2 rounded-full" style={{ background: a.color }} />
+                <span className={`text-[12px] font-semibold ${on ? "text-label" : "text-label-2"}`}>{a.label}</span>
+                {on && <span className="text-[10.5px] font-semibold" style={{ color: tintText(a.color) }}>{tt("seçili")}</span>}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playUpdateDemo(a.id);
+                  }}
+                  title={tt("Adada dene")}
+                  className="ml-auto rounded-full bg-well px-2.5 py-[3px] text-[10.5px] font-semibold text-label-2 opacity-70 transition-opacity hover:bg-well-hi hover:text-label group-hover:opacity-100"
+                >
+                  {tt("Adada dene")}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

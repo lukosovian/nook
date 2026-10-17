@@ -70,6 +70,7 @@ export const EVENTS = {
   humLevel: "nook://hum-level",
   humFound: "nook://hum-found",
   tray: "nook://tray",
+  studioGo: "nook://studio-go",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -234,7 +235,8 @@ export type SysEventKind =
   | "shelf"
   | "live"
   | "claude"
-  | "phone";
+  | "phone"
+  | "power";
 
 /** Mikrofonu / kamerayı şu an kullanan uygulamalar. */
 export interface PrivacyPayload {
@@ -269,6 +271,12 @@ export interface AudioOutput {
   headphone: boolean;
 }
 export type QuickKey = "wifi" | "bluetooth" | "dark" | "mute" | "mic";
+
+/** Nook Studio penceresini aç (açıksa öne getir) ve bölüme git */
+export const openStudioWindow = (section?: string) =>
+  inTauri ? invoke<void>("open_studio", { section: section ?? null }) : Promise.resolve(void window.open(`/?preview=studio${section ? `#${encodeURIComponent(section)}` : ""}`, "_blank"));
+
+/** Studio'dan adayı sohbetle ya da hızlı aramayla aç */
 
 export const quickState = () =>
   inTauri
@@ -323,7 +331,8 @@ export const quickVolume = (value: number) => (inTauri ? invoke<void>("quick_vol
 /** Ekran parlaklığı 0–100 (dizüstü paneli WMI, harici monitörler DDC/CI); desteklenmiyorsa null */
 export const brightnessGet = () => (inTauri ? invoke<number | null>("brightness_get") : Promise.resolve(70));
 export const brightnessSet = (value: number) => (inTauri ? invoke<void>("brightness_set", { value: Math.round(value) }) : Promise.resolve());
-export const quickAction = (action: "lock" | "screen-off") =>
+/** lock | screen-off | desktop (her şeyi küçült) | sleep | shutdown | restart */
+export const quickAction = (action: "lock" | "screen-off" | "desktop" | "sleep" | "shutdown" | "restart") =>
   inTauri ? invoke<void>("quick_action", { action }) : Promise.resolve();
 
 /** Lukonnect'ten okunan cihazlar (mouse, kulaklık, vantilatör). */
@@ -375,7 +384,7 @@ export interface NativeSettings {
   /** Arayüz ölçeği (0,8–1,5) */
   uiScale: number;
   /** Tepsi menüsünün yazıları (seçili dilde) */
-  trayLabels?: { open: string; center: string; tour: string; quiet: string; update: string; quit: string };
+  trayLabels?: { open: string; studio: string; center: string; tour: string; quiet: string; update: string; quit: string };
   /** Dosya sürüklerken fareyi sallayınca raf açılır */
   shelfShake: boolean;
   /** Gezgin'de seçili dosyaları rafa ekle */
@@ -638,6 +647,10 @@ export const openPath = (path: string) =>
   inTauri ? invoke<void>("open_path", { path }) : Promise.resolve(void window.open(path, "_blank"));
 export const revealPath = (path: string) => (inTauri ? invoke<void>("reveal_path", { path }) : noop());
 export const listApps = () => (inTauri ? invoke<AppEntry[]>("list_apps") : Promise.resolve([]));
+/** Öndeki pencerenin uygulaması ("chrome", "Code") — günlük için */
+export const foregroundApp = () => (inTauri ? invoke<string | null>("foreground_app") : Promise.resolve(null));
+/** Açılıştan beri imlecin aldığı yol (fiziksel piksel) */
+export const mouseTravel = () => (inTauri ? invoke<number>("mouse_travel") : Promise.resolve(0));
 /** Uygulama listesi, 5 dk önbellekli (sesli komutta her seferinde Başlat menüsü taranmasın) */
 let appsCache: { at: number; list: Promise<AppEntry[]> } | null = null;
 export function appsCached() {

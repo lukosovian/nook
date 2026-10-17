@@ -55,7 +55,19 @@ function openFromTray() {
  */
 export function useTray() {
   // "Adayı aç" imlecin olduğu ekranın adasına gider ("Tüm ekranlar"da ana ada olmayabilir)
-  useEffect(() => subscribe<string>(EVENTS.tray, (id) => id === "open" && openFromTray()), []);
+  useEffect(
+    () =>
+      subscribe<string>(EVENTS.tray, (id) => {
+        if (id === "open") openFromTray();
+        // Studio'dan "Nook'la sohbet"
+        if (id === "chat") {
+          const s = useNook.getState();
+          s.setSearching(false);
+          s.setTab("chat");
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (!isPrimary) return;

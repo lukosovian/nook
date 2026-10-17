@@ -11,6 +11,8 @@
     <!-- Su hatırlatması: telefonda bildirim, telefon yeniden başlayınca yeniden kurulur -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Bildirimler arka planda PC'ye gidebilsin: pil kısıtlamasından muaf olmayı sormak için -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Eski Android'de ekran görüntüsünü galeriye kaydetmek -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 

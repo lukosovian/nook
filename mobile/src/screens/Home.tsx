@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { MoreHorizontal } from "lucide-react";
-import { cached, getMedia, wakePc, type Pairing, type NowPlaying, type Status } from "../lib/pc";
+import { BookOpen, MoreHorizontal } from "lucide-react";
+import { cached, getDiary, getMedia, today, wakePc, type Pairing, type NowPlaying, type PcDiary, type Status } from "../lib/pc";
 import { ChipNook, errText, NookChip, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
 import { installUpdate, useInstallProgress, useMobileUpdate } from "../lib/update";
@@ -23,7 +23,7 @@ interface Tile {
 /** Masaüstündeki Nook çipleri gibi; telefona geldikçe buraya eklenir (Bildirimler, Claude sırada) */
 const TILES: Tile[] = [
   { id: "pc", nook: "control", label: "Bilgisayar", color: "#8FE03A" },
-  { id: "argus", nook: "argus", label: "Argus", color: "#2B8CFF" },
+  { id: "argus", nook: "argus", label: "Argus", color: "#00c0fa" },
   { id: "media", nook: "media", label: "Medya", color: "#FF5C8A" },
   { id: "clips", nook: "clip", label: "Pano", color: "#9B7BFF" },
   { id: "shelf", nook: "shelf", label: "Raf", color: "#2FD4C0" },
@@ -191,6 +191,7 @@ export function HomeScreen({
         </section>
       )}
       {online && <OutsideTip pairing={pairing} />}
+      <DiaryCard pairing={pairing} online={online} />
 
       <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Nook'lar</h2>
       <section className="grid grid-cols-2 gap-2.5 pb-4">
@@ -230,6 +231,61 @@ export function HomeScreen({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+const DIARY = "#9B7BFF";
+
+function dayLabel(day: string) {
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+  if (day === today()) return "Bugün";
+  if (day === yk) return "Dün";
+  const [yy, mm, dd] = day.split("-").map(Number);
+  return new Date(yy, mm - 1, dd).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
+}
+
+/** Nook'un günlüğü: PC'deki Nook her gece günü kendi ağzından yazar; en yenisi burada, öncekiler sayfada */
+function DiaryCard({ pairing, online }: { pairing: Pairing; online: boolean }) {
+  const [list, setList] = useState<PcDiary[]>(() => cached<PcDiary[]>("diary") ?? []);
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    if (online) void getDiary(pairing).then(setList).catch(() => {});
+  }, [pairing, online]);
+  const last = list[0];
+  if (!last) return null;
+  return (
+    <>
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={() => setAll(true)}
+        className="rounded-3xl p-4 text-left"
+        style={{ background: `linear-gradient(160deg, ${tintBg(DIARY, 16)}, ${tintBg(DIARY, 6)})`, border: `1px solid ${tintBg(DIARY, 30)}` }}
+      >
+        <span className="flex items-center gap-2 text-[12px] font-bold" style={{ color: tintText(DIARY) }}>
+          <BookOpen size={15} /> Nook'un günlüğü · {dayLabel(last.day)}
+        </span>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-label-2">{last.text}</p>
+      </motion.button>
+      <AnimatePresence>
+        {all && (
+          <Sheet key="diary" onClose={() => setAll(false)}>
+            <p className="mb-3 px-1 text-[17px] font-bold">Nook'un günlüğü</p>
+            <div className="flex max-h-[60vh] flex-col gap-2.5 overflow-y-auto">
+              {list.map((d) => (
+                <div key={d.day} className="rounded-2xl bg-card p-3.5">
+                  <p className="text-[12px] font-bold" style={{ color: tintText(DIARY) }}>
+                    {dayLabel(d.day)}
+                  </p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-label-2">{d.text}</p>
+                </div>
+              ))}
+            </div>
+          </Sheet>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

@@ -230,10 +230,16 @@ export function useClipboardFeed() {
           if (!out) return;
           const st = useNook.getState();
           const clip = st.clips.find((c) => c.text === text);
-          if (clip) st.patchClip(clip.id, { translation: out });
+          if (clip) st.patchClip(clip.id, { translation: out, askTranslate: false });
           if (!st.hovered) st.pushToast({ kind: "translate", title: tt("Çeviri"), detail: out, ms: Math.min(9000, 3500 + out.length * 40) });
         })
-        .catch((e) => console.warn("[nook] çeviri", e));
+        .catch((e) => {
+          // Ağ ya da kota: kartta "Tekrar dene" çıksın, sessizce kaybolmasın
+          console.warn("[nook] çeviri", e);
+          const st = useNook.getState();
+          const clip = st.clips.find((c) => c.text === text);
+          if (clip && !clip.translation) st.patchClip(clip.id, { askTranslate: true });
+        });
     });
     return () => {
       offImage();
@@ -534,7 +540,11 @@ export function useFocusRelease() {
 export function useStorageSync() {
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "nook") void useNook.persist.rehydrate();
+      if (e.key !== "nook") return;
+      // Bu pencerede cevap akarken öbür pencerenin kaydı sohbeti eski hâline döndürmesin
+      const busy = useNook.getState().chatBusy;
+      const chat = useNook.getState().chat;
+      void Promise.resolve(useNook.persist.rehydrate()).then(() => busy && useNook.setState({ chat }));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -560,6 +570,7 @@ const native = (s: Settings) => ({
   uiScale: s.uiScale ?? 1,
   trayLabels: {
     open: tt("Adayı aç"),
+    studio: "Nook Studio",
     center: tt("Adayı ortala"),
     tour: tt("Nook nedir?"),
     quiet: (s.quietUntil ?? 0) > Date.now() ? tt("Sessizliği bitir ({0})", new Date(s.quietUntil).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })) : tt("1 saat sessiz"),

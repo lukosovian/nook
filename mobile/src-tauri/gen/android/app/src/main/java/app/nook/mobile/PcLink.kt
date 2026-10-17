@@ -2,6 +2,8 @@ package app.nook.mobile
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
@@ -196,8 +198,42 @@ object PcLink {
     fun sendNotification(ctx: Context, n: JSONObject) {
         io.execute {
             if (post(ctx, "/v1/notify", n.toString().toByteArray()) != null) flushLocked(ctx)
-            else enqueue(ctx, n)
+            else {
+                enqueue(ctx, n)
+                retryLater(ctx.applicationContext)
+            }
         }
+    }
+
+    private val main = Handler(Looper.getMainLooper())
+    private var retryDelay = 0L
+
+    /**
+     * Gönderilemeyen bildirimler beklemede kalmasın: PC'ye ulaşılana kadar artan aralıklarla (1, 2, 4… en çok
+     * 10 dk) yeniden dener. Eskiden yalnızca yeni bir bildirim gelince ya da uygulama açılınca deneniyordu.
+     */
+    private fun retryLater(ctx: Context) {
+        main.post {
+            if (retryDelay > 0) return@post
+            retryDelay = 60_000L
+            schedule(ctx)
+        }
+    }
+
+    private fun schedule(ctx: Context) {
+        main.postDelayed({
+            io.execute {
+                flushLocked(ctx)
+                val left = runCatching { JSONArray(prefs(ctx).getString("outbox", "[]")).length() }.getOrDefault(0)
+                main.post {
+                    if (left == 0) retryDelay = 0L
+                    else {
+                        retryDelay = minOf(retryDelay * 2, 600_000L)
+                        schedule(ctx)
+                    }
+                }
+            }
+        }, retryDelay)
     }
 
     fun flushOutbox(ctx: Context) {

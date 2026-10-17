@@ -21,12 +21,13 @@ import {
 } from "../../lib/argus";
 import { sendChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
-import { useNook } from "../../store/nook";
-import { ACCENT, Bar, EmptyState, Segmented, tintBg, tintText } from "../ui/primitives";
-import { ArgusPromo } from "../ArgusPromo";
+import { dayKey, useNook } from "../../store/nook";
+import { ACCENT, EmptyState, Segmented, tintBg, tintText } from "../ui/primitives";
+import { ARGUS_CYAN, ARGUS_DEEP, ARGUS_GRADIENT, ArgusPromo } from "../ArgusPromo";
 import { tt } from "../../lib/i18n";
 
-const COLOR = ACCENT.orange;
+/** Argus'un kendi renkleri (uygulamadaki camgöbeği → mavi) */
+const COLOR = ARGUS_CYAN;
 
 type View = "watching" | "calendar" | "pick";
 const VIEWS: { id: View; label: string }[] = [
@@ -78,9 +79,9 @@ export function ArgusPanel() {
       </div>
       <SuggestionBanner />
       <FreshBanner />
-      <div ref={scroller} className="-mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5">
+      <div ref={scroller} className={`min-h-0 flex-1 ${view === "watching" && !focused ? "" : "-mr-1.5 overflow-y-auto pr-1.5"}`}>
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={focused ? `f${focused.id}` : view} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
+          <motion.div key={focused ? `f${focused.id}` : view} className={view === "watching" && !focused ? "h-full" : ""} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
             {focused ? <Detail item={focused} /> : view === "watching" ? <Watching /> : view === "calendar" ? <Calendar /> : <Pick />}
           </motion.div>
         </AnimatePresence>
@@ -100,7 +101,7 @@ function Poster({ item, w, h }: { item: ArgusItem; w: number; h: number }) {
   );
 }
 
-function WatchedButton({ item, ep, label = tt("İzledim") }: { item: ArgusItem; ep?: { season: number; episode: number } | null; label?: string }) {
+function WatchedButton({ item, ep, label = tt("İzledim"), wide }: { item: ArgusItem; ep?: { season: number; episode: number } | null; label?: string; wide?: boolean }) {
   const busy = useArgus((s) => s.busy === item.id);
   return (
     <motion.button
@@ -108,8 +109,8 @@ function WatchedButton({ item, ep, label = tt("İzledim") }: { item: ArgusItem; 
       transition={spring.pop}
       disabled={busy}
       onClick={() => void markWatched(item, ep)}
-      className="flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-[10.5px] font-medium disabled:opacity-60"
-      style={{ background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }}
+      className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-2.5 text-[10.5px] font-semibold text-white disabled:opacity-60 ${wide ? "w-full" : ""}`}
+      style={{ background: ARGUS_GRADIENT, boxShadow: `0 4px 12px -6px ${ARGUS_DEEP}` }}
     >
       {busy ? <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }} className="h-2.5 w-2.5 rounded-full border-[1.5px] border-current border-t-transparent" /> : <Check size={11} strokeWidth={2.8} />}
       {label}
@@ -231,32 +232,74 @@ function FreshBanner() {
   );
 }
 
+/** İzlediğin diziler: yan yana kartlar (afiş, sıradaki bölüm, ilerleme, "izledim"); fazlası yana kayar */
 function Watching() {
   const snap = useArgus((s) => s.snap);
   const list = useMemo(() => watching(snap), [snap]);
   if (!list.length) return <EmptyState title={tt("İzlediğin dizi yok")} hint={tt("Argus'ta durumu İzleniyor olan diziler burada")} color={COLOR} />;
   return (
-    <div className="space-y-1">
-      {list.map((it) => {
-        const s = it.series!;
-        const soon = s.upcoming[0];
-        return (
-          <div key={it.id} className="flex items-center gap-2.5 rounded-[12px] px-1 py-1 hover:bg-white/[0.03]">
-            <button onClick={() => useArgus.setState({ focusId: it.id })}>
-              <Poster item={it} w={30} h={44} />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-medium text-label">{it.title}</p>
-              <p className="truncate text-[10.5px] text-label-3">
-                {s.next ? tt("Sıradaki {0}{1}", epLabel(s.next), s.next.name ? ` · ${s.next.name}` : "") : soon?.date ? tt("Güncelsin · yeni bölüm {0}", dayLabel(soon.date)) : tt("Güncelsin")}
-              </p>
-              <Bar pct={s.aired ? (s.position / s.aired) * 100 : 0} color={COLOR} className="mt-1" />
-            </div>
-            {s.next && <WatchedButton item={it} ep={s.next} />}
-          </div>
-        );
-      })}
+    <div className="no-scrollbar -mx-0.5 flex h-full gap-2 overflow-x-auto px-0.5" onWheel={(e) => (e.currentTarget.scrollLeft += e.deltaY)}>
+      {list.map((it, i) => (
+        <SeriesCard key={it.id} item={it} delay={i * 0.03} />
+      ))}
     </div>
+  );
+}
+
+function SeriesCard({ item: it, delay }: { item: ArgusItem; delay: number }) {
+  const s = it.series!;
+  const soon = s.upcoming[0];
+  const src = posterSrc(it);
+  const pct = s.aired ? (s.position / s.aired) * 100 : 0;
+  const fresh = !!s.next?.date && s.next.date === dayKey();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...spring.pop, delay }}
+      className="relative flex h-full w-[158px] shrink-0 flex-col overflow-hidden rounded-[16px] border"
+      style={{ borderColor: tintBg(COLOR, 26), background: tintBg(ARGUS_DEEP, 8) }}
+    >
+      {/* Afiş: kartın üstü, aşağı doğru karta karışır */}
+      <button onClick={() => useArgus.setState({ focusId: it.id })} className="relative h-[92px] shrink-0 overflow-hidden" title={tt("Ayrıntı")}>
+        {src ? (
+          <img src={src} alt="" draggable={false} className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-label-3" style={{ background: `linear-gradient(140deg, ${tintBg(COLOR, 30)}, ${tintBg(ARGUS_DEEP, 40)})` }}>
+            <Tv size={26} strokeWidth={1.6} />
+          </span>
+        )}
+        <span className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 35%, rgb(10 14 22 / 0.95) 100%)" }} />
+        {it.genres[0] && (
+          <span className="absolute left-2 top-2 rounded-[6px] bg-black/55 px-1.5 py-[1px] text-[9px] font-semibold backdrop-blur-sm" style={{ color: tintText(COLOR) }}>
+            {it.genres[0]}
+          </span>
+        )}
+        {fresh && (
+          <span className="absolute right-2 top-2 rounded-[6px] px-1.5 py-[1px] text-[9px] font-bold text-black" style={{ background: COLOR }}>
+            {tt("YENİ")}
+          </span>
+        )}
+      </button>
+      <div className="-mt-3 flex min-h-0 flex-1 flex-col px-2.5 pb-2.5">
+        <p className="relative truncate text-[12.5px] font-bold leading-tight text-label">{it.title}</p>
+        <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-label-3">
+          {s.next ? `${epLabel(s.next)}${s.next.name ? ` · ${s.next.name}` : ""}` : soon?.date ? tt("Güncelsin · yeni bölüm {0}", dayLabel(soon.date)) : tt("Güncelsin")}
+        </p>
+        <div className="mt-auto">
+          <div className="mb-1 flex items-center justify-between text-[9.5px] tabular-nums">
+            <span className="text-label-3">{s.next ? epLabel(s.next) : tt("Bitti")}</span>
+            <span className="font-semibold" style={{ color: tintText(COLOR) }}>
+              {s.position}/{s.aired}
+            </span>
+          </div>
+          <span className="block h-[4px] overflow-hidden rounded-full bg-white/[0.07]">
+            <span className="block h-full rounded-full" style={{ width: `${Math.max(3, pct)}%`, background: ARGUS_GRADIENT }} />
+          </span>
+          <div className="mt-2">{s.next ? <WatchedButton item={it} ep={s.next} label={tt("+1 bölüm izledim")} wide /> : <div className="h-6" />}</div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

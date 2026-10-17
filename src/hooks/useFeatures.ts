@@ -31,6 +31,7 @@ import { nextPhase, remaining } from "../lib/focus";
 import { dayKey, isQuiet, isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
+import { logDiaryMinute } from "../lib/diary";
 
 /** Odak sayacı: faz bitince sıradakine geçer. */
 export function useFocusTimer() {
@@ -112,6 +113,7 @@ export function useDayTracker() {
         moodSum: s.affection,
         moodN: 1,
       });
+      void logDiaryMinute(away);
 
       if (away) {
         eye = 0;

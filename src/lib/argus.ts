@@ -15,10 +15,10 @@ import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, argusTmdbAdd, argusTmdbSearch, inTauri, isPrimary } from "./bridge";
 import type { IslandMode } from "./layout";
-import { ISLAND, ISLAND_TOP } from "./layout";
+import { ISLAND_TOP, SIDE_CARD_H, sizeFor } from "./layout";
 import { cardHit } from "./soundCard";
 import { dayKey, useNook } from "../store/nook";
-import { locale } from "./i18n";
+import { isTurkish, locale } from "./i18n";
 import { tt } from "./i18n";
 
 export interface ArgusEp {
@@ -127,7 +127,7 @@ export async function refreshArgus() {
 }
 
 export const posterSrc = (it: ArgusItem) => (it.poster && inTauri ? convertFileSrc(it.poster) : null);
-export const epLabel = (e: { season: number; episode: number }) => `S${e.season}B${e.episode}`;
+export const epLabel = (e: { season: number; episode: number }) => `S${e.season}${isTurkish ? "B" : "E"}${e.episode}`;
 export const findItem = (id: string | null | undefined) => useArgus.getState().snap?.items.find((i) => i.id === id) ?? null;
 
 const isStatus = (it: ArgusItem, s: string) => lc(it.status ?? "") === lc(s);
@@ -610,6 +610,18 @@ export function answerSuggestion(sug: ArgusSuggestion | null = useArgus.getState
   savePlayed(store);
   useArgus.setState({ suggestion: null });
 }
+/**
+ * Fragman, tanıtım, klip, inceleme, özet gibi bölüm olmayan videolar: adı Argus'taki bir diziyle eşleşse de
+ * "bitti mi?" diye sorulmaz (YouTube'da "Silo 2. Sezon Fragmanı" izlenince bölüm sanılıyordu).
+ */
+const EXTRA =
+  /(^|[^\p{L}])(trailer|teaser|fragman\p{L}*|tanıtım\p{L}*|tanitim\p{L}*|promo|recap|özet|ozet|review|inceleme\p{L}*|reaction|tepki\p{L}*|explained|analiz\p{L}*|behind the scenes|kamera arkası|featurette|sneak peek|first look|ilk bakış|interview|röportaj\p{L}*|roportaj\p{L}*|soundtrack|easter eggs?|bloopers?|shorts)(?=$|[^\p{L}])/iu;
+/** Bölüm olamayacak kadar kısa videolar (dizi bölümü en az 8 dk, film en az 40 dk) */
+const MIN_EPISODE_MS = 8 * 60_000;
+const MIN_MOVIE_MS = 40 * 60_000;
+const notAnEpisode = (text: string, durationMs: number, series: boolean) =>
+  EXTRA.test(text) || (durationMs > 0 && durationMs < (series ? MIN_EPISODE_MS : MIN_MOVIE_MS));
+
 // 15 dk'dan kısa bölümlerde neredeyse tamamı yeter
 const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, duration * 0.9) : MIN_WATCH_MS);
 
@@ -721,7 +733,9 @@ ${m.artist}`;
             if (lastText === text) lastMatch = r;
           });
         }
-        const { sug, fresh, nokey } = lastMatch;
+        const { fresh, nokey } = lastMatch;
+        // Fragman, klip, inceleme ya da çok kısa video: bölüm/film sayılmaz
+        const sug = lastMatch.sug && notAnEpisode(text, m.durationMs, lastMatch.sug.season != null) ? null : lastMatch.sug;
         if (fresh && !sug) offerFresh(fresh, step, m.durationMs);
         if (nokey && !sug) hintNoKey(step, m.durationMs);
         if (!sug) {
@@ -772,7 +786,7 @@ export interface ArgusCardData {
 
 const CARD_GAP = 10;
 /** Kartın görünen boyutu (pencerede soldan 6 px boşlukla) — açık adayla aynı boy */
-export const CARD_SIZE = { width: 360, height: ISLAND.expanded.height };
+export const CARD_SIZE = { width: 360, height: SIDE_CARD_H };
 /** Karta en son gönderilen — kart penceresi yeni açıldıysa "hazırım" deyince yeniden gönderilir */
 let lastCard: ArgusCardData | { visible: false } = { visible: false };
 const sendCard = (d: ArgusCardData | { visible: false }) => {
@@ -793,6 +807,8 @@ export function useArgusCard(mode: IslandMode) {
   // Ada tam ekrana yayılınca yanında yer kalmaz
   const big = useNook((s) => !!s.big);
   const show = isPrimary && inTauri && mode === "expanded" && !!live && !fullscreen && !big;
+  // Bölüm değişip ada daralınca/genişleyince kart da kayar
+  const islandW = useNook((s) => sizeFor(s.tab, s.searching).width);
   useEffect(() => {
     if (!isPrimary || !inTauri) return;
     const item = live ? snap?.items.find((i) => i.id === live.itemId) : null;
@@ -810,13 +826,13 @@ export function useArgusCard(mode: IslandMode) {
         needMs: live.needMs,
       };
       // Sağda yer yoksa (ada ekranın sağına taşındıysa) Rust kartı adanın soluna koyar
-      const x = window.innerWidth / 2 + ISLAND.expanded.width / 2 + CARD_GAP;
-      const leftEnd = window.innerWidth / 2 - ISLAND.expanded.width / 2 - CARD_GAP;
+      const x = window.innerWidth / 2 + islandW / 2 + CARD_GAP;
+      const leftEnd = window.innerWidth / 2 - islandW / 2 - CARD_GAP;
       let alive = true;
       void argusCard(true, x, ISLAND_TOP, leftEnd)
         .then((p) => {
           // İmleç karta (ve aradaki boşluğa) geçince ada kapanmasın
-          if (alive) setHitExtra("argus", cardHit(p.x + 6, p.x + 6 + CARD_SIZE.width, CARD_SIZE.height));
+          if (alive) setHitExtra("argus", cardHit(p.x + 6, p.x + 6 + CARD_SIZE.width, CARD_SIZE.height, islandW));
           return sendCard(data);
         })
         .catch((e) => console.warn("[nook] argus kartı", e));
@@ -829,5 +845,5 @@ export function useArgusCard(mode: IslandMode) {
     void sendCard({ visible: false });
     const t = window.setTimeout(() => void argusCard(false, 0, 0, 0).catch(() => {}), 260);
     return () => window.clearTimeout(t);
-  }, [show, live, snap]);
+  }, [show, live, snap, islandW]);
 }

@@ -7,7 +7,7 @@ import { sendChat } from "../../lib/chat";
 import { useArgus } from "../../lib/argus";
 import { search, searchOnline, type ResultKind, type SearchResult } from "../../lib/search";
 import { useNook } from "../../store/nook";
-import { Frame } from "../panels/Frame";
+import { Frame, HUB_COLOR } from "../panels/Frame";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
@@ -115,7 +115,7 @@ export function SearchPanel() {
   };
 
   return (
-    <Frame view="module" title={tt("Hızlı arama")}>
+    <Frame view="module" title={tt("Hızlı arama")} color={HUB_COLOR.search}>
       <div className="flex h-full flex-col gap-2">
         <div className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-well px-3 focus-within:bg-well-hi">
           <Search size={14} strokeWidth={2.4} className="shrink-0 text-label-3" />

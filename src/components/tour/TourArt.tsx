@@ -10,19 +10,14 @@ import {
   Eye,
   FileText,
   Hand,
-  House,
   ImageIcon,
   LogOut,
-  MessageCircle,
   Moon,
   MousePointer2,
   MousePointerClick,
-  Search,
   Settings,
   Target,
   Heart,
-  Layers,
-  Move,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
@@ -36,6 +31,7 @@ import { ACCENT, Bar, MiniNook, Segmented, tintBg, tintText, Toggle } from "../u
 import { MyNook, NookFigure } from "../mascot/Figure";
 import { SHOWCASE, TOUR_CHIPS } from "../../lib/look";
 import { endTour } from "../../lib/tour";
+import { isStudio, openStudio, studioGo } from "../../lib/studio";
 import { conflicts, prettyKeys, useInstalledApps } from "../../lib/shortcuts";
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
@@ -113,12 +109,18 @@ export function HoverArt() {
           <motion.div className="absolute" animate={{ left: [29, 29, 18, 18, 29, 29], top: [2.5, 2.5, 18, 18, 2.5, 2.5], scale: [1, 1, 2.4, 2.4, 1, 1] }} transition={HOVER_T} style={{ originX: 0, originY: 0 }}>
             <MyNook size={12} />
           </motion.div>
-          <motion.div className="absolute left-[70px] right-3 top-4 grid grid-cols-2 gap-1.5" animate={{ opacity: [0, 0, 1, 1, 0, 0] }} transition={HOVER_T}>
-            {[ACCENT.yellow, ACCENT.pink, ACCENT.red, ACCENT.teal, ACCENT.purple, ACCENT.orange].map((c, i) => (
-              <span key={i} className="flex h-[30px] items-center gap-1.5 rounded-full border px-1" style={{ background: tintBg(c, 14), borderColor: tintBg(c, 34) }}>
-                <MiniNook color={c} size={18} />
-                <span className="h-1.5 w-12 rounded-full" style={{ background: tintBg(c, 60) }} />
+          <motion.div className="absolute left-[70px] right-3 top-4 grid grid-cols-2 grid-rows-[1.3fr_1fr_1fr] gap-1.5" style={{ height: 102 }} animate={{ opacity: [0, 0, 1, 1, 0, 0] }} transition={HOVER_T}>
+            {[ACCENT.pink, ACCENT.red, ACCENT.orange, ACCENT.yellow, ACCENT.green, ACCENT.teal].map((c, i) => (
+              <span key={i} className="flex items-center gap-1.5 rounded-[10px] border px-1.5" style={{ background: tintBg(c, 12), borderColor: tintBg(c, 30) }}>
+                <span className="h-3.5 w-3.5 rounded-[5px]" style={{ background: tintBg(c, 45) }} />
+                <span className="h-1.5 w-10 rounded-full" style={{ background: tintBg(c, 55) }} />
               </span>
+            ))}
+          </motion.div>
+          {/* Soldaki dikey çubuk */}
+          <motion.div className="absolute left-2 top-[52px] flex flex-col gap-1.5" animate={{ opacity: [0, 0, 1, 1, 0, 0] }} transition={HOVER_T}>
+            {[ACCENT.purple, null, null, null].map((c, i) => (
+              <span key={i} className="h-3 w-3 rounded-[4px]" style={{ background: c ?? "rgb(255 255 255 / 0.14)" }} />
             ))}
           </motion.div>
         </Notch>
@@ -136,80 +138,6 @@ export function HoverArt() {
         <Tip icon={LogOut} color={ACCENT.teal}>{tt("Uzaklaş:")}{" "}<b className="font-medium text-label">{tt("kapanırım")}</b>
         </Tip>
         <Tip icon={Moon} color={ACCENT.purple}>{tt("Bilgisayar boştaysa")}{" "}<b className="font-medium text-label">{tt("uyurum")}</b>
-        </Tip>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- Bölümler
-
-const MODULES: { label: string; desc: string; color: string }[] = [
-  { label: tt("Bugün"), desc: tt("Hava, alarm, günün özeti"), color: ACCENT.yellow },
-  { label: tt("Medya"), desc: tt("Çalan müzik, şarkı sözleri"), color: ACCENT.pink },
-  { label: "Hum", desc: tt("Çalan şarkıyı bul"), color: ACCENT.purple },
-  { label: "Pomodoro", desc: tt("Odaklanma sayacı"), color: ACCENT.red },
-  { label: tt("Raf"), desc: tt("Bana bıraktığın dosyalar"), color: ACCENT.teal },
-  { label: tt("Pano"), desc: tt("Kopyaladıkların, çevirisi"), color: ACCENT.purple },
-  { label: tt("Not"), desc: tt("Hızlı karalama"), color: ACCENT.orange },
-  { label: tt("Alarm"), desc: tt("Alarm ve hatırlatıcı"), color: ACCENT.yellow },
-  { label: tt("Takvim"), desc: tt("Etkinlikler, geri sayım"), color: ACCENT.blue },
-  { label: tt("Kısayollar"), desc: tt("Sık açtığın uygulamalar"), color: ACCENT.blue },
-  { label: tt("Bildirimler"), desc: tt("Windows bildirimleri"), color: ACCENT.purple },
-  { label: tt("Kontrol"), desc: tt("Wi-Fi, uygulama bazlı ses"), color: ACCENT.green },
-  { label: tt("Sistem"), desc: tt("İşlemci, bellek, ağ"), color: ACCENT.red },
-  { label: tt("Oyun"), desc: tt("Benimle mini oyunlar"), color: ACCENT.pink },
-  { label: tt("Karne"), desc: tt("Haftalık istatistik"), color: ACCENT.teal },
-  { label: tt("Görünüm"), desc: tt("Beni giydir"), color: ACCENT.pink },
-  { label: tt("Yama notları"), desc: tt("Yeni gelenler"), color: ACCENT.orange },
-  { label: tt("Yıl özeti"), desc: tt("Yılın nasıl geçti"), color: ACCENT.yellow },
-];
-
-const NAV: { icon: LucideIcon; label: string }[] = [
-  { icon: House, label: tt("Ana sayfa") },
-  { icon: MessageCircle, label: tt("Sohbet") },
-  { icon: Search, label: tt("Ara") },
-  { icon: Settings, label: tt("Ayarlar") },
-];
-
-export function ModulesArt() {
-  return (
-    <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center gap-1.5">
-        {NAV.map(({ icon: Icon, label }) => (
-          <span key={label} className="flex items-center gap-1.5 rounded-full bg-well px-2.5 py-1 text-[11px] font-medium text-label-2">
-            <Icon size={12} strokeWidth={2.2} />
-            {label}
-          </span>
-        ))}
-        <span className="ml-auto text-[10.5px] text-label-3">{tt("sol üstteki ikonlar")}</span>
-      </div>
-      <div className="grid grid-cols-3 content-start gap-1.5">
-        {MODULES.map((m, i) => (
-          <motion.div
-            key={m.label}
-            className="flex min-w-0 items-center gap-2 rounded-full border py-1 pl-1 pr-2.5"
-            style={{ background: tintBg(m.color, 12), borderColor: tintBg(m.color, 32) }}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30, delay: 0.1 + i * 0.035 }}
-          >
-            <MiniNook color={m.color} size={26} />
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate text-[12px] font-medium" style={{ color: tintText(m.color) }}>
-                {m.label}
-              </span>
-              <span className="block truncate text-[10px] text-label-3">{m.desc}</span>
-            </span>
-          </motion.div>
-        ))}
-      </div>
-      <div className="mt-auto flex gap-2">
-        <Tip icon={Hand} color={ACCENT.purple}>{tt("Çipleri")}{" "}<b className="font-medium text-label">{tt("sürükle, sırala, gizle")}</b>
-        </Tip>
-        <Tip icon={Layers} color={ACCENT.blue}>{tt("Profiller:")}{" "}<b className="font-medium text-label">{tt("İş, Oyun, Eğlence")}</b>
-        </Tip>
-        <Tip icon={Move} color={ACCENT.teal}>{tt("Adayı")}{" "}<b className="font-medium text-label">{tt("istediğin yere taşı")}</b>
         </Tip>
       </div>
     </div>
@@ -363,10 +291,9 @@ export function KeysArt() {
       {clash.length ? (
         <button
           onClick={() => {
+            if (isStudio) return studioGo("settings", tt("Kısayollar"));
             endTour();
-            const st = useNook.getState();
-            st.setTab("settings");
-            st.setSettingsJump("Kısayollar");
+            openStudio(`settings:${tt("Kısayollar")}`);
           }}
           className="mx-0.5 flex items-center gap-1.5 rounded-[10px] px-2 py-1 text-left text-[10.5px] leading-snug transition-colors hover:bg-white/[0.04]"
           style={{ color: tintText(ACCENT.orange) }}
@@ -696,8 +623,9 @@ export function LookArt() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.9 }}
         onClick={() => {
-          useNook.getState().setPendingTab("look");
+          if (isStudio) return studioGo("look");
           endTour();
+          openStudio("look");
         }}
         className="absolute right-3.5 top-3.5 z-[40] flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium"
         style={{ background: tintBg(ACCENT.pink, 18), borderColor: tintBg(ACCENT.pink, 45), color: tintText(ACCENT.pink) }}
@@ -768,8 +696,8 @@ export function HelloChips() {
 export function DoneTips() {
   const tips = [
     { color: ACCENT.blue, icon: MousePointer2, text: tt("Üst ortaya gel → açılırım") },
-    { color: ACCENT.purple, icon: Settings, text: tt("Ayarlar › Nook nedir? → bu tanıtım") },
-    { color: ACCENT.pink, icon: Shuffle, text: tt("Sağ tık › Görünüm → beni giydir") },
+    { color: ACCENT.purple, icon: Settings, text: tt("Dişli → Nook Studio: ayarlar, görünüm") },
+    { color: ACCENT.pink, icon: Shuffle, text: tt("Studio › Görünüm → beni giydir") },
     { color: ACCENT.gray, icon: ExternalLink, text: tt("Sağ alttaki tepsi simgesi → kısa menü") },
   ];
   return (

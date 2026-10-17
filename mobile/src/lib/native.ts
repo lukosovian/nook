@@ -21,6 +21,11 @@ interface NookNativeApi {
   notifPrefs(): string;
   setNotifPrefs(json: string): void;
   testNotif(): void;
+  /** Pil kısıtlaması yok mu; sor; otomatik başlatma ayarı (eski uygulama sürümlerinde yok) */
+  batteryFree?(): boolean;
+  askBatteryFree?(): void;
+  openAutostart?(): void;
+  hasAutostart?(): boolean;
   peekShare(): string;
   clearShare(): void;
   uploadShared(host: string): void;

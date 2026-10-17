@@ -4,7 +4,8 @@ import { AlarmClock, AppWindow, ArrowUp, Brain, CircleAlert, Clapperboard, Globe
 import { toggleVoice } from "../../hooks/useFeatures";
 import { useGemini } from "../../hooks/useGemini";
 import { isPinnedBottom, useScrollMemory } from "../../hooks/useScrollMemory";
-import { setInteractive } from "../../lib/bridge";
+import { isPrimary, setInteractive } from "../../lib/bridge";
+import { studioGo } from "../../lib/studio";
 import type { ToolNote } from "../../lib/aiTools";
 import { sendChat, stopChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
@@ -37,8 +38,8 @@ function unpin() {
   void setInteractive(false);
 }
 
-/** Yerel yapay zekâ ile sohbet — her şey bilgisayarında kalır. */
-export function ChatPanel() {
+/** Gemini ile sohbet. `autoFocus`: açılınca yazma kutusu odaklansın (Studio ana sayfasında kapalı) */
+export function ChatPanel({ autoFocus = true }: { autoFocus?: boolean }) {
   const chat = useNook((s) => s.chat);
   const busy = useNook((s) => s.chatBusy);
   const model = useNook((s) => s.settings.aiModel);
@@ -51,7 +52,7 @@ export function ChatPanel() {
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const t = window.setTimeout(() => input.current?.focus(), 160);
+    const t = autoFocus ? window.setTimeout(() => input.current?.focus(), 160) : 0;
     window.addEventListener("blur", unpin);
     return () => {
       window.clearTimeout(t);
@@ -231,7 +232,8 @@ function Typing() {
 
 /** Anahtar yok / geçersiz / kontrol ediliyor */
 function NotReady({ state }: { state: ReturnType<typeof useGemini> }) {
-  const go = () => useNook.getState().setTab("settings");
+  // Studio'da Ayarlar › Asistan sayfası; adada Ayarlar sekmesi
+  const go = () => (isPrimary ? useNook.getState().setTab("settings") : studioGo("settings", tt("Yapay zekâ")));
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
       <p className="text-[12px] leading-relaxed text-label-2">

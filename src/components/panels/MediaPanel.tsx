@@ -18,8 +18,8 @@ export function MediaPanel() {
   if (lyricsOn) return <LyricsLayout media={media} />;
 
   return (
-    <div className="relative flex h-full items-center gap-3.5">
-      {/* Kapaktan gelen bulanık renk — kartın üstüne hafifçe yayılır */}
+    <div className="relative flex h-full items-center gap-4">
+      {/* Kapaktan gelen bulanık renk bütün kartı boyar; sağa doğru koyulaşır ki yazılar okunsun */}
       <AnimatePresence initial={false}>
         {media.artwork && (
           <motion.img
@@ -27,19 +27,20 @@ export function MediaPanel() {
             src={media.artwork}
             alt=""
             aria-hidden
-            className="pointer-events-none absolute -left-10 -top-10 h-[150%] w-[60%] object-cover opacity-0 blur-3xl"
+            className="pointer-events-none absolute -inset-3 h-[calc(100%+24px)] w-[calc(100%+24px)] max-w-none object-cover blur-[38px] saturate-150"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.35 }}
+            animate={{ opacity: 0.42 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.7 }}
           />
         )}
       </AnimatePresence>
+      <div className="pointer-events-none absolute -inset-3" style={{ background: "linear-gradient(100deg, rgb(0 0 0 / 0.05) 20%, rgb(0 0 0 / 0.55) 75%)" }} />
 
       <motion.div
-        className="relative flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] bg-well shadow-[0_12px_28px_-10px_rgba(0,0,0,0.9)]"
-        animate={{ scale: media.playing ? 1 : 0.92 }}
-        transition={{ type: "spring", stiffness: 300, damping: 22 }}
+        className="relative flex aspect-square h-[min(100%,156px)] shrink-0 items-center justify-center overflow-hidden rounded-[22px] bg-well shadow-[0_18px_36px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10"
+        animate={{ scale: media.playing ? 1 : 0.9, opacity: media.playing ? 1 : 0.8 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {media.artwork ? (
@@ -49,37 +50,46 @@ export function MediaPanel() {
               alt=""
               draggable={false}
               className="h-full w-full object-cover"
-              initial={{ opacity: 0, scale: 1.1 }}
+              initial={{ opacity: 0, scale: 1.12 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
+              transition={{ duration: 0.4 }}
             />
           ) : (
-            <MiniNook key="none" color={ACCENT.pink} size={40} eyes="happy" />
+            <MiniNook key="none" color={ACCENT.pink} size={44} eyes="happy" />
           )}
         </AnimatePresence>
+        {/* Cam parıltısı */}
+        <span className="pointer-events-none absolute inset-0 rounded-[22px]" style={{ background: "linear-gradient(155deg, rgb(255 255 255 / 0.16) 0%, transparent 38%)" }} />
       </motion.div>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-1.5 text-[10px] font-medium" style={{ color: tintText(ACCENT.pink) }}>
-          <Equalizer playing={media.playing} height={9} />
-          {appName(media.app)}
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 rounded-full bg-black/35 px-2 py-[2px] text-[9.5px] font-bold" style={{ color: tintText(ACCENT.pink) }}>
+            <Equalizer playing={media.playing} height={8} />
+            {appName(media.app)}
+          </span>
+          {media.album && media.album !== media.title && (
+            <span className="min-w-0 truncate rounded-full bg-black/30 px-2 py-[2px] text-[9.5px] font-medium text-label-2" title={media.album}>
+              {media.album}
+            </span>
+          )}
           <LyricsToggle on={false} />
         </div>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={media.trackKey}
-            className="mt-1"
-            initial={{ opacity: 0, y: 5 }}
+            className="mt-2"
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            transition={{ duration: 0.18 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
           >
-            <p className="truncate font-display text-[15px] font-medium leading-tight text-label" title={media.title}>
+            <p className="truncate font-display text-[18px] font-semibold leading-tight tracking-tight text-label" title={media.title}>
               {media.title}
             </p>
-            <p className="truncate text-[12px] text-label-2" title={media.artist}>
-              {media.artist || media.album || " "}
+            <p className="mt-0.5 truncate text-[12.5px] text-label-2" title={media.artist}>
+              {media.artist || media.album || " "}
             </p>
           </motion.div>
         </AnimatePresence>
@@ -122,7 +132,7 @@ function LyricsLayout({ media }: { media: NowPlaying }) {
       <LyricsView media={media} />
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">{media.durationMs > 0 && <Progress media={media} />}</div>
-        <Controls playing={media.playing} />
+        <Controls playing={media.playing} compact />
       </div>
     </div>
   );
@@ -285,11 +295,11 @@ function Progress({ media }: { media: NowPlaying }) {
           setActive(false);
         }}
       >
-        <div className={`overflow-hidden rounded-full bg-white/[0.1] transition-[height] ${active ? "h-[6px]" : "h-[3px]"}`}>
+        <div className={`overflow-hidden rounded-full bg-white/[0.12] transition-[height] ${active ? "h-[7px]" : "h-[4px]"}`}>
           <div
             ref={fill}
             className="h-full origin-left rounded-full"
-            style={{ transform: "scaleX(0)", background: ACCENT.pink, boxShadow: `0 0 8px ${ACCENT.pink}` }}
+            style={{ transform: "scaleX(0)", background: `linear-gradient(90deg, ${ACCENT.pink}, color-mix(in srgb, ${ACCENT.pink} 50%, white))`, boxShadow: `0 0 10px ${ACCENT.pink}` }}
           />
         </div>
       </div>
@@ -301,7 +311,7 @@ function Progress({ media }: { media: NowPlaying }) {
   );
 }
 
-function Controls({ playing }: { playing: boolean }) {
+function Controls({ playing, compact }: { playing: boolean; compact?: boolean }) {
   const setPlaying = useNook((s) => s.setPlaying);
   const send = (action: MediaAction) => {
     if (action === "toggle") setPlaying(!playing);
@@ -309,41 +319,67 @@ function Controls({ playing }: { playing: boolean }) {
   };
 
   return (
-    <div className="mt-1 flex items-center gap-4">
+    <div className={`flex items-center justify-center ${compact ? "gap-2" : "mt-1.5 gap-5"}`}>
       <ControlButton label={tt("Önceki")} onClick={() => send("prev")}>
-        <PrevGlyph size={18} />
+        <PrevGlyph size={17} />
       </ControlButton>
-      <ControlButton label={playing ? tt("Duraklat") : tt("Oynat")} onClick={() => send("toggle")} big>
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={playing ? "pause" : "play"}
-            initial={{ scale: 0.4, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.4, opacity: 0 }}
-            transition={spring.pop}
-            className="flex"
-          >
-            {playing ? <PauseGlyph size={18} /> : <PlayGlyph size={18} />}
-          </motion.span>
-        </AnimatePresence>
-      </ControlButton>
+      <PlayButton playing={playing} onClick={() => send("toggle")} />
       <ControlButton label={tt("Sonraki")} onClick={() => send("next")}>
-        <NextGlyph size={18} />
+        <NextGlyph size={17} />
       </ControlButton>
     </div>
   );
 }
 
-function ControlButton({ label, onClick, big, children }: { label: string; onClick: () => void; big?: boolean; children: React.ReactNode }) {
+/** Ortadaki büyük düğme: beyaz daire, siyah simge; çalarken çevresinde yavaşça nefes alan pembe hale */
+function PlayButton({ playing, onClick }: { playing: boolean; onClick: () => void }) {
+  return (
+    <motion.button
+      aria-label={playing ? tt("Duraklat") : tt("Oynat")}
+      title={playing ? tt("Duraklat") : tt("Oynat")}
+      onClick={onClick}
+      whileHover={{ scale: 1.06 }}
+      whileTap={{ scale: 0.88 }}
+      transition={spring.pop}
+      className="relative flex h-[44px] w-[44px] items-center justify-center rounded-full bg-white text-black shadow-[0_8px_22px_-6px_rgba(0,0,0,0.9)]"
+    >
+      {playing && (
+        <motion.span
+          className="pointer-events-none absolute -inset-[5px] rounded-full"
+          style={{ border: `1.5px solid ${ACCENT.pink}` }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0.55, 0.15, 0.55], scale: [1, 1.08, 1] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={playing ? "pause" : "play"}
+          initial={{ scale: 0.3, opacity: 0, rotate: -40 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          exit={{ scale: 0.3, opacity: 0, rotate: 40 }}
+          transition={spring.pop}
+          className="flex"
+          // PlayGlyph's path already sits ~2px right of its box; nudge back so the triangle looks centred.
+          style={{ marginLeft: playing ? 0 : -1 }}
+        >
+          {playing ? <PauseGlyph size={19} /> : <PlayGlyph size={19} />}
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
+  );
+}
+
+function ControlButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <motion.button
       aria-label={label}
       title={label}
       onClick={onClick}
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.85 }}
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.82 }}
       transition={spring.pop}
-      className={`flex items-center justify-center rounded-full ${big ? "h-9 w-9 bg-white text-black shadow-[0_0_18px_-4px_rgba(255,255,255,0.6)]" : "h-8 w-8 text-label-2 hover:text-label"}`}
+      className="flex h-9 w-9 items-center justify-center rounded-full text-label transition-colors hover:bg-white/[0.1]"
     >
       {children}
     </motion.button>

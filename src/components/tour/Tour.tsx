@@ -8,14 +8,15 @@ import { endTour } from "../../lib/tour";
 import { useNook, type Antic, type Settings } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { useArgus } from "../../lib/argus";
-import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, LookArt, ModulesArt, MoodArt } from "./TourArt";
+import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, LookArt, MoodArt } from "./TourArt";
+import { ModulesArt, StudioArt } from "./TourArt3";
 import { ClaudeArt, DayArt, HumArt, OutingsArt, ShieldArt } from "./TourArt2";
 import { useClaude } from "../../lib/claude";
 import { isTurkish, tt } from "../../lib/i18n";
 import { prettyKeys, type ShortcutKey } from "../../lib/shortcuts";
 import { LangChips } from "../ui/LangPicker";
 
-interface Step {
+export interface Step {
   title: string;
   text: string;
   /** Argus yoksa bunun yerine (Argus adımı) */
@@ -50,11 +51,18 @@ export const STEPS: Step[] = [
     Art: HoverArt,
   },
   {
-    title: tt("Her şey bir çip uzağında"),
-    text: tt("Açılınca ana sayfada renkli çipler var; her biri bir bölüm, tıkla içine gir. Çipleri sürükleyip sıralar, istemediğini gizlersin; İş, Oyun gibi profiller kurarsın. Adayı da üstteki tutamaçtan tutup ekranda istediğin yere taşırsın."),
+    title: tt("Ana sayfa ve modüller"),
+    text: tt("Açılınca solda dikey bir çubuk var: Ana sayfa, Modüller, Sohbet ve Ara. Ana sayfada en çok kullandığın modüller büyük kartlarda; bir modüle girince sol üstteki okla döndüğün yere dönersin. Sağ üstte kurulu alarmın, hava ve saat; oradaki düğmeyle ada tam ekran olur. İş, Oyun gibi profiller kurar, adayı istediğin yere taşırsın."),
     color: ACCENT.purple,
     antic: "nod",
     Art: ModulesArt,
+  },
+  {
+    title: tt("Nook Studio"),
+    text: tt("Ayarlar, görünümüm, kısayol tuşların, karnen, yıl özetin ve yama notları ayrı bir pencerede: Nook Studio. Adadaki dişliye ya da sağ alttaki tepsi simgesinden Nook Studio'ya bas; ada kapanır, Studio açılır. Bu tanıtım da orada, Ayarlar › Hakkında'da."),
+    color: ACCENT.gray,
+    antic: "wink",
+    Art: StudioArt,
   },
   {
     title: tt("Dosyaları bana yedir"),
@@ -65,7 +73,7 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Klavyeden çağır"),
-    text: tt("Fareye uzanmana gerek yok. Bu kısayollar her yerde çalışır; istersen Ayarlar'dan değiştirebilirsin."),
+    text: tt("Fareye uzanmana gerek yok. Bu kısayollar her yerde çalışır; istersen Studio › Ayarlar › Kısayollar'dan değiştirirsin."),
     color: ACCENT.yellow,
     antic: "suspicious",
     Art: KeysArt,
@@ -103,7 +111,7 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Günün düzeni bende"),
-    text: tt("Takvime etkinlik ekle, yaklaşınca çentikte geri sayarım. Alarm, sen kapatana kadar bekler; oyundaysan çıkınca seni bulur. Pomodoro'dayken YouTube'a kaçarsan cama vurup kalan süreyi gösteririm."),
+    text: tt("Takvime etkinlik ekle, yaklaşınca çentikte geri sayarım. Hatırlatıcı'ya “çamaşırı as 20 dk” yaz, vakti gelince çalarım. Alarm, sen kapatana kadar bekler; oyundaysan çıkınca seni bulur. Pomodoro'dayken YouTube'a kaçarsan cama vururum. Bilgisayarı belli bir saatte kapatmamı da isteyebilirsin (Kontrol › Zamanlı kapat)."),
     color: ACCENT.blue,
     antic: "note",
     Art: DayArt,
@@ -124,7 +132,7 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Beni kendine göre giydir"),
-    text: tt("Bana bir isim ver; bulut, kalp, damla gibi bir gövde, vinil ya da peluş doku ve renk seç. Gözlük, kep, tavşan kulağı, filiz, çiçek tokası da takarım. Üzerimize gelip tanış; Sağ tık › Görünüm'den istediğin zaman değiştirirsin."),
+    text: tt("Bana bir isim ver; Studio › Görünüm'de 80'den fazla hazır Nook var (astronot, kral, korsan, çilek…) ya da parça parça seç: gövde, doku, renk, gözler, gözlük, şapka, boyun ve yüz süsü. Üzerimize gelip tanış!"),
     color: ACCENT.pink,
     antic: "spin",
     Art: LookArt,
@@ -151,7 +159,7 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Hazırız!"),
-    text: tt("Artık seninleyim. Bu tanıtımı istediğin zaman Ayarlar'daki \"Nook nedir?\" ile yeniden açabilirsin."),
+    text: tt("Artık seninleyim. Bu tanıtımı istediğin zaman Nook Studio › Ayarlar › Hakkında'dan yeniden açabilirsin."),
     color: ACCENT.green,
     antic: "love",
     centered: true,
@@ -169,7 +177,7 @@ export function useTourSteps() {
 }
 
 /** Adım metni: {0} yerine kullanıcının o anki kısayolu */
-function stepText(step: Step, settings: Settings) {
+export function stepText(step: Step, settings: Settings) {
   if (!step.keys) return step.text;
   const combo = settings[step.keys];
   return combo ? step.text.replace("{0}", prettyKeys(combo)) : (step.noKeys ?? step.text.replace("{0}", tt("kısayol")));

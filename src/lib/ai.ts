@@ -275,12 +275,15 @@ export function pickLiteModel(models: ModelInfo[]): string | null {
   return models.find((m) => /flash-lite/i.test(m.id) && !/(preview|exp|latest)/i.test(m.id))?.id ?? models.find((m) => /flash-lite/i.test(m.id))?.id ?? null;
 }
 
+/** Hızlı istekte modelin kabul ettiği "düşünme" ayarı (null = ayarsız) */
+const noThinkCfg = new Map<string, object | null>();
+
 /**
  * Akışsız tek seferlik istek; düz metin cevabı döner. `fast`: model düşünmeden cevaplasın
  * (desteklemeyen model reddederse düşünme ayarı olmadan bir kez daha denenir).
  */
 export async function generateOnce(key: string, model: string, parts: Part[], system?: string, signal?: AbortSignal, fast = false): Promise<string> {
-  const send = (noThinking: boolean) =>
+  const send = (thinking: object | null) =>
     fetch(`${BASE}/models/${model}:generateContent`, {
       method: "POST",
       signal: signal ?? AbortSignal.timeout(fast ? 15_000 : 30_000),
@@ -288,11 +291,20 @@ export async function generateOnce(key: string, model: string, parts: Part[], sy
       body: JSON.stringify({
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
         contents: [{ role: "user", parts }],
-        generationConfig: { temperature: 0.2, ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+        generationConfig: { temperature: 0.2, ...(thinking ? { thinkingConfig: thinking } : {}) },
       }),
     });
-  let r = await send(fast);
-  if (fast && r.status === 400) r = await send(false);
+  // Gemini 3+ düşünmeyi `thinkingBudget: 0` ile kapatmıyor (reddediyor ya da yine düşünüyor, çeviri 10+ sn
+  // sürüyordu): önce en az düşünme seviyesi, olmazsa bütçe 0, o da olmazsa ayarsız. Tutan ayar modele göre hatırlanır.
+  const tries: (object | null)[] = !fast ? [null] : (noThinkCfg.has(model) ? [noThinkCfg.get(model)!] : /gemini-([3-9]|\d\d)/.test(model) ? [{ thinkingLevel: "minimal" }, { thinkingBudget: 0 }, null] : [{ thinkingBudget: 0 }, null]);
+  let r!: Response;
+  for (const cfg of tries) {
+    r = await send(cfg);
+    if (r.status !== 400) {
+      if (fast && r.ok) noThinkCfg.set(model, cfg);
+      break;
+    }
+  }
   if (!r.ok) throw await apiError(r);
   const j = (await r.json()) as { candidates?: { content?: { parts?: Part[] } }[] };
   return (j.candidates?.[0]?.content?.parts ?? [])

@@ -1156,7 +1156,7 @@ function Fit({ w, h, children }: { w: number; h: number; children: React.ReactNo
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.min(1, (el.clientWidth - 20) / w, (el.clientHeight - 12) / h)));
+    const ro = new ResizeObserver(() => setScale(Math.min(1.8, (el.clientWidth - 20) / w, (el.clientHeight - 12) / h)));
     ro.observe(el);
     return () => ro.disconnect();
   }, [w, h]);

@@ -10,6 +10,10 @@ import { tt } from "../lib/i18n";
 
 /** Argus'un kendi mavisi (logodaki geçiş) */
 export const ARGUS_BLUE = "#1a8cff";
+/** Argus'un uygulamadaki renkleri: açık camgöbeği ve koyu mavi (geçişin iki ucu) */
+export const ARGUS_CYAN = "#00c0fa";
+export const ARGUS_DEEP = "#015eea";
+export const ARGUS_GRADIENT = `linear-gradient(100deg, ${ARGUS_CYAN}, ${ARGUS_DEEP})`;
 
 const FEATURES: { icon: LucideIcon; text: string }[] = [
   { icon: CalendarDays, text: tt("İzlediğin dizi ve filmleri, bölüm bölüm takip et") },

@@ -30,6 +30,16 @@ const FOLLOW_POLL: Duration = Duration::from_millis(200);
 /// İmleç yeni ekranda bu kadar kalırsa ada oraya taşınır (kenardan geçerken zıplamasın).
 const FOLLOW_DWELL: Duration = Duration::from_millis(350);
 const MONITOR_REFRESH: Duration = Duration::from_secs(5);
+/// Bir karede bundan uzun sıçrayış (imleç ışınlandı, ekran değişti) yol sayılmaz
+const MAX_STEP_PX: f64 = 400.0;
+
+/// Açılıştan beri imlecin ekranda aldığı yol (fiziksel piksel) — Nook'un günlüğü için
+pub static MOUSE_PX: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[tauri::command]
+pub fn mouse_travel() -> u64 {
+    MOUSE_PX.load(Ordering::Relaxed)
+}
 
 #[derive(Clone, Serialize)]
 struct CursorPayload {
@@ -117,6 +127,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut monitors: Vec<Monitor> = Vec::new();
             let mut monitors_at = Instant::now() - MONITOR_REFRESH;
             let mut candidate: Option<(Monitor, Instant)> = None;
+            let mut last_pos: Option<(f64, f64)> = None;
 
             loop {
                 // Ada sürüklenip bırakıldı: yeni yeri kaydettir
@@ -126,6 +137,13 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     crate::window::finish_drag(&app, &label);
                 }
                 if let Some((px, py)) = cursor_position(&app) {
+                    if let Some((lx, ly)) = last_pos {
+                        let d = ((px - lx).powi(2) + (py - ly).powi(2)).sqrt();
+                        if d < MAX_STEP_PX {
+                            MOUSE_PX.fetch_add(d.round() as u64, Ordering::Relaxed);
+                        }
+                    }
+                    last_pos = Some((px, py));
                     let windows: Vec<_> = shared.windows.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
                     let forced = shared.forced.lock().unwrap().clone();
                     // Parolalı kalkan açıkken hiçbir pencere (ada, yan kart) açılmaz/tıklanmaz

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { clearBackground, EVENTS, guardAlert, isPrimary, subscribe, type ForegroundPayload } from "../lib/bridge";
 import { matchSite } from "../lib/guard";
-import { canGoOut, endPerch, haul, haulText, perchReturned, startOuting, tryPerch } from "../lib/outings";
+import { camp, canGoOut, endPerch, haul, haulText, isNight, perchReturned, startOuting, tryPerch } from "../lib/outings";
 import { isSleeping, isWorking, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 import { islandModeOf } from "./useIslandMode";
@@ -43,18 +43,30 @@ export function useOutings() {
       const s = useNook.getState();
       if (asleep) {
         if (s.outing === "hang") s.setOuting(null);
-        if (s.media?.playing || islandModeOf(s) !== "collapsed" || !canGoOut("fish")) return;
+        // Gece kamp ateşi, gündüz balık
+        const kind = isNight() ? "camp" : "fish";
+        if (s.media?.playing || islandModeOf(s) !== "collapsed" || !canGoOut(kind)) return;
         haul.stars = 0;
         haul.trash = 0;
-        startOuting("fish");
+        camp.mallows = 0;
+        startOuting(kind);
         window.clearTimeout(fishTimer);
         fishTimer = window.setTimeout(() => {
-          if (useNook.getState().outing === "fish") useNook.getState().setOuting(null);
+          const o = useNook.getState().outing;
+          if (o === "fish" || o === "camp") useNook.getState().setOuting(null);
         }, FISH_MAX);
         return;
       }
       window.clearTimeout(fishTimer);
-      if (s.outing === "fish") s.setOuting(null);
+      if (s.outing === "fish" || s.outing === "camp") s.setOuting(null);
+      if (camp.mallows) {
+        const n = camp.mallows;
+        camp.mallows = 0;
+        window.setTimeout(() => {
+          useNook.getState().pushToast({ kind: "fish", title: tt("Sen yokken kamp ateşi yaktım!"), detail: n > 1 ? tt("{0} marshmallow kızarttım, biri biraz yandı", n) : tt("Bir marshmallow kızarttım"), ms: 6000 });
+          playAntic("giggle");
+        }, 1800);
+      }
       // Dönünce: "hoş geldin" kartından sonra neler tuttuğunu anlatır
       const text = haulText();
       if (text) {

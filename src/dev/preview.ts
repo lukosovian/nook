@@ -6,9 +6,10 @@
 import { MotionGlobalConfig } from "motion/react";
 import { dayKey, useNook, type Tab } from "../store/nook";
 import { useArgus, type ArgusItem } from "../lib/argus";
+import { usePowerTimer } from "../lib/powerTimer";
 import { useClaude, type ClaudeAsk } from "../lib/claude";
 
-const TABS: Tab[] = ["home", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "settings", "year", "claude", "hum"];
+const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "hum"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -55,12 +56,15 @@ function demoClaude(mode: string, params: URLSearchParams) {
     plan: { fiveHour: { usedPct: 37, resetsAt: now + 2 * 3600_000 + 14 * 60_000 }, sevenDay: { usedPct: 62, resetsAt: now + 3 * 86_400_000 }, updatedAt: now - 60_000 },
     asks: ask ? [ask] : [],
     sessions: {
-      a: { ...base, id: "a", project: "Nook", cwd: "C:/Users/OEM/Desktop/Nook", state: ask ? "waiting" : "working", action: ask ? "Onay bekliyor · npm run tauri build" : "Düzenliyor · ClaudePanel.tsx", prompt: "Claude Code entegrasyonunu ekle", updatedAt: now - 20_000, edits: 12, commands: 5, files: ["ClaudePanel.tsx", "claude.rs", "Panels.tsx"] },
+      a: { ...base, id: "a", project: "Nook", cwd: "C:/Users/OEM/Desktop/Nook", state: ask ? "waiting" : CLAUDE_IDLE.includes(mode) && !params.has("claudework") ? "done" : "working", action: ask ? "Onay bekliyor · npm run tauri build" : "Düzenliyor · ClaudePanel.tsx", prompt: "Claude Code entegrasyonunu ekle", updatedAt: now - 20_000, edits: 12, commands: 5, files: ["ClaudePanel.tsx", "claude.rs", "Panels.tsx"] },
       b: { ...base, id: "b", project: "argus", cwd: "C:/Users/OEM/Desktop/Argus", state: "done", action: "Bitti", prompt: "Takvimdeki boş günleri gizle", reply: "Boş günler artık takvimde görünmüyor; filtre ayarlara da eklendi.", updatedAt: now - 9 * 60_000, edits: 3, commands: 2, files: ["calendar.js"] },
     },
   });
   if (ask) useNook.setState({ claudeCard: true });
 }
+
+/** Kapalı ada önizlemeleri: örnek Claude oturumu ve yaklaşan etkinlik kapsülü ezmesin */
+const CLAUDE_IDLE = ["music", "collapsed", "focusmini", "fish", "camp", "sleepcap", "split", "home", "homeq"];
 
 const DEMO_NOTE = "# Hafta\n- [x] Market: **süt**, ekmek\n- [ ] Pazartesi sunum provası\n> `npm run build` unutma";
 
@@ -69,6 +73,8 @@ export function applyPreview(mode: string) {
   const tr = (new URLSearchParams(location.search).get("lang") ?? "tr") === "tr";
   if (!new URLSearchParams(location.search).has("noargus")) demoArgus();
   demoClaude(mode, new URLSearchParams(location.search));
+  // Zamanlı kapatma kurulu görünsün
+  if (params0.has("timeron")) usePowerTimer.setState({ timer: { at: Date.now() + 42 * 60_000, action: "shutdown", from: "phone" } });
   document.documentElement.style.background = "#3a4a5c";
   // Ekran görüntüsü animasyonun ortasında çekilmesin
   if (new URLSearchParams(location.search).has("still")) {
@@ -144,7 +150,7 @@ export function applyPreview(mode: string) {
     padId: "p1",
     stopwatch: mode === "watchmini" || params0.has("sw") ? { startedAt: Date.now() - 754_300, acc: 0, laps: params0.has("sw") ? [512_400, 260_100] : [] } : null,
     extSyncedAt: 0,
-    extEvents: [
+    extEvents: CLAUDE_IDLE.includes(mode) && !params0.has("event") ? [] : [
       { id: "e1", day: dayKey(), time: "14:00", title: "Sprint planlama", start: Date.now() + 12 * 60_000, end: Date.now() + 72 * 60_000, allDay: false },
       { id: "e2", day: dayKey(), time: "", title: "Annemin doğum günü", start: Date.now(), end: Date.now() + 86_400_000, allDay: true },
     ],
@@ -168,10 +174,18 @@ export function applyPreview(mode: string) {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const j = i % 7;
         const k = i < 7 ? 1 : 0.7;
-        return [key, { music: 60 + j * 9, focus: Math.round([45, 90, 20, 75, 0, 110, 60][j] * k), pomodoros: Math.round([2, 4, 1, 3, 0, 4, 2][j] * k), game: [30, 0, 120, 0, 200, 15, 40][j], active: [260, 410, 180, 380, 90, 450, 300][j], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, water: [3, 5, 2, 4, 6, 1, 4][j] }];
+        return [key, { music: 60 + j * 9, focus: Math.round([45, 90, 20, 75, 0, 110, 60][j] * k), pomodoros: Math.round([2, 4, 1, 3, 0, 4, 2][j] * k), game: [30, 0, 120, 0, 200, 15, 40][j], active: [260, 410, 180, 380, 90, 450, 300][j], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, water: [3, 5, 2, 4, 6, 1, 4][j], mouse: 41_000 + j * 9000 }];
       }),
     ),
     weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() },
+    diary: (() => {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      return {
+        [dayKey(y)]: { text: "Bugün Luko Figma'ya öyle bir daldı ki farenin pili %7'ye kadar düştü, ben de bir ara pil yerine ona kahve önerecektim. Araya iki bölüm Mehmed sıkıştırdı, sonra suçluluk duygusuyla dört saat VS Code'a gömüldü. İmleç bugün tam 1,3 km yürüdü; ben olsam yorulurdum. Neyse ki beş bardak suyu unutmadı, aferin ona.", at: Date.now() - 9 * 3600_000 },
+        [dayKey()]: { text: "Sabah Spotify açıldı, öğlen Discord, akşam yine Figma: Luko'nun günü bir üçgen gibiydi. Ben de köşemde oturup ona su hatırlattım, iki kez dinledi. Fare bugün 900 metre yol yaptı, benden daha sportif.", at: Date.now() - 600_000 },
+      };
+    })(),
     privacy: { mic: mode === "privacy" || TABS.includes(mode as Tab) ? ["Discord"] : [], camera: [] },
   });
   // ?lyrics → şarkı sözleri açık · ?live → yayın maskesi · yıl özeti örnek verisi
@@ -231,6 +245,18 @@ export function applyPreview(mode: string) {
     st.addEvent({ day: d(0), time: "19:00", title: "Halı saha", remind: 60 });
     st.addEvent({ day: d(3), time: "14:00", title: "Diş hekimi", remind: 1440 });
     st.addEvent({ day: d(9), time: "", title: "Kira", remind: 0 });
+  }
+  if (mode === "remind" && !useNook.getState().events.length) {
+    const st = useNook.getState();
+    const at = (min: number) => {
+      const x = new Date(Date.now() + min * 60_000);
+      return { day: dayKey(x), time: x.toTimeString().slice(0, 5) };
+    };
+    st.addEvent({ ...at(12), title: "Çamaşırı as", remind: 0, reminder: true });
+    st.addEvent({ ...at(95), title: "İlacını iç", remind: 0, reminder: true });
+    st.addEvent({ ...at(60 * 20), title: "Faturayı öde", remind: 0, reminder: true });
+    st.addEvent({ day: dayKey(new Date(Date.now() + 86_400_000)), time: "10:30", title: "Sprint toplantısı", remind: 10 });
+    st.addEvent({ ...at(-90), title: "Kargoyu al", remind: -1, reminder: true });
   }
   // ?scroll=px → görünüm panelinin aşağısı
   // ?askclip → Pano'daki ilk metin çeviri izni bekliyor (Gemini anahtarı yok)
@@ -294,13 +320,10 @@ export function applyPreview(mode: string) {
         ],
       },
     });
-  } else if (mode === "report") {
-    useNook.setState({ media: null });
-    void import("../lib/report").then((m) => m.openReport());
-  } else if (mode === "notes") {
-    // ?v=0.2.26 → o sürümün notu
-    useNook.setState({ media: null });
-    void import("../lib/notes").then((m) => m.openNotes(params.get("v") ?? undefined));
+  } else if (mode === "report" || mode === "notes") {
+    // Karne ve yama notları artık Nook Studio'da: ?preview=notes&v=0.3.0 → Studio'nun o notu
+    const v = params.get("v");
+    location.replace(`/?preview=studio&still#${mode}${mode === "notes" && v ? `:${v}` : ""}`);
   } else if (mode === "tour") {
     useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
   } else if (TABS.includes(mode as Tab)) {
@@ -335,7 +358,7 @@ export function applyPreview(mode: string) {
     // ?big → tam ekran
     if (params.has("big")) window.setTimeout(() => void import("../lib/big").then((m) => m.enterBig()), 100);
     // ?bigstate → büyük adanın düzeni doğrudan (tarayıcıda pencere büyütülemez)
-    if (params.has("bigstate")) useNook.setState({ big: { width: window.innerWidth - 40, height: window.innerHeight - 20 } });
+    if (params.has("bigstate")) useNook.setState({ big: { width: Math.min(1360, window.innerWidth - 56), height: Math.min(820, window.innerHeight - 48) } });
     // Panels açılınca çalan müzik yüzünden medyaya geçer; istenen sekmeye geri dön
     window.setTimeout(() => useNook.getState().setTab(mode as Tab), 50);
   } else if (mode.startsWith("osd")) {
@@ -363,8 +386,15 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, ringing: { id: "r", hour: 7, minute: 30, label: tr ? "Toplantı" : "Meeting", repeat: "once", enabled: false, next: null } });
   } else if (mode === "feeding") {
     useNook.setState({ media: null, mood: "hungry" });
-  } else if (mode === "hang" || mode === "fish") {
+  } else if (mode === "hang" || mode === "fish" || mode === "camp") {
     useNook.setState({ media: null, outing: mode });
+  } else if (mode === "sleepcap") {
+    useNook.setState({ media: null, asleep: true });
+  } else if (mode === "claudemini") {
+    useNook.setState({ media: null });
+  } else if (mode === "split") {
+    // Müzik çalarken Pomodoro: ada bölünür
+    useNook.setState({ focus: { phase: "work", endsAt: Date.now() + 14 * 60_000, left: 0, total: 25 * 60_000, round: 1 } });
   } else if (mode === "guard") {
     useNook.setState({ media: null, guard: { site: params.get("site") ?? "YouTube" }, focus: { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 1 } });
   } else if (mode === "focusmini") {
@@ -385,6 +415,10 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, toasts: [{ id: "n", kind: "notify", title: "Ayşe", detail: "Akşam maça geliyor musun?", ms: 99999 }] });
   } else if (mode === "download") {
     useNook.setState({ media: null, downloads: [{ id: "d", name: "kurulum.exe", received: 42e6, speed: 8.4 * 1024 ** 2 }] });
+  } else if (mode === "updating" || mode === "restarting") {
+    // Güncelleme kapsülü: ?p=yüzde
+    useNook.setState({ media: null });
+    void import("../lib/update").then((m) => m.useUpdate.setState({ available: "0.3.1", progress: mode === "restarting" ? 100 : Number(params.get("p") ?? 42), restarting: mode === "restarting" }));
   }
   // "music": kapalı ada + mini oynatıcı (varsayılan veriler)
 

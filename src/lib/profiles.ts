@@ -17,7 +17,7 @@ export interface ProfileDef {
 export const ALL_PROFILE: ProfileDef = { id: "all", label: tt("Hepsi"), color: ACCENT.teal, ids: [] };
 
 export const DEFAULT_PROFILES: ProfileDef[] = [
-  { id: "work", label: tt("İş"), color: ACCENT.blue, ids: ["focus", "note", "calendar", "clip"], only: true },
+  { id: "work", label: tt("İş"), color: ACCENT.blue, ids: ["focus", "note", "calendar", "remind", "clip"], only: true },
   { id: "game", label: tt("Oyun"), color: ACCENT.red, ids: ["report", "media", "stats", "play"] },
   { id: "fun", label: tt("Eğlence"), color: ACCENT.pink, ids: ["media", "argus", "play", "look"] },
 ];

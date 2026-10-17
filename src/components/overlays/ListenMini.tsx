@@ -6,21 +6,25 @@ import { ACCENT } from "../ui/primitives";
 
 const BARS = 5;
 
-/** Sesli komut dinlenirken: solda mikrofon, sağda sesin şiddetine göre zıplayan çubuklar. */
-export function ListenMini() {
+/** Sesli komut dinlenirken: solda mikrofon, sağda sesin şiddetine göre zıplayan çubuklar. `demo`: Studio önizlemesi (uydurma ses) */
+export function ListenMini({ demo }: { demo?: boolean }) {
   const bars = useRef<(HTMLSpanElement | null)[]>([]);
 
   useEffect(() => {
     // Seviye Rust'tan ~14 Hz gelir; her çubuk biraz farklı tepki verir
-    return subscribe<number>(EVENTS.voiceLevel, (level) => {
+    const draw = (level: number) =>
       bars.current.forEach((el, i) => {
         if (!el) return;
         const shape = [0.55, 0.85, 1, 0.8, 0.5][i];
         const h = 3 + Math.min(1, level * shape * (0.75 + Math.random() * 0.5)) * 13;
         el.style.height = `${h}px`;
       });
-    });
-  }, []);
+    if (demo) {
+      const t = window.setInterval(() => draw(0.3 + Math.random() * 0.7), 90);
+      return () => window.clearInterval(t);
+    }
+    return subscribe<number>(EVENTS.voiceLevel, draw);
+  }, [demo]);
 
   return (
     <motion.div

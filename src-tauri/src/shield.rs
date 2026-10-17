@@ -139,6 +139,11 @@ fn state() -> MuteState {
 
 const NO_STATE: MuteState = MuteState { mic: false, call: false, call_avail: false };
 
+/// Kalkan şu an açık mı (telefon durum için sorar)
+pub fn is_on(app: &AppHandle) -> bool {
+    !open_labels(app).is_empty()
+}
+
 fn open_labels(app: &AppHandle) -> Vec<String> {
     app.webview_windows().into_keys().filter(|l| l.starts_with(PREFIX)).collect()
 }

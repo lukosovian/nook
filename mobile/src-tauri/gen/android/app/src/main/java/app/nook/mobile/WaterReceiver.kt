@@ -21,6 +21,11 @@ import org.json.JSONObject
 class WaterReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val ctx = context.applicationContext
+        // HyperOS bildirim dinleyicisini sık sık bırakıyor (izin açık ama hiçbir bildirim gelmiyor): bu alarm
+        // düzenli çalıştığından her seferinde yeniden bağlanmayı ister (süreç öldürülünce "bağlı" kaydı eski kalıyor,
+        // ona bakılmaz), bekleyen bildirimleri de gönderir
+        NookNotifService.rebind(ctx)
+        PcLink.flushOutbox(ctx)
         val pending = goAsync()
         PcLink.io.execute {
             try {

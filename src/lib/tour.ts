@@ -2,7 +2,8 @@
  * "Nook nedir?" tanıtımı: pencere önce büyür, sonra ada ekrana yayılır.
  * Kapanırken tersi: ada küçülür, animasyon bitince pencere eski boyutuna döner.
  */
-import { setWindowSize } from "./bridge";
+import { emitTo } from "@tauri-apps/api/event";
+import { inTauri, isPrimary, setWindowSize } from "./bridge";
 import { latestNote } from "./notes";
 import { TOUR_WINDOW } from "./layout";
 import { useNook } from "../store/nook";
@@ -15,6 +16,11 @@ const SHRINK_AFTER_MS = 700;
 let shrinkTimer = 0;
 
 export async function startTour() {
+  // Studio'dan (ya da öbür ekrandaki adadan) istenince tanıtımı ana ada açar
+  if (!isPrimary) {
+    if (inTauri) void emitTo("island", "nook://tray", "tour").catch(() => {});
+    return;
+  }
   window.clearTimeout(shrinkTimer);
   const s = useNook.getState();
   // Adımlardaki küçük Nook'lar ekrana girerken çizilip animasyonu takmasın

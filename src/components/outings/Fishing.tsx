@@ -23,7 +23,11 @@ const JUNK = [tt("eski_ödev_SON_son2.docx"), tt("Yeni klasör (7)"), "fatura_20
 type Catch = { kind: "star" | "trash"; name: string };
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
-export function Fishing({ width }: { width: number }) {
+/**
+ * `width`/`height`: kapalı adanın ölçüsü. Nook adanın içinde, sağ ucunda oturur; olta adanın
+ * kenarından dışarı uzanır, misina masaüstüne sarkar (adanın altındaki boşlukta Nook kalmaz).
+ */
+export function Fishing({ width, height = 34 }: { width: number; height?: number }) {
   const { look, color } = useMyLook();
   const [present, safeToRemove] = usePresence();
   const [face, setFace] = useState<Expression>("drowsy");
@@ -32,13 +36,13 @@ export function Fishing({ width }: { width: number }) {
   const [biting, setBiting] = useState(false);
   const alive = useRef(true);
 
-  // Nook adanın sağ alt köşesinde, kenara oturmuş
-  const cx = width / 2 - 4;
-  const cy = 6;
+  // Nook adanın içinde, sağ ucunda (kap üst kenardan değil, adanın alt kenarından ölçülür)
+  const cx = width / 2 - 22;
+  const cy = -height / 2 + 1;
   const hx = cx + 16.5 * K * 0.8;
   const hy = cy + 3;
 
-  const angle = useMotionValue(-120);
+  const angle = useMotionValue(-70);
   const depth = useMotionValue(0);
   const dip = useMotionValue(0);
   const tipX = useTransform(angle, (a) => hx + Math.cos(rad(a)) * ROD);
@@ -55,8 +59,9 @@ export function Fishing({ width }: { width: number }) {
       while (alive.current) {
         // Oltayı savur: geriye al, öne at, şamandıra suya iner
         setFace("idle");
-        await animate(angle, -105, { duration: 0.35, ease: "easeOut" });
-        await animate(angle, -38, { duration: 0.22, ease: "easeIn" });
+        // Olta adanın kenarından dışarı: yukarı kalkar, aşağı-sağa savrulur
+        await animate(angle, -62, { duration: 0.35, ease: "easeOut" });
+        await animate(angle, 22, { duration: 0.22, ease: "easeIn" });
         await animate(depth, REST, { type: "spring", stiffness: 60, damping: 9 });
         if (!alive.current) return;
         setFace("drowsy");
@@ -71,7 +76,7 @@ export function Fishing({ width }: { width: number }) {
         const got: Catch = Math.random() < STAR_CHANCE ? { kind: "star", name: tt("Parlak yıldız!") } : { kind: "trash", name: JUNK[Math.floor(Math.random() * JUNK.length)] };
         setHooked(got);
         // Sar: olta kalkar, ip kısalır
-        void animate(angle, -62, { duration: 0.5 });
+        void animate(angle, -8, { duration: 0.5 });
         await animate(depth, 0, { duration: 0.85, ease: [0.4, 0, 0.6, 1] });
         if (!alive.current) return;
         setHooked(null);
@@ -96,15 +101,15 @@ export function Fishing({ width }: { width: number }) {
     if (present) return;
     alive.current = false;
     void animate(depth, 0, { duration: 0.3 });
-    void animate(angle, -120, { duration: 0.3 }).then(safeToRemove);
+    void animate(angle, -70, { duration: 0.3 }).then(safeToRemove);
   }, [present, angle, depth, safeToRemove]);
 
   return (
     <motion.div
       className="pointer-events-none absolute left-1/2 top-full"
       style={{ width: 0, height: 0 }}
-      initial={{ opacity: 0, x: -30 }}
-      animate={{ opacity: present ? 1 : 0, x: 0, transition: present ? { duration: 0.35 } : { duration: 0.25, delay: 0.25 } }}
+      initial={{ opacity: 0, x: -14 }}
+      animate={{ opacity: present ? 1 : 0, x: 0, transition: present ? { duration: 0.35, delay: 0.15 } : { duration: 0.25, delay: 0.25 } }}
     >
       {/* Misina */}
       <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1">
@@ -161,7 +166,7 @@ export function Fishing({ width }: { width: number }) {
           <motion.div
             key="shown"
             className="absolute flex flex-col items-center"
-            style={{ left: cx - 60, top: cy + SIZE / 2 + 6, width: 120 }}
+            style={{ left: cx + 6, top: 10, width: 120 }}
             initial={{ opacity: 0, y: -10, scale: 0.4 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shown.kind === "star" ? { opacity: 0, y: -14, scale: 0.3, transition: { duration: 0.35 } } : { opacity: 0, x: 70, y: 40, rotate: 200, transition: { duration: 0.5, ease: "easeIn" } }}

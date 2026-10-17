@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy, Files, Languages, Pencil, Pin, Pipette, Search, X } from "lucide-react";
+import { Check, Copy, Languages, Pencil, Pin, Pipette, Search, X } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../../hooks/useAntics";
 import { clipboardWriteFiles, clipboardWriteImage, copyText, inTauri, setInteractive } from "../../lib/bridge";
@@ -99,7 +99,7 @@ export function ClipboardPanel() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
                     transition={spring.pop}
-                    className="group flex h-7 items-center rounded-full border"
+                    className="group flex h-8 items-center rounded-[11px] border"
                     style={{ background: tintBg(c.color!, 12), borderColor: tintBg(c.color!, 35) }}
                   >
                     <motion.button
@@ -109,7 +109,7 @@ export function ClipboardPanel() {
                       title={tt("{0} — kopyala", formatColor(c.color!, fmt, noHash))}
                       className="flex h-full items-center gap-1.5 py-1 pl-1 pr-1.5"
                     >
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: c.color!, boxShadow: `0 0 8px -1px ${c.color}` }}>
+                      <span className="flex h-6 w-6 items-center justify-center rounded-[8px]" style={{ background: c.color!, boxShadow: `0 0 10px -2px ${c.color}` }}>
                         <AnimatePresence>
                           {copied === c.id && (
                             <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
@@ -135,13 +135,13 @@ export function ClipboardPanel() {
               </AnimatePresence>
             </div>
           )}
-          <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-1.5">
             <AnimatePresence initial={false}>
               {items.map((c) =>
                 editing === c.id ? (
                   <EditRow key={c.id} clip={c} onDone={() => setEditing(null)} />
                 ) : (
-                  <ClipRow key={c.id} clip={c} copied={copied} onCopy={copy} onEdit={() => setEditing(c.id)} />
+                  <ClipCard key={c.id} clip={c} copied={copied} onCopy={copy} onEdit={() => setEditing(c.id)} />
                 ),
               )}
             </AnimatePresence>
@@ -152,50 +152,74 @@ export function ClipboardPanel() {
   );
 }
 
-function ClipRow({ clip: c, copied, onCopy, onEdit }: { clip: ClipItem; copied: string | null; onCopy: (c: ClipItem, tr?: boolean) => void; onEdit: () => void }) {
+/** Kaydın türü: kartın sol üstündeki rozet ve rengi */
+function clipType(c: ClipItem): { label: string; color: string; mono: boolean } {
+  const kind = c.kind ?? "text";
+  if (kind === "image") return { label: tt("Görsel"), color: ACCENT.pink, mono: false };
+  if (kind === "files") return { label: tt("Dosya"), color: ACCENT.teal, mono: false };
+  const t = c.text.trim();
+  if (/^(https?:\/\/|www\.)\S+$/i.test(t)) return { label: tt("Bağlantı"), color: ACCENT.blue, mono: true };
+  if (/^[\w.+-]+@[\w-]+\.[\w.]+$/.test(t)) return { label: tt("E-posta"), color: ACCENT.blue, mono: false };
+  if (/^[+\d\s().,-]{6,}$/.test(t)) return { label: tt("Sayı"), color: ACCENT.yellow, mono: true };
+  if (/[{};]|=>|^\s*(npm|npx|git|cd|pip|cargo|sudo|\$)\s|^\s*(const|let|import|function|def|class|SELECT)\b/m.test(t)) return { label: tt("Kod"), color: ACCENT.orange, mono: true };
+  return { label: tt("Metin"), color: ACCENT.purple, mono: false };
+}
+
+/** Pano kartı: tür rozeti, iki satırlık içerik (görselde önizleme), geldiği uygulama; üstüne gelince sabitle/düzenle/sil */
+function ClipCard({ clip: c, copied, onCopy, onEdit }: { clip: ClipItem; copied: string | null; onCopy: (c: ClipItem, tr?: boolean) => void; onEdit: () => void }) {
   const { pinClip, removeClip } = useNook.getState();
   const kind = c.kind ?? "text";
+  const type = clipType(c);
   const tip = c.app ? `${kind === "files" ? (c.paths ?? []).join("\n") : c.text}\n— ${c.app}` : kind === "files" ? (c.paths ?? []).join("\n") : c.text;
+  const done = copied === c.id;
+  const image = kind === "image" && c.path && inTauri;
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: 20 }}
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
       transition={spring.pop}
-      className="group overflow-hidden rounded-[10px] bg-well"
-      style={c.pinned ? { boxShadow: `inset 0 0 0 1px ${tintBg(ACCENT.yellow, 30)}` } : undefined}
+      className={`group relative flex min-w-0 flex-col overflow-hidden rounded-[13px] border ${c.translation || (c.askTranslate && !c.translation) ? "col-span-2" : ""}`}
+      style={{ background: done ? tintBg(ACCENT.green, 10) : "rgb(255 255 255 / 0.035)", borderColor: done ? tintBg(ACCENT.green, 45) : c.pinned ? tintBg(ACCENT.yellow, 35) : "rgb(255 255 255 / 0.06)" }}
     >
-      <div className="flex items-center transition-colors hover:bg-well-hi">
-        <button onClick={() => onCopy(c)} title={tip} className={`flex min-w-0 flex-1 items-center gap-2 pl-2.5 text-left ${kind === "image" ? "h-12" : "h-8"}`}>
-          {kind === "image" && c.path && inTauri && (
-            <img src={convertFileSrc(c.path)} alt="" draggable={false} className="h-9 w-14 shrink-0 rounded-[6px] object-cover" />
-          )}
-          {kind === "files" && <Files size={13} strokeWidth={2.2} className="shrink-0" style={{ color: tintText(ACCENT.teal) }} />}
-          <span className="min-w-0 flex-1 truncate text-[12px] text-label">
-            {kind === "image" ? tt("Görsel · {0}", c.text) : kind === "files" ? ((c.paths?.length ?? 0) > 1 ? tt("{0} dosya · {1}", c.paths!.length, c.text) : c.text) : c.text.replace(/\s+/g, " ")}
+      <button onClick={() => onCopy(c)} title={tip} className="relative flex min-h-[66px] flex-col px-2.5 pb-2 pt-2 text-left transition-colors hover:bg-white/[0.03]">
+        {image && (
+          <>
+            <img src={convertFileSrc(c.path!)} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover opacity-55" />
+            <span className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.75))" }} />
+          </>
+        )}
+        <span className="relative flex items-center gap-1">
+          <span className="rounded-[5px] px-1.5 py-[1px] text-[9px] font-bold" style={{ background: tintBg(type.color, 20), color: tintText(type.color) }}>
+            {type.label}
           </span>
-          {copied === c.id && <Check size={13} strokeWidth={3} style={{ color: ACCENT.green }} className="shrink-0" />}
-        </button>
-        {/* Üzerine gelince: sabitle, düzenle, sil */}
-        <div className="flex shrink-0 items-center pr-1">
-          <div className="flex items-center opacity-0 transition-opacity group-hover:opacity-100">
-            {kind === "text" && (
-              <RowAction label={tt("Önizle ve düzenle")} onClick={onEdit}>
-                <Pencil size={11} strokeWidth={2.4} />
-              </RowAction>
-            )}
-            <RowAction label={tt("Sil")} onClick={() => removeClip(c.id)}>
-              <X size={11} strokeWidth={2.6} />
-            </RowAction>
-          </div>
-          {/* Sabitliyse iğne hep görünür (tıkla: kaldır); değilse üzerine gelince */}
-          <div className={c.pinned ? "" : "opacity-0 transition-opacity group-hover:opacity-100"}>
-            <RowAction label={c.pinned ? tt("Sabitlemeyi kaldır") : tt("Sabitle")} onClick={() => pinClip(c.id, !c.pinned)} color={c.pinned ? ACCENT.yellow : undefined}>
-              <Pin size={11} strokeWidth={2.4} fill={c.pinned ? "currentColor" : "none"} />
-            </RowAction>
-          </div>
-        </div>
+          {c.pinned && <Pin size={9} strokeWidth={2.6} fill="currentColor" style={{ color: tintText(ACCENT.yellow) }} />}
+          {done && (
+            <span className="ml-auto flex items-center gap-0.5 text-[9.5px] font-semibold" style={{ color: tintText(ACCENT.green) }}>
+              <Check size={10} strokeWidth={3} />
+              {tt("Kopyalandı")}
+            </span>
+          )}
+        </span>
+        <span className={`relative mt-1 line-clamp-2 break-all text-label ${type.mono ? "font-mono text-[10.5px]" : "text-[11.5px]"}`}>
+          {kind === "image" ? c.text : kind === "files" ? ((c.paths?.length ?? 0) > 1 ? tt("{0} dosya · {1}", c.paths!.length, c.text) : c.text) : c.text.replace(/\s+/g, " ")}
+        </span>
+        {c.app && <span className="relative mt-auto truncate pt-1 text-[9.5px] text-label-3">{c.app}</span>}
+      </button>
+      {/* Üzerine gelince: sabitle, düzenle, sil */}
+      <div className="absolute right-1 top-1 flex items-center rounded-full bg-black/60 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+        <RowAction label={c.pinned ? tt("Sabitlemeyi kaldır") : tt("Sabitle")} onClick={() => pinClip(c.id, !c.pinned)} color={c.pinned ? ACCENT.yellow : undefined}>
+          <Pin size={10.5} strokeWidth={2.4} fill={c.pinned ? "currentColor" : "none"} />
+        </RowAction>
+        {kind === "text" && (
+          <RowAction label={tt("Önizle ve düzenle")} onClick={onEdit}>
+            <Pencil size={10.5} strokeWidth={2.4} />
+          </RowAction>
+        )}
+        <RowAction label={tt("Sil")} onClick={() => removeClip(c.id)}>
+          <X size={11} strokeWidth={2.6} />
+        </RowAction>
       </div>
       {c.translation && (
         <button
@@ -226,15 +250,26 @@ function ClipRow({ clip: c, copied, onCopy, onEdit }: { clip: ClipItem; copied: 
 function TranslateAsk({ clip: c }: { clip: ClipItem }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Gemini anahtarı varsa bu kart, kendiliğinden yapılan çeviri tutmadığında çıkar: yalnızca "Tekrar dene"
+  const gemini = useNook((s) => !!s.settings.geminiKey.trim());
   const run = async (always: boolean) => {
     const st = useNook.getState();
     if (always) st.updateSettings({ freeTranslate: true });
     setBusy(true);
-    const out = await translateToUser(c.text, true).catch(() => null);
+    setFailed(false);
+    const out = await translateToUser(c.text, gemini ? st.settings.freeTranslate === true : true).catch(() => null);
     setBusy(false);
     if (out) useNook.getState().patchClip(c.id, { translation: out, askTranslate: false });
     else setFailed(true);
   };
+  if (gemini)
+    return (
+      <div className="flex h-7 items-center gap-1.5 border-t border-white/[0.05] pl-2.5 pr-1">
+        <Languages size={11} strokeWidth={2.4} className="shrink-0" style={{ color: ACCENT.purple }} />
+        <span className="min-w-0 flex-1 truncate text-[10.5px] text-label-3">{busy ? tt("Çeviriyorum…") : failed ? tt("Yine olmadı, biraz sonra dene") : tt("Çeviri yetişmedi")}</span>
+        {!busy && <TextButton onClick={() => void run(false)}>{tt("Tekrar dene")}</TextButton>}
+      </div>
+    );
   const never = () => {
     const st = useNook.getState();
     st.updateSettings({ freeTranslate: false });
@@ -263,7 +298,7 @@ function RowAction({ label, onClick, color, children }: { label: string; onClick
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-white/10 hover:text-label"
+      className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-2 hover:bg-white/10 hover:text-label"
       style={color ? { color: tintText(color) } : undefined}
     >
       {children}
@@ -284,7 +319,7 @@ function EditRow({ clip, onDone }: { clip: ClipItem; onDone: () => void }) {
     onDone();
   };
   return (
-    <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-1 rounded-[10px] bg-well-hi p-1.5">
+    <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="col-span-2 space-y-1 rounded-[12px] bg-well-hi p-1.5">
       <textarea
         ref={ref}
         value={text}

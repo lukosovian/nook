@@ -1,5 +1,7 @@
+import type { UpdateAnimPref } from "../components/overlays/UpdateAnims";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import type { DeckKey } from "../lib/deck";
 import type {
   DevicesPayload,
   DownloadItem,
@@ -58,7 +60,7 @@ export type Antic =
   | "magnify";
 
 /** Nook adadan dışarıda: pencere üstüne tünemiş, iple sarkıyor ya da balık tutuyor */
-export type Outing = "perch" | "hang" | "fish";
+export type Outing = "perch" | "hang" | "fish" | "camp";
 
 /** Yüz ifadesi = mood › antic › uyku › yorgunluk (düşük pil) › gece uykululuğu */
 export type Expression =
@@ -112,6 +114,8 @@ export type Status = "working" | "error" | "success" | "annoyed" | "alarm";
 
 export type Tab =
   | "home"
+  /** Bütün modüllerin ızgarası */
+  | "modules"
   | "chat"
   | "media"
   | "shelf"
@@ -132,6 +136,7 @@ export type Tab =
   | "notes"
   | "archive"
   | "calendar"
+  | "remind"
   | "year"
   | "claude"
   | "hum"
@@ -196,6 +201,20 @@ export interface DayStats {
   moodN: number;
   /** İçilen bardak su */
   water: number;
+  /** İmlecin ekranda aldığı yol (cm) — Nook'un günlüğü */
+  mouse: number;
+}
+
+/** Günlük için günün ayrıntıları: hangi uygulamada kaç dakika, kablosuz farenin en düşük pili */
+export interface DayLog {
+  apps: Record<string, number>;
+  mouseBattery?: number;
+}
+
+/** Nook'un o gün için yazdığı mizahi günlük */
+export interface DiaryEntry {
+  text: string;
+  at: number;
 }
 
 /** Bir yılın birikmiş özeti (yıl özeti kartı). Süreler dakika. */
@@ -224,7 +243,7 @@ export interface YearStats {
 
 export const emptyYear = (): YearStats => ({ active: 0, music: 0, focus: 0, pomodoros: 0, game: 0, notifs: 0, care: 0, water: 0, plays: 0, feeds: 0, songs: 0, hours: Array(24).fill(0), days: [], artists: {} });
 
-export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0, water: 0 };
+export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0, water: 0, mouse: 0 };
 
 /** Yerel tarih anahtarı: 2026-10-02 */
 export const dayKey = (d = new Date()) =>
@@ -346,6 +365,8 @@ export interface Settings extends NativeSettings {
   waterEvery: number;
   /** Günün ilk açılışında özet */
   dailySummary: boolean;
+  /** Nook her gece günün mizahi günlüğünü yazar (Gemini) */
+  diary: boolean;
   /** Oyundan çıkınca özet kartı */
   gameSummary: boolean;
   /** Nook sıkılınca oyun teklif etsin */
@@ -356,6 +377,8 @@ export interface Settings extends NativeSettings {
   introStyle: "random" | "dust" | "warp" | "ripple" | "orbit" | "confetti" | "sparkle" | "bubbles" | "trek";
   /** Ekranlar arası geçiş efekti: "random" ya da bir efekt (lib/moveFx) */
   moveStyle: "random" | "beam" | "warp" | "portal" | "jump" | "slide" | "glitch";
+  /** Güncelleme kapsülünün animasyonu: biri, "cycle" (sırayla) ya da "random" (karışık) */
+  updateAnim: UpdateAnimPref;
   /** Pilde / enerji tasarrufunda animasyonları yavaşlat */
   powerSaver: boolean;
   /** Argus profili (kullanıcı adı); boşsa en son kullanılan */
@@ -368,6 +391,10 @@ export interface Settings extends NativeSettings {
   colorVision: import("../lib/palette").ColorVision;
   /** Nook ara sıra dışarı çıksın: pencere üstüne tüner, iple sarkar, boştayken balık tutar */
   outings: boolean;
+  /** Kapalı adada boştayken saat ve hava */
+  collapsedInfo: boolean;
+  /** Kapalı adanın kapsülleri: hangileri çıksın, içlerinde neler görünsün */
+  capsule: CapsuleCfg;
   /** Odak bekçisi: çalışırken dikkat dağıtan siteye girince uyarır */
   focusGuard: boolean;
   /** Bekçinin uyardığı siteler/uygulamalar (başlıkta ya da uygulama adında geçen) */
@@ -456,6 +483,30 @@ export interface CalEvent {
   remind: number;
   /** Hatırlatma alarmı */
   alarmId?: string;
+  /** Hatırlatıcı modülünden kurulan tek başına hatırlatma (takvimde etkinlik olarak görünmez) */
+  reminder?: boolean;
+}
+
+/** Kapalı adanın kapsül ayarları (Studio › Modüller › Kapalı ada) */
+export interface CapsuleCfg {
+  /** Kapatılan kapsüller: o iş sürerken ada kapsüle dönüşmez */
+  off: import("../components/overlays/Capsules").CapsuleKind[];
+  /** İki iş aynı anda sürerken ikincisi yanda baloncukta */
+  split: boolean;
+  /** Baloncuğun üstüne gelince ada o işin bölümüyle açılır */
+  bubbleOpens: boolean;
+  musicCover: boolean;
+  /** Şarkı adı (kapalıysa yalnızca sanatçı ya da hiç yazı yok) */
+  musicTitle: boolean;
+  musicArtist: boolean;
+  musicWave: boolean;
+  infoClock: boolean;
+  infoWeather: boolean;
+  infoDate: boolean;
+  infoSeconds: boolean;
+  focusPercent: boolean;
+  focusBar: boolean;
+  claudeAction: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -494,6 +545,7 @@ export const DEFAULT_SETTINGS: Settings = {
   eyeBreak: true,
   waterEvery: 60,
   dailySummary: true,
+  diary: true,
   gameSummary: true,
   gameIntro: true,
   breakReminderMin: 120,
@@ -501,6 +553,7 @@ export const DEFAULT_SETTINGS: Settings = {
   welcomeBack: 10,
   introStyle: "random",
   moveStyle: "random",
+  updateAnim: "cycle",
   powerSaver: true,
   argusProfile: "",
   argusPromo: true,
@@ -509,6 +562,23 @@ export const DEFAULT_SETTINGS: Settings = {
   argusDetect: true,
   humWatch: false,
   outings: true,
+  collapsedInfo: true,
+  capsule: {
+    off: [],
+    split: true,
+    bubbleOpens: true,
+    musicCover: true,
+    musicTitle: true,
+    musicArtist: true,
+    musicWave: true,
+    infoClock: true,
+    infoWeather: true,
+    infoDate: false,
+    infoSeconds: false,
+    focusPercent: true,
+    focusBar: true,
+    claudeAction: true,
+  },
   uiScale: 1,
   colorVision: "normal",
   // Eski kurulumlarda Türkçe, yeni kurulumda sistemin dili (bkz. lib/i18n)
@@ -662,6 +732,8 @@ interface NookState {
   /** Nook'un kendi bildirimlerinin geçmişi (en yeni başta) */
   nookNotifs: NookNotif[];
   pinnedApps: PinnedApp[];
+  /** Kısayol tuşları (eylemler ve sahneler); null = hiç düzenlenmedi, hazır tuşlar (bkz. useDeck) */
+  deck: DeckKey[] | null;
   /** Gün gün istatistik (son 30 gün) */
   days: Record<string, DayStats>;
   /** Oyun rekorları */
@@ -679,6 +751,10 @@ interface NookState {
   pendingTab: Tab | null;
   /** Günlük özetin en son gösterildiği gün */
   summaryDay: string;
+  /** Günlük için son birkaç günün ayrıntıları (gün → kayıt) */
+  dayLog: Record<string, DayLog>;
+  /** Nook'un günlükleri (gün → yazı), son iki hafta */
+  diary: Record<string, DiaryEntry>;
   /** Günün özeti büyük adada açık */
   brief: boolean;
   /** Yama notları büyük adada açık */
@@ -798,9 +874,11 @@ interface NookState {
   setFocus: (f: FocusState | null) => void;
   pushNotification: (n: NotificationPayload) => void;
   clearNotifications: () => void;
+  removeNotification: (id: number) => void;
   clearNookNotifs: () => void;
   pinApp: (a: Omit<PinnedApp, "id">) => void;
   unpinApp: (id: string) => void;
+  setDeck: (deck: DeckKey[]) => void;
   /** Bugünün istatistiğine ekle */
   track: (patch: Partial<DayStats>) => void;
   setScore: (game: string, score: number) => void;
@@ -815,6 +893,9 @@ interface NookState {
   setArchive: (archive: NookState["archive"]) => void;
   setNotesSeen: (version: string) => void;
   setSummaryDay: (day: string) => void;
+  /** Öndeki uygulamaya bir dakika ekle; kablosuz farenin pilini kaydet */
+  logMinute: (app: string | null, mouseBattery: number | null) => void;
+  setDiary: (day: string, text: string) => void;
   setLastOffer: (at: number) => void;
   setOuting: (outing: Outing | null) => void;
   setGuard: (guard: NookState["guard"]) => void;
@@ -823,6 +904,8 @@ interface NookState {
   patchClip: (id: string, patch: Partial<ClipItem>) => void;
   addEvent: (e: Omit<CalEvent, "id" | "alarmId">) => void;
   removeEvent: (id: string) => void;
+  /** Etkinlik kalsın, yalnızca hatırlatması iptal olsun */
+  cancelRemind: (id: string) => void;
 }
 
 const push = (list: number[], v: number) => [...list, v].slice(-HISTORY);
@@ -883,6 +966,7 @@ export const useNook = create<NookState>()(
       notifications: [],
       nookNotifs: [],
       pinnedApps: [],
+      deck: null,
       days: {},
       scores: {},
       online: true,
@@ -892,6 +976,8 @@ export const useNook = create<NookState>()(
       attachment: null,
       pendingTab: null,
       summaryDay: "",
+      dayLog: {},
+      diary: {},
       brief: false,
       notes: false,
       report: false,
@@ -1138,10 +1224,12 @@ export const useNook = create<NookState>()(
       pushNotification: (n) =>
         set((s) => ({ notifications: [{ ...n, at: Date.now() }, ...s.notifications.filter((x) => x.id !== n.id)].slice(0, MAX_NOTIFS) })),
       clearNotifications: () => set({ notifications: [] }),
+      removeNotification: (id) => set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
       clearNookNotifs: () => set({ nookNotifs: [] }),
       pinApp: (a) =>
         set((s) => (s.pinnedApps.some((p) => p.path === a.path) ? {} : { pinnedApps: [...s.pinnedApps, { ...a, id: crypto.randomUUID() }].slice(0, 12) })),
       unpinApp: (id) => set((s) => ({ pinnedApps: s.pinnedApps.filter((p) => p.id !== id) })),
+      setDeck: (deck) => set({ deck: deck.slice(0, 24) }),
       track: (patch) =>
         set((s) => {
           const key = dayKey();
@@ -1181,6 +1269,21 @@ export const useNook = create<NookState>()(
       setAttachment: (attachment) => set({ attachment }),
       setPendingTab: (pendingTab) => set({ pendingTab }),
       setSummaryDay: (summaryDay) => set({ summaryDay }),
+      logMinute: (app, mouseBattery) =>
+        set((s) => {
+          const key = dayKey();
+          const cur = s.dayLog[key] ?? { apps: {} };
+          const apps = app ? { ...cur.apps, [app]: (cur.apps[app] ?? 0) + 1 } : cur.apps;
+          const low = mouseBattery === null ? cur.mouseBattery : Math.min(cur.mouseBattery ?? 100, mouseBattery);
+          // Yalnızca son 3 gün (dünün günlüğü sabah yazılabilsin)
+          const keep = Object.keys(s.dayLog).filter((k) => k !== key).sort().slice(-2);
+          return { dayLog: { ...Object.fromEntries(keep.map((k) => [k, s.dayLog[k]])), [key]: { apps, mouseBattery: low } } };
+        }),
+      setDiary: (day, text) =>
+        set((s) => {
+          const keep = Object.keys(s.diary).filter((k) => k !== day).sort().slice(-13);
+          return { diary: { ...Object.fromEntries(keep.map((k) => [k, s.diary[k]])), [day]: { text, at: Date.now() } } };
+        }),
       setBrief: (brief) => set({ brief }),
       setNotes: (notes) => set({ notes }),
       setReport: (report) => set({ report }),
@@ -1218,6 +1321,12 @@ export const useNook = create<NookState>()(
           const ev = s.events.find((x) => x.id === id);
           return { events: s.events.filter((x) => x.id !== id), alarms: ev?.alarmId ? s.alarms.filter((a) => a.id !== ev.alarmId) : s.alarms };
         }),
+      cancelRemind: (id) =>
+        set((s) => {
+          const ev = s.events.find((x) => x.id === id);
+          if (!ev) return {};
+          return { events: s.events.map((x) => (x.id === id ? { ...x, remind: -1, alarmId: undefined } : x)), alarms: ev.alarmId ? s.alarms.filter((a) => a.id !== ev.alarmId) : s.alarms };
+        }),
       setBusy: (key, on) =>
         set((s) => ({ busy: on ? [...s.busy.filter((k) => k !== key), key] : s.busy.filter((k) => k !== key) })),
       setHold: (key, on) =>
@@ -1243,9 +1352,12 @@ export const useNook = create<NookState>()(
         notifications: s.notifications,
         nookNotifs: s.nookNotifs,
         pinnedApps: s.pinnedApps,
+        deck: s.deck,
         days: s.days,
         scores: s.scores,
         summaryDay: s.summaryDay,
+        dayLog: s.dayLog,
+        diary: s.diary,
         lastOffer: s.lastOffer,
         toured: s.toured,
         catches: s.catches,
@@ -1265,6 +1377,7 @@ export const useNook = create<NookState>()(
         const p = (persisted ?? {}) as Partial<NookState>;
         const settings = { ...DEFAULT_SETTINGS, ...p.settings };
         settings.look = { ...DEFAULT_SETTINGS.look, ...p.settings?.look };
+        settings.capsule = { ...DEFAULT_SETTINGS.capsule, ...p.settings?.capsule };
         // Yerel (Ollama) dönemden kalan model adı Gemini'de yok
         if (!settings.aiModel.startsWith("gemini")) settings.aiModel = "";
         // İlk sürümün varsayılanı birçok bilgisayarda başka programlarca tutuluyordu

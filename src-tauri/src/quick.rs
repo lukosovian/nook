@@ -192,12 +192,16 @@ pub fn unmute_mics(ids: &[String]) -> bool {
     all
 }
 
-/// action: lock | screen-off
+/// action: lock | screen-off | desktop (her şeyi küçült) | sleep | shutdown | restart
 #[tauri::command]
 pub fn quick_action(action: String) -> Result<(), String> {
     match action.as_str() {
         "lock" => imp::lock(),
         "screen-off" => imp::screen_off(),
+        "desktop" => imp::show_desktop(),
+        "sleep" => crate::remote::power::sleep(),
+        "shutdown" => crate::remote::power::exit(false),
+        "restart" => crate::remote::power::exit(true),
         _ => Err("bilinmeyen işlem".into()),
     }
 }
@@ -468,6 +472,23 @@ mod imp {
         }
     }
 
+    /// Masaüstünü göster: Win+D (bütün pencereler küçülür; bir daha basınca geri gelir)
+    pub fn show_desktop() -> Result<(), String> {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_LWIN};
+        let key = |vk: u16, up: bool| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: if up { KEYEVENTF_KEYUP } else { 0 }, time: 0, dwExtraInfo: 0 } },
+        };
+        let d = b'D' as u16;
+        let seq = [key(VK_LWIN, false), key(d, false), key(d, true), key(VK_LWIN, true)];
+        let sent = unsafe { SendInput(seq.len() as u32, seq.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
+        if sent as usize == seq.len() {
+            Ok(())
+        } else {
+            Err("tuş gönderilemedi".into())
+        }
+    }
+
     pub fn screen_off() -> Result<(), String> {
         use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, HWND_BROADCAST, SC_MONITORPOWER, WM_SYSCOMMAND};
         unsafe { PostMessageW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER as usize, 2) };
@@ -552,6 +573,9 @@ mod imp {
         Err("yalnızca Windows".into())
     }
     pub fn screen_off() -> Result<(), String> {
+        Err("yalnızca Windows".into())
+    }
+    pub fn show_desktop() -> Result<(), String> {
         Err("yalnızca Windows".into())
     }
     pub fn screen_on() -> Result<(), String> {

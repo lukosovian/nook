@@ -4,8 +4,8 @@ import { formatSize } from "../../lib/format";
 import { ISLAND } from "../../lib/layout";
 import { useNook } from "../../store/nook";
 
-/** Kapalı adada süren indirme: solda dönen halka + ok, sağda hız. */
-export function DownloadMini() {
+/** Kapalı adada süren indirme: solda dönen halka + ok, sağda hız. `demo`: Studio önizlemesindeki yazı */
+export function DownloadMini({ demo }: { demo?: string }) {
   const downloads = useNook((s) => s.downloads);
   const speed = downloads.reduce((a, d) => a + d.speed, 0);
   const size = 22;
@@ -33,7 +33,7 @@ export function DownloadMini() {
         <ArrowDown size={11} strokeWidth={3} className="text-sys-blue" />
       </div>
       <span className="absolute right-3 top-1/2 -translate-y-1/2 font-display text-[11px] font-medium tabular-nums text-sys-blue">
-        {speed > 0 ? `${formatSize(speed)}/s` : downloads.length > 1 ? `${downloads.length} dosya` : "…"}
+        {demo ?? (speed > 0 ? `${formatSize(speed)}/s` : downloads.length > 1 ? `${downloads.length} dosya` : "…")}
       </span>
     </motion.div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { BellRing } from "lucide-react";
+import { BatteryCharging, BellRing } from "lucide-react";
 import { native, onNative } from "../lib/native";
 import { tintBg, tintText, TopBar, useBackButton } from "../ui";
 
@@ -32,6 +32,9 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
   useBackButton(onBack);
   const [access, setAccess] = useState(() => native?.notifAccess() ?? !!import.meta.env.DEV);
   const [prefs, setPrefs] = useState<Prefs | null>(read);
+  // Pil tasarrufu Nook'u arka planda kısıtlıyorsa bildirimler ancak uygulama açılınca topluca gider
+  const [batteryFree, setBatteryFree] = useState(() => native?.batteryFree?.() ?? true);
+  const autostart = native?.hasAutostart?.() ?? false;
 
   // Ayarlardan izin verip dönünce
   useEffect(() => {
@@ -39,6 +42,7 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
       if (document.visibilityState !== "visible") return;
       setAccess(native?.notifAccess() ?? !!import.meta.env.DEV);
       setPrefs(read());
+      setBatteryFree(native?.batteryFree?.() ?? true);
     };
     document.addEventListener("visibilitychange", check);
     const t = window.setInterval(check, 4000);
@@ -108,6 +112,32 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
             <Row label="PC'ye gönder" sub={prefs.on ? "Açık" : "Kapalı"} on={prefs.on} onChange={(on) => save({ ...prefs, on })} />
           </section>
           {prefs.queued > 0 && <p className="-mt-2 px-2 text-[12px] text-label-3">{prefs.queued} bildirim PC açılınca gönderilecek.</p>}
+          {prefs.on && (!batteryFree || autostart) && (
+            <section className="rounded-3xl p-4" style={{ background: tintBg("#FFB547", 9), border: `1px solid ${tintBg("#FFB547", 26)}` }}>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: tintBg("#FFB547", 20), color: tintText("#FFB547") }}>
+                  <BatteryCharging size={20} />
+                </span>
+                <p className="text-[13px] leading-snug text-label-2">
+                  Telefon pil için Nook'u arka planda durduruyorsa bildirimler anında gitmez, uygulamayı açınca topluca gider. İkisini de aç:
+                </p>
+              </div>
+              {!batteryFree && (
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => native?.askBatteryFree?.()} className="mt-3 w-full rounded-2xl py-3 text-[14.5px] font-bold text-black" style={{ background: "#FFB547" }}>
+                  Pil kısıtlamasını kaldır
+                </motion.button>
+              )}
+              {batteryFree && <p className="mt-2.5 px-1 text-[12.5px] font-semibold" style={{ color: tintText("#3CCF6E") }}>✓ Pil kısıtlaması yok</p>}
+              {autostart && (
+                <>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => native?.openAutostart?.()} className="mt-2 w-full rounded-2xl bg-well py-3 text-[14.5px] font-semibold">
+                    Otomatik başlatmayı aç
+                  </motion.button>
+                  <p className="mt-2 px-1 text-[12px] leading-snug text-label-3">Açılan listede Nook Mobil'i aç. Xiaomi'de ayrıca: Ayarlar › Uygulamalar › Nook Mobil › Pil tasarrufu › Kısıtlama yok.</p>
+                </>
+              )}
+            </section>
+          )}
           <section className="rounded-3xl bg-card p-3">
             <motion.button whileTap={{ scale: 0.97 }} disabled={test === "busy"} onClick={sendTest} className="w-full rounded-2xl bg-well py-3 text-[14.5px] font-semibold">
               {test === "busy" ? "Gönderiliyor…" : "Deneme bildirimi gönder"}
