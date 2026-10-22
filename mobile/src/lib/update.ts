@@ -27,7 +27,7 @@ function newer(a: string, b: string) {
   return false;
 }
 
-async function appVersion() {
+export async function appVersion() {
   try {
     const { getVersion } = await import("@tauri-apps/api/app");
     return await getVersion();

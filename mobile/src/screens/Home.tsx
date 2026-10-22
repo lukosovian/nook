@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { BookOpen, MoreHorizontal } from "lucide-react";
-import { cached, getDiary, getMedia, today, wakePc, type Pairing, type NowPlaying, type PcDiary, type Status } from "../lib/pc";
-import { ChipNook, errText, NookChip, Sheet, tintBg, tintText, useToast } from "../ui";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { cached, getMedia, wakePc, type Pairing, type NowPlaying, type PcNote, type Status } from "../lib/pc";
+import { ChipNook, errText, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
 import { installUpdate, useInstallProgress, useMobileUpdate } from "../lib/update";
 import { diagnose } from "../lib/diagnose";
 import { native } from "../lib/native";
 import { onOutbox, pending } from "../lib/outbox";
 import type { Conn } from "../App";
+import { KeyButton, useDeck } from "./Keys";
+import { dayLabel, DIARY, useDiary } from "./Diary";
+import { useAppVersion } from "./Patch";
 
-export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify" | "look" | "claude" | "shelf";
+export type Screen = "home" | "pc" | "argus" | "media" | "clips" | "notes" | "hum" | "notify" | "look" | "claude" | "shelf" | "keys" | "diary" | "patch";
 
 interface Tile {
   id: Screen;
@@ -24,6 +27,7 @@ interface Tile {
 const TILES: Tile[] = [
   { id: "pc", nook: "control", label: "Bilgisayar", color: "#8FE03A" },
   { id: "argus", nook: "argus", label: "Argus", color: "#00c0fa" },
+  { id: "keys", nook: "apps", label: "Kısayollar", color: "#2B8CFF" },
   { id: "media", nook: "media", label: "Medya", color: "#FF5C8A" },
   { id: "clips", nook: "clip", label: "Pano", color: "#9B7BFF" },
   { id: "shelf", nook: "shelf", label: "Raf", color: "#2FD4C0" },
@@ -35,7 +39,7 @@ const TILES: Tile[] = [
 ];
 
 /** PC kapalıyken de açılanlar (son görülen veriyle; yapılanlar PC açılınca gider) */
-const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "shelf", "notes", "hum", "notify", "claude"];
+const OFFLINE_OK: Screen[] = ["pc", "argus", "clips", "shelf", "notes", "hum", "notify", "claude", "keys"];
 
 function gb(bytes: number) {
   return (bytes / 1024 ** 3).toLocaleString("tr-TR", { maximumFractionDigits: 1 });
@@ -83,6 +87,9 @@ export function HomeScreen({
   const install = useInstallProgress();
   const waiting = usePending();
   const diag = conn === "offline" ? diagnose(pairing) : null;
+  const [deck] = useDeck(pairing, online);
+  const homeKeys = (deck?.keys ?? []).filter((k) => k.home).slice(0, 6);
+  const mobile = useAppVersion();
 
   const subtitle = (t: Tile) => {
     if (t.id === "media") return !online ? "PC açılınca" : playing ? `${playing.title}${playing.artist ? ` · ${playing.artist}` : ""}` : "Çalan bir şey yok";
@@ -93,6 +100,10 @@ export function HomeScreen({
     if (t.id === "hum") return online ? "Çalan şarkıyı bul" : "Dinle, PC açılınca bulunur";
     if (t.id === "notify") return "Telefonun bildirimleri PC'de";
     if (t.id === "look") return online ? "Nook'unu giydir" : "PC açılınca";
+    if (t.id === "keys") {
+      const on = deck?.autos.filter((a) => a.on).length ?? 0;
+      return !online ? "PC açılınca basılır" : deck ? `${deck.keys.length} tuş${on ? ` · ${on} otomasyon` : ""}` : "Tuşlar, otomasyonlar";
+    }
     if (t.id === "claude") {
       const c = status?.claude;
       if (!online || !c) return "Son görülen oturumlar";
@@ -103,28 +114,29 @@ export function HomeScreen({
 
   return (
     <div className="safe flex min-h-screen flex-col gap-4 px-4">
-      {/* Üst: ortada PC'deki gibi canlı Nook, altında bağlantı */}
-      <header className="relative flex flex-col items-center pt-1">
-        <button onClick={() => setMenu(true)} className="absolute right-0 top-1 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-card text-label-2">
+      <header className="flex items-center gap-3 px-1 pt-1">
+        <span className="min-w-0 flex-1">
+          <span className="block font-round text-[26px] font-extrabold tracking-tight">{greeting()}</span>
+          <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-label-2">
+            <span className="h-2 w-2 rounded-full" style={{ background: online ? "#3ccf6e" : conn === "connecting" ? "#ffd23f" : "#f0545c" }} />
+            {conn === "online"
+              ? status?.locked
+                ? "PC açık · kilitli"
+                : "PC açık"
+              : conn === "connecting"
+                ? "Bağlanıyor…"
+                : conn === "auth"
+                  ? "Eşleşme geçersiz"
+                  : "Ulaşılamıyor"}
+          </span>
+        </span>
+        <button onClick={() => setMenu(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-label-2">
           <MoreHorizontal size={20} />
         </button>
-        {/* Nook'a dokununca Görünüm açılır */}
-        <div className={online ? "" : "opacity-60 grayscale"} onClick={() => online && onOpen("look")}>
-          <LiveNook look={status?.nook?.look} color={status?.nook?.color} online={online} playing={!!playing?.playing} />
-        </div>
-        <p className="-mt-1 flex items-center gap-1.5 text-[13px] text-label-2">
-          <span className="h-2 w-2 rounded-full" style={{ background: online ? "#3ccf6e" : conn === "connecting" ? "#ffd23f" : "#f0545c" }} />
-          {conn === "online"
-            ? status?.locked
-              ? "PC açık · kilitli"
-              : "PC açık"
-            : conn === "connecting"
-              ? "Bağlanıyor…"
-              : conn === "auth"
-                ? "Eşleşme geçersiz"
-                : "Ulaşılamıyor"}
-        </p>
       </header>
+
+      {/* PC'deki adadaki gibi canlı Nook; altında bilgisayarın durumu (dokununca Bilgisayar) */}
+      <Hero status={online ? status : null} nook={status?.nook} online={online} playing={!!playing?.playing} sub={subtitle(TILES[0])} onLook={() => online && onOpen("look")} onPc={() => onOpen("pc")} />
 
       {conn === "auth" && (
         <div className="rounded-3xl bg-red/10 p-4 text-[13.5px] text-red">PC'de eşleşme sıfırlanmış. Menüden “Eşleşmeyi kaldır”a bas ve kodu yeniden okut.</div>
@@ -191,18 +203,27 @@ export function HomeScreen({
         </section>
       )}
       {online && <OutsideTip pairing={pairing} />}
-      <DiaryCard pairing={pairing} online={online} />
+
+      {homeKeys.length > 0 && (
+        <>
+          <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Kısayollar</h2>
+          <section className="grid grid-cols-3 gap-2.5">
+            {homeKeys.map((k) => (
+              <KeyButton key={k.id} k={k} pairing={pairing} online={online} say={say} small />
+            ))}
+          </section>
+        </>
+      )}
 
       <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Nook'lar</h2>
-      <section className="grid grid-cols-2 gap-2.5 pb-4">
-        {TILES.filter((t) => t.id !== "claude" || status?.claude || cached("claude")).map((t) =>
-          t.id === "pc" ? (
-            <PcChip key={t.id} tile={t} sub={subtitle(t)} status={online ? status : null} disabled={false} onClick={() => onOpen(t.id)} />
-          ) : (
-            <NookChip key={t.id} id={t.nook} label={t.label} sub={subtitle(t)} color={t.color} disabled={!online && !OFFLINE_OK.includes(t.id)} onClick={() => onOpen(t.id)} />
-          ),
-        )}
+      <section className="grid grid-cols-2 gap-2.5">
+        {TILES.filter((t) => t.id !== "pc" && (t.id !== "claude" || status?.claude || cached("claude"))).map((t) => (
+          <TileCard key={t.id} tile={t} sub={subtitle(t)} disabled={!online && !OFFLINE_OK.includes(t.id)} onClick={() => onOpen(t.id)} />
+        ))}
       </section>
+
+      <h2 className="-mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Daha fazla</h2>
+      <More pairing={pairing} online={online} status={status} mobile={mobile} onOpen={onOpen} />
 
       {toast}
       <AnimatePresence>
@@ -218,6 +239,9 @@ export function HomeScreen({
               Nook Mobil'i tanı
             </button>
             <p className="px-1 text-[13px] text-label-3">Adresler: {pairing.hosts.join(", ")}</p>
+            <p className="mt-1 px-1 text-[13px] text-label-3">
+              Nook Mobil {mobile ?? "—"} · PC'de Nook {status?.version ?? "—"}
+            </p>
             <button
               onClick={() => {
                 setMenu(false);
@@ -234,58 +258,64 @@ export function HomeScreen({
   );
 }
 
-const DIARY = "#9B7BFF";
-
-function dayLabel(day: string) {
-  const y = new Date();
-  y.setDate(y.getDate() - 1);
-  const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
-  if (day === today()) return "Bugün";
-  if (day === yk) return "Dün";
-  const [yy, mm, dd] = day.split("-").map(Number);
-  return new Date(yy, mm - 1, dd).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : h < 22 ? "İyi akşamlar" : "İyi geceler";
 }
 
-/** Nook'un günlüğü: PC'deki Nook her gece günü kendi ağzından yazar; en yenisi burada, öncekiler sayfada */
-function DiaryCard({ pairing, online }: { pairing: Pairing; online: boolean }) {
-  const [list, setList] = useState<PcDiary[]>(() => cached<PcDiary[]>("diary") ?? []);
-  const [all, setAll] = useState(false);
-  useEffect(() => {
-    if (online) void getDiary(pairing).then(setList).catch(() => {});
-  }, [pairing, online]);
-  const last = list[0];
-  if (!last) return null;
+/** Nook'lar: kare kart, Nook üstte, adı ve iki satıra kadar durumu altta */
+function TileCard({ tile, sub, disabled, onClick }: { tile: Tile; sub: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <motion.button
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex min-h-[118px] min-w-0 flex-col items-start rounded-[26px] border p-3 text-left disabled:opacity-40"
+      style={{ background: `linear-gradient(155deg, ${tintBg(tile.color, 17)}, ${tintBg(tile.color, 5)})`, borderColor: tintBg(tile.color, 30) }}
+    >
+      <ChipNook id={tile.nook} size={42} />
+      <span className="mt-auto block w-full pt-2 text-[15px] font-bold leading-tight" style={{ color: tintText(tile.color) }}>
+        {tile.label}
+      </span>
+      <span className="mt-0.5 line-clamp-2 block w-full text-[11.5px] leading-snug text-label-3">{sub}</span>
+    </motion.button>
+  );
+}
+
+/** Ana ekranın altı: günlük ve yama notları birer satır, en altta iki tarafın sürümü */
+function More({ pairing, online, status, mobile, onOpen }: { pairing: Pairing; online: boolean; status: Status | null; mobile: string | null; onOpen: (s: Screen) => void }) {
+  const diary = useDiary(pairing, online);
+  const note = cached<PcNote[]>("patchNotes")?.[0];
+  const last = diary[0];
   return (
     <>
-      <motion.button
-        whileTap={{ scale: 0.98 }}
-        onClick={() => setAll(true)}
-        className="rounded-3xl p-4 text-left"
-        style={{ background: `linear-gradient(160deg, ${tintBg(DIARY, 16)}, ${tintBg(DIARY, 6)})`, border: `1px solid ${tintBg(DIARY, 30)}` }}
-      >
-        <span className="flex items-center gap-2 text-[12px] font-bold" style={{ color: tintText(DIARY) }}>
-          <BookOpen size={15} /> Nook'un günlüğü · {dayLabel(last.day)}
-        </span>
-        <p className="mt-1.5 text-[14px] leading-relaxed text-label-2">{last.text}</p>
-      </motion.button>
-      <AnimatePresence>
-        {all && (
-          <Sheet key="diary" onClose={() => setAll(false)}>
-            <p className="mb-3 px-1 text-[17px] font-bold">Nook'un günlüğü</p>
-            <div className="flex max-h-[60vh] flex-col gap-2.5 overflow-y-auto">
-              {list.map((d) => (
-                <div key={d.day} className="rounded-2xl bg-card p-3.5">
-                  <p className="text-[12px] font-bold" style={{ color: tintText(DIARY) }}>
-                    {dayLabel(d.day)}
-                  </p>
-                  <p className="mt-1 text-[14px] leading-relaxed text-label-2">{d.text}</p>
-                </div>
-              ))}
-            </div>
-          </Sheet>
-        )}
-      </AnimatePresence>
+      <section className="overflow-hidden rounded-[26px] bg-card">
+        <Row nook="today" color={DIARY} label="Nook'un günlüğü" sub={last ? `${dayLabel(last.day)} · ${last.text}` : "Nook her gece günü yazar"} onClick={() => onOpen("diary")} />
+        <div className="ml-[62px] h-px bg-edge" />
+        <Row nook="notes" color="#FFB13D" label="Yama notları" sub={note ? `${note.version} · ${note.headline}` : "Yeni sürümlerde neler var"} onClick={() => onOpen("patch")} />
+      </section>
+      <p className="pb-5 pt-1 text-center text-[11.5px] text-label-3">
+        Nook Mobil {mobile ?? "—"}
+        {status?.version ? ` · PC'de Nook ${status.version}` : ""}
+      </p>
     </>
+  );
+}
+
+function Row({ nook, color, label, sub, onClick }: { nook: string; color: string; label: string; sub: string; onClick: () => void }) {
+  return (
+    <motion.button whileTap={{ scale: 0.98 }} onClick={onClick} className="flex w-full items-center gap-3 px-3 py-2.5 text-left">
+      <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center">
+        <ChipNook id={nook} size={36} />
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block text-[14.5px] font-semibold" style={{ color: tintText(color) }}>
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-[12px] text-label-3">{sub}</span>
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-label-3" />
+    </motion.button>
   );
 }
 
@@ -326,38 +356,42 @@ function useNowPlaying(pairing: Pairing, online: boolean) {
   return np;
 }
 
-/** Bilgisayar çipi: tüm satırı kaplar; açık kalma süresi, işlemci, bellek ve boş disk içinde */
-function PcChip({ tile, sub, status, disabled, onClick }: { tile: Tile; sub: string; status: Status | null; disabled: boolean; onClick: () => void }) {
+/** Ana ekranın tepesi: canlı Nook (dokununca Görünüm), altında Bilgisayar satırı ve açık kalma, işlemci, bellek, boş disk */
+function Hero({ status, nook, online, playing, sub, onLook, onPc }: { status: Status | null; nook: Status["nook"]; online: boolean; playing: boolean; sub: string; onLook: () => void; onPc: () => void }) {
   const st = status?.stats;
   const bat = st?.battery;
+  const green = "#8FE03A";
   return (
-    <motion.button
-      whileTap={disabled ? undefined : { scale: 0.97 }}
-      disabled={disabled}
-      onClick={onClick}
-      className="col-span-2 flex min-w-0 flex-col gap-2 rounded-[26px] border py-1.5 pl-1.5 pr-3.5 text-left disabled:opacity-40"
-      style={{ background: tintBg(tile.color, 12), borderColor: tintBg(tile.color, 34) }}
+    <section
+      className="overflow-hidden rounded-[32px] border border-edge"
+      style={{ background: `radial-gradient(120% 75% at 50% 0%, ${tintBg(nook?.color ?? "#ffffff", 10)}, transparent 70%), var(--color-card)` }}
     >
-      <span className="flex min-w-0 items-center gap-2.5">
-        <span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center">
-          <ChipNook id={tile.nook} size={34} />
-        </span>
-        <span className="min-w-0 flex-1 leading-tight">
-          <span className="block truncate text-[14.5px] font-semibold" style={{ color: tintText(tile.color) }}>
-            {tile.label}
+      <div className={`flex justify-center pt-1 ${online ? "" : "opacity-60 grayscale"}`} onClick={onLook}>
+        <LiveNook look={nook?.look} color={nook?.color} online={online} playing={playing} />
+      </div>
+      <motion.button whileTap={{ scale: 0.98 }} onClick={onPc} className="block w-full px-3 pb-3 text-left">
+        <span className="flex items-center gap-2.5 rounded-[22px] bg-well py-1.5 pl-1.5 pr-3">
+          <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center">
+            <ChipNook id="control" size={32} />
           </span>
-          <span className="mt-0.5 block truncate text-[11.5px] text-label-3">{bat ? `${bat.charging ? "Şarj oluyor" : "Pil"} %${bat.percent} · ${sub}` : sub}</span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block text-[14.5px] font-semibold" style={{ color: tintText(green) }}>
+              Bilgisayar
+            </span>
+            <span className="mt-0.5 block truncate text-[11.5px] text-label-3">{bat ? `${bat.charging ? "Şarj oluyor" : "Pil"} %${bat.percent} · ${sub}` : sub}</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0 text-label-3" />
         </span>
-      </span>
-      {status && st && (
-        <span className="grid grid-cols-4 gap-1.5 pb-1.5 pl-2">
-          <Stat label="Açık" value={uptime(status.uptimeSec)} />
-          <Stat label="İşlemci" value={`%${Math.round(st.cpu)}`} frac={st.cpu / 100} color="#3d8bff" />
-          <Stat label="Bellek" value={`${gb(st.memUsed)} GB`} frac={st.memTotal ? st.memUsed / st.memTotal : 0} color="#8f6bff" />
-          <Stat label="Disk boş" value={`${gb(st.diskTotal - st.diskUsed)} GB`} frac={st.diskTotal ? st.diskUsed / st.diskTotal : 0} color="#f2a33a" />
-        </span>
-      )}
-    </motion.button>
+        {status && st && (
+          <span className="mt-3 grid grid-cols-4 gap-2 px-1.5">
+            <Stat label="Açık" value={uptime(status.uptimeSec)} />
+            <Stat label="İşlemci" value={`%${Math.round(st.cpu)}`} frac={st.cpu / 100} color="#3d8bff" />
+            <Stat label="Bellek" value={`${gb(st.memUsed)} GB`} frac={st.memTotal ? st.memUsed / st.memTotal : 0} color="#8f6bff" />
+            <Stat label="Disk boş" value={`${gb(st.diskTotal - st.diskUsed)} GB`} frac={st.diskTotal ? st.diskUsed / st.diskTotal : 0} color="#f2a33a" />
+          </span>
+        )}
+      </motion.button>
+    </section>
   );
 }
 

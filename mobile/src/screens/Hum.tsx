@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Copy, Music2, Smartphone } from "lucide-react";
 import { cached, getHums, humRecognize, phoneClipboard, type HumTrack, type Pairing, type PcHum } from "../lib/pc";
 import { startMic, type Mic } from "../lib/mic";
-import { pcmBase64, queue } from "../lib/outbox";
+import { onOutbox, pcmBase64, pending, queue } from "../lib/outbox";
 import { ChipNook, errText, tintBg, tintText, TopBar, useBackButton, useToast } from "../ui";
 import type { Conn } from "../App";
 
@@ -32,6 +32,17 @@ export function HumScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: C
   const [level, setLevel] = useState(0);
   const [hums, setHums] = useState<PcHum[] | null>(() => cached<PcHum[]>("hums"));
   const mic = useRef<Mic | null>(null);
+  const [waiting, setWaiting] = useState(() => pending("hum"));
+  useEffect(
+    () =>
+      onOutbox(() => {
+        setWaiting(pending("hum"));
+        // Bekleyen tanındıysa geçmiş tazelensin
+        if (online) void load();
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [online],
+  );
   const run = useRef(0);
 
   const load = () =>
@@ -142,6 +153,11 @@ export function HumScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: C
         <p className="px-6 text-center text-[14px] font-semibold" style={{ color: tintText(PURPLE) }}>
           {listening ? "Dinliyorum… (durdurmak için dokun)" : online ? "Çalan şarkıyı bulmak için dokun" : "PC kapalı: dokun, dinleyip saklayayım"}
         </p>
+        {waiting > 0 && !listening && (
+          <p className="-mt-1 px-6 text-center text-[12px] text-label-3">
+            {waiting} kayıt {online ? "PC'de tanınmayı bekliyor; Nook hazır olunca bulunur" : "PC açılınca tanınacak"}
+          </p>
+        )}
         <AnimatePresence mode="wait">
           {phase.kind === "found" && (
             <motion.div

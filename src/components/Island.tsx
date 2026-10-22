@@ -24,7 +24,7 @@ import { Fishing } from "./outings/Fishing";
 import { ContextMenu } from "./overlays/ContextMenu";
 import { DownloadMini } from "./overlays/DownloadMini";
 import { EventMini, StopwatchMini } from "./overlays/TimeMini";
-import { ClaudeCapsule, UpdateCapsule, FishCapsule, FocusCapsule, InfoCapsule, MusicCapsule, SleepCapsule, SplitBubble, useCapsule } from "./overlays/Capsules";
+import { ClaudeCapsule, UpdateCapsule, FishCapsule, FocusCapsule, InfoCapsule, MusicCapsule, SleepCapsule, SplitBubble, TAB_OF, useCapsule } from "./overlays/Capsules";
 import { Campfire } from "./outings/Campfire";
 import { ListenMini } from "./overlays/ListenMini";
 import { MoveFx } from "./overlays/MoveFx";
@@ -259,6 +259,11 @@ export function Island() {
             boxShadow: SHADOW,
           }}
           transition={transition}
+          onPointerEnter={() => {
+            // Bölünmüş adada ana kapsülün üstüne gelince ada onun bölümüyle açılsın (baloncuğunkiyle değil)
+            const tab = cap?.second ? TAB_OF[cap.kind] : undefined;
+            if (tab) useNook.getState().setPendingTab(tab);
+          }}
         >
           <AnimatePresence>
             {mode === "expanded" && <Panels key="panels" />}

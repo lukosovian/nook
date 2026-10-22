@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { AudioLines, Bell, Check, Eye, EyeOff, Gamepad2, HeartPulse, HelpCircle, Info, Keyboard, LayoutGrid, Lock, Play, Settings2, ShieldCheck, Smartphone, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useGemini } from "../../hooks/useGemini";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
-import { refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
+import { INVESTORS, refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
 import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
 import { alarmRing, listMonitors, openPath, quickState, remoteControlSet, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
@@ -958,10 +958,21 @@ function SupportersSection() {
         </p>
         {!!list.length && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {list.slice(0, 60).map((s) => (
+            {[...list.filter((s) => INVESTORS.has(s.login)), ...list.filter((s) => !INVESTORS.has(s.login))].slice(0, 60).map((s) => (
               <button key={s.login} title={s.login} onClick={() => void openPath(s.url)} className="group flex flex-col items-center gap-0.5">
-                <img src={s.avatar} alt={s.login} className="h-8 w-8 rounded-full ring-1 ring-white/10 transition-transform group-hover:scale-110" draggable={false} />
+                <img
+                  src={s.avatar}
+                  alt={s.login}
+                  className="h-8 w-8 rounded-full transition-transform group-hover:scale-110"
+                  style={{ boxShadow: INVESTORS.has(s.login) ? `0 0 0 2px ${ACCENT.yellow}` : "0 0 0 1px rgba(255,255,255,0.1)" }}
+                  draggable={false}
+                />
                 <span className="max-w-[52px] truncate text-[9.5px] text-label-3">{s.login}</span>
+                {INVESTORS.has(s.login) && (
+                  <span className="rounded-full px-1.5 text-[8.5px] font-semibold" style={{ background: tintBg(ACCENT.yellow), color: tintText(ACCENT.yellow) }}>
+                    {tt("Yatırımcı")}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -1066,7 +1077,7 @@ const MODIFIERS: [keyof KeyboardEvent, string][] = [
 ];
 
 /** Tıkla, tuş kombinasyonuna bas — kaydedilir. En az bir değiştirici tuş gerekir. `clearable`: Sil tuşu kısayolu kaldırır. */
-function ShortcutInput({ value, onChange, clearable }: { value: string; onChange: (v: string) => void; clearable?: boolean }) {
+export function ShortcutInput({ value, onChange, clearable }: { value: string; onChange: (v: string) => void; clearable?: boolean }) {
   const [recording, setRecording] = useState(false);
 
   const onKeyDown = (e: React.KeyboardEvent) => {

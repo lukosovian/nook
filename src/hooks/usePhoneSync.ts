@@ -1,18 +1,24 @@
 /**
  * Nook Mobil: pano geçmişi ve not sekmeleri köprüye aynalanır (telefon oradan okur); telefondan gelen
- * not ve görünüm değişiklikleri ("nook://remote") buradaki depoya uygulanır. Yalnızca ana adada çalışır.
+ * not ve görünüm değişiklikleri, kısayol basışları ("nook://remote") buradaki depoya uygulanır. Yalnızca ana adada çalışır.
  */
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { inTauri, isPrimary, subscribe } from "../lib/bridge";
+import { fileIcon, inTauri, isPrimary, subscribe } from "../lib/bridge";
 import { useNook, type Pad } from "../store/nook";
 import { normalizeColor, normalizeLook, type Look } from "../lib/look";
 import { useClaude } from "../lib/claude";
 import { drankWater, snoozeWater, waterInfo } from "./useFeatures";
+import { appPathOf, getDeck, isDangerous, runKey } from "../lib/deck";
+import { getAutomations, saveAutomations, triggerLabel, triggerMeta } from "../lib/automations";
+import { NOTES } from "../lib/notes";
 
 /** Telefona gönderilen geçmiş en fazla bu kadar */
 const MAX_CLIPS = 80;
 const MAX_HUMS = 40;
+
+/** Uygulama tuşlarının simgeleri (telefonda da kendi simgeleriyle görünsün); bir kez okunur */
+const appIcons = new Map<string, string | null>();
 
 interface NoteCmd {
   op: "set" | "add" | "remove" | "rename";
@@ -23,6 +29,13 @@ interface NoteCmd {
 
 function mirror() {
   const { clips, pads, padId, hums, shelf, diary } = useNook.getState();
+  const deck = getDeck();
+  // Simgesi henüz okunmamış uygulama tuşları: okununca ayna yeniden gider
+  const missing = deck.map(appPathOf).filter((p): p is string => !!p && !appIcons.has(p));
+  if (missing.length) {
+    missing.forEach((p) => appIcons.set(p, null));
+    void Promise.all(missing.map((p) => fileIcon(p, 48).then((i) => appIcons.set(p, i)))).then(mirror);
+  }
   void invoke("remote_mirror", {
     data: {
       clips: clips.slice(0, MAX_CLIPS).map((c) => ({
@@ -47,6 +60,8 @@ function mirror() {
         .sort()
         .reverse()
         .map((day) => ({ day, text: diary[day].text, at: diary[day].at })),
+      deck: deck.map((k) => ({ id: k.id, label: k.label, icon: k.icon, color: k.color, steps: k.steps.length, home: !!k.home, danger: isDangerous(k), appIcon: appIcons.get(appPathOf(k) ?? "") ?? null })),
+      autos: getAutomations().map((a) => ({ id: a.id, label: a.label, on: a.on, when: triggerLabel(a.when), icon: triggerMeta(a.when).icon, color: triggerMeta(a.when).color, steps: a.steps.length })),
       hums: hums.slice(0, MAX_HUMS).map((h) => ({ id: h.id, title: h.title, artist: h.artist, cover: h.cover ?? null, url: h.url ?? null, at: h.at, phone: !!h.phone })),
     },
   }).catch(() => {});
@@ -102,8 +117,12 @@ export function usePhoneSync() {
       timer = window.setTimeout(mirror, 600);
     };
     mirror();
+    // Yama notları değişmez: bir kez, yalnızca metinleri
+    void invoke("remote_notes", {
+      notes: NOTES.map((n) => ({ version: n.version, date: n.date, headline: n.headline, major: !!n.major, items: n.items.map((i) => ({ title: i.title, text: i.text })) })),
+    }).catch(() => {});
     const unsub = useNook.subscribe((st, prev) => {
-      if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.diary !== prev.diary || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
+      if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.diary !== prev.diary || st.deck !== prev.deck || st.automations !== prev.automations || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
     });
     // Su sayacı dakikada bir ilerler: telefonun gördüğü tahmin tazelensin
     const tick = window.setInterval(mirror, 60_000);
@@ -114,7 +133,7 @@ export function usePhoneSync() {
         mirror();
       } else if (st.sessions !== prev.sessions || st.plan !== prev.plan || st.setup !== prev.setup) schedule();
     });
-    const off = subscribe<{ kind: string; cmd: NoteCmd; op?: string; own?: boolean; id?: string; look?: Partial<Look>; color?: string | null }>("nook://remote", (e) => {
+    const off = subscribe<{ kind: string; cmd: NoteCmd; op?: string; own?: boolean; on?: boolean; id?: string; look?: Partial<Look>; color?: string | null }>("nook://remote", (e) => {
       if (e.kind === "note") applyNote(e.cmd);
       if (e.kind === "shelf" && e.op === "remove" && e.id) useNook.getState().removeShelf(e.id);
       // Telefondaki su hatırlatmasına cevap: yalnızca PC'de de hatırlatma bekliyorsa (iki kez sayılmasın)
@@ -124,6 +143,12 @@ export function usePhoneSync() {
         if (e.op === "drank" && (due || e.own)) drankWater();
         if (e.op === "snooze" && due) snoozeWater();
       }
+      // Telefondan kısayol tuşuna basıldı ya da otomasyon açılıp kapandı
+      if (e.kind === "deck" && e.op === "run") {
+        const k = getDeck().find((x) => x.id === e.id);
+        if (k) void runKey(k);
+      }
+      if (e.kind === "deck" && e.op === "auto") saveAutomations(getAutomations().map((a) => (a.id === e.id ? { ...a, on: !!e.on } : a)));
       // Telefondan görünüm değişti
       if (e.kind === "look") {
         const s = useNook.getState();

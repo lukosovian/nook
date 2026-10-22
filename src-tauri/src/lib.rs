@@ -187,6 +187,7 @@ pub fn run() {
             remote::remote_reset,
             remote::remote_control_set,
             remote::remote_profile,
+            remote::remote_notes,
             remote::remote_mirror,
             wol::wol_status,
             wol::wol_fix,

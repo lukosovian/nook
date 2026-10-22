@@ -121,6 +121,16 @@ pub struct Settings {
     pub hum_shortcut: String,
     /// Otomatik Hum: arkada dinler, bulduğu şarkıları kaydeder
     pub hum_auto: bool,
+    /// Kısayol tuşlarının klavye kısayolları (basılınca ön yüz o tuşu çalıştırır)
+    pub deck_hotkeys: Vec<DeckHotkey>,
+}
+
+/// Bir kısayol tuşunun klavye kısayolu
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DeckHotkey {
+    pub id: String,
+    pub accel: String,
 }
 
 /// Tepsi menüsündeki yazılar; boş olan Türkçe kalır (bkz. window::TRAY_ITEMS)
@@ -174,6 +184,7 @@ impl Default for Settings {
             live_shortcut: "Ctrl+Alt+L".into(),
             hum_shortcut: "Ctrl+Alt+M".into(),
             hum_auto: false,
+            deck_hotkeys: Vec::new(),
         }
     }
 }

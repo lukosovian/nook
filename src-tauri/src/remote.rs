@@ -49,10 +49,18 @@ static APP: Mutex<Option<AppHandle>> = Mutex::new(None);
 static PROFILE: Mutex<Value> = Mutex::new(Value::Null);
 /// Ön yüzün aynası: pano geçmişi ve not sekmeleri (ön yüz değiştikçe gönderir; telefon buradan okur)
 static MIRROR: Mutex<Value> = Mutex::new(Value::Null);
+/// Yama notları (yalnızca metin; ön yüz açılışta bir kez gönderir)
+static PATCH_NOTES: Mutex<Value> = Mutex::new(Value::Null);
 /// Son iki dakikada görülen imzalar (aynı isteğin tekrar gönderilmesine karşı)
 static SEEN: Mutex<VecDeque<(i64, String)>> = Mutex::new(VecDeque::new());
 /// Telefondan ekran kapatıldıysa ne zaman (o andan beri klavye/fare kullanılmadıysa ekran hâlâ kapalı)
 static SCREEN_OFF_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// Telefondan ev ağı (Tailscale değil) üzerinden gelen son istek: uzun aradan sonraki ilki "eve geldi"
+static LAST_LAN: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// Uzun aradan sonra telefonun ev ağından ilk görüldüğü an; Wi-Fi'ye bağlandım haberi gelince "eve geldi"
+static CAME_BACK: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// Telefon bu kadar süre ev ağından hiç bağlanmadıysa dışarıda sayılır
+const AWAY_AFTER: Duration = Duration::from_secs(20 * 60);
 
 fn config_path() -> Option<PathBuf> {
     Some(PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Nook").join("remote.json"))
@@ -155,6 +163,33 @@ fn allowed_peer(ip: IpAddr) -> bool {
     }
 }
 
+/// Ev ağındaki adres (Tailscale 100.64/10 ve bu bilgisayar değil)
+fn home_peer(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_private(),
+        IpAddr::V6(v6) => (v6.segments()[0] & 0xffc0) == 0xfe80,
+    }
+}
+
+/// Telefon ev ağından bağlandı: en az AWAY_AFTER boyunca gelmemişse geri dönmüş olabilir (Nook açıldıktan
+/// sonraki ilk bağlantı sayılmaz; telefon zaten evdeydi). "Eve geldi" telefonun Wi-Fi haberiyle kesinleşir.
+fn phone_seen_home() {
+    let mut last = LAST_LAN.lock().unwrap();
+    if last.is_some_and(|t| t.elapsed() >= AWAY_AFTER) {
+        *CAME_BACK.lock().unwrap() = Some(std::time::Instant::now());
+    }
+    *last = Some(std::time::Instant::now());
+}
+
+/// Telefon olayını ön yüze (otomasyonlar) ilet
+fn phone_event(event: &str) {
+    if let Some(app) = APP.lock().unwrap().as_ref() {
+        use tauri::Emitter;
+        crate::log::write("info", &format!("telefon olayı: {event}"));
+        let _ = app.emit_to(crate::window::ISLAND, "nook://phone-event", json!({ "event": event }));
+    }
+}
+
 fn header(req: &Request, name: &'static str) -> Option<String> {
     req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.as_str().to_owned())
 }
@@ -245,6 +280,9 @@ fn handle(mut req: Request) {
         crate::log::write("warn", &format!("telefon isteği reddedildi ({e}): {} {}", req.method(), req.url()));
         let _ = req.respond(err(401, e));
         return;
+    }
+    if peer.is_some_and(home_peer) {
+        phone_seen_home();
     }
     let url = req.url().to_owned();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
@@ -519,6 +557,10 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
                 return err(400, "ses çok kısa");
             }
             let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
+            // Ön yüz henüz açılmadıysa (PC yeni açıldı) bulunan şarkıyı geçmişe yazacak kimse yok: telefon sonra yeniden dener
+            if MIRROR.lock().unwrap().is_null() {
+                return err(503, "Nook hazır değil");
+            }
             // PC kapalıyken kaydedilip sonradan gönderilen dinleme: ne kadar önce duyulduğu
             let ago = query_param(query, "ago").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
             let out = crate::hum::phone(&app, &samples, ago);
@@ -579,6 +621,52 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             }
         }
         (Method::Get, "/v1/hum") => json_res(200, json!({ "hums": MIRROR.lock().unwrap()["hums"].clone() })),
+        // Telefondaki olay: { event: charging | unplugged | wifi } (wifi yalnızca "buradayım" demek; eve gelmeyi
+        // isteğin geldiği ağdan handle() anlar)
+        (Method::Post, "/v1/phone-event") => {
+            let b = body_json(body);
+            match b["event"].as_str().unwrap_or("") {
+                e @ ("charging" | "unplugged") => phone_event(e),
+                // Telefon Wi-Fi'ye bağlandı ve son on dakikada uzun aradan sonra ev ağından görüldü
+                "wifi" => {
+                    if CAME_BACK.lock().unwrap().take().is_some_and(|t| t.elapsed() < Duration::from_secs(600)) {
+                        phone_event("home");
+                    }
+                }
+                _ => return err(400, "bilinmeyen olay"),
+            }
+            json_res(200, json!({ "ok": true }))
+        }
+        // Kısayollar: tuşlar ve otomasyonlar (yollar telefona gitmez)
+        (Method::Get, "/v1/deck") => {
+            let m = MIRROR.lock().unwrap();
+            json_res(200, json!({ "keys": m["deck"].clone(), "autos": m["autos"].clone() }))
+        }
+        // { op: run, id } tuşa bas · { op: auto, id, on } otomasyonu aç/kapa
+        (Method::Post, "/v1/deck") => {
+            let b = body_json(body);
+            let op = b["op"].as_str().unwrap_or("");
+            let id = b["id"].as_str().unwrap_or("").to_owned();
+            if !matches!(op, "run" | "auto") || id.is_empty() {
+                return err(400, "bilinmeyen kısayol işlemi");
+            }
+            // Ayna ön yüz işleyene kadar eski kalmasın
+            if op == "auto" {
+                if let Some(a) = MIRROR.lock().unwrap()["autos"].as_array_mut().and_then(|l| l.iter_mut().find(|a| a["id"].as_str() == Some(&id))) {
+                    a["on"] = Value::Bool(b["on"].as_bool().unwrap_or(false));
+                }
+            }
+            match APP.lock().unwrap().as_ref() {
+                Some(app) => {
+                    use tauri::Emitter;
+                    let _ = app.emit_to(crate::window::ISLAND, "nook://remote", json!({ "kind": "deck", "op": op, "id": id, "on": b["on"].as_bool().unwrap_or(false) }));
+                    json_res(200, json!({ "ok": true }))
+                }
+                None => err(503, "Nook hazır değil"),
+            }
+        }
+        // Yama notları (en yeni sürüm önce)
+        (Method::Get, "/v1/patch-notes") => json_res(200, json!({ "notes": PATCH_NOTES.lock().unwrap().clone() })),
         // Nook'un günlüğü (en yeni önce)
         (Method::Get, "/v1/diary") => json_res(200, json!({ "diary": MIRROR.lock().unwrap()["diary"].clone() })),
         // Uzaktan açma ve bağlantı hazırlığının tamamı: telefon saklar, PC kapalıyken de gösterir
@@ -971,6 +1059,11 @@ pub fn remote_mirror(data: Value) {
 }
 
 #[tauri::command]
+pub fn remote_notes(notes: Value) {
+    *PATCH_NOTES.lock().unwrap() = notes;
+}
+
+#[tauri::command]
 pub fn remote_profile(profile: Value) {
     *PROFILE.lock().unwrap() = profile;
 }
@@ -992,7 +1085,7 @@ pub fn remote_reset() -> Info {
 pub(crate) mod power {
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, LUID};
     use windows_sys::Win32::Security::{AdjustTokenPrivileges, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY};
-    use windows_sys::Win32::System::Shutdown::{ExitWindowsEx, EWX_POWEROFF, EWX_REBOOT, EWX_SHUTDOWN, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OTHER};
+    use windows_sys::Win32::System::Shutdown::{ExitWindowsEx, EWX_FORCEIFHUNG, EWX_POWEROFF, EWX_REBOOT, EWX_SHUTDOWN, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OTHER};
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
     /// Kapatma yetkisi (SeShutdownPrivilege) işlem için açılmalı
@@ -1022,7 +1115,9 @@ pub(crate) mod power {
 
     pub fn exit(restart: bool) -> Result<(), String> {
         enable_shutdown_privilege()?;
-        let flags = if restart { EWX_REBOOT } else { EWX_SHUTDOWN | EWX_POWEROFF };
+        // Başında kimse yokken "uygulamalar kapanmayı engelliyor" ekranında sonsuza dek beklemesin: yanıt vermeyen
+        // uygulamalar süre dolunca kapatılır
+        let flags = (if restart { EWX_REBOOT } else { EWX_SHUTDOWN | EWX_POWEROFF }) | EWX_FORCEIFHUNG;
         if unsafe { ExitWindowsEx(flags, SHTDN_REASON_MAJOR_OTHER | SHTDN_REASON_FLAG_PLANNED) } == 0 {
             return Err("Windows kapatmayı reddetti".into());
         }

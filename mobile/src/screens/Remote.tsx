@@ -104,8 +104,8 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
   const text = useRef<HTMLTextAreaElement>(null);
   const prevText = useRef(SENTINEL);
   // Hareket işleyicileri en son değerleri okusun (her dokunuşta yeniden kurulmasın)
-  const st = useRef({ box, img, view, cursor, mode, mods, mon });
-  st.current = { box, img, view, cursor, mode, mods, mon };
+  const st = useRef({ box, img, view, cursor, mode, mods, mon, keys });
+  st.current = { box, img, view, cursor, mode, mods, mon, keys };
   /** Kullanıcı imleci son ne zaman oynattı: o sırada PC'den gelen imleç konumu yerelin üstüne yazılmasın */
   const touchedAt = useRef(0);
 
@@ -254,6 +254,8 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
   const onDown = (e: React.PointerEvent) => {
     // Yüzeye dokunmak yazı kutusunun odağını almasın: klavye açıksa açık kalır
     e.preventDefault();
+    // Klavye kapalıyken yazı kutusunda odak kalmasın: kalırsa Android her dokunuşta klavyeyi yeniden açıyor
+    if (!st.current.keys && document.activeElement === text.current) text.current?.blur();
     surface.current?.setPointerCapture(e.pointerId);
     const s = g.current;
     const p = pos(e);
@@ -456,6 +458,35 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
     });
   };
 
+  // Klavye telefonun geri tuşuyla / aşağı kaydırılarak kapatıldı: yazı kutusu da bıraksın, düğme de sönsün
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let full = vv.height;
+    let width = vv.width;
+    let shrunk = false;
+    const onResize = () => {
+      // Ekran döndü: yeni tam boy bu
+      if (Math.abs(vv.width - width) > 40) {
+        width = vv.width;
+        full = vv.height;
+        shrunk = false;
+        return;
+      }
+      if (vv.height < full * 0.85) shrunk = true;
+      else {
+        if (shrunk && st.current.keys) {
+          text.current?.blur();
+          setKeys(false);
+        }
+        shrunk = false;
+        full = Math.max(full, vv.height);
+      }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
   // ---------------------------------------------------------------- Görünüm
   const r = img ? layout(box, img, view) : null;
   const shownCursor = cursor && r ? { x: r.left + cursor.x * r.w, y: r.top + cursor.y * r.h } : null;
@@ -579,6 +610,7 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
         autoCorrect="off"
         spellCheck={false}
         onInput={(e) => onText(e.currentTarget.value)}
+        onBlur={() => setKeys(false)}
         className="pointer-events-none absolute bottom-0 left-0 h-px w-px opacity-0"
       />
     </motion.div>

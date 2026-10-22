@@ -295,6 +295,7 @@ export function useGameFeed() {
     return subscribe<GamePayload>(EVENTS.game, (g) => {
       const s = useNook.getState();
       s.track({ game: Math.round(g.secs / 60) });
+      s.logGame(g.app, g.secs);
       if (!s.settings.gameSummary) return;
       s.pushToast({
         kind: "game",

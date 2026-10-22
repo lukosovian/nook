@@ -22,7 +22,8 @@ export function diagnose(p: Pairing): Diagnosis {
   if (!net)
     return { title: "PC'ye ulaşılamıyor", detail: "PC kapalı ya da uykuda olabilir.", action: "wake", canWake: true };
   if (!net.online) return { title: "Telefonda internet yok", detail: "Wi-Fi'ye ya da mobil veriye bağlan.", action: "none", canWake: false };
-  const home = onHomeLan(p.hosts);
+  // Aynı adres aralığında ama Tailscale de açıkken ulaşılamıyorsa başka bir evin Wi-Fi'si olabilir: aşağıdaki gibi
+  const home = onHomeLan(p.hosts) && !(net.vpn && hasTs(p));
   if (home)
     return {
       title: "PC kapalı ya da uykuda",
@@ -62,10 +63,15 @@ export function diagnose(p: Pairing): Diagnosis {
   };
 }
 
-/** Evden uzaktaysa ve Tailscale kapalıysa açar (Nook açtıysa Nook kapanınca kapanır). Açtıysa true. */
-export function ensureTunnel(p: Pairing): boolean {
+/**
+ * Evden uzaktaysa ve Tailscale kapalıysa açar (Nook açtıysa Nook kapanınca kapanır). Açtıysa true.
+ * `unreached`: PC'nin ev ağı adresi yanıt vermedi. Telefon "evdeyim"i yalnızca Wi-Fi adresinin ilk üç
+ * bölümünden anlıyor; 192.168.1.x gibi aralıklar başka evlerde de var. O yüzden ev ağı adresi yanıt
+ * vermediyse aynı aralıktaki bir Wi-Fi'de de Tailscale denenir.
+ */
+export function ensureTunnel(p: Pairing, unreached = false): boolean {
   if (!native || !hasTs(p)) return false;
-  if (onHomeLan(p.hosts) !== false) return false;
+  if (onHomeLan(p.hosts) !== false && !unreached) return false;
   const net = netInfo();
   if (!net?.online || net.vpn) return false;
   try {

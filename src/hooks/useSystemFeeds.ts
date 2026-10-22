@@ -36,6 +36,7 @@ import { isLive, isSleeping, SULK_BELOW, useNook, type Antic, type Settings } fr
 import { islandModeOf } from "./useIslandMode";
 import { playAntic } from "./useAntics";
 import { dec, locale, tt } from "../lib/i18n";
+import type { DeckKey } from "../lib/deck";
 
 /** "12 dakikadır", "1 saat 20 dakikadır", "3 saattir" — ve ek almadan: "12 dakika", "3 saat" */
 function awayText(mins: number) {
@@ -551,7 +552,7 @@ export function useStorageSync() {
   }, []);
 }
 
-const native = (s: Settings) => ({
+const native = (s: Settings, deck: DeckKey[] | null) => ({
   monitorMode: s.monitorMode,
   monitorName: s.monitorName,
   sleepAfterSec: s.sleepAfterSec,
@@ -586,6 +587,8 @@ const native = (s: Settings) => ({
   liveShortcut: s.liveShortcut ?? "",
   humShortcut: s.humShortcut ?? "",
   humAuto: s.humAuto ?? false,
+  // Klavye kısayolu atanmış kısayol tuşları
+  deckHotkeys: (deck ?? []).filter((k) => k.hotkey).map((k) => ({ id: k.id, accel: k.hotkey! })),
 });
 
 /** Tam ekran oyun/video → ada kaçar (Rust ardından pencereyi gizler). Gizliyken kare çizilmez. */
@@ -708,10 +711,11 @@ export function useAffection() {
 /** Ayarları Rust'a ve Windows başlangıcına uygula (yalnızca ana ada; açılışta ve her değişimde). */
 export function useSettingsSync() {
   const settings = useNook((s) => s.settings);
-  const key = JSON.stringify(native(settings));
+  const deck = useNook((s) => s.deck);
+  const key = JSON.stringify(native(settings, deck));
   useEffect(() => {
     if (!isPrimary) return;
-    void applySettings(native(useNook.getState().settings)).catch((e) => {
+    void applySettings(native(useNook.getState().settings, useNook.getState().deck)).catch((e) => {
       console.warn("[nook] ayarlar", e);
       // Kısayolu başka bir program tutuyorsa sessizce çalışmamak yerine söyle
       const m = /Kısayol kaydedilemedi \(([^:]+):/.exec(String(e));

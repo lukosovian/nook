@@ -21,6 +21,22 @@ import org.json.JSONObject
 class WaterReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val ctx = context.applicationContext
+        // Düğmeye basıldı: bildirim hemen kapansın, cevap PcLink.io kuyruğunu beklemesin (bekleyen bildirimler
+        // PC'ye ulaşamazken o kuyruk dakikalarca dolu kalabiliyor, alıcının süresi de birkaç saniye)
+        if (intent.action == ACTION_DRANK || intent.action == ACTION_SNOOZE) {
+            hide(ctx)
+            val pending = goAsync()
+            Thread {
+                try {
+                    answer(ctx, if (intent.action == ACTION_DRANK) "drank" else "snooze")
+                } catch (e: Exception) {
+                    // gönderilemeyen cevap bir sonraki denetimde yeniden denenir
+                } finally {
+                    pending.finish()
+                }
+            }.start()
+            return
+        }
         // HyperOS bildirim dinleyicisini sık sık bırakıyor (izin açık ama hiçbir bildirim gelmiyor): bu alarm
         // düzenli çalıştığından her seferinde yeniden bağlanmayı ister (süreç öldürülünce "bağlı" kaydı eski kalıyor,
         // ona bakılmaz), bekleyen bildirimleri de gönderir
@@ -29,11 +45,7 @@ class WaterReceiver : BroadcastReceiver() {
         val pending = goAsync()
         PcLink.io.execute {
             try {
-                when (intent.action) {
-                    ACTION_DRANK -> answer(ctx, "drank")
-                    ACTION_SNOOZE -> answer(ctx, "snooze")
-                    else -> check(ctx)
-                }
+                check(ctx)
             } catch (e: Exception) {
                 // bir sonraki denetimde düzelir
             } finally {
@@ -79,6 +91,10 @@ class WaterReceiver : BroadcastReceiver() {
                 return
             }
             val now = System.currentTimeMillis()
+            // PC'ye ulaşamadığı için gönderilemeyen "İçtim" / "Sonra"
+            p.getString("waterAnswer", null)?.let { body ->
+                if (PcLink.post(ctx, "/v1/water", body.toByteArray()) != null) p.edit().remove("waterAnswer").apply()
+            }
             val pc = PcLink.get(ctx, "/v1/water")?.let { runCatching { JSONObject(it) }.getOrNull() }
             if (pc != null && pc.has("every")) {
                 val every = pc.optInt("every", 0)
@@ -119,11 +135,13 @@ class WaterReceiver : BroadcastReceiver() {
             val own = p.getBoolean("waterOwn", false)
             hide(ctx)
             val now = System.currentTimeMillis()
-            val sent = PcLink.post(ctx, "/v1/water", JSONObject().put("op", op).put("own", own).toString().toByteArray()) != null
             val every = p.getInt("waterEvery", 0)
             if (op == "drank") p.edit().putLong("waterLast", now).apply()
             // "Sonra": 15 dk sonra yeniden (PC'de de aynısı yapılır)
             else p.edit().putLong("waterLast", now - every * MIN + SNOOZE_MS).apply()
+            val body = JSONObject().put("op", op).put("own", own).toString()
+            val sent = PcLink.post(ctx, "/v1/water", body.toByteArray()) != null
+            if (sent) p.edit().remove("waterAnswer").apply() else p.edit().putString("waterAnswer", body).apply()
             schedule(ctx, if (sent) now + 20_000 else if (op == "drank") now + every * MIN else now + SNOOZE_MS)
         }
 

@@ -89,11 +89,7 @@ export function Brief() {
   const update = useUpdate((u) => u.available);
   const progress = useUpdate((u) => u.progress);
   const line = useTodayLine();
-  const yesterdayDiary = useNook((st) => {
-    const y = new Date();
-    y.setDate(y.getDate() - 1);
-    return st.diary[dayKey(y)]?.text ?? null;
-  });
+  const todayDiary = useNook((st) => st.diary[dayKey()]?.text ?? null);
 
   const now = new Date();
   const h = now.getHours();
@@ -112,8 +108,8 @@ export function Brief() {
 
   const tiles = useTiles();
   const hasShows = !!snap;
-  // Dünkü günlük varsa kartların ilk satırının yerini alır
-  const visibleTiles = tiles.slice(0, (hasShows ? 6 : 9) - (yesterdayDiary ? 3 : 0));
+  // Bugünün günlüğü (gece yazılır) varsa kartların ilk satırının yerini alır
+  const visibleTiles = tiles.slice(0, (hasShows ? 6 : 9) - (todayDiary ? 3 : 0));
 
   return (
     <motion.div
@@ -229,15 +225,15 @@ export function Brief() {
           </motion.div>
         )}
         <div className="grid min-h-0 flex-1 grid-cols-3 gap-2.5" style={{ gridAutoRows: "1fr" }}>
-          {yesterdayDiary && (
+          {todayDiary && (
             <motion.div {...enter(2)} className="col-span-3 min-h-0">
               <Card className="flex h-full gap-3 overflow-hidden px-3.5 py-2.5">
                 <MiniNook color={ACCENT.purple} size={22} eyes="happy" />
                 <p className="min-w-0 flex-1 overflow-y-auto text-[11px] leading-[1.38] text-label-2">
                   <span className="font-bold" style={{ color: tintText(ACCENT.purple) }}>
-                    {tt("Dünkü günlüğüm")} ·{" "}
+                    {tt("Bugünkü günlüğüm")} ·{" "}
                   </span>
-                  {yesterdayDiary}
+                  {todayDiary}
                 </p>
               </Card>
             </motion.div>

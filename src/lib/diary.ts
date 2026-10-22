@@ -182,7 +182,7 @@ export function useDiary() {
         if (text) useNook.getState().pushToast({ kind: "chat", title: tt("Bugünü günlüğüme yazdım"), detail: tt("Studio ana sayfasında ya da telefonda oku"), ms: 8000 });
       }
     };
-    // Sabah günün özeti açılırken dünkü günlük hazır olsun diye erkenden
+    // Açılışta dünkü günlük eksikse erkenden yazılsın (Studio ve telefon)
     const first = window.setTimeout(() => void check(), 8_000);
     const every = window.setInterval(() => void check(), CHECK_EVERY_MS);
     return () => {

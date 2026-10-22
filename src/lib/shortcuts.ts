@@ -117,3 +117,15 @@ export function conflicts(settings: Settings, apps: string[]): { info: ShortcutI
 
 /** "Ctrl+Shift+Space" → "Ctrl + Shift + Boşluk" */
 export const prettyKeys = (combo: string) => combo.replace("Space", tt("Boşluk")).split("+").join(" + ");
+
+/**
+ * Kısayol tuşuna (Studio › Kısayollar) verilen kombinasyon Nook'un kendi kısayollarından birinde ya da başka
+ * bir tuşta da var mı: varsa o işin adı. Nook'unkiler önce kaydedildiği için o zaman tuşunki çalışmaz.
+ */
+export function hotkeyTaken(combo: string, settings: Settings, keys: { id: string; label: string; hotkey?: string }[], self: string): string | null {
+  if (!combo) return null;
+  const n = norm(combo);
+  const own = SHORTCUTS.find((x) => settings[x.key] && norm(settings[x.key]) === n);
+  if (own) return own.label;
+  return keys.find((k) => k.id !== self && k.hotkey && norm(k.hotkey) === n)?.label ?? null;
+}

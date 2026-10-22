@@ -22,7 +22,8 @@ export function islandModeOf(s: State): IslandMode {
   if (s.notes && isPrimary) return "notes";
   if (s.report && isPrimary) return "report";
   // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
-  if (s.reminder) return "reminder";
+  // Otomasyon "çalışsın mı?" diye soruyor (aynı kart)
+  if (s.reminder || (s.autoAsk && isPrimary)) return "reminder";
   // Claude Code izin istiyor: cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
   if (s.claudeCard && isPrimary) return "claude";
   if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";

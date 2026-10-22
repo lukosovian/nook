@@ -6,7 +6,8 @@
 import { appsCached as listApps, quickState } from "./bridge";
 import { openArgus, useArgus } from "./argus";
 import { runTool, type ToolNote } from "./aiTools";
-import { lang } from "./i18n";
+import { lang, tt } from "./i18n";
+import { runByVoice } from "./automations";
 
 /** Sık açılan siteler: "Gmail'i aç" → adres */
 const SITES: Record<string, string> = {
@@ -205,9 +206,16 @@ async function runEnglish(raw: string): Promise<{ result: string; note: ToolNote
 
 /** Komutu yerelde yap; yapıldıysa sonucu, anlaşılmadıysa null döner */
 export async function runLocalCommand(raw: string): Promise<{ result: string; note: ToolNote } | null> {
+  // Kısayol tuşunun ya da otomasyonun adı ("gece modu", "oyun modu"): adın kendisiyse önce o
+  const key = async (exact: boolean) => {
+    const name = await runByVoice(raw, exact);
+    return name ? { result: `${name} çalıştırıldı.`, note: { icon: "toggle" as const, text: tt("{0} çalıştı", name) } } : null;
+  };
+  const hit = await key(true);
+  if (hit) return hit;
   // Nook'un dilindeki kalıplar önce ("google hava durumu ara" Türkçede İngilizce aramaya düşmesin)
-  if (lang === "tr") return (await runTurkish(raw)) ?? runEnglish(raw);
-  return (await runEnglish(raw)) ?? runTurkish(raw);
+  const local = lang === "tr" ? ((await runTurkish(raw)) ?? (await runEnglish(raw))) : ((await runEnglish(raw)) ?? (await runTurkish(raw)));
+  return local ?? key(false);
 }
 
 async function runTurkish(raw: string): Promise<{ result: string; note: ToolNote } | null> {

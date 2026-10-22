@@ -486,11 +486,15 @@ export const argusSetEpisodes = (p: Pairing, rowId: string, add: [number, number
 // ---------------------------------------------------------------- PC'yi açma
 
 /** Wake-on-LAN: ev ağına yayın; modemde yönlendirme varsa evin internet adresine de (dışarıdan açma) */
-export async function wakePc(p: Pairing, mac?: string | null) {
+export async function wakePc(p: Pairing, mac?: string | null, again = true) {
   const m = mac || p.mac;
   if (!m) throw new Error("PC'nin ağ kartı adresi bilinmiyor: PC açıkken uygulamayı bir kez aç.");
   const { invoke } = await import("@tauri-apps/api/core");
-  await invoke<number>("wake_pc", { mac: m, hosts: p.hosts, wan: p.wan ?? null });
+  const send = () => invoke<number>("wake_pc", { mac: m, hosts: p.hosts, wan: p.wan ?? null });
+  await send();
+  // Tek gönderim kaybolabiliyor (telefonun Wi-Fi'ı o an uykudaydı, modem paketi düşürdü): yarım dakika
+  // boyunca birkaç kez daha. PC açıkken gelen fazladan paketin zararı yok.
+  if (again) for (const ms of [2500, 7000, 15000, 30000]) window.setTimeout(() => void send().catch(() => {}), ms);
 }
 
 export interface WakeTestResult {
@@ -506,7 +510,7 @@ export interface WakeTestResult {
  */
 export async function wakeTest(p: Pairing, mac?: string | null): Promise<WakeTestResult | null> {
   await request(p, "POST", "/v1/wake/test", {});
-  await wakePc(p, mac);
+  await wakePc(p, mac, false);
   await new Promise((r) => setTimeout(r, 3000));
   return request(p, "GET", "/v1/wake/test").then((r) => r.json() as Promise<WakeTestResult | null>);
 }
@@ -809,3 +813,94 @@ export const getDiary = (p: Pairing) =>
     : request(p, "GET", "/v1/diary")
         .then((r) => r.json().then((j: { diary: PcDiary[] | null }) => j.diary ?? []))
         .then((d) => (cache("diary", d), d));
+
+/** PC'deki Nook'un yama notları (yalnızca metin; en yeni sürüm önce) */
+export interface PcNote {
+  version: string;
+  date: string;
+  headline: string;
+  major?: boolean;
+  items: { title: string; text: string }[];
+}
+
+export const getPatchNotes = (p: Pairing) =>
+  DEMO(p)
+    ? Promise.resolve<PcNote[]>([
+        {
+          version: "0.3.1",
+          date: "23 Ekim 2026",
+          headline: "Kısayollarda otomasyonlar, Studio'da oyun geçmişi ve Bugün'de bugünün günlüğü",
+          items: [
+            { title: "Otomasyonlar: bu olunca şunu yap", text: "Studio › Kısayollar'da yeni Otomasyonlar sekmesi. Bir şey olunca Nook senin yerine yapıyor." },
+            { title: "Rutinlere yeni adımlar", text: "Tuşlara ve otomasyonlara ses seviyesi, parlaklık, “Nook söylesin”, bekle, Wi-Fi ve Bluetooth adımları geldi." },
+          ],
+        },
+        { version: "0.3.0", date: "20 Ekim 2026", headline: "Yepyeni ada, Nook Studio ve kapalı ada kapsülleri", major: true, items: [{ title: "Nook Studio", text: "Bütün ayarlar tek pencerede." }] },
+      ])
+    : request(p, "GET", "/v1/patch-notes")
+        .then((r) => r.json().then((j: { notes: PcNote[] | null }) => j.notes ?? []))
+        .then((n) => (cache("patchNotes", n), n));
+
+// ---------------------------------------------------------------- Kısayollar
+
+/** PC'deki kısayol tuşu (adımları PC'de; telefon yalnızca basar) */
+export interface PcKey {
+  id: string;
+  label: string;
+  /** Masaüstündeki simge adı (DECK_ICONS) */
+  icon: string;
+  color: string;
+  steps: number;
+  /** Ana ekranda da gösterilsin */
+  home: boolean;
+  /** Kapatma/uyku: ikinci dokunuşta çalışır */
+  danger: boolean;
+  /** Uygulama tuşunun kendi simgesi (PNG data URL) */
+  appIcon: string | null;
+}
+
+export interface PcAuto {
+  id: string;
+  label: string;
+  on: boolean;
+  /** "Her gün 23:00" gibi */
+  when: string;
+  icon: string;
+  color: string;
+  steps: number;
+}
+
+export interface PcDeck {
+  keys: PcKey[];
+  autos: PcAuto[];
+}
+
+const DEMO_DECK: PcDeck = {
+  keys: [
+    { id: "d-mic", label: "Mikrofon", icon: "mic", color: "#f2a33a", steps: 1, home: true, danger: false, appIcon: null },
+    { id: "d-mute", label: "Ses", icon: "volume", color: "#f0545c", steps: 1, home: false, danger: false, appIcon: null },
+    { id: "k3", label: "Oyun modu", icon: "scene", color: "#8f6bff", steps: 3, home: true, danger: false, appIcon: null },
+    { id: "d-desktop", label: "Masaüstü", icon: "desktop", color: "#3d8bff", steps: 1, home: false, danger: false, appIcon: null },
+    { id: "d-lock", label: "Kilitle", icon: "lock", color: "#3fbfa5", steps: 1, home: true, danger: false, appIcon: null },
+    { id: "k6", label: "Spotify", icon: "app", color: "#3d8bff", steps: 1, home: false, danger: false, appIcon: null },
+    { id: "k7", label: "Uyku", icon: "sleep", color: "#3d8bff", steps: 1, home: false, danger: true, appIcon: null },
+  ],
+  autos: [
+    { id: "a1", label: "Gece modu", on: true, when: "Her gün 23:00", icon: "clock", color: "#ffd23f", steps: 4 },
+    { id: "a2", label: "Oyun bitince mola", on: true, when: "Oyun bitince", icon: "play", color: "#f0545c", steps: 1 },
+    { id: "a3", label: "Ayrılınca mikrofon kapansın", on: false, when: "Kilitlenince", icon: "lock", color: "#3fbfa5", steps: 1 },
+  ],
+};
+
+export const getDeck = (p: Pairing) =>
+  DEMO(p)
+    ? Promise.resolve(DEMO_DECK)
+    : request(p, "GET", "/v1/deck")
+        .then((r) => r.json().then((j: { keys: PcKey[] | null; autos: PcAuto[] | null }) => ({ keys: j.keys ?? [], autos: j.autos ?? [] })))
+        .then((d) => (cache("deck", d), d));
+
+/** Tuşa PC'de bas */
+export const runPcKey = (p: Pairing, id: string) => (DEMO(p) ? Promise.resolve() : request(p, "POST", "/v1/deck", { op: "run", id }).then(() => undefined));
+
+/** Otomasyonu aç / kapa */
+export const setPcAuto = (p: Pairing, id: string, on: boolean) => (DEMO(p) ? Promise.resolve() : request(p, "POST", "/v1/deck", { op: "auto", id, on }).then(() => undefined));

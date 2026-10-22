@@ -16,6 +16,9 @@ const REPO_API = "https://api.github.com/repos/lukosovian/nook";
 const STORE = "nook.supporters";
 const LIST_EVERY_MS = 6 * 3600_000;
 
+/** Destekçiler arasında “Yatırımcı” rozetiyle, en başta görünenler (GitHub adı) */
+export const INVESTORS = new Set(["hsnatagul"]);
+
 export interface Supporter {
   login: string;
   avatar: string;

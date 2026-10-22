@@ -9,6 +9,8 @@ import { useNook } from "../../store/nook";
 import { allProfiles } from "../../lib/profiles";
 import { tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
+import { useDeck } from "../../lib/deck";
+import { HomeKeys } from "./AppsPanel";
 import {
   Breath,
   byProfile,
@@ -155,10 +157,15 @@ function SmallCard({ m, st, delay }: { m: ModuleDef; st: Status | undefined; del
   );
 }
 
-/** Alt sıra: kalan bölümlerden birkaçı hızlı çip; sağda bütün modüller */
+/**
+ * Alt sıra: kalan bölümlerden birkaçı hızlı çip; sağda bütün modüller. Kısayollardan "Ana sayfada göster"
+ * seçilen tuş varsa çiplerin yerinde o tuşlar durur (tek tıkla çalışır).
+ */
 function QuickRow({ rest, total }: { rest: ModuleDef[]; total: number }) {
   const sub = useModuleStatus();
-  const quick = rest.slice(0, 3);
+  const deck = useDeck();
+  const keys = deck.filter((k) => k.home).slice(0, 7);
+  const quick = keys.length ? [] : rest.slice(0, 3);
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -186,6 +193,7 @@ function QuickRow({ rest, total }: { rest: ModuleDef[]; total: number }) {
           </motion.button>
         );
       })}
+      <HomeKeys keys={keys} />
       <motion.button
         onClick={() => useNook.getState().setTab("modules")}
         whileHover={{ scale: 1.03 }}

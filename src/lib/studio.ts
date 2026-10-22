@@ -1,7 +1,7 @@
 /**
  * Nook Studio: ayarlar, görünüm, kısayol tuşları, modüller, karne, yıl özeti ve yama notları ayrı bir
  * masaüstü penceresinde. Ada hafif kalır; ağır sayfalar burada geniş alanda açılır.
- * Bölüm adresi: "home" | "look" | "keys" | "modules" | "argus" | "report" | "year" | "notes" | "settings"
+ * Bölüm adresi: "home" | "look" | "keys" | "modules" | "argus" | "report" | "year" | "games" | "notes" | "settings"
  * ya da "settings:<bölüm başlığı>" (o ayara kaydırır), "notes:<sürüm>" (o sürümün notu).
  */
 import { useEffect, useState } from "react";
@@ -10,8 +10,8 @@ import { EVENTS, inTauri, openStudioWindow, subscribe, windowLabel } from "./bri
 import { useNook } from "../store/nook";
 import { exitBig } from "./big";
 
-export type StudioPage = "home" | "look" | "keys" | "modules" | "argus" | "report" | "year" | "notes" | "settings" | "tour";
-export const STUDIO_PAGES: StudioPage[] = ["home", "look", "keys", "modules", "argus", "report", "year", "notes", "settings", "tour"];
+export type StudioPage = "home" | "look" | "keys" | "modules" | "argus" | "report" | "year" | "games" | "notes" | "settings" | "tour" | "aquarium";
+export const STUDIO_PAGES: StudioPage[] = ["home", "look", "keys", "modules", "argus", "report", "year", "games", "notes", "settings", "tour", "aquarium"];
 
 export const isStudio = windowLabel === "studio" || (import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "studio");
 

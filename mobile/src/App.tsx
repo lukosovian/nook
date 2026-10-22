@@ -3,7 +3,7 @@ import { AnimatePresence } from "motion/react";
 import { DEMO_PAIRING, findHost, getStatus, loadPairing, PcError, savePairing, type Pairing, type Status } from "./lib/pc";
 import { native, onNative } from "./lib/native";
 import { ensureTunnel } from "./lib/diagnose";
-import { flush } from "./lib/outbox";
+import { flush, pending } from "./lib/outbox";
 import { PairScreen } from "./screens/Pair";
 import { HomeScreen, type Screen } from "./screens/Home";
 import { PcScreen } from "./screens/Pc";
@@ -16,6 +16,9 @@ import { ShelfScreen } from "./screens/Shelf";
 import { NotifyScreen } from "./screens/Notify";
 import { LookScreen } from "./screens/Look";
 import { ClaudeScreen } from "./screens/Claude";
+import { KeysScreen } from "./screens/Keys";
+import { DiaryScreen } from "./screens/Diary";
+import { PatchScreen } from "./screens/Patch";
 import { ShareSheet, type Shared } from "./screens/Share";
 import { tourSeen, TourScreen } from "./screens/Tour";
 import { useToast } from "./ui";
@@ -72,7 +75,7 @@ function useStatus(pairing: Pairing | null, onOnline: () => void) {
       if (e instanceof PcError && e.kind === "auth") return setConn("auth");
       fails.current++;
       // Evden uzaktaysak ve Tailscale kapalıysa aç, birkaç saniye sonra yeniden dene
-      if (!tunnelTried.current && ensureTunnel(pairing)) {
+      if (!tunnelTried.current && ensureTunnel(pairing, true)) {
         tunnelTried.current = true;
         window.setTimeout(() => void refresh(), 3500);
         window.setTimeout(() => void refresh(), 8000);
@@ -113,19 +116,30 @@ export function App() {
   });
   const [screen, setScreen] = useState<Screen>(() => {
     const s = import.meta.env.DEV ? new URLSearchParams(location.search).get("demo") : null;
-    return s === "pc" || s === "argus" || s === "media" || s === "clips" || s === "notes" || s === "hum" || s === "notify" || s === "look" || s === "claude" || s === "shelf" ? s : "home";
+    return s === "pc" || s === "argus" || s === "media" || s === "clips" || s === "notes" || s === "hum" || s === "notify" || s === "look" || s === "claude" || s === "shelf" || s === "keys" || s === "diary" || s === "patch" ? s : "home";
   });
   const [toast, say] = useToast();
   // PC açılınca: PC kapalıyken yazılan notlar, panoya gönderilenler, Hum kayıtları ve telefonun bildirimleri gider
-  const onOnline = () => {
+  const sendPending = () => {
     if (!pairing) return;
-    native?.flushOutbox();
     void flush(pairing).then((r) => {
       if (r.found.length) say(`PC kapalıyken dinlediğin şarkı bulundu: ${r.found.map((t) => t.title).join(", ")}`);
+      else if (r.missed) say("PC kapalıyken dinlediğin şarkı bulunamadı");
       else if (r.sent) say("PC kapalıyken yaptıkların PC'ye gönderildi");
     });
   };
+  const onOnline = () => {
+    native?.flushOutbox();
+    sendPending();
+  };
   const { status, conn, setConn, refresh } = useStatus(pairing, onOnline);
+  // Gönderilemeyen kaldıysa (PC yeni açıldı, Nook henüz hazır değildi) PC açıkken yarım dakikada bir yeniden
+  useEffect(() => {
+    if (conn !== "online") return;
+    const t = window.setInterval(() => pending() > 0 && sendPending(), 30_000);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conn, pairing]);
   // İlk açılışta tanıtım (menüden de açılır)
   const [tour, setTour] = useState(() => {
     const demo = import.meta.env.DEV ? new URLSearchParams(location.search).get("demo") : null;
@@ -192,6 +206,12 @@ export function App() {
         return <LookScreen {...common} />;
       case "claude":
         return <ClaudeScreen {...common} />;
+      case "keys":
+        return <KeysScreen {...common} />;
+      case "diary":
+        return <DiaryScreen {...common} />;
+      case "patch":
+        return <PatchScreen {...common} />;
       default:
         return (
           <HomeScreen

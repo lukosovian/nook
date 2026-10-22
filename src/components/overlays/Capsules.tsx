@@ -49,7 +49,7 @@ const SHAPE: Record<CapsuleKind, Omit<Capsule, "kind" | "second">> = {
 };
 
 /** Baloncuktan açılınca gidilecek bölüm */
-const TAB_OF: Partial<Record<CapsuleKind, Tab>> = { focus: "focus", claude: "claude", music: "media", watch: "focus", event: "calendar", download: "shelf" };
+export const TAB_OF: Partial<Record<CapsuleKind, Tab>> = { focus: "focus", claude: "claude", music: "media", watch: "focus", event: "calendar", download: "shelf" };
 
 /** Kapalı adada şu an ne gösterilecek (ve yanda baloncuk var mı) */
 export function useCapsule(collapsed: boolean): Capsule | null {

@@ -53,7 +53,7 @@ function demoClaude(mode: string, params: URLSearchParams) {
         : null;
   useClaude.setState({
     setup: { present: true, hooked: !params.has("unhooked"), stale: false, statusline: "nook" },
-    plan: { fiveHour: { usedPct: 37, resetsAt: now + 2 * 3600_000 + 14 * 60_000 }, sevenDay: { usedPct: 62, resetsAt: now + 3 * 86_400_000 }, updatedAt: now - 60_000 },
+    plan: { fiveHour: { usedPct: 37, resetsAt: now + 2 * 3600_000 + 14 * 60_000 }, sevenDay: { usedPct: 62, resetsAt: now + 3 * 86_400_000 }, updatedAt: now - (params.has("planstale") ? 24 : 1) * 60_000 },
     asks: ask ? [ask] : [],
     sessions: {
       a: { ...base, id: "a", project: "Nook", cwd: "C:/Users/OEM/Desktop/Nook", state: ask ? "waiting" : CLAUDE_IDLE.includes(mode) && !params.has("claudework") ? "done" : "working", action: ask ? "Onay bekliyor · npm run tauri build" : "Düzenliyor · ClaudePanel.tsx", prompt: "Claude Code entegrasyonunu ekle", updatedAt: now - 20_000, edits: 12, commands: 5, files: ["ClaudePanel.tsx", "claude.rs", "Panels.tsx"] },
@@ -165,6 +165,29 @@ export function applyPreview(mode: string) {
       { id: "p2", name: "Discord", path: "y" },
       { id: "p3", name: "Steam", path: "z" },
     ],
+    // &homekeys: ana sayfanın alt sırasında kısayol tuşları
+    deck: params0.has("homekeys")
+      ? [
+          { id: "d-mic", label: "Mikrofon", icon: "mic", color: "#f2a33a", steps: [{ kind: "quick", key: "mic" }], home: true },
+          { id: "k2", label: "Oyun modu", icon: "scene", color: "#8f6bff", steps: [{ kind: "quick", key: "mic", on: false }, { kind: "open", path: "y", name: "Discord" }, { kind: "power", action: "desktop" }], home: true, hotkey: "Ctrl+Alt+1" },
+          { id: "d-lock", label: "Kilitle", icon: "lock", color: "#3fbfa5", steps: [{ kind: "power", action: "lock" }], home: true },
+        ]
+      : null,
+    automations: [
+      { id: "a1", label: "Gece modu", on: true, only: [{ kind: "notGame" }, { kind: "between", from: "22:00", to: "02:00" }], last: Date.now() - 86_400_000, when: { kind: "time", at: "23:00", days: [] }, steps: [{ kind: "quick", key: "dark", on: true }, { kind: "brightness", value: 30 }, { kind: "volume", value: 20 }, { kind: "say", text: "Gece moduna geçtim, ekranı kararttım" }] },
+      { id: "a4", label: "Eve hoş geldin", on: true, ask: true, last: Date.now() - 40 * 60_000, when: { kind: "phone", event: "home" }, steps: [{ kind: "say", text: "Hoş geldin! Müziği açayım mı?" }, { kind: "media", action: "toggle" }] },
+      { id: "a2", label: "Discord açılınca", on: true, when: { kind: "app", name: "Discord" }, steps: [{ kind: "quick", key: "mic", on: false }] },
+      { id: "a3", label: "Ayrılınca mikrofon kapansın", on: false, when: { kind: "lock", locked: true }, steps: [{ kind: "quick", key: "mic", on: true }] },
+    ],
+    autoLog: [
+      { id: "a4", label: "Eve hoş geldin", at: Date.now() - 40 * 60_000, status: "ran" },
+      { id: "a2", label: "Discord açılınca", at: Date.now() - 3 * 3600_000, status: "ran" },
+      { id: "a1", label: "Gece modu", at: Date.now() - 86_400_000, status: "ran" },
+      { id: "a1", label: "Gece modu", at: Date.now() - 2 * 86_400_000, status: "skipped" },
+      { id: "a4", label: "Eve hoş geldin", at: Date.now() - 2 * 86_400_000 - 3600_000, status: "declined" },
+    ],
+    // &ask: adada "çalışsın mı?" kartı
+    autoAsk: params0.has("ask") ? { id: "a4", label: "Eve hoş geldin", detail: "Telefon eve gelince" } : null,
     scores: { catch: 17, simon: 6 },
     days: Object.fromEntries(
       // İki hafta: karne geçen haftayla kıyaslar
@@ -186,6 +209,20 @@ export function applyPreview(mode: string) {
         [dayKey()]: { text: "Sabah Spotify açıldı, öğlen Discord, akşam yine Figma: Luko'nun günü bir üçgen gibiydi. Ben de köşemde oturup ona su hatırlattım, iki kez dinledi. Fare bugün 900 metre yol yaptı, benden daha sportif.", at: Date.now() - 600_000 },
       };
     })(),
+    // Oyun geçmişi: bir yıldan fazla, her gün değil
+    gameLog: Object.fromEntries(
+      Array.from({ length: 420 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        if ((i * 7) % 5 > 2) return null;
+        const games: Record<string, number> = {};
+        if (i % 3 !== 1) games["Valorant"] = (40 + ((i * 37) % 110)) * 60;
+        if (i % 4 === 0) games["Elden Ring"] = (60 + ((i * 53) % 140)) * 60;
+        if (i % 6 === 2) games["Rocket League"] = (20 + ((i * 11) % 50)) * 60;
+        if (i % 9 === 5) games["Minecraft"] = (30 + ((i * 29) % 90)) * 60;
+        return Object.keys(games).length ? [dayKey(d), games] : null;
+      }).filter((x): x is [string, Record<string, number>] => !!x),
+    ),
     privacy: { mic: mode === "privacy" || TABS.includes(mode as Tab) ? ["Discord"] : [], camera: [] },
   });
   // ?lyrics → şarkı sözleri açık · ?live → yayın maskesi · yıl özeti örnek verisi
@@ -231,7 +268,7 @@ export function applyPreview(mode: string) {
   // Yeni sürümün notu kendiliğinden açılıp önizlenen paneli örtmesin
   if (mode !== "notes") void import("../lib/notes").then((m) => useNook.setState({ notesSeen: m.latestNote().version }));
   // Tanıtım videosu adayı kendisi sürer (dev/Reel): durum dondurulmaz
-  if (mode === "reel") return;
+  if (mode === "reel" || mode === "reel03") return;
   // ?profile=work|game|fun → ana sayfa profili
   const profile = params.get("profile");
   if (profile) useNook.getState().updateSettings({ homeProfile: profile as never });

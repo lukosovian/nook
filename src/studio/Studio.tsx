@@ -23,11 +23,13 @@ import { KeysPage } from "./pages/KeysPage";
 import { ModulesPage } from "./pages/ModulesPage";
 import { ReportPage } from "./pages/ReportPage";
 import { YearPage } from "./pages/YearPage";
+import { GamesPage } from "./pages/GamesPage";
 import { NotesPage } from "./pages/NotesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NavIcon } from "./ui";
 import { TourPage } from "./pages/TourPage";
 import { ArgusPage } from "./pages/ArgusPage";
+import { AquariumPage } from "./pages/AquariumPage";
 import { useArgus, useArgusFeed } from "../lib/argus";
 import { useUpdateCheck } from "../lib/update";
 
@@ -39,9 +41,11 @@ const PAGES: Record<StudioPage, (p: { arg: string | null }) => React.JSX.Element
   argus: ArgusPage,
   report: ReportPage,
   year: YearPage,
+  games: GamesPage,
   notes: NotesPage,
   settings: SettingsPage,
   tour: TourPage,
+  aquarium: AquariumPage,
 };
 
 export function Studio() {
@@ -146,7 +150,7 @@ function Sidebar({ page, go }: { page: StudioPage; go: (p: StudioPage) => void }
   const argus = useArgus((s) => !!s.snap) || isTurkish;
   return (
     <nav className="flex w-[232px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/[0.05] bg-white/[0.015] px-3 py-4">
-      {NAV.filter((n) => n.id !== "argus" || argus).map((n) => {
+      {NAV.filter((n) => (n.id !== "argus" || argus) && (n.id !== "aquarium" || page === "aquarium")).map((n) => {
         const on = n.id === page;
         return (
           <motion.button

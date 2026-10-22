@@ -71,6 +71,10 @@ export const EVENTS = {
   humFound: "nook://hum-found",
   tray: "nook://tray",
   studioGo: "nook://studio-go",
+  /** Kısayol tuşunun klavye kısayoluna basıldı (tuşun kimliği) */
+  deckKey: "nook://deck-key",
+  /** Nook Mobil: telefon eve geldi / şarja takıldı / çıkarıldı */
+  phoneEvent: "nook://phone-event",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -403,6 +407,8 @@ export interface NativeSettings {
   humShortcut: string;
   /** Otomatik Hum: arkada dinler, bulduklarını kaydeder */
   humAuto: boolean;
+  /** Kısayol tuşlarının klavye kısayolları */
+  deckHotkeys?: { id: string; accel: string }[];
 }
 
 /** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */

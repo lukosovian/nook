@@ -65,13 +65,22 @@ function Plan({ now }: { now: number }) {
       </p>
     );
   }
+  // Limitler yalnızca Claude Code'un durum satırıyla gelir; arada claude.ai'de harcanan Nook'a görünmez
+  const stale = now - plan.updatedAt > STALE_MS;
   return (
-    <div className="grid shrink-0 grid-cols-2 gap-1.5">
-      <Gauge label={tt("5 saat")} w={plan.fiveHour} weekly={false} now={now} />
-      <Gauge label={tt("Hafta")} w={plan.sevenDay} weekly now={now} />
+    <div className="shrink-0">
+      <div className="grid grid-cols-2 gap-1.5 transition-opacity" style={{ opacity: stale ? 0.5 : 1 }}>
+        <Gauge label={tt("5 saat")} w={plan.fiveHour} weekly={false} now={now} />
+        <Gauge label={tt("Hafta")} w={plan.sevenDay} weekly now={now} />
+      </div>
+      <p className="mt-1 truncate px-1 text-[9.5px] text-label-3" title={stale ? tt("Claude uygulamasında harcadığın kullanım, Claude Code bir sonraki cevabı verene kadar burada görünmez.") : undefined}>
+        {stale ? tt("{0} güncellendi · Claude Code'da bir mesajla tazelenir", ago(plan.updatedAt, now)) : tt("{0} güncellendi", ago(plan.updatedAt, now))}
+      </p>
     </div>
   );
 }
+
+const STALE_MS = 10 * 60_000;
 
 function Gauge({ label, w, weekly, now }: { label: string; w?: PlanWindow; weekly: boolean; now: number }) {
   const pct = w ? effectivePct(w, now) : null;

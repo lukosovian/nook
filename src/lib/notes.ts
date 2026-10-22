@@ -132,6 +132,11 @@ export type DemoId =
   | "shuffle"
   | "localstt"
   | "supporters"
+  | "investor"
+  | "gamelog"
+  | "todaydiary"
+  | "planstale"
+  | "splithover"
   | "nohalo"
   | "quiet"
   | "shortcuts"
@@ -170,7 +175,19 @@ export type DemoId =
   | "updateanims03"
   | "diary03"
   | "fixes03b"
-  | "mobile03";
+  | "mobile03"
+  | "automations"
+  | "deckapps"
+  | "homekeys"
+  | "deckreset"
+  | "newsteps"
+  | "deckhotkey"
+  | "voicekeys"
+  | "autoconds"
+  | "phonetrig"
+  | "autoask"
+  | "autolog"
+  | "mobile031";
 
 export interface NoteItem {
   title: string;
@@ -189,6 +206,98 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.1",
+    date: tt("23 Ekim 2026"),
+    headline: tt("Kısayollarda otomasyonlar, Studio'da oyun geçmişi, Bugün'de bugünün günlüğü, destekçilerde Yatırımcı rozeti ve yenilenen Nook Mobil"),
+    items: [
+      {
+        title: tt("Otomasyonlar: bu olunca şunu yap"),
+        text: tt("Studio › Kısayollar'da yeni Otomasyonlar sekmesi. Bir şey olunca Nook senin yerine yapıyor: saat gelince (istediğin günlerde), Nook açılınca, bir uygulama açılınca, oyun başlayınca ya da bitince, şarj takılınca ya da çıkınca, pil azalınca, Bluetooth cihaz bağlanınca, USB takılınca, internet gidip gelince, bilgisayarın başına dönünce ya da boşta kalınca, kilitleyince. Yapacakları tuşlardaki adımların aynısı: uygulama ya da site aç, mikrofon, ses, karanlık mod, medya, Pomodoro, kalkan… Hazır örneklerle (Gece modu, Günaydın, Ayrılınca mikrofon kapansın, Oyun bitince mola, Şarj çıkınca tasarruf) tek tıkla başlayabilir, her birini anahtarıyla açıp kapatabilirsin. Çalışınca adada kısaca görünüyor."),
+        demo: "automations",
+      },
+      {
+        title: tt("Rutinlere yeni adımlar"),
+        text: tt("Tuşlara ve otomasyonlara ses seviyesi, parlaklık, “Nook söylesin” (adada senin yazdığın bir cümle), bekle, Wi-Fi ve Bluetooth adımları geldi. Mikrofon, ses ve karanlık mod gibi adımlarda artık aç/kapa yerine kesin “aç” ya da “kapat” seçebiliyorsun: adımın üstündeki küçük düğmeye bas."),
+        demo: "newsteps",
+      },
+      {
+        title: tt("Uygulama tuşları öbür tuşların arasında"),
+        text: tt("Kısayollar'da uygulamalar artık ayrı bir bölümde, altta durmuyor: eklediğin uygulama ve klasörler kendi simgeleriyle öbür tuşların arasına giriyor, onlar gibi sıralanıp silinebiliyor. Daha önce eklediklerin de kendiliğinden taşındı. Studio'da boş bir tuşa uygulama eklersen tuş o uygulamanın adını ve simgesini alıyor."),
+        demo: "deckapps",
+      },
+      {
+        title: tt("Kısayollar ana sayfada"),
+        text: tt("Studio › Kısayollar'da bir tuşu seçip “Ana sayfada göster”i açınca o tuş adanın ana sayfasında, alt sırada da duruyor: adayı aç, tek tıkla çalıştır; Kısayollar modülüne girmen gerekmiyor. Birkaç tuş seçersen simge simge sıralanıyor."),
+        demo: "homekeys",
+      },
+      {
+        title: tt("Varsayılan tuşlar geri gelir"),
+        text: tt("Kısayollar'daki bütün tuşları silersen boş kalmıyor: “Varsayılanları geri getir”e basınca Mikrofon, Ses, Masaüstü ve Kilitle geri geliyor. Studio › Kısayollar'da da “Varsayılanlara dön” düğmesi var."),
+        demo: "deckreset",
+      },
+      {
+        title: tt("Tuşlara klavye kısayolu"),
+        text: tt("Studio › Kısayollar'da bir tuşa klavye kısayolu verebilirsin (ör. Ctrl+Alt+1): ada kapalıyken de, hangi programdaysan bastığında tuş çalışıyor. Seçtiğin tuşlar Nook'un başka bir kısayolunda, başka bir tuşta ya da bu bilgisayardaki bilinen bir programda varsa turuncu uyarı çıkıyor."),
+        demo: "deckhotkey",
+      },
+      {
+        title: tt("Tuşlar ve otomasyonlar sesle çalışıyor"),
+        text: tt("Sesli komutta tuşun ya da otomasyonun adını söylemen yetiyor: “Hey Nook, gece modu”, “oyun modunu çalıştır”. Ad Nook'un kendi komutlarından önce denenir; “sesi aç” gibi yerleşik komutlar bozulmasın diye ekli hâller (“gece modunu”) ancak o komutlar anlamazsa eşleşiyor. Otomasyon sesle çalıştırılınca tetikleyicisini ve koşullarını beklemiyor."),
+        demo: "voicekeys",
+      },
+      {
+        title: tt("Otomasyonlara koşul"),
+        text: tt("Otomasyon tetiklense de yalnızca istediğin durumda çalışsın: oyunda değilsem, belli bir saat aralığındaysa (22:00–08:00 gibi gece yarısını aşabilir), bilgisayar şarjdaysa ya da pildeyse, bilgisayarın başındaysam. Birkaç koşul eklersen hepsi tutmalı. Hazır “Gece modu” örneği artık oyundayken karartmıyor."),
+        demo: "autoconds",
+      },
+      {
+        title: tt("Telefonla tetiklenen otomasyonlar"),
+        text: tt("Nook Mobil eşliyse yeni tetikleyiciler var: telefon eve gelince, telefon şarja takılınca ve şarjdan çıkınca. “Eve geldi”, telefon en az 20 dakika ev ağından hiç bağlanmamışken Wi-Fi'ye bağlanıp PC'ye ev ağından ulaşınca sayılıyor (Tailscale ile dışarıdan bağlanmak sayılmıyor). Telefon tarafı Bildirim erişimi izniyle çalışan servisi kullanıyor, uygulama kapalıyken de. Yeni “Eve hoş geldin” örneğiyle başlayabilirsin."),
+        demo: "phonetrig",
+      },
+      {
+        title: tt("Çalışmadan önce sorsun"),
+        text: tt("Otomasyonda “Çalışmadan önce sor”u açarsan Nook tetiklenince adada “… çalışsın mı?” diye soruyor: “Çalıştır” ya da “Hayır”. 45 saniye içinde cevap vermezsen çalışmıyor."),
+        demo: "autoask",
+      },
+      {
+        title: tt("Son çalışanlar"),
+        text: tt("Otomasyonlar sekmesinde yeni “Son çalışanlar” kartı: hangi otomasyonun ne zaman çalıştığı, koşulu tutmadığı için atlandığı, sorulup çalıştırılmadığı ya da hata verdiği. Her otomasyonun satırında da en son ne zaman çalıştığı yazıyor."),
+        demo: "autolog",
+      },
+      {
+        title: tt("Oyun geçmişi"),
+        text: tt("Studio'da yeni Oyunlar sayfası: tam ekran oynadığın her oyunun süresi kendiliğinden kaydediliyor. Gün gün, ay ay, yıl yıl bak; bir aya ya da güne tıklayınca o döneme iniyorsun. Hangi oyunu ne kadar oynadığın, payı ve kaç gün açtığın yanında."),
+        demo: "gamelog",
+      },
+      {
+        title: tt("Bugün'de bugünün günlüğü"),
+        text: tt("Bugün modülündeki günün özeti artık dünkü değil, bugünün günlüğünü gösteriyor; günlük gece yazılınca kartların üstüne yerleşiyor."),
+        demo: "todaydiary",
+      },
+      {
+        title: tt("Destekçilerde Yatırımcı rozeti"),
+        text: tt("Studio › Ayarlar › Hakkında › Destekçiler'de Nook'un yatırımcısı en başta, altın halkalı profil fotoğrafı ve “Yatırımcı” rozetiyle görünüyor."),
+        demo: "investor",
+      },
+      {
+        title: tt("Claude kullanımı ne zaman güncellendi"),
+        text: tt("Claude modülündeki 5 saatlik ve haftalık göstergelerin altında, kullanımın en son ne zaman güncellendiği yazıyor. Bu sayılar yalnızca Claude Code cevap verdikçe yenileniyor; 10 dakikadan eski kalınca göstergeler soluklaşıyor. Arada Claude uygulamasında harcadığın kullanım da Claude Code'a bir mesaj atınca buraya geliyor."),
+        demo: "planstale",
+      },
+      {
+        title: tt("Bölünmüş adada doğru bölüm açılıyor"),
+        text: tt("Kapalı ada ikiye bölündüğünde (örneğin Claude çalışırken müzik de çalıyorsa) ana kapsülün üstüne gelince ada artık müziğe değil, o kapsülün kendi bölümüne açılıyor. Yandaki baloncuğun üstüne gelince de baloncuğun bölümü açılıyor."),
+        demo: "splithover",
+      },
+      {
+        title: tt("Nook Mobil 0.3.1"),
+        text: tt("Nook Mobil'in ana ekranı yenilendi: üstte canlı Nook'un ve bilgisayarın durumu tek kartta, Nook'lar büyük kartlarda; Nook'un günlüğü ortadan kalkıp alttaki “Daha fazla”ya geçti. Yama notları artık telefonda da okunuyor; telefonun ve PC'nin Nook sürümü orada ve ana ekranın en altında yazıyor. Su bildirimindeki “İçtim” hemen kapanıyor ve PC'ye gidiyor. PC kapalıyken Hum'la dinlediğin şarkı, PC açılınca Nook hazır olur olmaz bulunuyor; bulunamazsa söylüyor. Uzaktan kontrolde klavyeyi kapattıktan sonra her dokunuşta yeniden açılmıyor. PC'yi telefondan açma paketi yarım dakika boyunca birkaç kez gidiyor; telefondan kapatırken yanıt vermeyen bir uygulama kapanmayı sonsuza dek bekletmiyor. Evden uzakta başka bir Wi-Fi'dayken de Tailscale açılıp PC'ye bağlanıyor."),
+        demo: "mobile031",
+      },
+    ],
+  },
   {
     version: "0.3.0",
     date: tt("16 Ekim 2026"),

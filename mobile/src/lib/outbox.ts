@@ -13,6 +13,8 @@ export type Pending =
 const KEY = "nook.outbox";
 /** Hum kaydı büyük (~400 KB): en çok bu kadar bekler */
 const MAX_HUMS = 3;
+/** Tanınamayan (PC hazır değil, Shazam'a ulaşılamadı) Hum kaydı bu kadar süre yeniden denenir */
+const HUM_KEEP_MS = 3 * 86_400_000;
 
 function load(): Pending[] {
   try {
@@ -106,6 +108,8 @@ export interface FlushResult {
   sent: number;
   /** PC kapalıyken dinlenip şimdi bulunan şarkılar */
   found: HumTrack[];
+  /** PC kapalıyken dinlenip şarkısı bulunamayanlar */
+  missed: number;
 }
 
 /** Bekleyenleri sırayla gönderir; PC'ye ulaşılamazsa kalanlar bekler */
@@ -116,7 +120,7 @@ export function flush(p: Pairing): Promise<FlushResult> {
 }
 
 async function run(p: Pairing): Promise<FlushResult> {
-  const out: FlushResult = { sent: 0, found: [] };
+  const out: FlushResult = { sent: 0, found: [], missed: 0 };
   let list = load();
   if (!list.length) return out;
   // Çakışma denetimi için PC'deki notların şu anki hâli
@@ -135,12 +139,17 @@ async function run(p: Pairing): Promise<FlushResult> {
       else if (item.kind === "hum") {
         const bytes = Uint8Array.from(atob(item.pcm), (c) => c.charCodeAt(0));
         const r = await humRecognize(p, new Int16Array(bytes.buffer), Date.now() - item.at);
+        // Shazam'a ulaşılamadı (PC yeni açılmış, internet daha gelmemiş olabilir): kayıt kalsın, sonra yeniden
+        if (r.status === "error") throw new PcError(r.message, "server");
         if (r.status === "found") out.found.push(r.track);
+        else out.missed++;
       } else await sendNote(p, item, pcPads);
       out.sent++;
     } catch (e) {
       // Ulaşılamıyorsa sonra; PC reddettiyse (ör. silinmiş not) bu kayıttan vazgeç
       if (e instanceof PcError && e.kind === "offline") break;
+      // Hum kaydı kolay kolay atılmaz: PC'deki Nook hazır olunca yeniden denenir
+      if (item.kind === "hum" && Date.now() - item.at < HUM_KEEP_MS) break;
     }
     list = load().filter((x) => !(x.at === item.at && x.kind === item.kind));
     save(list);

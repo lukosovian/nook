@@ -38,12 +38,16 @@ async function boot() {
   const Wardrobe = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "wardrobe" ? (await import("./dev/Wardrobe")).Wardrobe : null;
   // Yalnızca geliştirme: ?preview=reel ile Instagram tanıtım videosu (dev/Reel)
   const Reel = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "reel" ? (await import("./dev/Reel")).Reel : null;
+  // Yalnızca geliştirme: ?preview=reel03 ile 0.3 güncellemesinin videosu (dev/Reel03)
+  const Reel03 = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "reel03" ? (await import("./dev/Reel03")).Reel03 : null;
+  // Yalnızca geliştirme: ?preview=karakter ile karakter denemesi (dev/CharacterLab)
+  const CharacterLab = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "karakter" ? (await import("./dev/CharacterLab")).CharacterLab : null;
   // Nook Studio penceresi (önizlemede ?preview=studio#bölüm)
   const StudioApp = isStudio ? (await import("./studio/Studio")).Studio : null;
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ColorVision />
-      {StudioApp ? <StudioApp /> : cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : Reel ? <Reel /> : <App />}
+      {StudioApp ? <StudioApp /> : cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : Reel ? <Reel /> : Reel03 ? <Reel03 /> : CharacterLab ? <CharacterLab /> : <App />}
     </StrictMode>,
   );
 }

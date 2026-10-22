@@ -2,6 +2,7 @@ import type { UpdateAnimPref } from "../components/overlays/UpdateAnims";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { DeckKey } from "../lib/deck";
+import type { Automation, AutoRun } from "../lib/automations";
 import type {
   DevicesPayload,
   DownloadItem,
@@ -731,9 +732,16 @@ interface NookState {
   notifications: NotifItem[];
   /** Nook'un kendi bildirimlerinin geçmişi (en yeni başta) */
   nookNotifs: NookNotif[];
+  /** Eski ayrı uygulama tuşları: açılışta tuşlara taşınır (bkz. migratePinnedApps) */
   pinnedApps: PinnedApp[];
   /** Kısayol tuşları (eylemler ve sahneler); null = hiç düzenlenmedi, hazır tuşlar (bkz. useDeck) */
   deck: DeckKey[] | null;
+  /** Otomasyonlar: "bu olunca şunu yap" (bkz. lib/automations) */
+  automations: Automation[];
+  /** Otomasyonların son çalışmaları (en yeni başta) */
+  autoLog: AutoRun[];
+  /** "Çalışsın mı?" diye soran otomasyon (adada cevap bekler) */
+  autoAsk: { id: string; label: string; detail: string } | null;
   /** Gün gün istatistik (son 30 gün) */
   days: Record<string, DayStats>;
   /** Oyun rekorları */
@@ -755,6 +763,8 @@ interface NookState {
   dayLog: Record<string, DayLog>;
   /** Nook'un günlükleri (gün → yazı), son iki hafta */
   diary: Record<string, DiaryEntry>;
+  /** Oyun geçmişi (gün → oyun → oynanan saniye); hiç silinmez */
+  gameLog: Record<string, Record<string, number>>;
   /** Günün özeti büyük adada açık */
   brief: boolean;
   /** Yama notları büyük adada açık */
@@ -876,9 +886,10 @@ interface NookState {
   clearNotifications: () => void;
   removeNotification: (id: number) => void;
   clearNookNotifs: () => void;
-  pinApp: (a: Omit<PinnedApp, "id">) => void;
-  unpinApp: (id: string) => void;
   setDeck: (deck: DeckKey[]) => void;
+  setAutomations: (list: Automation[]) => void;
+  setAutoLog: (log: AutoRun[]) => void;
+  setAutoAsk: (ask: NookState["autoAsk"]) => void;
   /** Bugünün istatistiğine ekle */
   track: (patch: Partial<DayStats>) => void;
   setScore: (game: string, score: number) => void;
@@ -896,6 +907,8 @@ interface NookState {
   /** Öndeki uygulamaya bir dakika ekle; kablosuz farenin pilini kaydet */
   logMinute: (app: string | null, mouseBattery: number | null) => void;
   setDiary: (day: string, text: string) => void;
+  /** Biten oyun oturumunu bugünün oyun geçmişine ekle */
+  logGame: (app: string, secs: number) => void;
   setLastOffer: (at: number) => void;
   setOuting: (outing: Outing | null) => void;
   setGuard: (guard: NookState["guard"]) => void;
@@ -967,6 +980,9 @@ export const useNook = create<NookState>()(
       nookNotifs: [],
       pinnedApps: [],
       deck: null,
+      automations: [],
+      autoLog: [],
+      autoAsk: null,
       days: {},
       scores: {},
       online: true,
@@ -978,6 +994,7 @@ export const useNook = create<NookState>()(
       summaryDay: "",
       dayLog: {},
       diary: {},
+      gameLog: {},
       brief: false,
       notes: false,
       report: false,
@@ -1226,10 +1243,10 @@ export const useNook = create<NookState>()(
       clearNotifications: () => set({ notifications: [] }),
       removeNotification: (id) => set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
       clearNookNotifs: () => set({ nookNotifs: [] }),
-      pinApp: (a) =>
-        set((s) => (s.pinnedApps.some((p) => p.path === a.path) ? {} : { pinnedApps: [...s.pinnedApps, { ...a, id: crypto.randomUUID() }].slice(0, 12) })),
-      unpinApp: (id) => set((s) => ({ pinnedApps: s.pinnedApps.filter((p) => p.id !== id) })),
       setDeck: (deck) => set({ deck: deck.slice(0, 24) }),
+      setAutomations: (automations) => set({ automations: automations.slice(0, 40) }),
+      setAutoLog: (autoLog) => set({ autoLog }),
+      setAutoAsk: (autoAsk) => set({ autoAsk }),
       track: (patch) =>
         set((s) => {
           const key = dayKey();
@@ -1283,6 +1300,12 @@ export const useNook = create<NookState>()(
         set((s) => {
           const keep = Object.keys(s.diary).filter((k) => k !== day).sort().slice(-13);
           return { diary: { ...Object.fromEntries(keep.map((k) => [k, s.diary[k]])), [day]: { text, at: Date.now() } } };
+        }),
+      logGame: (app, secs) =>
+        set((s) => {
+          const key = dayKey();
+          const cur = s.gameLog[key] ?? {};
+          return { gameLog: { ...s.gameLog, [key]: { ...cur, [app]: (cur[app] ?? 0) + secs } } };
         }),
       setBrief: (brief) => set({ brief }),
       setNotes: (notes) => set({ notes }),
@@ -1353,11 +1376,14 @@ export const useNook = create<NookState>()(
         nookNotifs: s.nookNotifs,
         pinnedApps: s.pinnedApps,
         deck: s.deck,
+        automations: s.automations,
+        autoLog: s.autoLog,
         days: s.days,
         scores: s.scores,
         summaryDay: s.summaryDay,
         dayLog: s.dayLog,
         diary: s.diary,
+        gameLog: s.gameLog,
         lastOffer: s.lastOffer,
         toured: s.toured,
         catches: s.catches,

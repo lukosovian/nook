@@ -1,8 +1,15 @@
 package app.nook.mobile
 
 import android.app.Notification
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -18,20 +25,78 @@ import java.io.ByteArrayOutputStream
  * Telefona gelen bildirimleri PC'deki Nook'a iletir (Ayarlar › Bildirim erişimi'nde Nook'a izin verilince
  * Android bu servisi kendisi çalıştırır; uygulama kapalıyken de). Süren işler (müzik, indirme, navigasyon),
  * grup özetleri ve kullanıcının sessize aldığı uygulamalar gönderilmez.
+ *
+ * Servis sürekli açık durduğu için otomasyonların telefon olaylarını da buradan gönderir: şarja takıldı /
+ * çıkarıldı ve Wi-Fi'ye bağlandı (PC, isteğin ev ağından gelmesine bakıp "eve geldi"yi anlar).
  */
 class NookNotifService : NotificationListenerService() {
     private val icons = HashMap<String, String?>()
     /** Aynı bildirim art arda güncellenince (WhatsApp, indirmeler) bir kez gitsin */
     private val recent = LinkedHashMap<String, Long>()
 
+    private var power: BroadcastReceiver? = null
+    private var wifi: ConnectivityManager.NetworkCallback? = null
+
     override fun onListenerConnected() {
         PcLink.prefs(this).edit().putBoolean("notifBound", true).apply()
+        watchPhone()
     }
 
     /** Android servisi bıraktı (güncellemeden sonra sık olur): yeniden bağlanmayı iste */
     override fun onListenerDisconnected() {
         PcLink.prefs(this).edit().putBoolean("notifBound", false).apply()
+        unwatchPhone()
         rebind(this)
+    }
+
+    override fun onDestroy() {
+        unwatchPhone()
+        super.onDestroy()
+    }
+
+    private fun phoneEvent(event: String) {
+        val ctx = applicationContext
+        PcLink.io.execute { PcLink.post(ctx, "/v1/phone-event", JSONObject().put("event", event).toString().toByteArray()) }
+    }
+
+    /** Şarj ve Wi-Fi olaylarını dinle (Android 8'den beri bunlar ancak çalışan bir servisten dinlenebiliyor) */
+    private fun watchPhone() {
+        if (power == null) {
+            val r = object : BroadcastReceiver() {
+                override fun onReceive(c: Context, i: Intent) {
+                    phoneEvent(if (i.action == Intent.ACTION_POWER_CONNECTED) "charging" else "unplugged")
+                }
+            }
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
+            }
+            // Android 13+: dışarıdan (başka uygulamalardan) gelen yayın kabul edilmesin; sistem yayını yine gelir
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(r, filter, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(r, filter)
+            power = r
+        }
+        if (wifi == null) {
+            val since = System.currentTimeMillis()
+            val cb = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    // Kaydolur kaydolmaz gelen "zaten bağlı" haberi eve gelmek değil
+                    if (System.currentTimeMillis() - since < 3000) return
+                    // Adres alınsın, PC'ye ulaşılabilsin
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ phoneEvent("wifi") }, 5000)
+                }
+            }
+            runCatching {
+                getSystemService(ConnectivityManager::class.java).registerNetworkCallback(NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(), cb)
+                wifi = cb
+            }
+        }
+    }
+
+    private fun unwatchPhone() {
+        power?.let { runCatching { unregisterReceiver(it) } }
+        power = null
+        wifi?.let { runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } }
+        wifi = null
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {

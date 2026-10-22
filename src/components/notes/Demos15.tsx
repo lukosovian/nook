@@ -234,7 +234,51 @@ function Mobile03Demo() {
   );
 }
 
+// ---------------------------------------------------------------- Yatırımcı rozeti
+
+/** Destekçiler: yatırımcı altın halkası ve rozetiyle en başa kayıyor, ötekiler yanında */
+function Investor03Demo() {
+  const n = useTick(1100);
+  const first = n % 4 !== 0;
+  const people = [
+    { c: ACCENT.blue, name: "ugur" },
+    { c: ACCENT.green, name: "ayse" },
+    { c: ACCENT.purple, name: "hasan", star: true },
+    { c: ACCENT.orange, name: "mert" },
+  ];
+  const order = first ? [people[2], people[0], people[1], people[3]] : people;
+  return (
+    <Stage>
+      <div className="absolute inset-x-6 bottom-4 top-6 flex flex-col gap-2">
+        <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] text-label-3">{tt("Destekçiler")}</span>
+        <div className="flex gap-2.5">
+          {order.map((p) => (
+            <motion.span key={p.name} layout transition={{ type: "spring", stiffness: 380, damping: 26 }} className="flex flex-col items-center gap-0.5">
+              <span
+                className="h-8 w-8 rounded-full"
+                style={{
+                  background: `radial-gradient(circle at 35% 30%, ${p.c}, color-mix(in srgb, ${p.c} 60%, black))`,
+                  boxShadow: p.star && first ? `0 0 0 2px ${ACCENT.yellow}` : "0 0 0 1px rgba(255,255,255,0.1)",
+                }}
+              />
+              <span className="text-[8.5px] text-label-3">{p.name}</span>
+              <AnimatePresence>
+                {p.star && first && (
+                  <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="rounded-full px-1.5 text-[8px] font-semibold" style={{ background: tintBg(ACCENT.yellow), color: tintText(ACCENT.yellow) }}>
+                    {tt("Yatırımcı")}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.span>
+          ))}
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
 export const DEMOS15 = {
+  investor: Investor03Demo,
   updateanims03: UpdateAnims03Demo,
   diary03: Diary03Demo,
   fixes03b: Fixes03bDemo,

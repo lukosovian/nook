@@ -57,10 +57,12 @@ import {
 } from "./hooks/useSystemFeeds";
 import { usePhoneSync } from "./hooks/usePhoneSync";
 import { useDiary } from "./lib/diary";
+import { useAutomations } from "./lib/automations";
 
 export default function App() {
   useSettingsSync();
   usePhoneSync();
+  useAutomations();
   useShieldMicFeed();
   // Bilgisayar yeni açıldıysa ve parola kilidi açıksa kalkanla başla
   useEffect(() => {

@@ -6,6 +6,7 @@
 //!  - Düz metin yapıştır (Ctrl+Alt+V): panodaki biçim atılır, metin yapıştırılır
 //!  - Ses çıkışı (isteğe bağlı): seçili çıkışlar arasında sırayla geçer
 //!  - Hum (Ctrl+Alt+M): bilgisayarda çalan şarkıyı bul
+//!  - Kısayol tuşları (isteğe bağlı): basılınca ön yüz o tuşu çalıştırır ("nook://deck-key")
 
 use std::sync::{Arc, Mutex};
 
@@ -23,7 +24,7 @@ use crate::window::{self, ISLAND};
 /// Ayarlar art arda uygulanınca kayıtlar yarışmasın; aynı set tekrar kaydedilmesin.
 static REGISTERED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Role {
     Search,
     Ask,
@@ -34,6 +35,8 @@ enum Role {
     Output,
     Live,
     Hum,
+    /// Kısayol tuşu (kimliği)
+    Deck(String),
 }
 
 #[derive(Clone, Serialize)]
@@ -46,7 +49,7 @@ pub(crate) enum VoiceEvent {
 
 pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let mut registered = REGISTERED.lock().unwrap();
-    let list = [
+    let mut list = vec![
         (settings.shortcut.as_str(), Role::Search),
         (settings.ask_shortcut.as_str(), Role::Ask),
         (settings.voice_shortcut.as_str(), Role::Voice),
@@ -57,7 +60,14 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         (settings.live_shortcut.as_str(), Role::Live),
         (settings.hum_shortcut.as_str(), Role::Hum),
     ];
-    let wanted: Vec<String> = list.iter().map(|(s, _)| s.to_string()).collect();
+    list.extend(settings.deck_hotkeys.iter().map(|h| (h.accel.as_str(), Role::Deck(h.id.clone()))));
+    let wanted: Vec<String> = list
+        .iter()
+        .map(|(s, r)| match r {
+            Role::Deck(id) => format!("{s}={id}"),
+            _ => s.to_string(),
+        })
+        .collect();
     if *registered == wanted {
         return Ok(());
     }
@@ -78,7 +88,7 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             continue;
         }
         seen.push(norm);
-        let res = gs.on_shortcut(accel, move |app, _shortcut, event| match (role, event.state()) {
+        let res = gs.on_shortcut(accel, move |app, _shortcut, event| match (&role, event.state()) {
             (Role::Search, ShortcutState::Pressed) => {
                 if let Some(label) = open_island(app) {
                     let _ = app.emit_to(label.as_str(), "nook://search", ());
@@ -101,6 +111,9 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             }
             (Role::Hum, ShortcutState::Pressed) => {
                 let _ = app.emit("nook://hum-toggle", ());
+            }
+            (Role::Deck(id), ShortcutState::Pressed) => {
+                let _ = app.emit_to(ISLAND, "nook://deck-key", id.clone());
             }
             _ => {}
         });
