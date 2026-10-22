@@ -5,7 +5,7 @@
 # Nook
 
 **A little living island for the top of your Windows screen.**
-A Dynamic Island–style hub with a 3D mascot that keeps your music, files, alarms and focus in one place — and occasionally wanders off to sit on your windows.
+A Dynamic Island–style hub with a 3D mascot that keeps your music, files, alarms and focus in one place — and occasionally wanders off to sit on your windows. Comes with **Nook Studio** for settings and the big pages, and **Nook Mobile** for your Android phone.
 
 [**⬇ Download for Windows**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe) · [Instagram @nooktheblob](https://www.instagram.com/nooktheblob/) · [Türkçe](#türkçe)
 
@@ -19,7 +19,7 @@ Windows 10 / 11 · Free · English, Türkçe, Español, Português, Deutsch, Fra
 
 ## What it does
 
-Move the mouse to the black notch at the top center of your screen and the island opens. Move away and it closes. It never covers your windows and hides itself in games and full-screen video.
+Move the mouse to the black notch at the top center of your screen and the island opens. Move away and it closes. Every module opens the island at its own size, and while it's closed the island can show small live pills (music, timer, next alarm…). It never covers your windows and hides itself in games and full-screen video.
 
 <img src="docs/home.png" alt="Home page with chips" width="680">
 
@@ -30,17 +30,19 @@ Move the mouse to the black notch at the top center of your screen and the islan
 | 🤖 **Claude Code** | Watch your Claude Code sessions live, answer permission requests and questions right from the island, get a ping when it's done, and see how much of your plan limit is used (5 hours / week) |
 | 📥 **Shelf** | Drag a file onto Nook — it swallows it. Drag it back out anywhere later. Screenshots land here automatically |
 | 📋 **Clipboard** | History of copied text and colors; foreign text is translated into your language |
-| 📝 **Note · ⏰ Alarm** | Quick scratchpad and alarms that ring even on top of full-screen games — and wait for you until you dismiss them |
+| 📝 **Note · ⏰ Alarm · 🔔 Reminder** | Quick scratchpad, reminders, and alarms that ring even on top of full-screen games — and wait for you until you dismiss them |
 | 📅 **Calendar** | Events and reminders (subscribe to a Google / Outlook .ics link too); the notch counts down when one is near |
 | 🍅 **Pomodoro** | Focus timer with a **focus guard**: open YouTube or X while working and Nook knocks on the glass |
 | 🔎 **Quick search** | `Ctrl+Shift+Space` — open apps, calculate, convert units and currencies, find emoji, search the web |
-| 🎛️ **Controls** | Wi-Fi, Bluetooth, dark mode, mic, per-app volume, brightness |
+| 🎛️ **Controls** | Wi-Fi, Bluetooth, dark mode, mic, per-app volume, brightness, and a scheduled shutdown |
+| ⌨️ **Shortcuts** | A Stream Deck–style grid of buttons: open apps, sites and folders with one click |
 | 📊 **System · Report card** | CPU, memory, network, disk — and a weekly report card of your focus, music and breaks |
 | 🔔 **Notifications** | Windows notifications shown on the island (muted while you focus) |
-| 🗂️ **Profiles** | Drag chips to reorder or hide them, and keep separate home pages for Work, Games, Fun… Move the island anywhere on screen by its handle |
+| 🗂️ **Profiles** | Arrange modules on one grid, hide the ones you don't use, and keep separate home pages for Work, Games, Fun… Move the island anywhere on screen by its handle |
 | 🎮 **Games** | Five mini games to play with Nook |
 | ☀️ **Daily brief** | The first time you open it each day: weather, alarms, water, new episodes |
-| 🔊 **Sounds** | Soft little sounds when the island opens, a notification arrives or Nook is happy (Settings › Sound) |
+| 🔊 **Sounds** | Soft little sounds when the island opens, a notification arrives or Nook is happy (Studio › Settings › Sound) |
+| 📔 **Nook's diary** | Nook writes a short diary entry about your day |
 
 ### Nook, the mascot
 
@@ -63,9 +65,17 @@ Dress it up your way: **14 bodies** (sphere, cloud, heart, star, cat, teddy…),
 </tr>
 </table>
 
+### Nook Studio
+
+A separate window for everything that doesn't fit on the island: all settings (with search), the **look** of your Nook, the weekly **report card**, your **year in review**, **patch notes**, shows and movies from Argus, and a chat with Nook. Open it from the tray icon or the island. Updates install right on the island — pick one of ten update animations.
+
+### Nook Mobile (Android)
+
+A companion app for your phone ([download NookMobil.apk](https://github.com/lukosovian/nook/releases/latest/download/NookMobil.apk)). Over your home Wi-Fi (or Tailscale when you're away) you can control the PC's music, see and control its screen (mouse and keyboard), send files to the shelf, read the clipboard, get your phone's notifications on the PC, and turn the computer on or off. It updates itself in the app.
+
 ### AI (optional)
 
-With a free **Google Gemini** key, Nook can chat, set alarms and timers, take notes, control music and remember things about you. **Ask the screen** (`Ctrl+Shift+A`) lets it look at a screenshot and explain an error; **voice commands** (`Ctrl+Shift+D`, hold) let you just say it. The key is stored only on your computer.
+With a free **Google Gemini** key, Nook can chat, set alarms and timers, take notes, control music and remember things about you. **Ask the screen** (`Ctrl+Shift+A`) lets it look at a screenshot and explain an error; **voice commands** (`Ctrl+Shift+D`, hold — or just say **"Hey Nook"**) let you just say it. Speech is transcribed on your computer (Whisper, offline) and common commands run instantly without Gemini. The key is stored only on your computer.
 
 ### Privacy
 
@@ -83,7 +93,7 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 
 ### Accessibility
 
-- **9 languages** — pick one on the first page of the tour or in Settings › Language. Nook chats in your language too.
+- **9 languages** — pick one on the first page of the tour or in Studio › Settings › Language. Nook chats in your language too.
 - **Interface size** from 80% to 150% for 4K displays and small laptops.
 - **Color-blind palettes** for protanopia, deuteranopia and tritanopia.
 
@@ -95,11 +105,11 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 
 1. Download [**Nook-setup.exe**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe) (always the latest version) and run it.
 2. Nook isn't code-signed yet, so Windows may show **"Windows protected your PC"**. Click **More info → Run anyway**.
-3. Nook starts at the top of your screen and introduces itself. It starts with Windows and **updates itself** (Settings › Version).
+3. Nook starts at the top of your screen and introduces itself. It starts with Windows and **updates itself** (Studio › Settings › About).
 
 **Requirements:** Windows 10 or 11 (64-bit) with Microsoft Edge WebView2 (already included in Windows 11).
 
-**Tray icon** (bottom right): left-click opens the island; right-click for a short menu — center the island, the tour, one hour of quiet, check for updates, quit. **To uninstall:** Windows Settings › Apps (Nook also removes its Claude Code hooks).
+**Tray icon** (bottom right): left-click opens the island; right-click for a short menu — Nook Studio, center the island, the tour, one hour of quiet, check for updates, quit. **To uninstall:** Windows Settings › Apps (Nook also removes its Claude Code hooks).
 
 ### Keyboard shortcuts
 
@@ -113,11 +123,11 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 | `Ctrl+Alt+S` | Add the files selected in Explorer to the shelf |
 | `Ctrl+Alt+L` | Stream mask on / off |
 
-All of them are in Settings › Shortcuts, which also warns when a shortcut takes over a well-known one from another app (e.g. Word's Paste Special). Plain-text paste has no shortcut by default; you can give it one there.
+All of them are in Studio › Settings › Shortcuts, which also warns when a shortcut takes over a well-known one from another app (e.g. Word's Paste Special). Plain-text paste has no shortcut by default; you can give it one there.
 
 ### Get a Gemini key (free)
 
-Go to [aistudio.google.com](https://aistudio.google.com), sign in with your Google account, click **Create API key** and paste it into Nook (Settings › AI). Nook picks the best available model on its own.
+Go to [aistudio.google.com](https://aistudio.google.com), sign in with your Google account, click **Create API key** and paste it into Nook (Studio › Settings › AI). Nook picks the best available model on its own.
 
 ### FAQ
 
@@ -141,18 +151,25 @@ npm run dev             # just the UI in a browser, with previews:
 - `src-tauri/` — window management, cursor tracking, Windows APIs (audio, brightness, notifications, perching…)
 - `src/` — the island UI, the mascot (3D body is a WebGL SDF raymarcher in `src/lib/nook3d.glsl`)
 - `src/locales/*.json` — translations. Keys are the Turkish source text; a missing key falls back to Turkish. Fixes and new languages are welcome.
+- `mobile/` — Nook Mobile (Tauri Android); the PC side of the bridge is `src-tauri/src/remote.rs`
 - Releases: bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, then `.\release.ps1 "notes"`.
+
+## Supporters
+
+Thanks to everyone who starred Nook on GitHub — you show up in Studio › Settings › About › Supporters. ⭐
 
 ---
 
 ## Türkçe
 
-**Nook**, Windows ekranının üst ortasındaki çentikte yaşayan, 3B maskotlu bir "Dynamic Island". Fareyi çentiğe götür, ada açılsın: müzik ve şarkı sözleri, dosya rafı, pano geçmişi, not, alarm, takvim, Pomodoro ve odak bekçisi, hızlı arama, kontrol merkezi, sistem bilgisi, bildirimler, mini oyunlar ve günün özeti hepsi bir arada. Çipleri sürükleyip sıralar, İş / Oyun / Eğlence gibi profiller kurarsın.
+**Nook**, Windows ekranının üst ortasındaki çentikte yaşayan, 3B maskotlu bir "Dynamic Island". Fareyi çentiğe götür, ada açılsın: müzik ve şarkı sözleri, dosya rafı, pano geçmişi, not, alarm, takvim, Pomodoro ve odak bekçisi, hızlı arama, kontrol merkezi, sistem bilgisi, bildirimler, mini oyunlar ve günün özeti hepsi bir arada. Her modül adayı kendi boyutunda açar, kapalı adada küçük canlı kapsüller durur; modülleri tek ızgarada dizer, İş / Oyun / Eğlence gibi profiller kurarsın. Ayarlar, Görünüm, Karne, Yıl özeti ve Yama notları **Nook Studio** penceresinde.
 
 **Hum** (`Ctrl+Alt+M`) videoda ya da dizide çalan şarkıyı bulur. **Claude Code** kullanıyorsan oturumlarını adada izler, izin isteklerini ve sorularını terminale dönmeden adadan cevaplarsın; plan limitinin ne kadar dolduğunu da görürsün.
 
-Nook'un keyfi vardır; ilgilenirsen sevinir, unutursan küser. Ara sıra dışarı da çıkar: pencerelerin üstüne tüner, adadan iple sarkar, sen yokken masaüstünde balık tutar. Gemini anahtarınla sohbet eder, ekranına bakar, sesli komutları anlar. Gizlilik kalkanı (`Ctrl+Alt+H`) ekranını 22 canlı Nook sahnesinden biriyle örter, mikrofonunu kapatır, istersen parolayla kilitlenir; hassas veri koruyucusu kopyaladığın şifreyi ve kart numarasını panoda tutmaz. Her şey bilgisayarında kalır. 9 dil, arayüz boyutu ve renk körü paletleri var.
+Nook'un keyfi vardır; ilgilenirsen sevinir, unutursan küser. Ara sıra dışarı da çıkar: pencerelerin üstüne tüner, adadan iple sarkar, sen yokken masaüstünde balık tutar. Gemini anahtarınla sohbet eder, ekranına bakar; sesli komutları ("Hey Nook") bilgisayarda internetsiz yazıya döker. Gizlilik kalkanı (`Ctrl+Alt+H`) ekranını 22 canlı Nook sahnesinden biriyle örter, mikrofonunu kapatır, istersen parolayla kilitlenir; hassas veri koruyucusu kopyaladığın şifreyi ve kart numarasını panoda tutmaz. Her şey bilgisayarında kalır. 9 dil, arayüz boyutu ve renk körü paletleri var.
 
 **Kurulum:** [**Nook-setup.exe**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe)'yi indirip çalıştır (her zaman en yeni sürüm). Windows "bilgisayarınız korundu" derse **Ek bilgi → Yine de çalıştır**. Nook kendini tanıtır, Windows'la açılır ve kendiliğinden güncellenir.
+
+**Nook Mobil:** Android telefondan bilgisayarın müziğini yönet, ekranını gör ve kontrol et, rafa dosya at, bilgisayarı aç kapat. [NookMobil.apk](https://github.com/lukosovian/nook/releases/latest/download/NookMobil.apk).
 
 Instagram: [@nooktheblob](https://www.instagram.com/nooktheblob/)
