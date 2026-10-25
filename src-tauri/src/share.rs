@@ -6,12 +6,15 @@
 //! Değişince "nook://share" ({ on, source }) yayılır.
 
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 const POLL: Duration = Duration::from_secs(2);
+/// Paylaşım bu kadar süre hiç görünmezse bitmiş sayılır: paylaşım çubuğu kaynak değişince,
+/// ekran değişince ya da yeniden çizilirken bir anlığına kaybolur, yayın sürerken "bitti" denmesin.
+const GRACE: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Serialize, PartialEq)]
 pub struct Share {
@@ -48,9 +51,14 @@ pub fn spawn(app: AppHandle) {
         .name("nook-share".into())
         .spawn(move || {
             let mut last = Share { on: false, source: String::new() };
+            let mut lost: Option<Instant> = None;
             loop {
                 thread::sleep(POLL);
                 let now = detect();
+                if last.on && !now.on && lost.get_or_insert_with(Instant::now).elapsed() < GRACE {
+                    continue;
+                }
+                lost = None;
                 if now != last {
                     crate::log::write("info", &format!("yayın/paylaşım: {} ({})", now.on, now.source));
                     let _ = app.emit("nook://share", &now);
@@ -83,20 +91,22 @@ mod imp {
 
     unsafe extern "system" fn each(hwnd: HWND, data: LPARAM) -> BOOL {
         let found = &mut *(data as *mut Option<&'static str>);
-        if IsWindowVisible(hwnd) == 0 {
-            return 1;
-        }
+        let vis = IsWindowVisible(hwnd) != 0;
         let mut buf = [0u16; 256];
-        let n = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
-        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
-        if let Some((_, src)) = CLASS_HINTS.iter().find(|(c, _)| *c == class) {
-            *found = Some(src);
-            return 0;
+        if vis {
+            let n = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+            let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+            if let Some((_, src)) = CLASS_HINTS.iter().find(|(c, _)| *c == class) {
+                *found = Some(src);
+                return 0;
+            }
         }
         let n = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
         if n > 0 {
-            let title = String::from_utf16_lossy(&buf[..n as usize]).to_lowercase();
-            if let Some((_, src)) = TITLE_HINTS.iter().find(|(t, _)| title.contains(t)) {
+            let title = String::from_utf16_lossy(&buf[..n as usize]).to_lowercase().replace('\u{307}', "");
+            // Tarayıcının "… ekranınızı paylaşıyor" çubuğunda "Gizle"ye basılınca pencere gizlenebilir
+            // ama paylaşım bitene dek kapanmaz; normal tarayıcı penceresi (" - ") değilse gizliyken de say.
+            if let Some((_, src)) = TITLE_HINTS.iter().find(|(t, s)| title.contains(t) && (vis || (*s == "Tarayıcı" && !title.contains(" - ")))) {
                 *found = Some(src);
                 return 0;
             }

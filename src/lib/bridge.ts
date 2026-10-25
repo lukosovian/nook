@@ -75,6 +75,8 @@ export const EVENTS = {
   deckKey: "nook://deck-key",
   /** Nook Mobil: telefon eve geldi / şarja takıldı / çıkarıldı */
   phoneEvent: "nook://phone-event",
+  /** WhatsApp Web köprüsü durum ve mesaj güncellemesi */
+  whatsapp: "nook://whatsapp",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -104,9 +106,69 @@ export interface NotificationPayload {
   icon: string | null;
   /** Telefondan geldi (Nook Mobil) */
   phone?: boolean;
+  /** Telefondaki bildirime RemoteInput ile yanıt göndermek için anahtar ("pkg|title") */
+  replyKey?: string | null;
   /** PC kapalıyken telefonda bekleyip sonradan geldi: adada kart açılmaz */
   quiet?: boolean;
 }
+
+export interface WaChat {
+  id: string;
+  title: string;
+  lastText: string;
+  time: string;
+  unread: number;
+  avatar?: string | null;
+}
+
+export interface WaMessage {
+  id: string;
+  sender: string;
+  text: string;
+  time: string;
+  fromMe: boolean;
+}
+
+export interface WaState {
+  status: "disconnected" | "loading" | "qr" | "ready";
+  qr: string | null;
+  chats: WaChat[];
+  activeChat: string | null;
+  messages: WaMessage[];
+  windowVisible: boolean;
+  enabled: boolean;
+}
+
+const WA_DEMO: WaState = {
+  status: "ready",
+  qr: null,
+  chats: [
+    { id: "Elif", title: "Elif", lastText: "Akşam 8'de buluşuyoruz değil mi?", time: "21:14", unread: 2 },
+    { id: "Mert", title: "Mert", lastText: "Dosyaları rafa bıraktım, bakarsın", time: "20:42", unread: 0 },
+    { id: "Tasarım Ekibi", title: "Tasarım Ekibi", lastText: "Yeni sürüm harika olmuş!", time: "19:05", unread: 1 },
+  ],
+  activeChat: "Elif",
+  messages: [
+    { id: "m1", sender: "Elif", text: "Selam! Nook'un yeni sürümünü denedin mi?", time: "21:12", fromMe: false },
+    { id: "m2", sender: "Sen", text: "Evet, şu an adadan yazıyorum 😄", time: "21:13", fromMe: true },
+    { id: "m3", sender: "Elif", text: "Akşam 8'de buluşuyoruz değil mi?", time: "21:14", fromMe: false },
+  ],
+  windowVisible: false,
+  enabled: true,
+};
+
+export const replyNotification = (replyKey: string, text: string) =>
+  inTauri ? invoke<void>("reply_notification", { replyKey, text }) : Promise.resolve();
+export const waState = () => (inTauri ? invoke<WaState>("wa_state") : Promise.resolve(WA_DEMO));
+export const waConnect = (show: boolean) =>
+  inTauri ? invoke<WaState>("wa_connect", { show }) : Promise.resolve({ ...WA_DEMO, windowVisible: show });
+export const waDisconnect = () =>
+  inTauri
+    ? invoke<WaState>("wa_disconnect")
+    : Promise.resolve<WaState>({ status: "disconnected", qr: null, chats: [], activeChat: null, messages: [], windowVisible: false, enabled: false });
+export const waSelectChat = (title: string) => (inTauri ? invoke<void>("wa_select_chat", { title }) : Promise.resolve());
+export const waSend = (title: string, text: string, replyKey?: string | null) =>
+  inTauri ? invoke<string>("wa_send", { title, text, replyKey: replyKey ?? null }) : Promise.resolve("web");
 
 /** Sesli komut: kısayol basılınca "start", bırakınca kayıt (base64 WAV) ya da hata. */
 export type VoicePayload = { phase: "start" } | { phase: "done"; audio: string | null } | { phase: "error"; message: string };
@@ -379,6 +441,8 @@ export interface NativeSettings {
   shieldMuteCalls: boolean;
   autoScreenshots: boolean;
   hideInFullscreen: boolean;
+  /** Oyun açıkken başka bir ekran varsa gizlenmek yerine diğer ekrana geçer */
+  gameSecondScreen: boolean;
   /** Oyun açılınca ada gizlenmeden önce kısa özet */
   gameIntro: boolean;
   /** Bu kadar dakikada bir oyun molası hatırlat (0 = kapalı) */
@@ -569,6 +633,9 @@ export const openWith = (path: string) => (inTauri ? invoke<void>("open_with", {
 export const saveText = (path: string, text: string) => invoke<void>("save_text", { path, text });
 /** https adresinden metin indir (takvim aboneliği) */
 export const fetchText = (url: string) => (inTauri ? invoke<string>("fetch_text", { url }) : fetch(url).then((r) => r.text()));
+/** Geribildirime eklemek için son günlük satırlarını getir */
+export const recentLogs = (max = 25) =>
+  inTauri ? invoke<string[]>("recent_logs", { max }) : Promise.resolve<string[]>([]);
 
 /** Bilgisayardaki birimler (C:, D:, USB) */
 export interface DiskVolume {
@@ -721,6 +788,10 @@ export interface CursorPayload {
   inside: boolean;
   /** İmleç göz takibi menzilinde mi */
   near: boolean;
+  /** Sol tuş ada dışında basılı tutuluyor (pencere/metin/dosya sürükleme) */
+  drag?: boolean;
+  /** Windows kabuğunda gerçek bir dosya/klasör sürükleniyor */
+  fileDrag?: boolean;
 }
 
 export interface FileMeta {

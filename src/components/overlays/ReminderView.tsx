@@ -17,7 +17,8 @@ export function ReminderView() {
   const reminder = useNook((s) => s.reminder);
   const ask = useNook((s) => s.autoAsk);
   const today = useNook((s) => s.days[dayKey()]?.water ?? 0);
-  if (!reminder) return ask ? <AskView label={ask.label} detail={ask.detail} /> : null;
+  if (ask) return <AskView label={ask.label} detail={ask.detail} />;
+  if (!reminder) return null;
   const drinking = reminder.phase === "drinking";
 
   return (

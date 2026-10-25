@@ -32,6 +32,7 @@ import { dayKey, isQuiet, isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
 import { logDiaryMinute } from "../lib/diary";
+import { isWhatsAppNotif, useWhatsApp } from "../lib/whatsapp";
 
 /** Odak sayacı: faz bitince sıradakine geçer. */
 export function useFocusTimer() {
@@ -147,12 +148,23 @@ export function useNotificationFeed() {
     if (!isPrimary) return;
     return subscribe<NotificationPayload>(EVENTS.notification, (n) => {
       const s = useNook.getState();
+      useWhatsApp.getState().ingestNotification(n);
       if (!s.settings.notifications) return;
       s.pushNotification(n);
       s.track({ notifs: 1 });
       const focusing = s.settings.focusMute && s.focus?.phase === "work" && s.focus.endsAt !== null;
       if (s.fullscreen || focusing || n.quiet) return;
-      s.pushToast({ kind: "notify", title: n.title, detail: n.body || n.app, icon: n.icon, ms: 4500 });
+      const wa = isWhatsAppNotif(n);
+      const replyKey = n.replyKey ?? null;
+      s.pushToast({
+        kind: "notify",
+        title: n.title,
+        detail: n.body || n.app,
+        icon: n.icon,
+        replyKey,
+        whatsappChat: wa ? n.title : null,
+        ms: replyKey || wa ? 6500 : 4500,
+      });
       playAntic("surprised");
     });
   }, []);
@@ -293,6 +305,7 @@ export function useGameFeed() {
   useEffect(() => {
     if (!isPrimary) return;
     return subscribe<GamePayload>(EVENTS.game, (g) => {
+      if (g.secs < 120) return;
       const s = useNook.getState();
       s.track({ game: Math.round(g.secs / 60) });
       s.logGame(g.app, g.secs);
@@ -311,7 +324,8 @@ export function useGameFeed() {
   useEffect(() => {
     if (!isPrimary) return;
     return subscribe<GamePeekPayload>(EVENTS.gameStart, (g) => {
-      const { stats, devices, pushToast } = useNook.getState();
+      const { settings, stats, devices, pushToast } = useNook.getState();
+      if (!settings.gameIntro) return;
       const parts = [
         stats && tt("İşlemci %{0}", Math.round(stats.cpu)),
         stats && stats.memTotal > 0 && `Bellek %${Math.round((stats.memUsed / stats.memTotal) * 100)}`,

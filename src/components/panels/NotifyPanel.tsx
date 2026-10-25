@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
 import { useNook, type NookNotif, type NotifItem } from "../../store/nook";
-import { X } from "lucide-react";
+import { Check, MessageCircle, Reply, SendHorizontal, X } from "lucide-react";
 import { ACCENT, EmptyState, MiniNook, Segmented, TextButton, Toggle, tintBg, tintText } from "../ui/primitives";
 import { STYLE } from "../overlays/ToastView";
 import { tt, locale } from "../../lib/i18n";
 import { notifyStatus } from "../../lib/bridge";
+import { isWhatsAppNotif, replyToNotification, useWhatsApp } from "../../lib/whatsapp";
 
 type Source = "windows" | "phone" | "nook";
 /** Son seçilen sekme (panel kapanıp açılınca korunur) */
@@ -168,6 +169,31 @@ const appColor = (app: string) => {
 
 function Row({ n }: { n: NotifItem }) {
   const c = appColor(n.app);
+  const isWa = isWhatsAppNotif(n);
+  const waReady = useWhatsApp((s) => s.web.status === "ready");
+  const canReply = !!(n.replyKey || (isWa && waReady));
+  const [replying, setReplying] = useState(false);
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const send = async () => {
+    if (!text.trim()) return;
+    const ok = await replyToNotification(n, text.trim());
+    if (ok) {
+      setText("");
+      setReplying(false);
+      setSent(true);
+      window.setTimeout(() => setSent(false), 2500);
+    }
+  };
+
+  const openWa = () => {
+    useWhatsApp.getState().selectChat(n.title);
+    const s = useNook.getState();
+    s.noteModuleUse("whatsapp");
+    s.setTab("whatsapp");
+  };
+
   return (
     <motion.div
       layout
@@ -195,6 +221,62 @@ function Row({ n }: { n: NotifItem }) {
           <span className="shrink-0 text-[10px] tabular-nums text-label-3 transition-opacity group-hover:opacity-0">{ago(n.at)}</span>
         </div>
         {n.body && <p className="line-clamp-2 text-[11px] leading-snug text-label-2">{n.body}</p>}
+        {(canReply || isWa || sent) && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {replying ? (
+              <div className="flex flex-1 items-center gap-1">
+                <input
+                  type="text"
+                  autoFocus
+                  value={text}
+                  placeholder={tt("{0} kişisine yanıt yaz…", n.title)}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void send();
+                    else if (e.key === "Escape") setReplying(false);
+                  }}
+                  className="h-6 min-w-0 flex-1 rounded-full border border-white/10 bg-well px-2.5 text-[11px] text-label outline-none placeholder:text-label-3 focus:border-white/25"
+                />
+                <button
+                  onClick={() => void send()}
+                  disabled={!text.trim()}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border disabled:opacity-35"
+                  style={{ background: tintBg(c, 20), borderColor: tintBg(c, 45), color: tintText(c) }}
+                >
+                  <SendHorizontal size={11} strokeWidth={2.5} />
+                </button>
+              </div>
+            ) : (
+              <>
+                {sent && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: tintText(ACCENT.green) }}>
+                    <Check size={10.5} strokeWidth={2.8} />
+                    {tt("Gönderildi")}
+                  </span>
+                )}
+                {canReply && (
+                  <button
+                    onClick={() => setReplying(true)}
+                    className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors"
+                    style={{ background: tintBg(c, 14), borderColor: tintBg(c, 34), color: tintText(c) }}
+                  >
+                    <Reply size={10} strokeWidth={2.5} />
+                    {tt("Yanıtla")}
+                  </button>
+                )}
+                {isWa && (
+                  <button
+                    onClick={openWa}
+                    className="flex items-center gap-1 rounded-full bg-well px-2 py-0.5 text-[10px] font-medium text-label-2 hover:bg-well-hi hover:text-label"
+                  >
+                    <MessageCircle size={10} strokeWidth={2.4} />
+                    {tt("Sohbet")}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
       <button
         onClick={() => useNook.getState().removeNotification(n.id)}

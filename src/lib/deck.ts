@@ -1,12 +1,25 @@
 /**
- * Kısayol tuşları (Stream Deck gibi): tek tuşla bir eylem ya da birden çok adımı sırayla yapan bir rutin.
+ * Kısayol tuşları (Stream Deck gibi): tek tuşla bir eylem ya da birden çok adımı sırayla yapan kısayol.
  * Uygulama/klasör/site açma, mikrofon-ses-karanlık mod, kilitle, masaüstünü göster, uyku/kapat,
  * medya, Pomodoro, gizlilik kalkanı, Hum, ses seviyesi, parlaklık, Nook'un söylemesi ve bekleme.
  * Tuşlar Kısayollar modülünde (istenirse ana sayfada da), düzenleyicisi Nook Studio'da. Aynı adımları
  * otomasyonlar da kullanır (lib/automations).
  */
+import { useEffect, useState } from "react";
 import { DECK_ICONS } from "./deckIcons";
-import { brightnessSet, mediaControl, openPath, quickAction, quickSet, quickState, quickVolume, shieldOn, type QuickKey } from "./bridge";
+import {
+  brightnessSet,
+  isPrimary,
+  mediaControl,
+  openPath,
+  quickAction,
+  quickSet,
+  quickState,
+  quickVolume,
+  shieldOn,
+  type QuickKey,
+  type QuickState,
+} from "./bridge";
 import { startFocus } from "./focus";
 import { toggleHum } from "../hooks/useHum";
 import { useNook } from "../store/nook";
@@ -73,7 +86,7 @@ export const ACTIONS: { id: string; label: string; icon: string; color: string; 
   { id: "shutdown", label: tt("Kapat"), icon: "power", color: "#f0545c", step: { kind: "power", action: "shutdown" }, danger: true },
 ];
 
-/** Değeri olan adımlar (ses seviyesi, parlaklık, söz, bekleme): rutinde ayarlanır */
+/** Değeri olan adımlar (ses seviyesi, parlaklık, söz, bekleme) */
 export const VALUE_KINDS: DeckStep["kind"][] = ["volume", "brightness", "say", "wait"];
 
 /** Adımın hazır eylemi (simge ve renk için); aç/kapa ve değerli adımlar türüne göre eşleşir */
@@ -101,7 +114,7 @@ export const keyFromAction = (id: string): DeckKey => {
 /** Uygulama ya da klasör tuşu: tek basışta açar, kendi simgesiyle görünür */
 export const appKey = (a: { name: string; path: string }): DeckKey => ({ id: crypto.randomUUID(), label: a.name, icon: "app", color: "#3d8bff", steps: [{ kind: "open", path: a.path, name: a.name }] });
 
-/** Tuş tek bir uygulama/klasör açıyorsa yolu (simgesi oradan okunur); site ve rutinlerde null */
+/** Tuş tek bir uygulama/klasör açıyorsa yolu (simgesi oradan okunur); sitelerde ve çok adımlılarda null */
 export const appPathOf = (k: DeckKey) => {
   const s = k.steps.length === 1 ? k.steps[0] : null;
   return k.icon === "app" && s?.kind === "open" && !/^https?:/i.test(s.path) ? s.path : null;
@@ -137,6 +150,91 @@ export const nextQuick = (s: Extract<DeckStep, { kind: "quick" }>): Extract<Deck
   return { kind: "quick", key: s.key, ...(want == null ? {} : { on: s.key === "mic" || s.key === "mute" ? !want : want }) };
 };
 
+// --- Canlı hızlı ayar durumu (mikrofon/ses kapalı simgesi ve durum ışığı tüm pencerelerde ortak) ---
+
+let cachedQuick: QuickState | null = null;
+const quickListeners = new Set<(q: QuickState | null) => void>();
+let quickTimer: number | null = null;
+
+const deckChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("nook-deck") : null;
+
+export const getQuickState = () => cachedQuick;
+
+export async function refreshQuickState(broadcast = true): Promise<QuickState | null> {
+  const q = await quickState();
+  if (q) {
+    cachedQuick = q;
+    quickListeners.forEach((fn) => fn(q));
+    if (broadcast) deckChannel?.postMessage({ kind: "quick", state: q });
+  }
+  return q;
+}
+
+deckChannel?.addEventListener("message", (ev) => {
+  const d = ev.data;
+  if (!d || typeof d !== "object") return;
+  if (d.kind === "quick" && d.state) {
+    cachedQuick = d.state as QuickState;
+    quickListeners.forEach((fn) => fn(cachedQuick));
+  } else if (isPrimary && d.kind === "toast") {
+    useNook.getState().pushToast({ kind: "chat", title: d.title, detail: d.detail ?? "", ms: d.ms ?? 5000 });
+  } else if (isPrimary && d.kind === "hum") {
+    toggleHum();
+  }
+});
+
+/** Kısayollar, ana sayfa ve Studio için canlı mikrofon/ses/Wi-Fi/karanlık mod durumu */
+export function useQuickState(): QuickState | null {
+  const [st, setSt] = useState<QuickState | null>(cachedQuick);
+  useEffect(() => {
+    quickListeners.add(setSt);
+    if (!cachedQuick) void refreshQuickState(false);
+    if (quickTimer == null) {
+      quickTimer = window.setInterval(() => {
+        void refreshQuickState(false);
+      }, 1500);
+    }
+    return () => {
+      quickListeners.delete(setSt);
+      if (quickListeners.size === 0 && quickTimer != null) {
+        window.clearInterval(quickTimer);
+        quickTimer = null;
+      }
+    };
+  }, []);
+  return st;
+}
+
+/**
+ * Tuşun canlı görünümü: mikrofon ya da ses kapalıyken üstü çizili simge (`micoff` / `mute`), kırmızı vurgu
+ * ve durum ışığı döner. Hem adadaki Kısayollar/Ana Sayfa'da hem Studio'da hem de Nook Mobil aynasında kullanılır.
+ */
+export function keyVisual(k: DeckKey, q: QuickState | null) {
+  const isMic = k.icon === "mic" || k.icon === "micoff" || k.steps.some((s) => s.kind === "quick" && s.key === "mic");
+  const isMute = k.icon === "volume" || k.icon === "mute" || k.steps.some((s) => s.kind === "quick" && s.key === "mute");
+  const micMuted = isMic && !!q?.micMuted;
+  const audioMuted = isMute && !!q?.muted;
+  const muted = micMuted || audioMuted;
+  const iconName = micMuted ? "micoff" : audioMuted ? "mute" : k.icon;
+  const Icon = DECK_ICONS[iconName] ?? DECK_ICONS[k.icon] ?? DECK_ICONS.bolt;
+  const color = muted ? "#ff453a" : k.color;
+
+  let lit: "on" | "off" | null = null;
+  if (q) {
+    if (isMic) lit = q.micMuted ? "off" : "on";
+    else if (isMute) lit = q.muted ? "off" : "on";
+    else {
+      const s = k.steps.length === 1 ? k.steps[0] : null;
+      if (s?.kind === "quick") {
+        if (s.key === "dark") lit = q.dark ? "on" : null;
+        else if (s.key === "wifi" && q.wifi != null) lit = q.wifi ? "on" : "off";
+        else if (s.key === "bluetooth" && q.bluetooth != null) lit = q.bluetooth ? "on" : "off";
+      }
+    }
+  }
+  return { iconName, Icon, color, lit, muted };
+}
+
 /** Adımın kısa anlatımı (Studio'daki listede) */
 export function stepLabel(s: DeckStep): string {
   switch (s.kind) {
@@ -161,6 +259,11 @@ export function stepLabel(s: DeckStep): string {
 
 const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
+export function pushIslandToast(title: string, detail = "", ms = 5000) {
+  useNook.getState().pushToast({ kind: "chat", title, detail, ms });
+  if (!isPrimary) deckChannel?.postMessage({ kind: "toast", title, detail, ms });
+}
+
 async function runStep(s: DeckStep, label: string) {
   switch (s.kind) {
     case "open":
@@ -173,23 +276,35 @@ async function runStep(s: DeckStep, label: string) {
         const cur = s.key === "mic" ? st?.micMuted : s.key === "mute" ? st?.muted : s.key === "dark" ? st?.dark : s.key === "wifi" ? st?.wifi : st?.bluetooth;
         on = !cur;
       }
-      return quickSet(s.key, on);
+      await quickSet(s.key, on);
+      void refreshQuickState();
+      return;
     }
     case "power":
       return quickAction(s.action);
     case "media":
       return mediaControl(s.action);
     case "volume":
-      return quickVolume(s.value / 100);
+      await quickVolume(s.value / 100);
+      void refreshQuickState();
+      return;
     case "brightness":
       return brightnessSet(s.value);
     case "say":
-      return useNook.getState().pushToast({ kind: "chat", title: s.text || label, detail: "", ms: 5000 });
+      return pushIslandToast(s.text || label, "", 5000);
     case "wait":
       return wait(s.sec * 1000);
     case "nook":
       if (s.action === "focus") return void startFocus("work", 0);
-      if (s.action === "shield") return shieldOn(false);
+      if (s.action === "shield") {
+        await shieldOn(false);
+        void refreshQuickState();
+        return;
+      }
+      if (!isPrimary) {
+        deckChannel?.postMessage({ kind: "hum" });
+        return;
+      }
       return toggleHum();
   }
 }
@@ -203,10 +318,13 @@ export async function runKey(k: { label: string; steps: DeckStep[] }) {
     try {
       await runStep(s, k.label);
     } catch (e) {
-      useNook.getState().pushToast({ kind: "chat", title: tt("{0} yapılamadı", k.label), detail: String(e), ms: 4000 });
+      pushIslandToast(tt("{0} yapılamadı", k.label), String(e), 4000);
+      void refreshQuickState();
       return false;
     }
     if (i < k.steps.length - 1 && s.kind !== "wait") await wait(s.kind === "open" ? 450 : 150);
   }
+  void refreshQuickState();
+  window.setTimeout(() => void refreshQuickState(), 250);
   return true;
 }

@@ -45,6 +45,7 @@ export function pickMove(style: "random" | MoveKind): MoveKind {
 
 const REST = { x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1, rotate: 0, skewX: 0, opacity: 1 };
 const RGB = (r: number) => `drop-shadow(${r}px 0 0 rgba(255,40,80,0.9)) drop-shadow(${-r}px 0 0 rgba(40,220,255,0.9))`;
+const RGB_CLEAR = "drop-shadow(0px 0 0 rgba(255,40,80,0)) drop-shadow(0px 0 0 rgba(40,220,255,0))";
 
 /** Adanın (ve Nook'un) kaybolma/belirme hareketi */
 export function moveTarget({ kind, dir, phase }: Move): TargetAndTransition {
@@ -135,7 +136,7 @@ export function moveTarget({ kind, dir, phase }: Move): TargetAndTransition {
             skewX: [0, -16, 12, -6, 3, 0],
             scaleY: [0.02, 0.5, 1.1, 0.92, 1.03, 1],
             opacity: [0, 0.8, 0.5, 1, 0.8, 1],
-            filter: [RGB(10), RGB(-7), RGB(5), RGB(-3), RGB(1), RGB(0)],
+            filter: [RGB(10), RGB(-7), RGB(5), RGB(-3), RGB(1), RGB_CLEAR],
             transition: { duration: 0.55, ease: "linear" },
           };
   }

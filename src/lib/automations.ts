@@ -7,7 +7,7 @@
  */
 import { useEffect } from "react";
 import { EVENTS, isPrimary, subscribe, type ForegroundPayload, type GamePayload, type GamePeekPayload, type SysEvent } from "./bridge";
-import { getDeck, isDangerous, migratePinnedApps, runKey, type DeckStep } from "./deck";
+import { getDeck, isDangerous, migratePinnedApps, pushIslandToast, runKey, type DeckStep } from "./deck";
 import { useNook } from "../store/nook";
 import { tt } from "./i18n";
 
@@ -201,6 +201,10 @@ export const autoSafe = (steps: DeckStep[]) => !isDangerous({ steps });
 let inGame = false;
 
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+const minsOf = (s: string) => {
+  const [h, m] = s.split(":").map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : -1;
+};
 
 function holds(c: Condition) {
   const s = useNook.getState();
@@ -209,8 +213,8 @@ function holds(c: Condition) {
       return !inGame;
     case "between": {
       const now = hhmm(new Date());
-      // Gece yarısını aşan aralık (22:00–08:00)
-      return c.from <= c.to ? now >= c.from && now < c.to : now >= c.from || now < c.to;
+      // Gece yarısını aşan aralık (22:00–08:00), bitiş dakikası dahil
+      return c.from <= c.to ? now >= c.from && now <= c.to : now >= c.from || now <= c.to;
     }
     case "power": {
       const bat = s.stats?.battery;
@@ -237,29 +241,61 @@ const ALIAS: Record<string, string> = {
   olk: "outlook",
   ms_teams: "teams",
   msteams: "teams",
+  discordptb: "discord",
+  discordcanary: "discord",
+  chrome: "googlechrome",
+  firefox: "mozillafirefox",
 };
 
-/** Öndeki program (küçük harf, .exe'siz) seçilen uygulama mı */
-export function appMatches(name: string, exe: string) {
+/** Öndeki program (küçük harf, .exe'siz) ya da UWP pencere başlığı seçilen uygulama mı */
+export function appMatches(name: string, exe: string, title = "") {
   const want = norm(name);
+  if (!want) return false;
   const got = norm(ALIAS[exe] ?? exe);
-  return !!want && !!got && (want.includes(got) || got.includes(want));
+  if (got && got !== "applicationframehost" && (want.includes(got) || got.includes(want))) return true;
+  if (title) {
+    const t = norm(title);
+    if (t && (exe === "applicationframehost" || !got) && t.includes(want)) return true;
+  }
+  return false;
 }
 
 /** Aynı otomasyon art arda (ör. Bluetooth kopup bağlanırken) bir dakikada bir kez */
 const COOLDOWN_MS = 60_000;
+/** Saat tetikleyicisi 2 dakikalık pencerede yalnızca bir kez çalışsın */
+const TIME_COOLDOWN_MS = 3 * 60_000;
 /** "Çalışsın mı?" sorusu bu kadar cevapsız kalırsa çalışmaz */
 const ASK_MS = 45_000;
+const BOOT_GUARD_KEY = "nook-auto-boot";
 
 function log(a: Automation, status: AutoRun["status"]) {
   const s = useNook.getState();
   s.setAutoLog([{ id: a.id, label: a.label, at: Date.now(), status }, ...s.autoLog].slice(0, 60));
 }
 
-async function run(a: Automation) {
+async function run(a: Automation, manual = false) {
   // Nook bir şey söylemiyorsa çalıştığı kısaca görünsün
-  if (!a.steps.some((s) => s.kind === "say")) useNook.getState().pushToast({ kind: "chat", title: tt("Otomasyon: {0}", a.label), detail: triggerLabel(a.when), ms: 3000 });
-  log(a, (await runKey(a)) ? "ran" : "error");
+  if (!a.steps.some((s) => s.kind === "say")) {
+    pushIslandToast(tt("Otomasyon: {0}", a.label), manual ? tt("Şimdi çalıştırıldı") : triggerLabel(a.when), 3000);
+  }
+  const ok = await runKey(a);
+  log(a, ok ? "ran" : "error");
+  return ok;
+}
+
+/**
+ * Otomasyonu tetikleyicisini ya da koşullarını beklemeden hemen çalıştırır
+ * (Nook Mobil'den, Nook Studio'daki "Dene" düğmesinden ya da sesli komuttan).
+ */
+export async function runAutomationNow(idOrAuto: string | Automation): Promise<boolean> {
+  const list = getAutomations();
+  const a = typeof idOrAuto === "string" ? list.find((x) => x.id === idOrAuto) : idOrAuto;
+  if (!a || !a.steps.length || !autoSafe(a.steps)) return false;
+  const now = Date.now();
+  if (list.some((x) => x.id === a.id)) {
+    saveAutomations(list.map((x) => (x.id === a.id ? { ...x, last: now } : x)));
+  }
+  return run(a, true);
 }
 
 let askTimer = 0;
@@ -277,9 +313,9 @@ export function answerAsk(yes: boolean) {
   else log(a, "declined");
 }
 
-function fire(match: (t: Trigger) => boolean) {
+function fire(match: (t: Trigger) => boolean, cooldown = COOLDOWN_MS) {
   const now = Date.now();
-  const due = getAutomations().filter((a) => a.on && a.steps.length && autoSafe(a.steps) && match(a.when) && now - (a.last ?? 0) > COOLDOWN_MS);
+  const due = getAutomations().filter((a) => a.on && a.steps.length && autoSafe(a.steps) && match(a.when) && now - (a.last ?? 0) > cooldown);
   if (!due.length) return;
   saveAutomations(getAutomations().map((a) => (due.some((d) => d.id === a.id) ? { ...a, last: now } : a)));
   for (const a of due) {
@@ -307,33 +343,60 @@ export function useAutomations() {
     if (!isPrimary) return;
     migratePinnedApps();
 
-    // Saat: yarım dakikada bir bakılır; aynı dakikada iki kez çalışmaz (bekleme süresi)
+    // Saat: 15 saniyede bir bakılır; arka planda WebView2 yavaşlasa bile 2 dakikalık pencerede yakalar
     const tick = () => {
       const d = new Date();
-      const at = hhmm(d);
-      fire((t) => t.kind === "time" && t.at === at && (!t.days.length || t.days.includes(d.getDay())));
+      const nowMins = d.getHours() * 60 + d.getMinutes();
+      const day = d.getDay();
+      fire((t) => {
+        if (t.kind !== "time") return false;
+        if (t.days.length && !t.days.includes(day)) return false;
+        const target = minsOf(t.at);
+        const diff = nowMins - target;
+        return target >= 0 && diff >= 0 && diff <= 2;
+      }, TIME_COOLDOWN_MS);
     };
-    const clock = window.setInterval(tick, 20_000);
-    // Nook açılınca: ada yerleşsin diye biraz sonra
-    const boot = window.setTimeout(() => fire((t) => t.kind === "start"), 4000);
+    tick();
+    const clock = window.setInterval(tick, 15_000);
+
+    // Nook açılınca: ada yerleşsin diye biraz sonra; sağ tık › Yenile'de tekrar çalışmasın
+    let boot = 0;
+    try {
+      if (!sessionStorage.getItem(BOOT_GUARD_KEY)) {
+        boot = window.setTimeout(() => {
+          try {
+            sessionStorage.setItem(BOOT_GUARD_KEY, "1");
+          } catch {
+            /* önemsiz */
+          }
+          fire((t) => t.kind === "start");
+        }, 4000);
+      }
+    } catch {
+      boot = window.setTimeout(() => fire((t) => t.kind === "start"), 4000);
+    }
 
     let fg = "";
     const offs = [
       subscribe<ForegroundPayload>(EVENTS.foreground, (p) => {
-        if (p.app === fg) return;
-        fg = p.app;
-        fire((t) => t.kind === "app" && appMatches(t.name, p.app));
+        const key = p.app === "applicationframehost" && p.title ? `${p.app}:${p.title}` : p.app;
+        if (!key || key === fg) return;
+        fg = key;
+        fire((t) => t.kind === "app" && appMatches(t.name, p.app, p.title));
       }),
       subscribe<GamePeekPayload>(EVENTS.gameStart, () => {
         inGame = true;
         fire((t) => t.kind === "game" && !t.end);
       }),
-      subscribe<GamePayload>(EVENTS.game, () => {
+      subscribe<GamePayload>(EVENTS.game, (g) => {
         inGame = false;
-        fire((t) => t.kind === "game" && t.end);
+        if (g.secs >= 15) fire((t) => t.kind === "game" && t.end);
       }),
       subscribe<SysEvent>(EVENTS.event, (e) => fire((t) => t.kind === "event" && t.event === e.kind)),
-      subscribe<boolean>(EVENTS.idle, (asleep) => fire((t) => t.kind === "idle" && t.back === !asleep)),
+      subscribe<boolean>(EVENTS.idle, (asleep) => {
+        useNook.getState().setAsleep(asleep);
+        fire((t) => t.kind === "idle" && t.back === !asleep);
+      }),
       subscribe<boolean>(EVENTS.locked, (locked) => fire((t) => t.kind === "lock" && t.locked === locked)),
       subscribe<{ event: PhoneEvent }>(EVENTS.phoneEvent, (p) => fire((t) => t.kind === "phone" && t.event === p.event)),
       // Tuşun klavye kısayolu (Rust kaydeder, basılınca kimliğini yollar)
@@ -380,7 +443,7 @@ export async function runByVoice(raw: string, exact: boolean): Promise<string | 
   }
   const auto = getAutomations().find((a) => a.steps.length && autoSafe(a.steps) && same(a.label));
   if (auto) {
-    void run(auto);
+    void runAutomationNow(auto);
     return auto.label;
   }
   return null;

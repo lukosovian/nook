@@ -27,6 +27,7 @@ import { isTurkish, tt } from "../../lib/i18n";
 import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 import { conflictOf, duplicateOf, SHORTCUTS, useInstalledApps } from "../../lib/shortcuts";
+import { FeedbackSection } from "./FeedbackSection";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: tt("Ana") },
@@ -93,7 +94,7 @@ export const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; c
   { id: "modules", title: tt("Modüller"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
   { id: "shortcuts", title: tt("Kısayollar"), hint: tt("Klavye kısayolları"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Kısayollar")] },
   { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.teal, sections: [tt("Telefon")] },
-  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Destekçiler")] },
+  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, geribildirim, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Geribildirim"), tt("Destekçiler")] },
 ];
 
 /** Bölüm başlığından kategorisi ("Ayarlar › Kısayollar"a gönderme gibi) */
@@ -192,6 +193,9 @@ export function CategoryBody({ id }: { id: CatId }) {
             )}
             <Row label={tt("Adanın yeri")} hint={s.islandPos ? tt("Taşındı · üstteki ✥ ile sürükle") : tt("Üst orta · üstteki ✥ ile sürükle")}>
               <TextButton disabled={!s.islandPos} onClick={() => update({ islandPos: null })}>{tt("Ortala")}</TextButton>
+            </Row>
+            <Row label={tt("Oyunda ikinci ekrana geç")} hint={tt("Oyun açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
+              <Toggle on={s.gameSecondScreen} onChange={(v) => update({ gameSecondScreen: v })} color={ACCENT.blue} />
             </Row>
           </Section>
           <Section title={tt("Erişilebilirlik")}>
@@ -330,6 +334,9 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Row label={tt("Oyunda / tam ekranda gizlen")}>
             <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
           </Row>
+          <Row label={tt("Oyunda ikinci ekrana geç")} hint={tt("Oyun açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
+            <Toggle on={s.gameSecondScreen} onChange={(v) => update({ gameSecondScreen: v })} color={ACCENT.blue} />
+          </Row>
           <Row label={tt("Oyun açılınca özet")} hint={tt("Kısa süre oyunun üstünde merhaba der")}>
             <Toggle on={s.gameIntro} onChange={(v) => update({ gameIntro: v })} />
           </Row>
@@ -412,6 +419,7 @@ export function CategoryBody({ id }: { id: CatId }) {
               <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
             </Row>
           </Section>
+          <FeedbackSection />
           <SupportersSection />
         </>
       );

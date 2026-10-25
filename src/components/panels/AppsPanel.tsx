@@ -2,8 +2,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AppWindow, Plus, RotateCcw, Search, X, Zap } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
-import { fileIcon, listApps, quickState, type AppEntry, type QuickState } from "../../lib/bridge";
-import { ACTIONS, appKey, appPathOf, DECK_ICONS, getDeck, hasAppKey, isDangerous, keyFromAction, resetDeck, runKey, useDeck, VALUE_KINDS, type DeckKey } from "../../lib/deck";
+import { fileIcon, listApps, type AppEntry, type QuickState } from "../../lib/bridge";
+import {
+  ACTIONS,
+  appKey,
+  appPathOf,
+  DECK_ICONS,
+  getDeck,
+  hasAppKey,
+  isDangerous,
+  keyFromAction,
+  keyVisual,
+  resetDeck,
+  runKey,
+  useDeck,
+  useQuickState,
+  VALUE_KINDS,
+  type DeckKey,
+} from "../../lib/deck";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, MiniNook, Segmented, TextButton, tintBg, tintText } from "../ui/primitives";
@@ -13,23 +29,22 @@ import { tt } from "../../lib/i18n";
 let appsCache: Promise<AppEntry[]> | undefined;
 
 /**
- * Kısayollar (Stream Deck gibi): basılabilir tuşlar tek listede: eylemler (mikrofon, ses, masaüstü, kilit…),
- * rutinler ve uygulama/klasör tuşları. "+" ile uygulama ya da hazır eylem eklenir; rutinler (tek tuşla
- * sırayla birden çok iş) ve otomasyonlar Nook Studio › Kısayollar'da kurulur. Hepsi silinirse hazır
- * tuşlar tek basışta geri gelir.
+ * Kısayollar (Stream Deck gibi): basılabilir tuşlar tek listede: eylemler (mikrofon, ses, masaüstü, kilit…)
+ * ve uygulama/klasör tuşları. "+" ile uygulama ya da hazır eylem eklenir; gelişmiş tuşlar ve otomasyonlar
+ * Nook Studio › Kısayollar'da kurulur. Hepsi silinirse hazır tuşlar tek basışta geri gelir.
  */
 export function AppsPanel() {
   const deck = useDeck();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
-  const quick = useQuick();
+  const quick = useQuickState();
 
   if (adding) return <Picker onClose={() => setAdding(false)} />;
 
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex shrink-0 items-center justify-between">
-        <p className="text-[10.5px] text-label-3">{editing ? tt("Kaldırmak için tuşa bas") : tt("Bas, çalışsın · rutin ve otomasyonlar: Studio › Kısayollar")}</p>
+        <p className="text-[10.5px] text-label-3">{editing ? tt("Kaldırmak için tuşa bas") : tt("Bas, çalışsın · otomasyonlar: Studio › Kısayollar")}</p>
         {deck.length > 0 && <TextButton onClick={() => setEditing((v) => !v)}>{editing ? tt("Bitti") : tt("Düzenle")}</TextButton>}
       </div>
       <div className="grid min-h-0 flex-1 auto-rows-[66px] grid-cols-5 gap-2 overflow-y-auto p-0.5 pr-1">
@@ -69,18 +84,6 @@ export function AppsPanel() {
       </div>
     </div>
   );
-}
-
-/** Mikrofon, ses, karanlık mod tuşları şu anki hâli göstersin */
-function useQuick() {
-  const [quick, setQuick] = useState<QuickState | null>(null);
-  useEffect(() => {
-    const load = () => void quickState().then((q) => q && setQuick(q)).catch(() => {});
-    load();
-    const t = window.setInterval(load, 1500);
-    return () => window.clearInterval(t);
-  }, []);
-  return quick;
 }
 
 /** Kapatma/uyku gibi tuşlar: ilk basış kurar, üç saniye içinde ikinci basış çalıştırır */
@@ -173,23 +176,16 @@ function KeyCap({
   );
 }
 
-/** Tek adımlı aç/kapa tuşunun şu anki hâli: true = kapalı (mikrofon/ses), karanlık mod açık */
-function quickOn(k: DeckKey, q: QuickState | null) {
-  const s = k.steps.length === 1 ? k.steps[0] : null;
-  if (!q || !s || s.kind !== "quick") return null;
-  return s.key === "mic" ? q.micMuted : s.key === "mute" ? q.muted : s.key === "dark" ? q.dark : s.key === "wifi" ? q.wifi : q.bluetooth;
-}
-
 function ActionKey({ k, editing, quick }: { k: DeckKey; editing: boolean; quick: QuickState | null }) {
-  const state = quickOn(k, quick);
-  const off = state === true && (k.icon === "mic" || k.icon === "volume");
-  const Icon = off ? (k.icon === "mic" ? DECK_ICONS.micoff : DECK_ICONS.mute) : (DECK_ICONS[k.icon] ?? Zap);
+  const { Icon, color, lit, muted } = keyVisual(k, quick);
   const [armed, setArmed] = useArmed();
+  const isQuickToggle = k.steps.length === 1 && k.steps[0].kind === "quick";
+  const litColor = lit === "off" ? ACCENT.red : lit === "on" ? k.color : isQuickToggle ? null : undefined;
   return (
     <KeyCap
-      color={off ? ACCENT.red : k.color}
-      label={off ? tt("{0} kapalı", k.label) : k.label}
-      lit={state != null ? (off ? ACCENT.red : state ? k.color : null) : undefined}
+      color={color}
+      label={muted ? tt("{0} kapalı", k.label) : k.label}
+      lit={litColor}
       title={editing ? tt("{0} — kaldır", k.label) : k.steps.length > 1 ? tt("{0} · {1} adım", k.label, k.steps.length) : k.label}
       editing={editing}
       armed={armed}
@@ -248,21 +244,22 @@ function AppKey({ k, path, editing }: { k: DeckKey; path: string; editing: boole
  */
 export function HomeKeys({ keys }: { keys: DeckKey[] }) {
   const compact = keys.length > 3;
+  const quick = useQuickState();
   return (
     <>
       {keys.map((k) => (
-        <HomeKey key={k.id} k={k} compact={compact} />
+        <HomeKey key={k.id} k={k} compact={compact} quick={quick} />
       ))}
     </>
   );
 }
 
-function HomeKey({ k, compact }: { k: DeckKey; compact: boolean }) {
+function HomeKey({ k, compact, quick }: { k: DeckKey; compact: boolean; quick: QuickState | null }) {
   const path = appPathOf(k);
   const icon = useIcon(path);
-  const Icon = DECK_ICONS[k.icon] ?? Zap;
+  const { Icon, color: visColor, muted } = keyVisual(k, quick);
   const [armed, setArmed] = useArmed();
-  const color = armed ? ACCENT.red : k.color;
+  const color = armed ? ACCENT.red : visColor;
   return (
     <motion.button
       onClick={() => {
@@ -271,7 +268,7 @@ function HomeKey({ k, compact }: { k: DeckKey; compact: boolean }) {
         playAntic("wink");
         void runKey(k);
       }}
-      title={armed ? tt("Tekrar bas") : k.label}
+      title={armed ? tt("Tekrar bas") : muted ? tt("{0} kapalı", k.label) : k.label}
       whileHover={{ scale: 1.04 }}
       whileTap={{ scale: 0.93 }}
       className={`flex h-full min-w-0 items-center gap-1 rounded-[11px] border ${compact ? "w-[34px] shrink-0 justify-center" : "pl-[3px] pr-2.5"}`}
@@ -282,7 +279,7 @@ function HomeKey({ k, compact }: { k: DeckKey; compact: boolean }) {
       </span>
       {!compact && (
         <span className="truncate text-[11px] font-semibold" style={{ color: path ? "var(--color-label-2)" : tintText(color) }}>
-          {armed ? tt("Tekrar bas") : k.label}
+          {armed ? tt("Tekrar bas") : muted ? tt("{0} kapalı", k.label) : k.label}
         </span>
       )}
     </motion.button>
@@ -314,7 +311,7 @@ function ActionPicker({ onClose }: { onClose: () => void }) {
   const deck = useDeck();
   return (
     <div className="grid min-h-0 flex-1 grid-cols-3 gap-1 overflow-y-auto pr-1">
-      {/* Ses seviyesi, Nook söylesin gibi değer isteyenler Studio'da rutinin içinde ayarlanır */}
+      {/* Ses seviyesi, Nook söylesin gibi değer isteyenler Studio'da ayarlanır */}
       {ACTIONS.filter((a) => !VALUE_KINDS.includes(a.step.kind)).map((a) => {
         const Icon = DECK_ICONS[a.icon] ?? Zap;
         const has = deck.some((k) => k.steps.length === 1 && JSON.stringify(k.steps[0]) === JSON.stringify(a.step));

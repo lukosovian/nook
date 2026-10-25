@@ -902,5 +902,8 @@ export const getDeck = (p: Pairing) =>
 /** Tuşa PC'de bas */
 export const runPcKey = (p: Pairing, id: string) => (DEMO(p) ? Promise.resolve() : request(p, "POST", "/v1/deck", { op: "run", id }).then(() => undefined));
 
+/** Otomasyonu koşulsuz şimdi çalıştır */
+export const runPcAuto = (p: Pairing, id: string) => (DEMO(p) ? Promise.resolve() : request(p, "POST", "/v1/deck", { op: "run-auto", id }).then(() => undefined));
+
 /** Otomasyonu aç / kapa */
 export const setPcAuto = (p: Pairing, id: string, on: boolean) => (DEMO(p) ? Promise.resolve() : request(p, "POST", "/v1/deck", { op: "auto", id, on }).then(() => undefined));

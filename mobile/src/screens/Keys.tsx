@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { AppWindow, ArrowRight, Zap } from "lucide-react";
+import { AppWindow, ArrowRight, Play, Zap } from "lucide-react";
 import { DECK_ICONS } from "@nook/lib/deckIcons";
-import { cached, getDeck, runPcKey, setPcAuto, type Pairing, type PcAuto, type PcDeck, type PcKey } from "../lib/pc";
+import { cached, getDeck, runPcAuto, runPcKey, setPcAuto, type Pairing, type PcAuto, type PcDeck, type PcKey } from "../lib/pc";
 import { errText, tintBg, tintText, TopBar, useBackButton, useToast } from "../ui";
 import type { Conn } from "../App";
 
@@ -30,18 +30,32 @@ export function useDeck(pairing: Pairing, online: boolean) {
 
 /**
  * Kısayollar: PC'deki tuşlar (dokun, PC'de çalışsın; kapatma/uyku ikinci dokunuşta) ve otomasyonlar
- * (aç/kapa). Tuşlar ve otomasyonlar PC'de, Nook Studio › Kısayollar'da kurulur.
+ * (dokunup istediğin zaman çalıştır ya da sağdaki anahtarla otomatik tetiklenmesini aç/kapa).
+ * Tuşlar ve otomasyonlar PC'de, Nook Studio › Kısayollar'da kurulur.
  */
 export function KeysScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: Conn; onBack: () => void }) {
   useBackButton(onBack);
   const online = conn === "online";
   const [toast, say] = useToast();
   const [deck, setDeck] = useDeck(pairing, online);
+  const [runningId, setRunningId] = useState<string | null>(null);
 
   const toggle = async (a: PcAuto) => {
     setDeck((d) => d && { ...d, autos: d.autos.map((x) => (x.id === a.id ? { ...x, on: !a.on } : x)) });
     try {
       await setPcAuto(pairing, a.id, !a.on);
+    } catch (e) {
+      say(errText(e));
+    }
+  };
+
+  const runAuto = async (a: PcAuto) => {
+    if (!online) return say("PC açılınca");
+    setRunningId(a.id);
+    window.setTimeout(() => setRunningId((cur) => (cur === a.id ? null : cur)), 700);
+    try {
+      await runPcAuto(pairing, a.id);
+      say(`Çalıştırıldı: ${a.label}`);
     } catch (e) {
       say(errText(e));
     }
@@ -55,29 +69,74 @@ export function KeysScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: 
       {deck && !deck.keys.length && <p className="px-1 text-[14px] text-label-2">PC'de hiç tuş yok.</p>}
       <section className="grid grid-cols-3 gap-2.5">
         {(deck?.keys ?? []).map((k) => (
-          <KeyButton key={k.id} k={k} pairing={pairing} online={online} say={say} />
+          <KeyButton
+            key={k.id}
+            k={k}
+            pairing={pairing}
+            online={online}
+            say={say}
+            onRan={() => {
+              window.setTimeout(() => {
+                void getDeck(pairing).then(setDeck).catch(() => {});
+              }, 350);
+            }}
+          />
         ))}
       </section>
 
       {!!deck?.autos.length && (
         <>
-          <h2 className="-mb-1 mt-2 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Otomasyonlar</h2>
+          <div className="-mb-1 mt-2 flex items-center justify-between px-1">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Otomasyonlar</h2>
+            <span className="text-[11px] text-label-3">Dokun: şimdi çalıştır · Anahtar: otomatik</span>
+          </div>
           <section className="flex flex-col gap-2">
             {deck.autos.map((a) => {
               const Icon = DECK_ICONS[a.icon] ?? Zap;
+              const hit = runningId === a.id;
               return (
-                <div key={a.id} className={`flex items-center gap-3 rounded-3xl bg-card p-3 ${a.on ? "" : "opacity-60"}`}>
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{ background: tintBg(a.color, 20), color: tintText(a.color) }}>
-                    <Icon size={20} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">{a.label}</span>
-                    <span className="flex items-center gap-1 truncate text-[12.5px] text-label-3">
-                      <span style={{ color: tintText(a.color) }}>{a.when}</span>
-                      <ArrowRight size={11} className="shrink-0" />
-                      {a.steps} adım
+                <div
+                  key={a.id}
+                  className={`flex items-center gap-3 rounded-3xl border p-3 transition-colors ${a.on ? "" : "opacity-75"}`}
+                  style={{
+                    background: hit ? tintBg(a.color, 22) : "var(--color-card)",
+                    borderColor: hit ? tintBg(a.color, 55) : "rgb(255 255 255 / 0.05)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    disabled={!online || a.steps === 0}
+                    onClick={() => void runAuto(a)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{ background: tintBg(a.color, 20), color: tintText(a.color) }}>
+                      <Icon size={20} />
                     </span>
-                  </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold">{a.label}</span>
+                      <span className="flex items-center gap-1 truncate text-[12.5px] text-label-3">
+                        <span style={{ color: tintText(a.color) }}>{a.when}</span>
+                        <ArrowRight size={11} className="shrink-0" />
+                        {a.steps} adım
+                      </span>
+                    </span>
+                  </button>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.9 }}
+                    disabled={!online || a.steps === 0}
+                    onClick={() => void runAuto(a)}
+                    aria-label={`${a.label} çalıştır`}
+                    title="Şimdi çalıştır"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border disabled:opacity-40"
+                    style={{
+                      background: tintBg(a.color, hit ? 34 : 16),
+                      borderColor: tintBg(a.color, 42),
+                      color: tintText(a.color),
+                    }}
+                  >
+                    <Play size={14} fill="currentColor" />
+                  </motion.button>
                   <Switch on={a.on} color={a.color} disabled={!online} onChange={() => void toggle(a)} />
                 </div>
               );
@@ -106,7 +165,21 @@ function Switch({ on, color, disabled, onChange }: { on: boolean; color: string;
 }
 
 /** Basılabilir tuş: rengine boyanmış kart; uygulama tuşu kendi simgesiyle. `small`: ana ekrandaki sıra */
-export function KeyButton({ k, pairing, online, say, small }: { k: PcKey; pairing: Pairing; online: boolean; say: (m: string) => void; small?: boolean }) {
+export function KeyButton({
+  k,
+  pairing,
+  online,
+  say,
+  small,
+  onRan,
+}: {
+  k: PcKey;
+  pairing: Pairing;
+  online: boolean;
+  say: (m: string) => void;
+  small?: boolean;
+  onRan?: () => void;
+}) {
   const [armed, setArmed] = useState(false);
   const [hit, setHit] = useState(false);
   useEffect(() => {
@@ -125,6 +198,7 @@ export function KeyButton({ k, pairing, online, say, small }: { k: PcKey; pairin
     window.setTimeout(() => setHit(false), 500);
     try {
       await runPcKey(pairing, k.id);
+      onRan?.();
     } catch (e) {
       say(errText(e));
     }

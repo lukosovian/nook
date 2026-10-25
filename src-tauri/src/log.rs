@@ -33,3 +33,15 @@ pub fn write(level: &str, msg: &str) {
 pub fn log_line(level: String, msg: String) {
     write(&level, &msg.chars().take(2000).collect::<String>());
 }
+
+/// Geribildirim formuna eklemek için son günlük satırlarını okur (varsayılan son 25 satır).
+#[tauri::command]
+pub fn recent_logs(max: Option<usize>) -> Vec<String> {
+    let _guard = LOCK.lock().unwrap();
+    let Some(p) = path() else { return Vec::new() };
+    let Ok(raw) = std::fs::read_to_string(&p) else { return Vec::new() };
+    let limit = max.unwrap_or(25).clamp(1, 100);
+    let lines: Vec<&str> = raw.lines().filter(|l| !l.trim().is_empty()).collect();
+    let start = lines.len().saturating_sub(limit);
+    lines[start..].iter().map(|s| (*s).to_string()).collect()
+}

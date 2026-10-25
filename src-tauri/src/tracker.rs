@@ -42,6 +42,7 @@ pub fn mouse_travel() -> u64 {
 }
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CursorPayload {
     /// Hangi pencere için: dinleyiciler bütün pencerelerin olaylarını alır, kendininkini seçer
     label: String,
@@ -49,6 +50,10 @@ struct CursorPayload {
     y: f64,
     inside: bool,
     near: bool,
+    /// Sol tuş ada dışında basılı tutuluyor (pencere/metin/dosya sürükleme)
+    drag: bool,
+    /// Windows kabuğunda gerçek bir dosya/klasör sürükleniyor (SysDragImage görünür)
+    file_drag: bool,
 }
 
 struct Prev {
@@ -56,6 +61,7 @@ struct Prev {
     /// Sol tuş basılı mıydı / basış adanın içinde mi başladı
     down: bool,
     drag: bool,
+    file_drag: bool,
     near: bool,
     last: (f64, f64),
     emitted: Instant,
@@ -63,7 +69,7 @@ struct Prev {
 
 impl Default for Prev {
     fn default() -> Self {
-        Self { inside: false, down: false, drag: false, near: false, last: (f64::NAN, f64::NAN), emitted: Instant::now() - EMIT_EVERY }
+        Self { inside: false, down: false, drag: false, file_drag: false, near: false, last: (f64::NAN, f64::NAN), emitted: Instant::now() - EMIT_EVERY }
     }
 }
 
@@ -156,7 +162,27 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         .unwrap()
                         .is_some_and(|(l, t, r, b)| px >= l as f64 && px < r as f64 && py >= t as f64 && py < b as f64);
 
+                    let down = left_button_down();
                     let mut over_any = false;
+                    for (label, ws) in &windows {
+                        let locked = shield_locked || (gated && label != window::ISLAND);
+                        let g = ws.geom;
+                        let k = g.scale * window::zoom();
+                        let (x, y) = ((px - g.x) / k, (py - g.y) / k);
+                        let over = !in_game && !locked && (ws.hit.contains(x, y) || ws.extra.contains(x, y));
+                        let prev_drag = prev.get(label).is_some_and(|p| p.drag);
+                        let prev_down = prev.get(label).is_some_and(|p| p.down);
+                        over_any |= over || (down && (prev_drag || (!prev_down && over)));
+                    }
+                    if down && !was_down {
+                        press_on_us = over_any;
+                    } else if !down {
+                        press_on_us = false;
+                    }
+                    was_down = down;
+                    let ext_drag = down && !press_on_us && !in_game && !shield_locked;
+                    let file_drag = ext_drag && is_dragging_file();
+
                     for (label, ws) in windows {
                         let p = prev.entry(label.clone()).or_default();
                         // Açılış kilidinde parola kutusu ana adada: yalnızca o açık kalır
@@ -168,7 +194,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         // Ada içinde basılıp (metin seçerken, kaydırıcı çekerken) imleç dışarı kayarsa
                         // tuş bırakılana kadar ada kapanmaz.
                         let over = !in_game && !locked && (ws.hit.contains(x, y) || ws.extra.contains(x, y));
-                        let down = left_button_down();
+                        let prev_down = p.down;
                         if !down {
                             p.drag = false;
                         } else if !p.down && over {
@@ -176,7 +202,6 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         }
                         p.down = down;
                         let hit = over || p.drag;
-                        over_any |= hit;
                         let inside = !locked && (hit || forced.contains(&label));
                         let near = inside || ws.hit.distance(x, y) < TRACK_RADIUS;
 
@@ -201,22 +226,25 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         // Uzaktaki imleç hareketleri webview'u hiç uyandırmaz (kaynak tasarrufu).
                         let moved = (x, y) != p.last;
                         let due = p.emitted.elapsed() >= EMIT_EVERY;
-                        if ((moved && (near || p.near)) && due) || inside != p.inside {
-                            let _ = app.emit_to(label.as_str(), "nook://cursor", CursorPayload { label: label.clone(), x, y, inside: hit, near });
+                        let drag_changed = inside && (down != prev_down || file_drag != p.file_drag);
+                        if ((moved && (near || p.near)) && due) || inside != p.inside || drag_changed {
+                            let _ = app.emit_to(
+                                label.as_str(),
+                                "nook://cursor",
+                                CursorPayload { label: label.clone(), x, y, inside: hit, near, drag: ext_drag, file_drag },
+                            );
                             p.emitted = Instant::now();
                             // Yalnızca gönderilen konumu hatırla — ara hareketler bir sonraki gönderimde gider
                             p.last = (x, y);
                         }
                         p.inside = inside;
                         p.near = near;
+                        p.file_drag = file_drag;
                     }
 
-                    let down = left_button_down();
-                    if down && !was_down {
-                        press_on_us = over_any;
-                    }
-                    was_down = down;
-                    if shake.step(px, down && !press_on_us && !in_game && !shield_locked) && shared.settings().shelf_shake {
+                    // Yalnızca gerçek bir dosya/klasör sürüklenirken sallama rafı açar;
+                    // pencere taşırken ya da boş alanda seçim yaparken açılmaz.
+                    if shake.step(px, file_drag) && shared.settings().shelf_shake {
                         crate::log::write("info", "raf: sallama");
                         let _ = app.emit_to(crate::shortcut::target(&app).as_str(), "nook://shelf-shake", ());
                     }
@@ -269,6 +297,15 @@ fn follow(
         *candidate = None;
         return;
     }
+    // Oyun açıkken "Oyunda ikinci ekrana geç" etkinse imleç oyunun ekranına gitse bile Nook oyun ekranına dönmez
+    if shared.settings().game_second_screen {
+        if let Some((gl, gt, _, _)) = *shared.game_screen.lock().unwrap() {
+            if target.position().x == gl && target.position().y == gt {
+                *candidate = None;
+                return;
+            }
+        }
+    }
     match candidate {
         Some((m, since)) if window::same_monitor(m, &target) => {
             if since.elapsed() >= FOLLOW_DWELL {
@@ -300,6 +337,43 @@ fn click_through(hwnd: isize, on: bool) {
 
 #[cfg(not(windows))]
 fn click_through(_hwnd: isize, _on: bool) {}
+
+/// Windows kabuğunda gerçek bir dosya/klasör sürükleniyor mu?
+/// Pencere taşınırken (GUI_INMOVESIZE) ya da boş alanda seçim kutusu çizilirken false döner;
+/// yalnızca kabuk sürükleme görseli ("SysDragImage") ekranda görünürken true döner.
+#[cfg(windows)]
+fn is_dragging_file() -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        FindWindowExW, GetGUIThreadInfo, IsWindowVisible, GUITHREADINFO, GUI_INMOVESIZE,
+    };
+    unsafe {
+        let mut gti: GUITHREADINFO = std::mem::zeroed();
+        gti.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(0, &mut gti) != 0 && (gti.flags & GUI_INMOVESIZE) != 0 {
+            return false;
+        }
+        const CLASS: [u16; 13] = [
+            b'S' as u16, b'y' as u16, b's' as u16, b'D' as u16, b'r' as u16, b'a' as u16,
+            b'g' as u16, b'I' as u16, b'm' as u16, b'a' as u16, b'g' as u16, b'e' as u16, 0,
+        ];
+        let mut hwnd = std::ptr::null_mut();
+        loop {
+            hwnd = FindWindowExW(std::ptr::null_mut(), hwnd, CLASS.as_ptr(), std::ptr::null());
+            if hwnd.is_null() {
+                break;
+            }
+            if IsWindowVisible(hwnd) != 0 {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+#[cfg(not(windows))]
+fn is_dragging_file() -> bool {
+    false
+}
 
 /// Farenin sol tuşu şu an basılı mı (tuşlar yer değiştirilmişse fiziksel sol tuş).
 #[cfg(windows)]

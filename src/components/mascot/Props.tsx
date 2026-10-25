@@ -9,6 +9,7 @@ import type { Expression } from "../../store/nook";
  */
 
 export type SleepStyle = "blanket" | "bubble" | "nap";
+export type FeedStyle = "chomp" | "vacuum" | "catch" | "folder" | "box";
 
 const sec = (ms: number) => ms / 1000;
 const HAND_BG = "radial-gradient(circle at 35% 30%, #ffffff 0%, #e4e4ea 55%, #a9a9b4 100%)";
@@ -30,12 +31,22 @@ const pop = {
   transition: { type: "spring", stiffness: 420, damping: 22 },
 } as const;
 
-export function Props({ expression, sleepStyle }: { expression: Expression; sleepStyle: SleepStyle }) {
+export function Props({
+  expression,
+  sleepStyle,
+  feedStyle = "chomp",
+}: {
+  expression: Expression;
+  sleepStyle: SleepStyle;
+  feedStyle?: FeedStyle;
+}) {
   const sleeping = expression === "sleepy";
+  const feeding = expression === "hungry" || expression === "chewing";
   return (
     <AnimatePresence>
       {sleeping && sleepStyle === "blanket" && <Blanket key="blanket" />}
       {sleeping && sleepStyle === "bubble" && <SnotBubble key="bubble" />}
+      {feeding && <FeedProp key={`feed-${feedStyle}`} expression={expression} style={feedStyle} />}
       {expression === "read" && <Book key="book" />}
       {expression === "campfire" && <Campfire key="fire" />}
       {expression === "umbrella" && <Umbrella key="umbrella" />}
@@ -50,6 +61,284 @@ export function Props({ expression, sleepStyle }: { expression: Expression; slee
       {expression === "djScratch" && <Turntable key="deck" />}
       {expression === "djEar" && <SoundArcs key="arcs" />}
     </AnimatePresence>
+  );
+}
+
+/** Küçük dosya kâğıdı (kıvrık köşeli, satırlı) */
+function MiniDoc() {
+  return (
+    <div
+      className="relative overflow-hidden rounded-[1.5px]"
+      style={{
+        width: 7.4,
+        height: 9.2,
+        background: "linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)",
+        boxShadow: "0 1px 2.5px rgba(0,0,0,0.45), inset 0 0 0 0.4px rgba(120,140,220,0.45)",
+      }}
+    >
+      <span
+        className="absolute right-0 top-0"
+        style={{ width: 2.4, height: 2.4, background: "#c7d2fe", borderBottomLeftRadius: 1 }}
+      />
+      {[2.8, 4.6, 6.4].map((y, i) => (
+        <span
+          key={y}
+          className="absolute rounded-full"
+          style={{ left: 1.3, top: y, width: i === 2 ? 3.2 : 4.6, height: 0.75, background: "#6366f1" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Dosya bırakılırken seçilen yutma/yakalama üslubunun eşyası ve efektleri */
+function FeedProp({ expression, style }: { expression: "hungry" | "chewing"; style: FeedStyle }) {
+  const chewing = expression === "chewing";
+
+  if (style === "chomp") {
+    return (
+      <motion.div className="pointer-events-none absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        {/* Gelen dosya: hungry'de yukarıda süzülür, chewing'de ağza dalıp küçülür */}
+        <motion.div
+          className="absolute"
+          style={{ left: 8.3, top: -8 }}
+          initial={{ y: -4, scale: 0.6, opacity: 0 }}
+          animate={
+            chewing
+              ? { y: [-2, 18, 22], scale: [1, 0.55, 0.1], rotate: [-8, 12, 0], opacity: [1, 0.9, 0] }
+              : { y: [-2, 0.5, -2], rotate: [-6, 6, -6], scale: 1, opacity: 1 }
+          }
+          transition={
+            chewing
+              ? { duration: 0.42, times: [0, 0.65, 1], ease: "easeIn" }
+              : { duration: 0.9, repeat: Infinity, ease: "easeInOut" }
+          }
+        >
+          <MiniDoc />
+        </motion.div>
+        {/* Çiğnerken etrafa saçılan minik kırıntı/parıltılar */}
+        {chewing &&
+          [
+            [-6, 13],
+            [6.5, 12.5],
+            [-4.5, 17.5],
+          ].map(([dx, dy], i) => (
+            <motion.span
+              key={i}
+              className="absolute rounded-full"
+              style={{ left: 12, top: 16, width: 1.8, height: 1.8, background: "#fef08a" }}
+              initial={{ x: 0, y: 0, scale: 0, opacity: 0 }}
+              animate={{ x: [0, dx], y: [0, dy - 14], scale: [0, 1.1, 0], opacity: [0, 1, 0] }}
+              transition={{ duration: 0.5, delay: 0.25 + i * 0.1, ease: "easeOut" }}
+            />
+          ))}
+      </motion.div>
+    );
+  }
+
+  if (style === "vacuum") {
+    return (
+      <motion.div className="pointer-events-none absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        {/* Vakum hava çizgileri: dışarıdan ağza (12, 18.5) doğru çekilir */}
+        {[
+          { x0: 2, y0: 4, x1: 10.5, y1: 17.5, d: 0 },
+          { x0: 12, y0: 1, x1: 12, y1: 17, d: 0.14 },
+          { x0: 22, y0: 4, x1: 13.5, y1: 17.5, d: 0.28 },
+        ].map((ln, i) => (
+          <motion.span
+            key={i}
+            className="absolute rounded-full"
+            style={{ width: 1.5, height: 4.5, background: "rgba(186,230,253,0.9)", boxShadow: "0 0 2px rgba(125,211,252,0.8)" }}
+            initial={{ left: ln.x0, top: ln.y0, opacity: 0, scaleY: 0.5 }}
+            animate={
+              chewing
+                ? { left: [ln.x0, ln.x1], top: [ln.y0, ln.y1], opacity: [0.9, 0], scaleY: [1.3, 0.2] }
+                : { left: [ln.x0, ln.x1], top: [ln.y0, ln.y1], opacity: [0, 0.95, 0], scaleY: [0.6, 1.2, 0.4] }
+            }
+            transition={{
+              duration: chewing ? 0.36 : 0.52,
+              repeat: chewing ? 1 : Infinity,
+              delay: ln.d,
+              ease: "easeIn",
+            }}
+          />
+        ))}
+        {/* Döne döne çekilen dosya */}
+        <motion.div
+          className="absolute"
+          style={{ left: 8.3, top: -6 }}
+          animate={
+            chewing
+              ? { y: [0, 21], x: [0, 2, -2, 0], rotate: [0, 540], scale: [1, 0.08], opacity: [1, 1, 0] }
+              : { y: [-2, 1.5, -2], x: [-1, 1, -1], rotate: [-14, 14, -14], scale: [0.95, 1.04, 0.95], opacity: 1 }
+          }
+          transition={
+            chewing
+              ? { duration: 0.52, ease: "easeIn" }
+              : { duration: 0.55, repeat: Infinity, ease: "easeInOut" }
+          }
+        >
+          <MiniDoc />
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  if (style === "catch") {
+    return (
+      <motion.div className="pointer-events-none absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        {/* Havadaki dosya: Nook zıplayınca elleriyle yakalayıp döndürür */}
+        <motion.div
+          className="absolute"
+          style={{ left: 8.3, top: -9 }}
+          animate={
+            chewing
+              ? { y: [-1, 2, 14, 18], scale: [1, 1.08, 0.45, 0], rotate: [0, -18, 180, 360], opacity: [1, 1, 0.85, 0] }
+              : { y: [-2.5, 0.5, -2.5], rotate: [-8, 8, -8], scale: 1, opacity: 1 }
+          }
+          transition={
+            chewing
+              ? { duration: 0.72, times: [0, 0.28, 0.78, 1], ease: "easeInOut" }
+              : { duration: 0.75, repeat: Infinity, ease: "easeInOut" }
+          }
+        >
+          <MiniDoc />
+        </motion.div>
+        {/* Havada yakalama anında parlayan yıldız */}
+        {chewing && (
+          <motion.span
+            className="absolute text-[7px] font-bold leading-none text-amber-300"
+            style={{ left: 17, top: -6 }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 1.35, 0], opacity: [0, 1, 0], rotate: [0, 45, 90] }}
+            transition={{ duration: 0.55, delay: 0.14, ease: "easeOut" }}
+          >
+            ✦
+          </motion.span>
+        )}
+      </motion.div>
+    );
+  }
+
+  if (style === "folder") {
+    return (
+      <motion.div className="pointer-events-none absolute" style={{ left: 2, top: 12.5, width: 20, height: 14 }} {...pop}>
+        {/* Sarı klasör arka yaprak + kulakçık */}
+        <div
+          className="absolute rounded-[1.5px]"
+          style={{ left: 2.5, top: 2, width: 13.5, height: 9.5, background: "#d97706", boxShadow: "0 1px 2px rgba(0,0,0,0.45)" }}
+        >
+          <span
+            className="absolute rounded-t-[1.2px]"
+            style={{ left: 0, top: -1.8, width: 5.5, height: 2.2, background: "#d97706" }}
+          />
+        </div>
+        {/* Klasörün içine kayan belge */}
+        <motion.div
+          className="absolute"
+          style={{ left: 5.5, top: -4.5 }}
+          animate={
+            chewing
+              ? { y: [0, 6.2, 6.2], scale: [0.9, 0.82, 0.82], rotate: [-4, 0, 0] }
+              : { y: [-1.5, 0.5, -1.5], scale: 0.9, rotate: [-6, 3, -6] }
+          }
+          transition={
+            chewing
+              ? { duration: 0.85, times: [0, 0.35, 1], ease: "easeOut" }
+              : { duration: 0.8, repeat: Infinity, ease: "easeInOut" }
+          }
+        >
+          <MiniDoc />
+        </motion.div>
+        {/* Sarı klasör ön kapak */}
+        <motion.div
+          className="absolute rounded-[1.5px]"
+          style={{
+            left: 2.5,
+            top: 4,
+            width: 13.5,
+            height: 7.6,
+            originY: 1,
+            background: "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)",
+            boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.45)",
+          }}
+          animate={chewing ? { scaleY: [0.78, 1, 1] } : { scaleY: [0.78, 0.84, 0.78] }}
+          transition={chewing ? { duration: 0.4, times: [0, 0.5, 1] } : { duration: 0.9, repeat: Infinity }}
+        >
+          {/* Damga basılınca beliren kırmızı onay mührü */}
+          {chewing && (
+            <motion.span
+              className="absolute flex items-center justify-center rounded-full"
+              style={{
+                left: 4.6,
+                top: 1.5,
+                width: 4.5,
+                height: 4.5,
+                border: "0.8px solid #ef4444",
+                background: "rgba(239,68,68,0.18)",
+                color: "#dc2626",
+                fontSize: 3.2,
+                fontWeight: 900,
+              }}
+              initial={{ scale: 0, opacity: 0, rotate: -20 }}
+              animate={{ scale: [0, 1.25, 1], opacity: [0, 1, 1], rotate: -12 }}
+              transition={{ duration: 0.35, delay: 0.42, ease: "easeOut" }}
+            >
+              ✓
+            </motion.span>
+          )}
+        </motion.div>
+        {/* Klasörü tutan sol el */}
+        <PropHand x={2.2} y={8.5} rotate={18} />
+        {/* Sağ el + kırmızı damga: chewing'de klasörün üstüne "tak!" diye basar */}
+        <motion.div
+          className="absolute"
+          style={{ left: 10.5, top: -2 }}
+          animate={
+            chewing
+              ? { y: [-2, -3, 5.2, 5.2, 0], x: [2, 2, -1, -1, 2], rotate: [12, 18, -4, -4, 10] }
+              : { y: [-1.5, -3, -1.5], x: 2, rotate: [8, 16, 8] }
+          }
+          transition={
+            chewing
+              ? { duration: 0.85, times: [0, 0.25, 0.45, 0.68, 1], ease: "easeInOut" }
+              : { duration: 0.8, repeat: Infinity, ease: "easeInOut" }
+          }
+        >
+          <span
+            className="absolute rounded-[1px]"
+            style={{ left: -1, top: 2.2, width: 4.4, height: 1.8, background: "#ef4444", boxShadow: "0 0.6px 1px rgba(0,0,0,0.4)" }}
+          />
+          <span
+            className="absolute rounded-t-[1.5px]"
+            style={{ left: 0.2, top: -0.5, width: 2, height: 3, background: "#991b1b" }}
+          />
+          <PropHand x={2.4} y={1.2} rotate={-22} />
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // style === "box": kutunun içine düşen dosya ve kapanınca çekilen koli bandı
+  return (
+    <motion.div className="pointer-events-none absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div
+        className="absolute"
+        style={{ left: 8.3, top: -9 }}
+        animate={
+          chewing
+            ? { y: [0, 12], scale: [1, 0.3], opacity: [1, 0] }
+            : { y: [-1.5, 1, -1.5], rotate: [-5, 5, -5], scale: 1, opacity: 1 }
+        }
+        transition={
+          chewing
+            ? { duration: 0.28, ease: "easeIn" }
+            : { duration: 0.85, repeat: Infinity, ease: "easeInOut" }
+        }
+      >
+        <MiniDoc />
+      </motion.div>
+    </motion.div>
   );
 }
 

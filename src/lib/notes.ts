@@ -187,7 +187,14 @@ export type DemoId =
   | "phonetrig"
   | "autoask"
   | "autolog"
-  | "mobile031";
+  | "mobile031"
+  | "sharehold"
+  | "feedstyles"
+  | "studiofit"
+  | "gamescreen"
+  | "deckfix"
+  | "whatsapp"
+  | "feedback";
 
 export interface NoteItem {
   title: string;
@@ -206,6 +213,48 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.2",
+    date: tt("25 Ekim 2026"),
+    headline: tt("Kullanıcı geribildirim sistemi, WhatsApp modülü, oyunda 2. ekrana geçiş ve canlı kısayol durumları"),
+    items: [
+      {
+        title: tt("Kullanıcı geribildirim sistemi ve GitHub Issues takibi"),
+        text: tt("Nook Studio › Ayarlar › Hakkında içinde yeni Geribildirim bölümü! Karşılaştığın bir sorunu veya aklına gelen bir özelliği (Hata ya da Öneri seçerek) tek tıkla doğrudan GitHub'a bildirebilirsin. Dilersen Nook sürümü, sistem bilgisi ve son hata kayıtları otomatik olarak eklenir. Ayrıca lukosovian/nook deposundaki açık ve çözülmüş tüm bildirimleri, senin açtığın konuları ve geliştirici yanıtlarını tarayıcıya çıkmadan Studio içinden canlı takip edebilirsin."),
+        demo: "feedback",
+      },
+      {
+        title: tt("WhatsApp modülü ve gelen bildirimden anında hızlı yanıt"),
+        text: tt("Adadaki yeni WhatsApp modülüyle son sohbetlerini görebilir, mesaj geçmişini okuyabilir ve Nook'tan çıkmadan yanıt yazabilirsin. Telefonun Nook Mobil ile bağlıysa gelen WhatsApp (ve Telegram, Mesajlar gibi) bildirimleri ek bir QR koduna gerek kalmadan doğrudan adadaki bildirim kartından ya da Bildirimler sekmesinden anında yanıtlanıyor. Ayrıca istersen WhatsApp sekmesinden “WhatsApp Web Bağla”ya basıp QR kodunu adanın içinden okutarak bildirim gelmesini beklemeden tüm sohbetlerine ulaşabilirsin."),
+        demo: "whatsapp",
+      },
+      {
+        title: tt("Oyun açıkken gizlenmek yerine 2. ekrana geçiyor"),
+        text: tt("Bilgisayarında ikinci bir ekran varsa ve 1. ekranda tam ekran bir oyun açtığında Nook artık arka planda gizlenip kaybolmuyor; kendiliğinden 2. ekrana geçip orada elinin altında kalıyor. Oyunu kapattığında ya da simge durumuna küçülttüğünde de tekrar 1. ekrandaki yerine dönüyor. İstersen Ayarlar › Oyun (veya Ekran) altındaki “Oyunda ikinci ekrana geç” anahtarıyla açıp kapatabilirsin."),
+        demo: "gamescreen",
+      },
+      {
+        title: tt("Kısayollarda canlı mikrofon durumu ve otomasyon düzeltmeleri"),
+        text: tt("Mikrofon veya ses kapalıyken Kısayollar tuşu artık yalnızca adadaki Kısayollar sekmesinde değil; adanın ana sayfasındaki alt sırada, Nook Studio › Kısayollar'da ve Studio ana sayfasında da üstü çizili simgeyle ve kırmızı ışıkla görünüyor. Kısayollardaki kafa karıştıran “Yeni rutin” ayrımı kaldırılıp tek tuş yapısına sadeleştirildi; otomasyonlarda ise saat, oyun, boşta kalma ve UWP uygulama algılama hataları giderildi."),
+        demo: "deckfix",
+      },
+      {
+        title: tt("Dosya bırakırken her seferinde farklı bir yutma ve akıcı geçiş"),
+        text: tt("Adanın üstüne dosya sürükleyip bıraktığında Nook artık önce koca adayı açmaya çalışıp sonra küçülmüyor; doğrudan yutma moduna geçiyor. Üstelik her bırakışta farklı bir hareket yapıyor: bazen ağzını kocaman açıp ham diye yutuyor, bazen vakumlayıp hüpletiyor, bazen zıplayıp havada kapıyor, bazen sarı klasöre koyup damgalıyor, bazen de koliye paketliyor. Fareyi sallayarak rafı açma da artık pencere taşırken ya da boş bir yere basılı tutup sallarken tetiklenmiyor; yalnızca gerçekten bir dosya sürüklenirken açılıyor ve dosyayı bırakıp çıkınca raf bekletmeden kapanıyor."),
+        demo: "feedstyles",
+      },
+      {
+        title: tt("Yayın sürerken “Yayın bitti” demiyor"),
+        text: tt("Ekran paylaşırken tarayıcının “ekranınızı paylaşıyor” çubuğunda Gizle'ye basınca ya da paylaşılan pencere/ekran değişirken çubuk bir anlığına kaybolunca Nook yayının bittiğini sanıp gizlenen bölümleri açıyordu. Artık gizlenen tarayıcı çubuğu paylaşım bitene dek izleniyor ve çubuk 10 saniye boyunca hiç görünmezse yayın bitmiş sayılıyor; o sırada Not, Pano ve Bildirimler gizli kalıyor."),
+        demo: "sharehold",
+      },
+      {
+        title: tt("Studio daraltılınca arama, görünüm ve kısayollar taşmıyor"),
+        text: tt("Nook Studio penceresini en küçük boyuta daralttığında ana sayfadaki arama çubuğu ve yanındaki kıyafet (Görünüm) düğmesi kartın dışına taşmıyor; Görünüm ve Kısayollar sayfalarındaki paneller de pencere genişliğine göre esneyip rahatça sığıyor."),
+        demo: "studiofit",
+      },
+    ],
+  },
   {
     version: "0.3.1",
     date: tt("23 Ekim 2026"),

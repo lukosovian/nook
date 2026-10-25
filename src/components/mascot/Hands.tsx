@@ -2,6 +2,7 @@ import { motion, type TargetAndTransition } from "motion/react";
 import { ANTIC_MS } from "../../hooks/useAntics";
 import { FACE } from "../../lib/layout";
 import type { Expression } from "../../store/nook";
+import type { FeedStyle } from "./Props";
 
 /**
  * Gövdeden kopuk, yüzen küçük eller (Grok Bot / Rayman gibi).
@@ -177,8 +178,56 @@ export const DANCE_HANDS: [Pose, Pose][] = [
   [show({ x: -2, y: -3, rotate: 35 }), show({ x: 2, y: -3, rotate: -35 })],
 ];
 
-export function Hands({ expression, dance = null, color = "#FFFFFF" }: { expression: Expression; dance?: number | null; color?: string }) {
-  const [l, r] = (dance != null ? DANCE_HANDS[dance] : null) ?? POSES[expression] ?? [HIDE, HIDE];
+/** Dosya bırakılırken üsluba göre el hareketleri (folder üslubunun elleri klasör/damgayla çizilir) */
+const FEED_HANDS: Record<FeedStyle, { hungry: [Pose, Pose]; chewing: [Pose, Pose] }> = {
+  chomp: {
+    hungry: [show({ x: -2.5, y: -4.5, rotate: 28 }), show({ x: 2.5, y: -4.5, rotate: -28 })],
+    chewing: [
+      show({ x: 3.5, y: [3, 1.5, 3, 1.5, 3], rotate: 18, transition: { duration: 0.85 } }),
+      show({ x: -3.5, y: [1.5, 3, 1.5, 3, 1.5], rotate: -18, transition: { duration: 0.85 } }),
+    ],
+  },
+  vacuum: {
+    hungry: [show({ x: 5.5, y: 5.2, rotate: 30 }), show({ x: -5.5, y: 5.2, rotate: -30 })],
+    chewing: [
+      show({ x: [5.5, 1.5, 4], y: [5.2, 2, 4], rotate: 20, transition: { duration: 0.85 } }),
+      show({ x: [-5.5, -1.5, -4], y: [5.2, 2, 4], rotate: -20, transition: { duration: 0.85 } }),
+    ],
+  },
+  catch: {
+    hungry: [
+      show({ x: -2, y: [-7, -9, -7], rotate: 35, transition: { duration: 0.55, repeat: Infinity } }),
+      show({ x: 2, y: [-9, -7, -9], rotate: -35, transition: { duration: 0.55, repeat: Infinity } }),
+    ],
+    chewing: [
+      show({ x: [-2, 4, 2], y: [-8, -11, 2], rotate: [35, 10, 20], transition: { duration: 0.85 } }),
+      show({ x: [2, -4, -2], y: [-8, -11, 2], rotate: [-35, -10, -20], transition: { duration: 0.85 } }),
+    ],
+  },
+  folder: {
+    hungry: [HIDE, HIDE],
+    chewing: [HIDE, HIDE],
+  },
+  box: {
+    hungry: [show({ x: -3, y: -6, rotate: 30 }), show({ x: 3, y: -6, rotate: -30 })],
+    chewing: [show({ x: 2.5, y: 1 }), show({ x: -2.5, y: 1 })],
+  },
+};
+
+export function Hands({
+  expression,
+  dance = null,
+  color = "#FFFFFF",
+  feedStyle = "chomp",
+}: {
+  expression: Expression;
+  dance?: number | null;
+  color?: string;
+  feedStyle?: FeedStyle;
+}) {
+  const feedPose =
+    expression === "hungry" || expression === "chewing" ? FEED_HANDS[feedStyle][expression] : null;
+  const [l, r] = (dance != null ? DANCE_HANDS[dance] : null) ?? feedPose ?? POSES[expression] ?? [HIDE, HIDE];
   return (
     <>
       <Hand side={-1} pose={l} color={color} />

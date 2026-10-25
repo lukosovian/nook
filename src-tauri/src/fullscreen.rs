@@ -3,7 +3,8 @@
 //! bir pencere olarak oyunun görüntüsünü ya da performansını etkilemesin diye gerçekten gizlenir.
 //!
 //! Oyun modu: tam ekran uygulama bir tarayıcı/video oynatıcı değilse "oyun" sayılır; çıkınca
-//! süre ve en yüksek işlemci/bellek kullanımı "nook://game" ile bildirilir.
+//! süre ve en yüksek işlemci/bellek kullanımı "nook://game" ile bildirilir. "Oyunda ikinci ekrana geç"
+//! açıksa ve başka bir ekran varsa ada gizlenmek yerine diğer ekrana taşınır; oyun kapanınca geri döner.
 
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
@@ -12,15 +13,13 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Monitor};
 
-use crate::state::Shared;
+use crate::state::{MonitorMode, Shared};
 
 const POLL: Duration = Duration::from_millis(500);
 /// Frontend'in "kaçış" animasyonu — pencere bundan sonra gizlenir.
 const HIDE_AFTER: Duration = Duration::from_millis(260);
-/// Bundan kısa tam ekranlar (yükleme ekranı, yanlışlıkla F11) oyun özeti çıkarmaz.
-const MIN_GAME: Duration = Duration::from_secs(120);
 /// Oyun açılınca ada gizlenmeden önce özet kartı bu kadar görünür.
 const INTRO_PEEK: Duration = Duration::from_secs(5);
 /// Mola hatırlatıcısı için ada oyunun üstünde bu kadar görünür, sonra yine gizlenir.
@@ -64,6 +63,8 @@ struct GameSession {
 struct Session {
     exe: String,
     pid: u32,
+    hwnd: isize,
+    monitor: (i32, i32, i32, i32),
     started: Instant,
     /// Gösterilen mola hatırlatması sayısı
     breaks: u64,
@@ -107,6 +108,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
         .spawn(move || {
             let mut hidden: HashSet<String> = HashSet::new();
             let mut session: Option<Session> = None;
+            // Oyun yüzünden 2. ekrana taşındıysa önceki ekranı hatırla; oyun kapanınca geri dön
+            let mut game_displaced: Option<Monitor> = None;
             // Ada oyunun üstünde kısa süre görünsün (açılış özeti, mola hatırlatması)
             let mut peek_until: Option<Instant> = None;
             // Vakti gelen alarm bir kez bildirilir: gizliyken sayfanın saati yavaşlar (Chromium arka plan kısıtlaması)
@@ -123,7 +126,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     rung_for = next;
                     let _ = app.emit("nook://alarm-due", next);
                     // Oyunda görünmedi denince nedenini görebilmek için: öndeki tam ekran ne, ada gizli mi
-                    let fg = imp::fullscreen_monitor(&shared).and_then(|d| d.1).map(|(_, e)| pretty(&e));
+                    let fg = imp::fullscreen_monitor(&shared).and_then(|d| d.2).map(|(_, e)| pretty(&e));
                     crate::log::write("info", &format!("alarm vakti: tam ekran={fg:?}, gizli ada={}", hidden.len()));
                 }
                 let guard = shared.guard.load(Ordering::Relaxed);
@@ -134,16 +137,18 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 let detected = imp::fullscreen_monitor(&shared);
 
                 // --- Oyun oturumu
-                let game = detected.as_ref().and_then(|d| d.1.clone()).filter(|(_, e)| {
+                let game = detected.as_ref().and_then(|d| d.2.clone().map(|(pid, e)| (d.0, d.1, pid, e))).filter(|(_, _, _, e)| {
                     let stem = e.rsplit(['\\', '/']).next().unwrap_or(e).to_lowercase();
                     !NOT_GAMES.contains(&stem.trim_end_matches(".exe"))
                 });
                 // Alt-Tab ile oyundan çıkıldıysa ama oyun hâlâ açıksa oturum sürer — dönünce baştan saymaz
                 let away = game.is_none() && session.as_ref().is_some_and(|s| imp::alive(s.pid, &s.exe));
-                let in_session_game = matches!((&session, &game), (Some(s), Some((_, g))) if s.exe == *g);
+                let in_session_game = matches!((&session, &game), (Some(s), Some((_, _, _, g))) if s.exe == *g);
                 match (&mut session, game) {
                     _ if away => {}
-                    (Some(s), Some((_, g))) if s.exe == g => {
+                    (Some(s), Some((mon, hwnd, _, g))) if s.exe == g => {
+                        s.hwnd = hwnd;
+                        s.monitor = mon;
                         s.peak_cpu = s.peak_cpu.max(f32::from_bits(shared.cpu.load(Ordering::Relaxed)));
                         s.peak_mem = s.peak_mem.max(shared.mem.load(Ordering::Relaxed));
                         let mins = s.started.elapsed().as_secs() / 60;
@@ -156,22 +161,74 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     }
                     (cur, next) => {
                         if let Some(s) = cur.take() {
-                            if s.started.elapsed() >= MIN_GAME {
-                                let _ = app.emit(
-                                    "nook://game",
-                                    GameSession { app: pretty(&s.exe), secs: s.started.elapsed().as_secs(), peak_cpu: s.peak_cpu, peak_mem: s.peak_mem },
-                                );
-                            }
+                            let _ = app.emit(
+                                "nook://game",
+                                GameSession { app: pretty(&s.exe), secs: s.started.elapsed().as_secs(), peak_cpu: s.peak_cpu, peak_mem: s.peak_mem },
+                            );
                         }
-                        if let (Some((_, exe)), true) = (&next, settings.game_intro) {
-                            peek_until = Some(Instant::now() + INTRO_PEEK);
+                        if let Some((_, _, _, exe)) = &next {
+                            if settings.game_intro {
+                                peek_until = Some(Instant::now() + INTRO_PEEK);
+                            }
                             let _ = app.emit("nook://game-start", GamePeek { app: pretty(exe), mins: 0 });
                         }
-                        *cur = next.map(|(pid, exe)| Session { exe, pid, started: Instant::now(), breaks: 0, peak_cpu: 0.0, peak_mem: 0 });
+                        *cur = next.map(|(monitor, hwnd, pid, exe)| Session {
+                            exe,
+                            pid,
+                            hwnd,
+                            monitor,
+                            started: Instant::now(),
+                            breaks: 0,
+                            peak_cpu: 0.0,
+                            peak_mem: 0,
+                        });
                     }
                 }
 
-                *shared.game_screen.lock().unwrap() = if in_session_game { detected.as_ref().map(|d| d.0) } else { None };
+                // Oyun penceresi 1. ekranda hâlâ tam ekran görünüyorsa (kullanıcı 2. ekranda Discord'a/Nook'a tıklamış olsa bile)
+                // oyun ekranı dolu sayılır ki Nook 1. ekrana geri sıçramasın.
+                let game_mon = if in_session_game {
+                    detected.as_ref().map(|d| d.0)
+                } else {
+                    session
+                        .as_ref()
+                        .filter(|s| imp::alive(s.pid, &s.exe) && imp::window_covers(s.hwnd, s.monitor))
+                        .map(|s| s.monitor)
+                };
+                *shared.game_screen.lock().unwrap() = game_mon;
+
+                // "Oyunda ikinci ekrana geç" açıksa ve başka bir monitör varsa, Nook gizlenmek yerine diğer ekrana geçer
+                let can_move_second = settings.game_second_screen && settings.monitor_mode != MonitorMode::All;
+                if let (true, Some((gl, gt, _, _))) = (can_move_second, game_mon) {
+                    let monitors = app.available_monitors().unwrap_or_default();
+                    if let Some(cur_mon) = crate::window::monitor_of(&shared, crate::window::ISLAND, &monitors) {
+                        if cur_mon.position().x == gl && cur_mon.position().y == gt {
+                            if let Some(other) = monitors.iter().find(|m| !(m.position().x == gl && m.position().y == gt)).cloned() {
+                                if game_displaced.is_none() {
+                                    game_displaced = Some(cur_mon);
+                                }
+                                if hidden.remove(crate::window::ISLAND) {
+                                    if let Some(ws) = shared.windows.lock().unwrap().get(crate::window::ISLAND).copied() {
+                                        webview_visible(&app, crate::window::ISLAND, true);
+                                        imp::show(ws.hwnd, true);
+                                    }
+                                    let _ = app.emit_to(crate::window::ISLAND, "nook://fullscreen", false);
+                                }
+                                crate::window::relocate(&app, shared.clone(), crate::window::ISLAND.into(), other);
+                            }
+                        }
+                    }
+                } else if let Some(prev_mon) = game_displaced.take() {
+                    if settings.monitor_mode != MonitorMode::All {
+                        let monitors = app.available_monitors().unwrap_or_default();
+                        let cur_mon = crate::window::monitor_of(&shared, crate::window::ISLAND, &monitors);
+                        if monitors.iter().any(|m| crate::window::same_monitor(m, &prev_mon))
+                            && cur_mon.as_ref().is_none_or(|c| !crate::window::same_monitor(c, &prev_mon))
+                        {
+                            crate::window::relocate(&app, shared.clone(), crate::window::ISLAND.into(), prev_mon);
+                        }
+                    }
+                }
 
                 let peek = peek_until.is_some_and(|t| Instant::now() < t);
                 // DirectX'in özel tam ekran kipi pencere boyutundan anlaşılmayabilir: Windows'a da sor
@@ -184,6 +241,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 for (label, ws) in windows {
                     // Yan kartlar (ses kartı) adaya bağlı: içeriğini ada gizler
                     if !label.starts_with(crate::window::ISLAND) {
+                        continue;
+                    }
+                    // Oyun nedeniyle 2. ekrana taşınıyorsa ya da taşındıysa gizleme
+                    if label == crate::window::ISLAND && game_displaced.is_some() {
                         continue;
                     }
                     // Ada penceresinin üst-orta noktası tam ekran monitörün içinde mi?
@@ -212,10 +273,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 }
                 // Windows "her zaman en üstte" pencereleri ara sıra alta itiyor (Gezgin, tarayıcı öne gelince
                 // ada, ses kartı, Argus kartı altta kalıyordu). Öndeki pencere değişince ve arada bir yeniden en öne al.
-                // Tam ekran oyunda dokunulmaz (oyunun üstüne sürekli pencere itmek onu alta atabilir).
+                // Tam ekran oyunda dokunulmaz (oyunun üstüne sürekli pencere itmek onu alta atabilir); ama ada 2. ekrana geçtiyse güvenle en üstte tutulur.
                 tick = tick.wrapping_add(1);
                 let fg = imp::foreground();
-                if !in_game && (fg != last_fg || tick % TOPMOST_EVERY == 0) {
+                if (!in_game || game_displaced.is_some()) && (fg != last_fg || tick % TOPMOST_EVERY == 0) {
                     for (label, w) in app.webview_windows() {
                         if hidden.contains(&label) || !ON_TOP.iter().any(|p| label.starts_with(p)) {
                             continue;
@@ -285,8 +346,8 @@ mod imp {
         "XamlExplorerHostIslandWindow",
     ];
 
-    /// Tam ekran bir pencerenin kapladığı monitör (sol, üst, sağ, alt — fiziksel px), süreç kimliği ve exe yolu.
-    pub fn fullscreen_monitor(shared: &Shared) -> Option<((i32, i32, i32, i32), Option<(u32, String)>)> {
+    /// Tam ekran bir pencerenin kapladığı monitör (sol, üst, sağ, alt — fiziksel px), pencere tanıtıcısı, süreç kimliği ve exe yolu.
+    pub fn fullscreen_monitor(shared: &Shared) -> Option<((i32, i32, i32, i32), isize, Option<(u32, String)>)> {
         unsafe {
             let fg = GetForegroundWindow();
             if fg.is_null() || shared.is_ours(fg as isize) || IsWindowVisible(fg) == 0 || IsIconic(fg) != 0 {
@@ -320,7 +381,22 @@ mod imp {
             if shared.is_ours(owner as isize) || webview {
                 return None;
             }
-            Some(((m.left, m.top, m.right, m.bottom), exe))
+            Some(((m.left, m.top, m.right, m.bottom), fg as isize, exe))
+        }
+    }
+
+    /// Verilen pencere hâlâ görünür, simge durumunda değil ve belirtilen ekranı kaplıyor mu?
+    pub fn window_covers(hwnd: isize, (ml, mt, mr, mb): (i32, i32, i32, i32)) -> bool {
+        unsafe {
+            let h = hwnd as HWND;
+            if h.is_null() || IsWindowVisible(h) == 0 || IsIconic(h) != 0 {
+                return false;
+            }
+            let mut r: RECT = std::mem::zeroed();
+            if GetWindowRect(h, &mut r) == 0 {
+                return false;
+            }
+            r.left <= ml && r.top <= mt && r.right >= mr && r.bottom >= mb
         }
     }
 
@@ -411,8 +487,11 @@ mod imp {
     pub fn exclusive_fullscreen() -> bool {
         false
     }
-    pub fn fullscreen_monitor(_shared: &Shared) -> Option<((i32, i32, i32, i32), Option<(u32, String)>)> {
+    pub fn fullscreen_monitor(_shared: &Shared) -> Option<((i32, i32, i32, i32), isize, Option<(u32, String)>)> {
         None
+    }
+    pub fn window_covers(_hwnd: isize, _mon: (i32, i32, i32, i32)) -> bool {
+        false
     }
     pub fn alive(_pid: u32, _exe: &str) -> bool {
         false

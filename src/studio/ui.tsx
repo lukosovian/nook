@@ -92,7 +92,7 @@ export function Btn({ onClick, color, children, ghost = false, disabled }: { onC
       whileTap={{ scale: 0.96 }}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-9 items-center gap-2 rounded-[12px] border px-3.5 text-[12.5px] font-semibold transition-colors disabled:opacity-40"
+      className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-[12px] border px-3.5 text-[12.5px] font-semibold transition-colors disabled:opacity-40"
       style={ghost ? { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.09)", color: "var(--color-label-2)" } : { background: tintBg(color, 18), borderColor: tintBg(color, 42), color: tintText(color) }}
     >
       {children}

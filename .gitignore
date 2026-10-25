@@ -6,3 +6,7 @@ ilham
 release
 
 .claude/settings.local.json
+.claude/skills/
+.agents/
+AGENTS.md
+CLAUDE.md

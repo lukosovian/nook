@@ -37,6 +37,7 @@ mod tracker;
 mod verify;
 mod voice;
 mod wake;
+mod whatsapp;
 mod stt;
 mod window;
 pub mod wol;
@@ -178,6 +179,7 @@ pub fn run() {
             hum::hum_watching,
             net::online_state,
             log::log_line,
+            log::recent_logs,
             claude::claude_decide,
             claude::claude_setup,
             claude::claude_connect,
@@ -189,6 +191,13 @@ pub fn run() {
             remote::remote_profile,
             remote::remote_notes,
             remote::remote_mirror,
+            remote::reply_notification,
+            whatsapp::wa_state,
+            whatsapp::wa_connect,
+            whatsapp::wa_disconnect,
+            whatsapp::wa_select_chat,
+            whatsapp::wa_send,
+            whatsapp::wa_push,
             wol::wol_status,
             wol::wol_fix,
             outside::outside_status,
@@ -234,6 +243,7 @@ pub fn run() {
             net::spawn(handle.clone());
             share::spawn(handle.clone());
             remote::spawn(handle.clone());
+            whatsapp::spawn(handle.clone());
             powertimer::spawn(handle.clone());
             outside::spawn();
             brightness::spawn(handle);
@@ -243,6 +253,7 @@ pub fn run() {
         })
         .on_window_event(|win, event| {
             shield::on_window_event(win, event);
+            whatsapp::on_window_event(win, event);
             let shared = win.state::<Arc<Shared>>();
             match event {
                 // Tracker, imleci pencere-yerel koordinata çevirmek için konum/ölçeği önbellekte tutar.

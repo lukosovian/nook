@@ -34,7 +34,7 @@ export function ShelfPanel() {
   const name = useNookName();
 
   if (!shelf.length) {
-    return <EmptyState title={tt("Raf boş")} hint={tt("Bir dosyayı {0} sürükle — kutuya dönüşüp yutar", ek(name, "a"))} color={ACCENT.teal} />;
+    return <EmptyState title={tt("Raf boş")} hint={tt("Bir dosyayı {0} sürükle ya da dosyayı tutup salla — yakalayıp rafa koyar", ek(name, "a"))} color={ACCENT.teal} />;
   }
 
   return (

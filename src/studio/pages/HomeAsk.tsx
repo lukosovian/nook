@@ -117,9 +117,9 @@ export function HomeSearch() {
 
   const shown = open && (query ? results.length > 0 : true);
   return (
-    <div ref={box} className="relative z-30 w-full max-w-[520px]">
+    <div ref={box} className="relative z-30 min-w-0 max-w-[520px] flex-1">
       <div
-        className="flex h-12 items-center gap-2.5 rounded-[16px] border px-4 transition-colors"
+        className="flex h-12 min-w-0 items-center gap-2 overflow-hidden rounded-[16px] border px-3 transition-colors xl:gap-2.5 xl:px-4"
         style={{ background: open ? "rgb(255 255 255 / 0.07)" : "rgb(255 255 255 / 0.045)", borderColor: open ? tintBg(ACCENT.teal, 45) : "rgb(255 255 255 / 0.08)" }}
       >
         <Search size={17} strokeWidth={2.4} className="shrink-0" style={{ color: open ? tintText(ACCENT.teal) : "var(--color-label-3)" }} />
@@ -134,10 +134,10 @@ export function HomeSearch() {
           onKeyDown={onKeyDown}
           spellCheck={false}
           placeholder={tt("Ara, hesapla, çevir…")}
-          className="min-w-0 flex-1 bg-transparent text-[14.5px] text-label outline-none placeholder:text-label-3"
+          className="w-0 min-w-0 flex-1 bg-transparent text-[14px] text-label outline-none placeholder:text-label-3 xl:text-[14.5px]"
         />
         {searchKey && (
-          <span className="shrink-0 rounded-[7px] border border-white/[0.08] bg-white/[0.04] px-1.5 py-[2px] text-[10.5px] font-semibold text-label-3" title={tt("Adada hızlı arama")}>
+          <span className="hidden shrink-0 rounded-[7px] border border-white/[0.08] bg-white/[0.04] px-1.5 py-[2px] text-[10.5px] font-semibold text-label-3 xl:inline-block" title={tt("Adada hızlı arama")}>
             {searchKey}
           </span>
         )}

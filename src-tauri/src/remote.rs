@@ -13,7 +13,7 @@ use std::io::Read;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -59,6 +59,8 @@ static SCREEN_OFF_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 static LAST_LAN: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 /// Uzun aradan sonra telefonun ev ağından ilk görüldüğü an; Wi-Fi'ye bağlandım haberi gelince "eve geldi"
 static CAME_BACK: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// PC'den telefona gönderilmeyi bekleyen bildirim yanıtları (RemoteInput: WhatsApp, Telegram, Mesajlar…)
+static REPLIES: (Mutex<Vec<Value>>, Condvar) = (Mutex::new(Vec::new()), Condvar::new());
 /// Telefon bu kadar süre ev ağından hiç bağlanmadıysa dışarıda sayılır
 const AWAY_AFTER: Duration = Duration::from_secs(20 * 60);
 
@@ -642,12 +644,12 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             let m = MIRROR.lock().unwrap();
             json_res(200, json!({ "keys": m["deck"].clone(), "autos": m["autos"].clone() }))
         }
-        // { op: run, id } tuşa bas · { op: auto, id, on } otomasyonu aç/kapa
+        // { op: run, id } tuşa bas · { op: auto, id, on } otomasyonu aç/kapa · { op: run-auto, id } otomasyonu şimdi çalıştır
         (Method::Post, "/v1/deck") => {
             let b = body_json(body);
             let op = b["op"].as_str().unwrap_or("");
             let id = b["id"].as_str().unwrap_or("").to_owned();
-            if !matches!(op, "run" | "auto") || id.is_empty() {
+            if !matches!(op, "run" | "auto" | "run-auto") || id.is_empty() {
                 return err(400, "bilinmeyen kısayol işlemi");
             }
             // Ayna ön yüz işleyene kadar eski kalmasın
@@ -692,11 +694,23 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
                     "body": s("text"),
                     "icon": b["icon"].as_str().filter(|i| i.starts_with("data:image/")),
                     "phone": true,
+                    "replyKey": b["replyKey"].as_str().filter(|k| !k.is_empty()),
                     // PC kapalıyken telefonda bekleyip şimdi gelen: listeye girsin, adada kart açmasın
                     "quiet": b["at"].as_i64().is_some_and(|at| now_ms() - at > 120_000),
                 }),
             );
             json_res(200, json!({ "ok": true }))
+        }
+        // PC'den yazılan bildirim yanıtlarını (WhatsApp, Telegram…) telefona uzun-yoklamayla ilet
+        (Method::Get, "/v1/notify/replies") => {
+            let (lock, cvar) = &REPLIES;
+            let mut guard = lock.lock().unwrap();
+            if guard.is_empty() {
+                let (g, _) = cvar.wait_timeout(guard, Duration::from_secs(20)).unwrap();
+                guard = g;
+            }
+            let list: Vec<Value> = guard.drain(..).collect();
+            json_res(200, json!({ "replies": list }))
         }
         // Telefondan dosya: ?name=…&to=shots (ekran görüntüleri klasörü); yoksa İndirilenler › Nook Mobil
         (Method::Post, "/v1/file") => {
@@ -1066,6 +1080,32 @@ pub fn remote_notes(notes: Value) {
 #[tauri::command]
 pub fn remote_profile(profile: Value) {
     *PROFILE.lock().unwrap() = profile;
+}
+
+/// Telefondaki bildirime (WhatsApp, Telegram, Mesajlar…) RemoteInput üzerinden yanıt gönder
+pub fn queue_reply(reply_key: String, text: String) -> Result<(), String> {
+    if !RUNNING.load(Ordering::SeqCst) {
+        return Err("Telefon köprüsü kapalı".into());
+    }
+    let reply_key = reply_key.trim().to_owned();
+    let text = text.trim().to_owned();
+    if reply_key.is_empty() || text.is_empty() {
+        return Err("Yanıt boş".into());
+    }
+    let (lock, cvar) = &REPLIES;
+    let mut guard = lock.lock().unwrap();
+    guard.push(json!({ "replyKey": reply_key, "text": text, "at": now_ms() }));
+    if guard.len() > 30 {
+        guard.remove(0);
+    }
+    cvar.notify_all();
+    crate::log::write("info", &format!("telefon bildirim yanıtı kuyruğa eklendi: {reply_key}"));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reply_notification(reply_key: String, text: String) -> Result<(), String> {
+    queue_reply(reply_key, text)
 }
 
 /// Yeni anahtar: eşleşmiş telefon(lar) bağlantıyı kaybeder, QR yeniden okutulmalı.

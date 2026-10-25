@@ -1,21 +1,30 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Nook ada penceresinin izinleri",
-  "windows": ["island", "island-*", "argus-card", "sound-card", "shield-*", "perch", "studio"],
+  "description": "Default capabilities for Nook island window",
+  "windows": ["island*", "perch", "shield*", "argus", "sound", "studio", "whatsapp"],
+  "remote": {
+    "urls": ["https://web.whatsapp.com/*", "https://*.whatsapp.com/*"]
+  },
   "permissions": [
     "core:default",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-start-dragging",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
-    "core:window:allow-start-dragging",
-    "core:window:allow-set-focus",
+    "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
-    "drag:default",
-    "autostart:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered",
     "updater:default",
-    "process:allow-restart",
-    "dialog:allow-open",
-    "dialog:allow-save"
+    "process:allow-restart"
   ]
 }

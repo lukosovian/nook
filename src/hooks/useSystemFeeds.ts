@@ -344,11 +344,12 @@ export function useEventFeed() {
   // alarm çalarken, oyunda ada gizliyken ya da ada açıkken gelen bildirim beklemede kalır, sonra gösterilir.
   const head = useNook((s) => s.toasts[0]);
   const showing = useNook((s) => !s.fullscreen && islandModeOf(s) === "toast");
+  const holdReplyToast = useNook((s) => s.hovered && !!(s.toasts[0]?.replyKey || s.toasts[0]?.whatsappChat));
   useEffect(() => {
-    if (!head || !showing) return;
+    if (!head || !showing || holdReplyToast) return;
     const t = window.setTimeout(() => useNook.getState().shiftToast(), head.ms ?? 3200);
     return () => window.clearTimeout(t);
-  }, [head?.id, showing]);
+  }, [head?.id, showing, holdReplyToast]);
 }
 
 /** Yeni ekran görüntüsü → rafa düşer, Nook sevinir (yalnızca ana ada). */
@@ -565,6 +566,7 @@ const native = (s: Settings, deck: DeckKey[] | null) => ({
   shieldMuteCalls: s.shieldMuteCalls ?? true,
   autoScreenshots: s.autoScreenshots,
   hideInFullscreen: s.hideInFullscreen,
+  gameSecondScreen: s.gameSecondScreen ?? true,
   gameIntro: s.gameIntro,
   breakReminderMin: s.breakReminderMin,
   islandPos: s.islandPos ?? null,

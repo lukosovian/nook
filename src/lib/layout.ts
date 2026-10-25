@@ -121,6 +121,7 @@ export const MODULE_SIZE: Partial<Record<string, IslandSize>> = {
   hum: { width: 720, height: 300 },
   argus: { width: 760, height: 336 },
   claude: { width: 744, height: 330 },
+  whatsapp: { width: 744, height: 330 },
   focus: { width: 660, height: 300 },
   shelf: { width: 700, height: 300 },
   clip: { width: 700, height: 320 },

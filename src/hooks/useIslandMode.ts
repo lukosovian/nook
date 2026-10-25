@@ -15,7 +15,9 @@ export function islandModeOf(s: State): IslandMode {
   if (s.tour && isPrimary) return "tour";
   // Hum dinlerken ve sonucu gösterirken: üstüne gelinse de açılmaz (düğmelere basılabilsin)
   if (s.hum && isPrimary) return "hum";
-  if (s.mood === "hungry" || s.mood === "chewing") return "feeding";
+  // Ada sabitse ya da sallamayla (shelf-drop) açılmışsa, dosya bırakılırken 700×300 raf
+  // imlecin altından 196×66'ya küçülüp titreşmesin; Nook sol köşede yutma animasyonunu oynar.
+  if ((s.mood === "hungry" || s.mood === "chewing") && !s.pinned && !s.holds.length) return "feeding";
   if (s.searching) return "search";
   // Günün özeti: üzerine gelinse de büyük kalır
   if (s.brief && isPrimary) return "brief";
@@ -26,6 +28,10 @@ export function islandModeOf(s: State): IslandMode {
   if (s.reminder || (s.autoAsk && isPrimary)) return "reminder";
   // Claude Code izin istiyor: cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
   if (s.claudeCard && isPrimary) return "claude";
+  // Yanıtlanabilir bildirim kartı (WhatsApp / Nook Mobil hızlı yanıt): üstüne gelince kapanmasın ki doğrudan yanıt yazılabilsin
+  if (s.toasts.length && (s.toasts[0].replyKey || s.toasts[0].whatsappChat) && !s.pinned && !s.grabbed && !s.holds.length) {
+    return "toast";
+  }
   if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";
   if (s.toasts.length) return "toast";
   if (s.osd) return "osd";

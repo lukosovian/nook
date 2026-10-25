@@ -1,12 +1,7 @@
 // İlk sırada kalmalı: Motion requestAnimationFrame'i içe aktarılırken yakalar
 import "./lib/frameCap";
-import { StrictMode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
-import { ArgusCard } from "./components/ArgusCard";
-import { Shield } from "./components/Shield";
-import { SoundCard } from "./components/SoundCard";
-import { Perch } from "./components/outings/Perch";
 import { windowLabel } from "./lib/bridge";
 import { isStudio } from "./lib/studio";
 import { installLogging } from "./lib/log";
@@ -15,39 +10,80 @@ import { useColorVision } from "./lib/palette";
 
 async function boot() {
   installLogging();
+  const preview = import.meta.env.DEV ? new URLSearchParams(location.search).get("preview") : null;
   // Yalnızca geliştirme: ?preview=… ile tasarım önizlemesi (üretim paketinden çıkarılır)
-  if (import.meta.env.DEV) {
-    const mode = new URLSearchParams(location.search).get("preview");
-    if (mode) (await import("./dev/preview")).applyPreview(mode);
+  if (import.meta.env.DEV && preview) {
+    (await import("./dev/preview")).applyPreview(preview);
   }
-  // Yalnızca geliştirme: ?preview=argcard ile yan kart
-  const cardDemo =
-    import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "argcard"
-      ? { visible: true, title: "Tuzlu Kahve", episode: "S1B6 · 6. Bölüm", poster: null, meta: ["2025", "Dram, Romantik", "★ 7.8"], status: "İzleniyor", playedMs: 11 * 60_000, needMs: 15 * 60_000 }
-      : null;
-  // Yalnızca geliştirme: ?preview=soundcard ile soldaki ses kartı
-  const soundDemo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "soundcard" ? { visible: true, detached: false, right: new URLSearchParams(location.search).has("right") } : null;
-  // Yalnızca geliştirme: ?preview=shield ile gizlilik kalkanı
-  const shieldDemo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "shield";
-  // Yalnızca geliştirme: ?preview=perch ile pencere üstüne tüneyen Nook
-  const perchDemo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "perch";
-  const PerchStage = perchDemo ? (await import("./dev/PerchStage")).PerchStage : null;
-  const Logo = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "logo" ? (await import("./dev/Logo")).Logo : null;
-  const Gallery = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "gallery" ? (await import("./dev/Gallery")).Gallery : null;
-  const Poster = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "poster" ? (await import("./dev/Poster")).Poster : null;
-  const Wardrobe = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "wardrobe" ? (await import("./dev/Wardrobe")).Wardrobe : null;
-  // Yalnızca geliştirme: ?preview=reel ile Instagram tanıtım videosu (dev/Reel)
-  const Reel = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "reel" ? (await import("./dev/Reel")).Reel : null;
-  // Yalnızca geliştirme: ?preview=reel03 ile 0.3 güncellemesinin videosu (dev/Reel03)
-  const Reel03 = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "reel03" ? (await import("./dev/Reel03")).Reel03 : null;
-  // Yalnızca geliştirme: ?preview=karakter ile karakter denemesi (dev/CharacterLab)
-  const CharacterLab = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "karakter" ? (await import("./dev/CharacterLab")).CharacterLab : null;
-  // Nook Studio penceresi (önizlemede ?preview=studio#bölüm)
-  const StudioApp = isStudio ? (await import("./studio/Studio")).Studio : null;
+
+  let view: ReactNode;
+  if (isStudio) {
+    const { Studio } = await import("./studio/Studio");
+    view = <Studio />;
+  } else if (preview === "argcard") {
+    const { ArgusCard } = await import("./components/ArgusCard");
+    view = (
+      <ArgusCard
+        initial={{
+          visible: true,
+          title: "Tuzlu Kahve",
+          episode: "S1B6 · 6. Bölüm",
+          poster: null,
+          meta: ["2025", "Dram, Romantik", "★ 7.8"],
+          status: "İzleniyor",
+          playedMs: 11 * 60_000,
+          needMs: 15 * 60_000,
+        }}
+      />
+    );
+  } else if (windowLabel === "argus-card") {
+    const { ArgusCard } = await import("./components/ArgusCard");
+    view = <ArgusCard />;
+  } else if (preview === "soundcard") {
+    const { SoundCard } = await import("./components/SoundCard");
+    view = <SoundCard initial={{ visible: true, detached: false, right: new URLSearchParams(location.search).has("right") }} />;
+  } else if (windowLabel === "sound-card") {
+    const { SoundCard } = await import("./components/SoundCard");
+    view = <SoundCard />;
+  } else if (windowLabel.startsWith("shield-") || preview === "shield") {
+    const { Shield } = await import("./components/Shield");
+    view = <Shield />;
+  } else if (windowLabel === "perch") {
+    const { Perch } = await import("./components/outings/Perch");
+    view = <Perch />;
+  } else if (import.meta.env.DEV && preview === "perch") {
+    const { PerchStage } = await import("./dev/PerchStage");
+    view = <PerchStage />;
+  } else if (import.meta.env.DEV && preview === "gallery") {
+    const { Gallery } = await import("./dev/Gallery");
+    view = <Gallery />;
+  } else if (import.meta.env.DEV && preview === "poster") {
+    const { Poster } = await import("./dev/Poster");
+    view = <Poster />;
+  } else if (import.meta.env.DEV && preview === "logo") {
+    const { Logo } = await import("./dev/Logo");
+    view = <Logo />;
+  } else if (import.meta.env.DEV && preview === "wardrobe") {
+    const { Wardrobe } = await import("./dev/Wardrobe");
+    view = <Wardrobe />;
+  } else if (import.meta.env.DEV && preview === "reel") {
+    const { Reel } = await import("./dev/Reel");
+    view = <Reel />;
+  } else if (import.meta.env.DEV && preview === "reel03") {
+    const { Reel03 } = await import("./dev/Reel03");
+    view = <Reel03 />;
+  } else if (import.meta.env.DEV && preview === "karakter") {
+    const { CharacterLab } = await import("./dev/CharacterLab");
+    view = <CharacterLab />;
+  } else {
+    const { default: App } = await import("./App");
+    view = <App />;
+  }
+
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ColorVision />
-      {StudioApp ? <StudioApp /> : cardDemo ? <ArgusCard initial={cardDemo} /> : windowLabel === "argus-card" ? <ArgusCard /> : soundDemo ? <SoundCard initial={soundDemo} /> : windowLabel === "sound-card" ? <SoundCard /> : windowLabel.startsWith("shield-") || shieldDemo ? <Shield /> : windowLabel === "perch" ? <Perch /> : PerchStage ? <PerchStage /> : Gallery ? <Gallery /> : Poster ? <Poster /> : Logo ? <Logo /> : Wardrobe ? <Wardrobe /> : Reel ? <Reel /> : Reel03 ? <Reel03 /> : CharacterLab ? <CharacterLab /> : <App />}
+      {view}
     </StrictMode>,
   );
 }

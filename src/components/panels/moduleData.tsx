@@ -15,6 +15,7 @@ import { latestNote } from "../../lib/notes";
 import { CHIP_NOOKS } from "../../lib/look";
 import { NookFigure } from "../mascot/Figure";
 import { CLAUDE_COLOR, effectivePct, useClaude } from "../../lib/claude";
+import { useUnifiedWaChats, useWhatsApp, WA_COLOR } from "../../lib/whatsapp";
 import { isTurkish, locale, pct, tt } from "../../lib/i18n";
 import { formatSize } from "../../lib/format";
 import { SKY_LABEL } from "../../lib/weather";
@@ -31,6 +32,7 @@ export interface ModuleDef {
 export const MODULES: ModuleDef[] = [
   { id: "today", label: tt("Bugün"), color: ACCENT.yellow, desc: tt("Hava, alarm, günün özeti") },
   { id: "media", label: tt("Medya"), color: ACCENT.pink, desc: tt("Çalan müzik, şarkı sözleri") },
+  { id: "whatsapp", label: "WhatsApp", color: WA_COLOR, desc: tt("Mesajları gör ve yanıtla") },
   { id: "hum", label: "Hum", color: ACCENT.purple, desc: tt("Çalan şarkıyı bul") },
   { id: "argus", label: "Argus", color: ARGUS_BLUE, desc: tt("Dizi ve film listen") },
   { id: "claude", label: "Claude", color: CLAUDE_COLOR, desc: tt("Claude Code oturumların") },
@@ -206,6 +208,8 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
   const claudeAsks = useClaude((s) => s.asks.length);
   const claudePlan = useClaude((s) => s.plan);
   const claudeHooked = useClaude((s) => !!s.setup?.hooked);
+  const waWebStatus = useWhatsApp((s) => s.web.status);
+  const waChats = useUnifiedWaChats();
   const lastHum = useNook((s) => s.hums[0]);
   const humCount = useNook((s) => s.hums.length);
   const humListening = useNook((s) => s.hum?.phase === "listening");
@@ -236,6 +240,23 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
       progress: media?.durationMs ? pos / media.durationMs : undefined,
       foot: media ? [media.artist || media.app.replace(/\.exe$/i, ""), media.durationMs ? `${mmss(pos)} / ${mmss(media.durationMs)}` : undefined] : [tt("Bir şey çalınca burada")],
     },
+    whatsapp: (() => {
+      const unread = waChats.reduce((sum, c) => sum + c.unread, 0);
+      const top = waChats[0];
+      if (!top) {
+        return {
+          text: waWebStatus === "ready" ? tt("Sohbetler hazır") : tt("Mesajlar"),
+          state: waWebStatus === "ready" ? ("idle" as const) : ("empty" as const),
+          foot: [waWebStatus === "ready" ? tt("WhatsApp Web bağlı") : tt("Bildirimden ya da Web'den yanıtla")] as [string],
+        };
+      }
+      return {
+        text: live ? tt("Gizli") : unread > 0 ? tt("{0} okunmamış", unread) : `${top.title} · ${top.lastText || tt("Sohbet")}`,
+        state: unread > 0 ? ("active" as const) : ("idle" as const),
+        value: unread > 0 ? String(unread) : String(waChats.length),
+        foot: [live ? tt("Gizli") : `${top.title}: ${top.lastText || ""}`, top.time || undefined] as [string, string?],
+      };
+    })(),
     shelf: {
       text: shelf.length ? tt("{0} öğe", shelf.length) : tt("Boş"),
       state: shelf.length ? "idle" : "empty",

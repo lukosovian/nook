@@ -9,9 +9,10 @@ import { useNook, type Pad } from "../store/nook";
 import { normalizeColor, normalizeLook, type Look } from "../lib/look";
 import { useClaude } from "../lib/claude";
 import { drankWater, snoozeWater, waterInfo } from "./useFeatures";
-import { appPathOf, getDeck, isDangerous, runKey } from "../lib/deck";
-import { getAutomations, saveAutomations, triggerLabel, triggerMeta } from "../lib/automations";
+import { appPathOf, getDeck, getQuickState, isDangerous, keyVisual, refreshQuickState, runKey } from "../lib/deck";
+import { getAutomations, runAutomationNow, saveAutomations, triggerLabel, triggerMeta } from "../lib/automations";
 import { NOTES } from "../lib/notes";
+import { tt } from "../lib/i18n";
 
 /** Telefona gönderilen geçmiş en fazla bu kadar */
 const MAX_CLIPS = 80;
@@ -30,6 +31,7 @@ interface NoteCmd {
 function mirror() {
   const { clips, pads, padId, hums, shelf, diary } = useNook.getState();
   const deck = getDeck();
+  const quick = getQuickState();
   // Simgesi henüz okunmamış uygulama tuşları: okununca ayna yeniden gider
   const missing = deck.map(appPathOf).filter((p): p is string => !!p && !appIcons.has(p));
   if (missing.length) {
@@ -60,8 +62,28 @@ function mirror() {
         .sort()
         .reverse()
         .map((day) => ({ day, text: diary[day].text, at: diary[day].at })),
-      deck: deck.map((k) => ({ id: k.id, label: k.label, icon: k.icon, color: k.color, steps: k.steps.length, home: !!k.home, danger: isDangerous(k), appIcon: appIcons.get(appPathOf(k) ?? "") ?? null })),
-      autos: getAutomations().map((a) => ({ id: a.id, label: a.label, on: a.on, when: triggerLabel(a.when), icon: triggerMeta(a.when).icon, color: triggerMeta(a.when).color, steps: a.steps.length })),
+      deck: deck.map((k) => {
+        const vis = keyVisual(k, quick);
+        return {
+          id: k.id,
+          label: vis.muted ? tt("{0} kapalı", k.label) : k.label,
+          icon: vis.iconName,
+          color: vis.color,
+          steps: k.steps.length,
+          home: !!k.home,
+          danger: isDangerous(k),
+          appIcon: appIcons.get(appPathOf(k) ?? "") ?? null,
+        };
+      }),
+      autos: getAutomations().map((a) => ({
+        id: a.id,
+        label: a.label,
+        on: a.on,
+        when: triggerLabel(a.when),
+        icon: triggerMeta(a.when).icon,
+        color: triggerMeta(a.when).color,
+        steps: a.steps.length,
+      })),
       hums: hums.slice(0, MAX_HUMS).map((h) => ({ id: h.id, title: h.title, artist: h.artist, cover: h.cover ?? null, url: h.url ?? null, at: h.at, phone: !!h.phone })),
     },
   }).catch(() => {});
@@ -116,7 +138,7 @@ export function usePhoneSync() {
       window.clearTimeout(timer);
       timer = window.setTimeout(mirror, 600);
     };
-    mirror();
+    void refreshQuickState(false).then(mirror);
     // Yama notları değişmez: bir kez, yalnızca metinleri
     void invoke("remote_notes", {
       notes: NOTES.map((n) => ({ version: n.version, date: n.date, headline: n.headline, major: !!n.major, items: n.items.map((i) => ({ title: i.title, text: i.text })) })),
@@ -124,8 +146,10 @@ export function usePhoneSync() {
     const unsub = useNook.subscribe((st, prev) => {
       if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.diary !== prev.diary || st.deck !== prev.deck || st.automations !== prev.automations || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
     });
-    // Su sayacı dakikada bir ilerler: telefonun gördüğü tahmin tazelensin
-    const tick = window.setInterval(mirror, 60_000);
+    // Su sayacı ve mikrofon/ses durumu düzenli olarak telefon aynasında tazelenir
+    const tick = window.setInterval(() => {
+      void refreshQuickState(false).then(mirror);
+    }, 15_000);
     // Claude'da onay isteği hemen telefona yansısın
     const unsubClaude = useClaude.subscribe((st, prev) => {
       if (st.asks !== prev.asks) {
@@ -143,10 +167,14 @@ export function usePhoneSync() {
         if (e.op === "drank" && (due || e.own)) drankWater();
         if (e.op === "snooze" && due) snoozeWater();
       }
-      // Telefondan kısayol tuşuna basıldı ya da otomasyon açılıp kapandı
+      // Telefondan kısayol tuşuna basıldı, otomasyon şimdi çalıştırıldı ya da açılıp kapandı
       if (e.kind === "deck" && e.op === "run") {
         const k = getDeck().find((x) => x.id === e.id);
-        if (k) void runKey(k);
+        if (k) void runKey(k).then(() => mirror());
+        else if (e.id) void runAutomationNow(e.id).then(() => mirror());
+      }
+      if (e.kind === "deck" && e.op === "run-auto" && e.id) {
+        void runAutomationNow(e.id).then(() => mirror());
       }
       if (e.kind === "deck" && e.op === "auto") saveAutomations(getAutomations().map((a) => (a.id === e.id ? { ...a, on: !!e.on } : a)));
       // Telefondan görünüm değişti

@@ -140,6 +140,7 @@ export type Tab =
   | "remind"
   | "year"
   | "claude"
+  | "whatsapp"
   | "hum"
   | "settings";
 
@@ -525,6 +526,7 @@ export const DEFAULT_SETTINGS: Settings = {
   nookName: "",
   look: { shape: "sphere", texture: "smooth", eyes: "pill", glasses: "none", head: "none", neck: "none", face: "none" },
   hideInFullscreen: true,
+  gameSecondScreen: true,
   islandPos: null,
   sensitiveGuard: true,
   shieldShortcut: "Ctrl+Alt+H",
@@ -647,6 +649,10 @@ export interface Toast extends SysEvent {
   icon?: string | null;
   /** Kart ekranda ne kadar kalsın (ms) */
   ms?: number;
+  /** Telefondaki bildirime doğrudan yanıt anahtarı */
+  replyKey?: string | null;
+  /** WhatsApp mesajıysa sohbet başlığı */
+  whatsappChat?: string | null;
 }
 
 const MAX_SHELF = 24;
@@ -842,7 +848,7 @@ interface NookState {
   setStats: (stats: StatsPayload) => void;
   setDevices: (devices: DevicesPayload) => void;
   setOsd: (osd: Osd | null) => void;
-  pushToast: (event: SysEvent & { icon?: string | null; ms?: number }) => void;
+  pushToast: (event: SysEvent & { icon?: string | null; ms?: number; replyKey?: string | null; whatsappChat?: string | null }) => void;
   shiftToast: () => void;
   updateSettings: (patch: Partial<Settings>) => void;
   setFullscreen: (fullscreen: boolean) => void;

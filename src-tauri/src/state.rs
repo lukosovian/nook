@@ -93,6 +93,8 @@ pub struct Settings {
     pub shield_mute_calls: bool,
     pub auto_screenshots: bool,
     pub hide_in_fullscreen: bool,
+    /// Oyun açıkken başka bir ekran varsa gizlenmek yerine oraya geçer
+    pub game_second_screen: bool,
     /// Oyun açılınca ada gizlenmeden önce birkaç saniye özet gösterir
     pub game_intro: bool,
     /// Bu kadar dakikada bir mola hatırlatır (0 = kapalı)
@@ -170,6 +172,7 @@ impl Default for Settings {
             shield_mute_calls: true,
             auto_screenshots: true,
             hide_in_fullscreen: true,
+            game_second_screen: true,
             game_intro: true,
             break_reminder_min: 120,
             island_pos: None,

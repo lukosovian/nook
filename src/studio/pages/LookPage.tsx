@@ -51,8 +51,8 @@ export function LookPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex w-[380px] shrink-0 flex-col items-center justify-center border-r border-white/[0.05] px-8">
-        <div className="relative flex h-[360px] w-full items-center justify-center overflow-hidden rounded-[28px] border" style={{ background: `radial-gradient(circle at 50% 38%, ${tintBg(color, 28)}, transparent 68%), rgb(255 255 255 / 0.02)`, borderColor: tintBg(color, 22) }}>
+      <div className="flex w-[270px] shrink-0 flex-col items-center justify-center border-r border-white/[0.05] px-5 xl:w-[380px] xl:px-8">
+        <div className="relative flex h-[290px] w-full items-center justify-center overflow-hidden rounded-[28px] border xl:h-[360px]" style={{ background: `radial-gradient(circle at 50% 38%, ${tintBg(color, 28)}, transparent 68%), rgb(255 255 255 / 0.02)`, borderColor: tintBg(color, 22) }}>
           {/* Sahne: altta yumuşak ışık halkası */}
           <span className="absolute bottom-7 left-1/2 h-10 w-56 -translate-x-1/2 rounded-[50%]" style={{ background: `radial-gradient(ellipse, ${tintBg(color, 30)}, transparent 70%)` }} />
           <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}>
@@ -75,10 +75,10 @@ export function LookPage() {
             </motion.span>
           </AnimatePresence>
         </div>
-        <p className="mt-5 text-[26px] font-extrabold tracking-tight text-label">{name}</p>
-        <p className="mt-1 text-center text-[12.5px] leading-relaxed text-label-3">{tt("Seçtiğin her şey adada, telefonda ve kalkanda da görünür")}</p>
+        <p className="mt-4 text-[24px] font-extrabold tracking-tight text-label xl:mt-5 xl:text-[26px]">{name}</p>
+        <p className="mt-1 text-center text-[12px] leading-relaxed text-label-3 xl:text-[12.5px]">{tt("Seçtiğin her şey adada, telefonda ve kalkanda da görünür")}</p>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col px-8 pb-4 pt-7">
+      <div className="flex min-w-0 flex-1 flex-col px-5 pb-4 pt-6 xl:px-8 xl:pt-7">
         <div className="mb-5 flex items-center gap-4">
           <NavIcon icon={Shirt} color={ACCENT.pink} on size={48} />
           <div>

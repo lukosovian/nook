@@ -340,14 +340,38 @@ mod imp {
     }
 
     pub fn endpoint_muted(capture: bool) -> Option<bool> {
-        unsafe { endpoint(capture).and_then(|v| v.GetMute()).ok().map(|b| b.as_bool()) }
+        unsafe {
+            let console = endpoint(capture).and_then(|v| v.GetMute()).ok().map(|b| b.as_bool());
+            if !capture || console == Some(true) {
+                return console;
+            }
+            let comm = enumerator()
+                .and_then(|e| e.GetDefaultAudioEndpoint(eCapture, eCommunications))
+                .and_then(|d| d.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None))
+                .and_then(|v| v.GetMute())
+                .ok()
+                .map(|b| b.as_bool());
+            comm.or(console)
+        }
     }
 
     pub fn set_endpoint_muted(capture: bool, muted: bool) -> Result<(), String> {
         unsafe {
-            endpoint(capture)
+            let res = endpoint(capture)
                 .and_then(|v| v.SetMute(muted, std::ptr::null()))
-                .map_err(|e| e.to_string())
+                .map_err(|e| e.to_string());
+            if capture {
+                if let Ok(e) = enumerator() {
+                    for role in [eMultimedia, eCommunications] {
+                        if let Ok(d) = e.GetDefaultAudioEndpoint(eCapture, role) {
+                            if let Ok(v) = d.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
+                                let _ = v.SetMute(muted, std::ptr::null());
+                            }
+                        }
+                    }
+                }
+            }
+            res
         }
     }
 

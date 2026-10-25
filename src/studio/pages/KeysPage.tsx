@@ -1,16 +1,15 @@
 /**
  * Studio › Kısayollar, iki sekme:
  * - Tuşlar: Stream Deck gibi. Solda tuşların (seç, sırala), sağda seçili tuşun düzenleyicisi: adı, simgesi,
- *   rengi, ana sayfada görünüp görünmeyeceği ve adımları. Birden çok adım = rutin (ör. "Oyun modu":
- *   mikrofonu aç, Discord'u aç, masaüstünü temizle). Uygulama tuşları da burada, kendi simgeleriyle.
+ *   rengi, ana sayfada görünüp görünmeyeceği ve adımları. Uygulama tuşları da burada, kendi simgeleriyle.
  * - Otomasyonlar: "bu olunca şunu yap" (lib/automations). Solda liste, hazır örnekler ve son çalışanlar;
  *   sağda tetikleyici, koşullar, "önce sor" ve adımlar.
  * Tuşa klavye kısayolu atanabilir; tuşlar ve otomasyonlar adlarıyla sesle de çalışır ("Hey Nook, gece modu").
  */
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, AppWindow, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Globe, Keyboard, Layers, Mic, Play, Plus, RotateCcw, Search, Trash2, Wand2, X, Zap } from "lucide-react";
-import { fileIcon, listApps, type AppEntry } from "../../lib/bridge";
+import { AlertTriangle, AppWindow, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Globe, Keyboard, Mic, Play, Plus, RotateCcw, Search, Trash2, Wand2, X, Zap } from "lucide-react";
+import { fileIcon, listApps, type AppEntry, type QuickState } from "../../lib/bridge";
 import {
   ACTIONS,
   actionOf,
@@ -20,20 +19,24 @@ import {
   DEFAULT_DECK,
   getDeck,
   isDangerous,
+  keyVisual,
   nextQuick,
   quickLit,
   resetDeck,
   runKey,
   stepLabel,
   useDeck,
+  useQuickState,
   type DeckKey,
   type DeckStep,
 } from "../../lib/deck";
 import {
+  autoSafe,
   CONDITIONS,
   conditionId,
   conditionLabel,
   getAutomations,
+  runAutomationNow,
   saveAutomations,
   TEMPLATES,
   triggerLabel,
@@ -76,15 +79,19 @@ function Tabs({ tab }: { tab: "keys" | "auto" }) {
 
 function KeysTab() {
   const deck = useDeck();
+  const quick = useQuickState();
   const [sel, setSel] = useState<string | null>(deck[0]?.id ?? null);
   const key = deck.find((k) => k.id === sel) ?? null;
   const patch = (p: Partial<DeckKey>) => key && save(getDeck().map((k) => (k.id === key.id ? { ...k, ...p } : k)));
 
-  const add = (kind: "scene" | "action") => {
-    const k: DeckKey =
-      kind === "scene"
-        ? { id: crypto.randomUUID(), label: tt("Yeni rutin"), icon: "scene", color: DECK_COLORS[(getDeck().length * 3) % DECK_COLORS.length], steps: [] }
-        : { id: crypto.randomUUID(), label: tt("Yeni tuş"), icon: "bolt", color: DECK_COLORS[(getDeck().length * 3) % DECK_COLORS.length], steps: [] };
+  const add = () => {
+    const k: DeckKey = {
+      id: crypto.randomUUID(),
+      label: tt("Yeni tuş"),
+      icon: "bolt",
+      color: DECK_COLORS[(getDeck().length * 3) % DECK_COLORS.length],
+      steps: [],
+    };
     save([...getDeck(), k]);
     setSel(k.id);
   };
@@ -96,12 +103,19 @@ function KeysTab() {
     [list[i], list[j]] = [list[j], list[i]];
     save(list);
   };
-  // Boş yeni tuşa ilk adım olarak uygulama eklenince tuş o uygulamanın adını ve simgesini alır
+  // Boş yeni tuşa ilk adım olarak uygulama ya da hazır eylem eklenince tuş onun adını ve simgesini alır
   const setSteps = (steps: DeckStep[]) => {
     if (!key) return;
     const first = steps[0];
-    if (!key.steps.length && steps.length === 1 && first.kind === "open" && key.icon === "bolt" && key.label === tt("Yeni tuş"))
-      return patch({ steps, label: first.name.slice(0, 22), icon: /^https?:/i.test(first.path) ? "web" : "app" });
+    if (!key.steps.length && steps.length === 1 && key.icon === "bolt" && key.label === tt("Yeni tuş")) {
+      if (first.kind === "open") {
+        return patch({ steps, label: first.name.slice(0, 22), icon: /^https?:/i.test(first.path) ? "web" : "app" });
+      }
+      const act = actionOf(first);
+      if (act) {
+        return patch({ steps, label: act.label.slice(0, 22), icon: act.icon, color: act.color });
+      }
+    }
     patch({ steps });
   };
   const restore = () => {
@@ -115,21 +129,18 @@ function KeysTab() {
         icon={Keyboard}
         color={ACCENT.blue}
         title={tt("Kısayollar")}
-        subtitle={tt("Tek tuşla bir iş ya da sırayla birkaç iş (rutin)")}
+        subtitle={tt("Tek basışta çalışan kısayol tuşların")}
         actions={
           <>
             <Tabs tab="keys" />
-            <Btn color={ACCENT.purple} onClick={() => add("scene")}>
-              <Layers size={14} /> {tt("Yeni rutin")}
-            </Btn>
-            <Btn color={ACCENT.blue} onClick={() => add("action")}>
+            <Btn color={ACCENT.blue} onClick={add}>
               <Plus size={14} /> {tt("Yeni tuş")}
             </Btn>
           </>
         }
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_330px] gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         {/* Tuşlar */}
         <Panel
           title={tt("Tuşların")}
@@ -140,13 +151,13 @@ function KeysTab() {
             </Btn>
           }
         >
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-3 gap-2.5 xl:grid-cols-5 xl:gap-3">
             <AnimatePresence initial={false}>
               {deck.map((k) => (
-                <BigKey key={k.id} k={k} on={k.id === sel} onClick={() => setSel(k.id)} />
+                <BigKey key={k.id} k={k} on={k.id === sel} quick={quick} onClick={() => setSel(k.id)} />
               ))}
             </AnimatePresence>
-            <button onClick={() => add("action")} className="flex h-[92px] flex-col items-center justify-center gap-1 rounded-[18px] border border-dashed border-white/[0.12] text-label-3 hover:border-white/25 hover:text-label-2">
+            <button onClick={add} className="flex h-[92px] flex-col items-center justify-center gap-1 rounded-[18px] border border-dashed border-white/[0.12] text-label-3 hover:border-white/25 hover:text-label-2">
               <Plus size={20} />
               <span className="text-[11px] font-semibold">{tt("Tuş ekle")}</span>
             </button>
@@ -160,7 +171,7 @@ function KeysTab() {
             </div>
           )}
           <p className="mt-4 text-[11.5px] leading-relaxed text-label-3">
-            {tt("Kapat, yeniden başlat ve uyku tuşları yanlışlıkla basılmasın diye ikinci basışta çalışır. Mikrofon ve ses tuşları açık/kapalı olduğunu ışığıyla gösterir. “Ana sayfada göster” dediğin tuşlar adanın ana sayfasında, alt sırada da durur.")}
+            {tt("Kapat, yeniden başlat ve uyku tuşları yanlışlıkla basılmasın diye ikinci basışta çalışır. Mikrofon ve ses tuşları açık/kapalı olduğunu simgesiyle ve ışığıyla gösterir. “Ana sayfada göster” dediğin tuşlar adanın ana sayfasında, alt sırada da durur.")}
           </p>
         </Panel>
 
@@ -234,7 +245,7 @@ function KeysTab() {
               )}
 
               <div>
-                <Label>{key.steps.length > 1 ? tt("Rutin: {0} adım, sırayla", key.steps.length) : tt("Ne yapsın")}</Label>
+                <Label>{key.steps.length > 1 ? tt("Ne yapsın ({0} adım, sırayla)", key.steps.length) : tt("Ne yapsın")}</Label>
                 <Steps steps={key.steps} onChange={setSteps} />
               </div>
             </div>
@@ -296,12 +307,14 @@ function IconBtn({ label, onClick, danger, children }: { label: string; onClick:
   );
 }
 
-/** Büyük basılabilir tuş (seçiliyse renginde çerçeveli); uygulama tuşu kendi simgesiyle */
-function BigKey({ k, on, onClick }: { k: DeckKey; on: boolean; onClick: () => void }) {
-  const Icon = DECK_ICONS[k.icon] ?? Zap;
+/** Büyük basılabilir tuş (seçiliyse renginde çerçeveli); uygulama tuşu kendi simgesiyle, mikrofon/ses kapalıysa üstü çizili */
+function BigKey({ k, on, quick, onClick }: { k: DeckKey; on: boolean; quick: QuickState | null; onClick: () => void }) {
+  const { Icon, color: visColor, lit, muted } = keyVisual(k, quick);
   const path = appPathOf(k);
   const icon = useAppIcon(path);
-  const color = path ? ACCENT.blue : k.color;
+  const color = path ? ACCENT.blue : visColor;
+  const isQuickToggle = k.steps.length === 1 && k.steps[0].kind === "quick";
+  const litColor = lit === "off" ? ACCENT.red : lit === "on" ? k.color : isQuickToggle ? "rgb(255 255 255 / 0.16)" : null;
   return (
     <motion.button
       layout
@@ -316,19 +329,25 @@ function BigKey({ k, on, onClick }: { k: DeckKey; on: boolean; onClick: () => vo
         path
           ? { background: on ? tintBg(color, 12) : "rgb(255 255 255 / 0.035)", borderColor: on ? tintBg(color, 60) : "rgb(255 255 255 / 0.065)", boxShadow: on ? `0 0 0 1px ${tintBg(color, 50)}` : undefined }
           : {
-              background: `linear-gradient(150deg, ${tintBg(k.color, on ? 22 : 13)} 0%, ${tintBg(k.color, on ? 6 : 3)} 100%)`,
-              borderColor: tintBg(k.color, on ? 60 : 26),
-              boxShadow: on ? `0 0 0 1px ${tintBg(k.color, 50)}, 0 12px 28px -14px ${k.color}` : undefined,
+              background: `linear-gradient(150deg, ${tintBg(color, on ? 22 : 13)} 0%, ${tintBg(color, on ? 6 : 3)} 100%)`,
+              borderColor: tintBg(color, on ? 60 : 26),
+              boxShadow: on ? `0 0 0 1px ${tintBg(color, 50)}, 0 12px 28px -14px ${color}` : undefined,
             }
       }
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-[13px]" style={path ? { background: "rgb(255 255 255 / 0.05)" } : { color: tintText(k.color), background: tintBg(k.color, on ? 30 : 20) }}>
+      {litColor && k.steps.length <= 1 && (
+        <span
+          className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full"
+          style={{ background: litColor, boxShadow: lit ? `0 0 6px ${litColor}` : undefined }}
+        />
+      )}
+      <span className="flex h-10 w-10 items-center justify-center rounded-[13px]" style={path ? { background: "rgb(255 255 255 / 0.05)" } : { color: tintText(color), background: tintBg(color, on ? 30 : 20) }}>
         {path ? icon ? <img src={icon} alt="" className="h-7 w-7 object-contain" /> : <AppWindow size={20} className="text-label-3" /> : <Icon size={20} strokeWidth={2.2} />}
       </span>
-      <span className="w-full truncate text-center text-[11.5px] font-semibold" style={{ color: path ? "var(--color-label-2)" : tintText(k.color) }}>
-        {k.label}
+      <span className="w-full truncate text-center text-[11.5px] font-semibold" style={{ color: path ? "var(--color-label-2)" : tintText(color) }}>
+        {muted ? tt("{0} kapalı", k.label) : k.label}
       </span>
-      {k.steps.length > 1 && <span className="absolute right-2 top-2 rounded-full px-1.5 text-[9.5px] font-bold" style={{ background: tintBg(k.color, 24), color: tintText(k.color) }}>{k.steps.length}</span>}
+      {k.steps.length > 1 && <span className="absolute right-2 top-2 rounded-full px-1.5 text-[9.5px] font-bold" style={{ background: tintBg(color, 24), color: tintText(color) }}>{k.steps.length}</span>}
       {isDangerous(k) && <span className="absolute left-2 top-2 h-1.5 w-1.5 rounded-full" style={{ background: ACCENT.red }} title={tt("İkinci basışta çalışır")} />}
       {(k.home || k.hotkey) && (
         <span className="-mt-1.5 w-full truncate text-center text-[9px] font-semibold text-label-3">{[k.hotkey, k.home && tt("Ana sayfada")].filter(Boolean).join(" · ")}</span>
@@ -337,15 +356,16 @@ function BigKey({ k, on, onClick }: { k: DeckKey; on: boolean; onClick: () => vo
   );
 }
 
-/** "Dene": tuşu şimdi çalıştır (tehlikeli tuşlar burada denenmez) */
-function KeyTest({ k }: { k: { label: string; steps: DeckStep[] } }) {
+/** "Dene": tuşu ya da otomasyonu şimdi çalıştır (tehlikeli tuşlar burada denenmez) */
+function KeyTest({ k, onRun }: { k: { label: string; steps: DeckStep[] }; onRun?: () => void }) {
   const [done, setDone] = useState(false);
   if (isDangerous(k) || !k.steps.length) return null;
   return (
     <Btn
       color={ACCENT.green}
       onClick={() => {
-        void runKey(k);
+        if (onRun) onRun();
+        else void runKey(k);
         setDone(true);
         window.setTimeout(() => setDone(false), 1200);
       }}
@@ -623,7 +643,7 @@ function AutoTab() {
         }
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_330px] gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-4">
           <Panel title={tt("Otomasyonların")} hint={list.length ? tt("{0} otomasyon · {1} açık", list.length, list.filter((a) => a.on).length) : tt("Henüz yok")}>
             <div className="space-y-2">
@@ -636,7 +656,7 @@ function AutoTab() {
             </div>
           </Panel>
           <Panel title={tt("Hazır örnekler")} hint={tt("Tek tıkla ekle, sonra istediğin gibi değiştir")} delay={0.04}>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
               {TEMPLATES.map((t) => {
                 const m = triggerMeta(t.when);
                 const Icon = DECK_ICONS[m.icon] ?? Zap;
@@ -660,7 +680,7 @@ function AutoTab() {
           <History />
         </div>
 
-        <Panel title={auto ? tt("Otomasyonu düzenle") : tt("Bir otomasyon seç")} right={auto && <KeyTest k={auto} />}>
+        <Panel title={auto ? tt("Otomasyonu düzenle") : tt("Bir otomasyon seç")} right={auto && <KeyTest k={auto} onRun={() => void runAutomationNow(auto)} />}>
           {auto ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -712,10 +732,11 @@ function AutoTab() {
   );
 }
 
-/** Liste satırı: tetikleyicinin simgesi, ad, "ne zaman → ne", aç/kapa */
+/** Liste satırı: tetikleyicinin simgesi, ad, "ne zaman → ne", şimdi çalıştır, aç/kapa */
 function AutoRow({ a, on, onClick }: { a: Automation; on: boolean; onClick: () => void }) {
   const m = triggerMeta(a.when);
   const Icon = DECK_ICONS[m.icon] ?? Zap;
+  const canRun = a.steps.length > 0 && autoSafe(a.steps);
   return (
     <motion.div
       layout
@@ -743,6 +764,19 @@ function AutoRow({ a, on, onClick }: { a: Automation; on: boolean; onClick: () =
         )}
       </span>
       {a.last && <span className="shrink-0 text-[10.5px] text-label-3">{when(a.last)}</span>}
+      {canRun && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void runAutomationNow(a);
+          }}
+          title={tt("Şimdi çalıştır")}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-90"
+          style={{ background: tintBg(m.color, 16), borderColor: tintBg(m.color, 38), color: tintText(m.color) }}
+        >
+          <Play size={11} fill="currentColor" />
+        </button>
+      )}
       <span onClick={(e) => e.stopPropagation()}>
         <Toggle on={a.on} onChange={(v) => saveAutomations(getAutomations().map((x) => (x.id === a.id ? { ...x, on: v } : x)))} color={m.color} />
       </span>

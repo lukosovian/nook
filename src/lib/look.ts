@@ -534,6 +534,7 @@ export const HALLOWEEN: { name: string; color: string; look: Look }[] = [
 export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
   today: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "flower", eyes: "sparkle" } },
   media: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "heart", head: "headphones" } },
+  whatsapp: { color: "#25D366", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", eyes: "sparkle", head: "antenna" } },
   argus: { color: "#2B8CFF", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "bead", glasses: "round" } },
   focus: { color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "sphere", texture: "smooth", eyes: "calm", head: "sprout" } },
   shelf: { color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush" } },

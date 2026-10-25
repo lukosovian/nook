@@ -32,6 +32,7 @@ import { ScratchPanel } from "./ScratchPanel";
 import { ShelfPanel } from "./ShelfPanel";
 import { StatsPanel } from "./StatsPanel";
 import { ClaudePanel } from "./ClaudePanel";
+import { WhatsAppPanel } from "./WhatsAppPanel";
 
 const PANEL: Record<Module, () => React.JSX.Element> = {
   chat: () => <ChatPanel />,
@@ -58,6 +59,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   settings: StudioRedirect,
   year: StudioRedirect,
   claude: ClaudePanel,
+  whatsapp: WhatsAppPanel,
   hum: HumPanel,
 };
 
@@ -124,9 +126,9 @@ export function Panels() {
         <motion.div
           key={tab}
           className="flex h-full min-h-0 flex-col"
-          initial={{ opacity: 0, y: 6, filter: "blur(3px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -4, filter: "blur(3px)" }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.16, ease: easeOut }}
         >
           {/* AnimatePresence initial={false} ilk çizimdeki sekmeye "giriş animasyonu yok" der ve Motion bunu
@@ -146,7 +148,7 @@ export function Panels() {
 }
 
 /** Yayındayken içeriği ekranda okunmasın diye buzlanan bölümler */
-const LIVE_HIDDEN = new Set<Tab>(["note", "clip", "notify", "chat", "calendar", "remind", "claude"]);
+const LIVE_HIDDEN = new Set<Tab>(["note", "clip", "notify", "chat", "calendar", "remind", "claude", "whatsapp"]);
 
 /** Yayın maskesi: hassas bölüm buzlu camın arkasında; "Bu sefer göster" ile o an açılır */
 function LiveVeil({ tab, children }: { tab: Tab; children: React.ReactNode }) {

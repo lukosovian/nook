@@ -87,7 +87,7 @@ object PcLink {
     }
 
     /** İmzalı GET; yanıt gövdesi ya da ulaşılamazsa null */
-    fun get(ctx: Context, path: String, timeoutMs: Int = 3000): String? {
+    fun get(ctx: Context, path: String, timeoutMs: Int = 3000, readTimeoutMs: Int = 8000): String? {
         val p = pairing(ctx) ?: return null
         val order = listOfNotNull(p.lastHost) + p.hosts.filter { it != p.lastHost }
         for (host in order) {
@@ -95,7 +95,7 @@ object PcLink {
                 val ts = System.currentTimeMillis().toString()
                 val c = URL("http://$host:${p.port}$path").openConnection() as HttpURLConnection
                 c.connectTimeout = timeoutMs
-                c.readTimeout = 8000
+                c.readTimeout = readTimeoutMs
                 c.setRequestProperty("x-nook-ts", ts)
                 c.setRequestProperty("x-nook-sig", sign(p.key, ts, "GET", path, ByteArray(0)))
                 val code = c.responseCode

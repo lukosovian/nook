@@ -9,7 +9,7 @@ import { useArgus, type ArgusItem } from "../lib/argus";
 import { usePowerTimer } from "../lib/powerTimer";
 import { useClaude, type ClaudeAsk } from "../lib/claude";
 
-const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "hum"];
+const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "whatsapp", "hum"];
 
 const ART =
   "data:image/svg+xml;utf8," +

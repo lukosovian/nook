@@ -1,6 +1,9 @@
 package app.nook.mobile
 
+import android.app.ActivityOptions
 import android.app.Notification
+import android.app.PendingIntent
+import android.app.RemoteInput
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -14,12 +17,15 @@ import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Telefona gelen bildirimleri PC'deki Nook'a iletir (Ayarlar › Bildirim erişimi'nde Nook'a izin verilince
@@ -28,6 +34,9 @@ import java.io.ByteArrayOutputStream
  *
  * Servis sürekli açık durduğu için otomasyonların telefon olaylarını da buradan gönderir: şarja takıldı /
  * çıkarıldı ve Wi-Fi'ye bağlandı (PC, isteğin ev ağından gelmesine bakıp "eve geldi"yi anlar).
+ *
+ * Mesajlaşma bildirimlerinin (WhatsApp, Telegram, Mesajlar…) içindeki RemoteInput yanıt eylemlerini saklar;
+ * PC'deki Nook'tan yazılan yanıtları doğrudan bildirimin kendi PendingIntent'i üzerinden gönderir.
  */
 class NookNotifService : NotificationListenerService() {
     private val icons = HashMap<String, String?>()
@@ -40,6 +49,7 @@ class NookNotifService : NotificationListenerService() {
     override fun onListenerConnected() {
         PcLink.prefs(this).edit().putBoolean("notifBound", true).apply()
         watchPhone()
+        if (replies.isNotEmpty()) startReplyPoller(applicationContext)
     }
 
     /** Android servisi bıraktı (güncellemeden sonra sık olur): yeniden bağlanmayı iste */
@@ -132,6 +142,9 @@ class NookNotifService : NotificationListenerService() {
             recent[sig] = now
         }
 
+        // Yanıtlanabilir bildirim (WhatsApp, Telegram, Mesajlar…): RemoteInput eylemini kaydet
+        val replyKey = captureReplyAction(pkg, title, n, now)
+
         val info = appInfo(sbn)
         val name = info?.let { packageManager.getApplicationLabel(it).toString() } ?: pkg
         remember(pkg, name)
@@ -141,8 +154,21 @@ class NookNotifService : NotificationListenerService() {
             .put("title", title.take(200))
             .put("text", text.take(1000))
             .put("at", now)
+        if (replyKey != null) json.put("replyKey", replyKey)
         icon(pkg, info)?.let { json.put("icon", it) }
         PcLink.sendNotification(this, json)
+        if (replyKey != null) startReplyPoller(applicationContext)
+    }
+
+    private fun captureReplyAction(pkg: String, title: String, n: Notification, now: Long): String? {
+        if (title.isEmpty()) return null
+        val direct = n.actions?.toList() ?: emptyList()
+        val wearable = runCatching { Notification.WearableExtender(n).actions }.getOrDefault(emptyList())
+        val act = (direct + wearable).firstOrNull { !it.remoteInputs.isNullOrEmpty() && it.actionIntent != null } ?: return null
+        val key = "$pkg|${title.take(200)}"
+        replies.entries.removeAll { now - it.value.at > REPLY_TTL_MS }
+        replies[key] = ReplyTarget(act.actionIntent, act.remoteInputs, now)
+        return key
     }
 
     @Suppress("DEPRECATION")
@@ -180,6 +206,72 @@ class NookNotifService : NotificationListenerService() {
     }
 
     companion object {
+        private const val REPLY_TTL_MS = 6 * 3600_000L
+
+        private class ReplyTarget(val intent: PendingIntent, val inputs: Array<RemoteInput>, @Volatile var at: Long)
+
+        private val replies = ConcurrentHashMap<String, ReplyTarget>()
+        private val polling = AtomicBoolean(false)
+
+        /**
+         * PC'den gelen bildirim yanıtlarını uzun-yoklama (long-poll) ile bekler ve bildirimin kendi
+         * RemoteInput PendingIntent'ini tetikleyerek mesajı gönderir.
+         */
+        private fun startReplyPoller(ctx: Context) {
+            if (!polling.compareAndSet(false, true)) return
+            Thread {
+                try {
+                    while (replies.isNotEmpty()) {
+                        val now = System.currentTimeMillis()
+                        replies.entries.removeAll { now - it.value.at > REPLY_TTL_MS }
+                        if (replies.isEmpty()) break
+                        val res = PcLink.get(ctx, "/v1/notify/replies", 3000, 26_000)
+                        if (res == null) {
+                            Thread.sleep(5000)
+                            continue
+                        }
+                        val arr = runCatching { JSONObject(res).optJSONArray("replies") }.getOrNull() ?: continue
+                        for (i in 0 until arr.length()) {
+                            val item = arr.optJSONObject(i) ?: continue
+                            val key = item.optString("replyKey")
+                            val text = item.optString("text").trim()
+                            if (key.isEmpty() || text.isEmpty()) continue
+                            sendRemoteReply(ctx, key, text)
+                        }
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    polling.set(false)
+                    if (replies.isNotEmpty()) startReplyPoller(ctx)
+                }
+            }.apply { isDaemon = true; start() }
+        }
+
+        private fun sendRemoteReply(ctx: Context, key: String, text: String) {
+            val chatTitle = key.substringAfter("|")
+            val target = replies[key]
+                ?: replies.entries.firstOrNull { it.key.substringAfter("|").equals(chatTitle, ignoreCase = true) }?.value
+                ?: return
+            runCatching {
+                val fillIn = Intent().addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                val bundle = Bundle()
+                for (ri in target.inputs) bundle.putCharSequence(ri.resultKey, text)
+                RemoteInput.addResultsToIntent(target.inputs, fillIn, bundle)
+                if (Build.VERSION.SDK_INT >= 34) {
+                    runCatching {
+                        val opts = ActivityOptions.makeBasic()
+                        opts.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                        target.intent.send(ctx, 0, fillIn, null, null, null, opts.toBundle())
+                    }.onFailure {
+                        target.intent.send(ctx, 0, fillIn)
+                    }
+                } else {
+                    target.intent.send(ctx, 0, fillIn)
+                }
+                target.at = System.currentTimeMillis()
+            }
+        }
+
         /**
          * Uygulama güncellenince Android bildirim dinleyicisini çoğu zaman yeniden bağlamıyor: izin açık
          * görünür ama hiçbir bildirim gelmez (telefon yeniden başlayana kadar). Uygulama her açılışta ister.

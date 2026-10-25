@@ -8,6 +8,7 @@ import { Island } from "./components/Island";
 import { useUpdateCheck } from "./lib/update";
 import { useArgusDetect, useArgusFeed } from "./lib/argus";
 import { useClaudeFeed } from "./lib/claude";
+import { useWhatsAppFeed } from "./lib/whatsapp";
 import { useAlarms } from "./hooks/useAlarms";
 import { useTray } from "./hooks/useTray";
 import { useHum } from "./hooks/useHum";
@@ -79,6 +80,7 @@ export default function App() {
   useStatsFeed();
   useDevicesFeed();
   useClaudeFeed();
+  useWhatsAppFeed();
   useSupportersFeed();
   useFullscreenFeed();
   usePrivacyFeed();

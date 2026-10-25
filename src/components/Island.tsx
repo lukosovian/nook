@@ -8,7 +8,7 @@ import { boostFrames } from "../lib/frameCap";
 import { useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
 import { useSoundCard } from "../lib/soundCard";
-import { isPrimary } from "../lib/bridge";
+import { clearBackground, isPrimary } from "../lib/bridge";
 import { FACE, ISLAND, ISLAND_TOP, mascotPose, tourPose, viewOf } from "../lib/layout";
 import { spring } from "../lib/motion";
 import { startTour } from "../lib/tour";
@@ -52,7 +52,13 @@ const SHADOW = "none";
 const CLEAN = { x: 0, rotate: 0, skewX: 0, filter: "none" };
 
 function jelly(mood: Mood, away: boolean): TargetAndTransition {
-  return { ...CLEAN, ...jellyPose(mood, away) };
+  const pose = jellyPose(mood, away);
+  return {
+    ...CLEAN,
+    ...pose,
+    // filter (drop-shadow / brightness / blur) yay ile "none"a enterpole edilemez; anında sıfırlanmalı
+    transition: { ...(pose.transition as object), filter: { duration: 0 } },
+  };
 }
 
 function jellyPose(mood: Mood, away: boolean): TargetAndTransition {
@@ -112,11 +118,13 @@ const measure = (() => {
     return ctx.measureText(text).width;
   };
 })();
-function toastFit(title?: string, detail?: string) {
+function toastFit(title?: string, detail?: string, replyable?: boolean) {
   if (!title) return ISLAND.toast.width;
   const text = Math.max(measure(title, "500 13px 'Inter Variable', sans-serif"), detail ? measure(detail, "11px 'Inter Variable', sans-serif") : 0);
-  // Solda Nook (52) + sağda avatar ve boşluklar (~56)
-  return Math.round(Math.min(580, Math.max(ISLAND.toast.width, 52 + text + 60)));
+  // Solda Nook (52) + sağda avatar ve boşluklar (~56); yanıtlanabilir bildirimlerde yanıt kutusu/düğmeleri için ek pay
+  const extra = replyable ? 190 : 60;
+  const minW = replyable ? 440 : ISLAND.toast.width;
+  return Math.round(Math.min(580, Math.max(minW, 52 + text + extra)));
 }
 
 export function Island() {
@@ -191,7 +199,7 @@ export function Island() {
   const lookTab = useNook((s) => s.tab === "look");
   // Kapalı ada bir işin kapsülüne dönüşür (müzik, odak, Claude…); iki iş varsa yanda baloncuk
   const cap = useCapsule(mode === "collapsed");
-  const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail));
+  const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail, !!(s.toasts[0]?.replyKey || s.toasts[0]?.whatsappChat)));
   const width = cap ? cap.width : mode === "toast" ? toastWidth : shape.width;
   const height = cap ? cap.height : shape.height;
   const radius = cap ? Math.round(cap.height * 0.45) : shape.radius;
@@ -209,6 +217,13 @@ export function Island() {
   const ref = useRef<HTMLDivElement>(null);
   useHitRect(ref);
   useSelectHold();
+
+  // Ada küçüldüğünde ya da ekran geçişi bittiğinde şeffaf WebView2 yüzeyini tazele (kenar izi kalmasın)
+  useEffect(() => {
+    if (mode !== "collapsed" || move) return;
+    const t = window.setTimeout(() => void clearBackground().catch(() => {}), 550);
+    return () => window.clearTimeout(t);
+  }, [mode, move]);
 
   // Ses/parlaklık her adımda: Nook bara doğru dürtüp (ya da geri çekip) yerine döner
   const nudge = useAnimationControls();
@@ -310,6 +325,8 @@ export function Island() {
           </AnimatePresence>
           <PrivacyDots mode={mode} />
           <ContextMenu bounds={ref} refreshOnly={mode === "gate"} />
+          {/* Yuvarlak sağ/sol alt köşelerde iç katmanların (kart, kenarlık, parıltı) dışarı sızmasını önleyen saf siyah iç çerçeve */}
+          <div className="pointer-events-none absolute inset-0 z-30 rounded-[inherit]" style={{ boxShadow: "inset 0 0 0 1.5px #000000" }} />
 
           <AnimatePresence>
             {mode === "osd" && <OsdView key="osd" />}
@@ -366,10 +383,13 @@ function Halo({
   color: string | null;
   transition: object;
 }) {
-  // Yalnızca bir durum varken (renkli). Varsayılan beyaz parıltı kaldırıldı: adanın arkasında
-  // beyaz bir ışık yanıyormuş gibi görünüyordu.
-  const size = FACE * pose.scale * 2.8;
+  // Yalnızca bir durum varken (renkli). Varsayılan beyaz parıltı ve CSS blur katmanı kaldırıldı:
+  // şeffaf pencerede GPU blur katmanı adanın yuvarlak sağ/sol alt köşelerinden dışarı renk/beyaz çizgi sızdırıyordu.
+  const size = FACE * pose.scale * 2.6;
   const visible = color ? 1 : 0;
+  const lastColor = useRef(color);
+  if (color) lastColor.current = color;
+  const activeColor = color ?? lastColor.current;
   return (
     <motion.div
       className="pointer-events-none absolute z-[5] rounded-full"
@@ -380,11 +400,8 @@ function Halo({
         width: size,
         height: size,
         opacity: visible,
-        background: `radial-gradient(circle, ${color ?? "rgba(160,190,255,0.55)"} 0%, transparent 62%)`,
+        background: activeColor ? `radial-gradient(circle, ${activeColor} 0%, transparent 58%)` : "none",
       }}
-      // mix-blend-mode yok: şeffaf pencerede screen karışımı adanın dışına mavi-beyaz ışık sızdırıyordu
-      // (ada zaten siyah, siyah üstünde screen ile normal çizim aynı görünür)
-      style={{ filter: "blur(6px)" }}
       transition={{ ...transition, opacity: { duration: 0.35 }, background: { duration: 0.35 } }}
     />
   );

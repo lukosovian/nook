@@ -21,23 +21,25 @@ import { useNook, type Expression, type Status } from "../../store/nook";
 import { Eye, eyesFor } from "./Eye";
 import { Hands } from "./Hands";
 import { Mouth } from "./Mouth";
-import { Props, type SleepStyle } from "./Props";
+import { Props, type FeedStyle, type SleepStyle } from "./Props";
 import { statusColor } from "../../lib/palette";
 
 /** Durum renkleri (rozet, alt ton, ada parıltısı) — renk körlüğü paletine göre */
 export const STATUS_COLOR = new Proxy({} as Record<Status, string>, { get: (_, k) => statusColor(k as Status) });
 
 const sec = (ms: number) => ms / 1000;
-/** Dosya gelince yüz kutuya dönüşür (seçilen gövde ne olursa olsun). */
+/** Kutu üslubunda ("box") yüz kutuya dönüşür; diğer üsluplarda 3B gövde korunur. */
 const BOX_SHAPE: Partial<Record<Expression, BodyShape>> = {
   hungry: { width: 26, height: 23, borderRadius: radii([7, 7, 7, 7]) },
   chewing: { width: 26, height: 22, borderRadius: radii([7, 7, 7, 7]) },
 };
 
-/** CSS gövde (3B resim yoksa): gerinirken basılıp yayılır, uyurken biraz çöker. */
-function bodyFor(expression: Expression): BodyShape {
-  const box = BOX_SHAPE[expression];
-  if (box) return box;
+/** CSS gövde (3B resim yoksa ya da kutu üslubundaysa): gerinirken basılıp yayılır, uyurken biraz çöker. */
+function bodyFor(expression: Expression, isBox = false): BodyShape {
+  if (isBox) {
+    const box = BOX_SHAPE[expression];
+    if (box) return box;
+  }
   if (expression === "stretch") return roundBody(28, 21);
   if (expression === "sleepy") return roundBody(24, 23);
   return roundBody(FACE);
@@ -47,6 +49,86 @@ function bodyFor(expression: Expression): BodyShape {
 const IMG_SQUASH: Partial<Record<Expression, { scaleX: number; scaleY: number }>> = {
   stretch: { scaleX: 1.14, scaleY: 0.86 },
   sleepy: { scaleX: 1, scaleY: 0.96 },
+};
+
+/** Dosya bırakılırken seçilen üsluba göre bütün yüzün/gövdenin hareketleri */
+const FEED_BODY: Record<FeedStyle, { hungry: TargetAndTransition; chewing: TargetAndTransition }> = {
+  chomp: {
+    hungry: { x: 0, y: -0.6, rotate: 0, scaleX: 1.04, scaleY: 0.96 },
+    chewing: {
+      x: 0,
+      y: [0, 1, -0.8, 0.8, -0.5, 0],
+      rotate: [0, -2.5, 2.5, -2, 0],
+      scaleX: [1, 1.14, 0.92, 1.1, 0.96, 1],
+      scaleY: [1, 0.84, 1.08, 0.88, 1.04, 1],
+      transition: { duration: 0.85, ease: "easeInOut" },
+    },
+  },
+  vacuum: {
+    hungry: {
+      x: 0,
+      y: [0, -0.8, 0],
+      rotate: 0,
+      scaleX: [0.96, 1.02, 0.96],
+      scaleY: [1.04, 0.98, 1.04],
+      transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" },
+    },
+    chewing: {
+      x: 0,
+      y: [0, -1.5, 1.2, 0],
+      rotate: 0,
+      scaleX: [1, 1.2, 1.16, 0.94, 1],
+      scaleY: [1, 1.16, 1.14, 0.92, 1],
+      transition: { duration: 0.85, times: [0, 0.38, 0.58, 0.82, 1], ease: "easeInOut" },
+    },
+  },
+  catch: {
+    hungry: {
+      x: 0,
+      y: [1.4, 2.2, 1.4],
+      rotate: 0,
+      scaleX: 1.07,
+      scaleY: 0.91,
+      transition: { duration: 0.6, repeat: Infinity, ease: "easeInOut" },
+    },
+    chewing: {
+      x: 0,
+      y: [1.5, -6.5, -5.5, 1, 0],
+      rotate: [0, 0, 360, 360, 360],
+      scaleX: [1.06, 0.94, 1, 1.06, 1],
+      scaleY: [0.92, 1.08, 1, 0.94, 1],
+      transition: { duration: 0.88, times: [0, 0.25, 0.72, 0.88, 1], ease: "easeInOut" },
+    },
+  },
+  folder: {
+    hungry: {
+      x: 0,
+      y: 0.4,
+      rotate: [-2, 1, -2],
+      scaleX: 1,
+      scaleY: 1,
+      transition: { duration: 0.9, repeat: Infinity, ease: "easeInOut" },
+    },
+    chewing: {
+      x: 0,
+      y: [0.4, -1, 1.8, 0],
+      rotate: [0, -4, 3, 0],
+      scaleX: [1, 0.97, 1.05, 1],
+      scaleY: [1, 1.03, 0.95, 1],
+      transition: { duration: 0.85, times: [0, 0.3, 0.5, 1], ease: "easeInOut" },
+    },
+  },
+  box: {
+    hungry: { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 },
+    chewing: {
+      x: 0,
+      rotate: 0,
+      scaleX: [1, 1.1, 0.96, 1.05, 1],
+      scaleY: [1, 0.86, 1.04, 0.96, 1],
+      y: 0,
+      transition: { duration: 0.8 },
+    },
+  },
 };
 
 /** 3B gövde resminin ekrandaki boyu (px) ve çizim çözünürlüğü (büyük adada da keskin kalsın) */
@@ -237,13 +319,26 @@ interface NookProps {
   bounds?: RefObject<HTMLElement | null>;
   /** 3B gövdenin çizim çözünürlüğü (telefonun GPU'su büyük çizimde bozuluyor, orada daha küçük) */
   res?: number;
+  /** Dosya bırakma üslubu (verilmezse her seferinde rastgele değişir) */
+  feedStyle?: FeedStyle;
 }
 
-export function Nook({ expression, status = null, grooving = false, color = "#FFFFFF", look: wanted = DEFAULT_LOOK, bounds, res = IMG_RES }: NookProps) {
+export function Nook({
+  expression,
+  status = null,
+  grooving = false,
+  color = "#FFFFFF",
+  look: wanted = DEFAULT_LOOK,
+  bounds,
+  res = IMG_RES,
+  feedStyle: feedStyleProp,
+}: NookProps) {
   const ref = useRef<HTMLDivElement>(null);
   const look = useLook(ref, !NO_LOOK.has(expression));
   const lid = useBlink(BLINKS.has(expression));
   const press = useGrab();
+  const autoFeedStyle = useFeedStyle(expression);
+  const feedStyle = feedStyleProp ?? autoFeedStyle;
 
   // --- 3B kafa çevirme: gözler kenara kayar ve kısalır, ışık ters yöne gider
   const fresh = useBodyImage(wanted, color, res);
@@ -253,8 +348,9 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   if (fresh) shownRef.current = { wear: wanted, img: fresh };
   const wear = fresh ? wanted : shownRef.current?.wear ?? wanted;
   const img = fresh ?? shownRef.current?.img ?? null;
-  const isBox = expression === "hungry" || expression === "chewing";
-  /** 3B gövde görünüyor (kutuya dönüşünce CSS kutu devralır) */
+  const isFeeding = expression === "hungry" || expression === "chewing";
+  const isBox = isFeeding && feedStyle === "box";
+  /** 3B gövde görünüyor (yalnızca "box" üslubunda CSS kutu devralır) */
   const solid = !!img && !isBox;
   /** Gözlük resmin içinde sabit: gözler camın dışına kaymasın diye az oynar */
   const glassesOn = solid && lensOn(wear);
@@ -298,7 +394,22 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
   const rightSX = useTransform([rightScaleX, attentionScale], ([s, a]: number[]) => s * a);
 
   const [left, right, shineL, shineR] = eyesFor(expression, wear.eyes);
-  const body = bodyFor(expression);
+  const body = bodyFor(expression, isBox);
+  const bodyAnim = wave
+    ? DANCES[dance]
+    : expression === "sleepy" && sleepStyle === "nap"
+      ? NAP
+      : expression === "hungry" || expression === "chewing"
+        ? FEED_BODY[feedStyle][expression]
+        : BODY[expression];
+  const eyeOffset =
+    expression === "hungry"
+      ? feedStyle === "catch"
+        ? { x: 0, y: -2 }
+        : feedStyle === "folder"
+          ? { x: 0, y: 1.8 }
+          : { x: 0, y: -1 }
+      : (EYE_OFFSET[expression] ?? { x: 0, y: 0 });
   // Balon şişirerek uyurken "z" çıkmaz
   const floater = expression === "sleepy" && sleepStyle === "bubble" ? undefined : FLOATER[expression];
   const tint = status ? STATUS_COLOR[status] : null;
@@ -326,9 +437,9 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
         className="relative"
         style={{ width: FACE, height: FACE }}
         initial={false}
-        animate={wave ? DANCES[dance] : expression === "sleepy" && sleepStyle === "nap" ? NAP : BODY[expression]}
+        animate={bodyAnim}
       >
-        <Hands expression={expression} dance={wave ? dance : null} color={color} />
+        <Hands expression={expression} dance={wave ? dance : null} color={color} feedStyle={feedStyle} />
 
         {/* 3B gövde: biçim, doku ve aksesuarlar tek resimde (lib/nook3d) */}
         {img && (
@@ -394,7 +505,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
 
           {/* Gözler */}
           <motion.div className="absolute inset-0" style={{ y: eyesY }}>
-            <motion.div className="absolute inset-0" initial={false} animate={damp(EYE_OFFSET[expression] ?? { x: 0, y: 0 }, glassesOn ? 0.25 : 1)} transition={spring.eye}>
+            <motion.div className="absolute inset-0" initial={false} animate={damp(eyeOffset, glassesOn ? 0.25 : 1)} transition={spring.eye}>
               <motion.div className="absolute inset-0" initial={false} animate={{ opacity: wave || hideEyes ? 0 : 1 }} transition={{ duration: 0.15 }}>
                 {/* Göz bandı sol gözü örter */}
                 {!(solid && wear.glasses === "eyepatch") && <Eye shape={left} shine={shineL} x={leftX} scaleX={leftSX} scaleY={scaleYL} />}
@@ -402,7 +513,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
               </motion.div>
             </motion.div>
           </motion.div>
-          <Mouth expression={expression} />
+          <Mouth expression={expression} feedStyle={feedStyle} />
 
           {/* Gözlerin yerine geçen çizimler gözlerin hizasında; gözlükte camlara sığsın */}
           <div className="pointer-events-none absolute inset-0" style={{ transform: `translateY(${eyeY - 1.2}px) scale(${glassesOn ? 0.7 : 1})` }}>
@@ -416,7 +527,7 @@ export function Nook({ expression, status = null, grooving = false, color = "#FF
         </motion.div>
 
         {/* Eşyalar: yorgan, kitap, kamp ateşi, şemsiye, kâğıt-kalem, büyüteç… */}
-        <Props expression={expression} sleepStyle={sleepStyle} />
+        <Props expression={expression} sleepStyle={sleepStyle} feedStyle={feedStyle} />
 
         {/* Su bardağı: içerken ağzına gider, eğilir, su azalır */}
         <AnimatePresence>{expression === "drink" && <Glass key="glass" />}</AnimatePresence>
@@ -577,6 +688,7 @@ function damp(t: TargetAndTransition, k: number): TargetAndTransition {
 /** Uyurken bir yana devrilmiş şekerleme */
 const NAP: TargetAndTransition = { x: 0, rotate: [-16, -18, -16], y: [1.5, 2.2, 1.5], transition: { duration: 3.6, repeat: Infinity, ease: "easeInOut" } };
 const SLEEP_STYLES: SleepStyle[] = ["blanket", "bubble", "nap"];
+export const FEED_STYLES: FeedStyle[] = ["chomp", "vacuum", "catch", "folder", "box"];
 
 /** Her uykuya dalışta farklı bir uyku: yorgan çeker, burnundan balon şişirir ya da yana devrilir. */
 function useSleepStyle(expression: Expression): SleepStyle {
@@ -590,6 +702,29 @@ function useSleepStyle(expression: Expression): SleepStyle {
     if (expression === "sleepy" && prev.current !== "sleepy" && !(import.meta.env.DEV && location.search.includes("sleep="))) {
       setStyle((cur) => {
         const others = SLEEP_STYLES.filter((s) => s !== cur);
+        return others[Math.floor(Math.random() * others.length)];
+      });
+    }
+    prev.current = expression;
+  }, [expression]);
+  return style;
+}
+
+/** Her dosya gelişinde farklı bir yutma/yakalama hareketi: lokma, vakum, havada kapma, klasöre damgalama ya da koli. */
+function useFeedStyle(expression: Expression): FeedStyle {
+  const [style, setStyle] = useState<FeedStyle>(() =>
+    import.meta.env.DEV && new URLSearchParams(location.search).get("feed")
+      ? (new URLSearchParams(location.search).get("feed") as FeedStyle)
+      : FEED_STYLES[Math.floor(Math.random() * FEED_STYLES.length)],
+  );
+  const prev = useRef(expression);
+  useEffect(() => {
+    const entering =
+      (expression === "hungry" && prev.current !== "hungry") ||
+      (expression === "chewing" && prev.current !== "hungry" && prev.current !== "chewing");
+    if (entering && !(import.meta.env.DEV && location.search.includes("feed="))) {
+      setStyle((cur) => {
+        const others = FEED_STYLES.filter((s) => s !== cur);
         return others[Math.floor(Math.random() * others.length)];
       });
     }

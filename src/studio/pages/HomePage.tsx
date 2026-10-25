@@ -4,11 +4,11 @@
  */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Droplet, Heart, HeartHandshake, Monitor, Music, Shirt, Zap, type LucideIcon } from "lucide-react";
+import { ArrowRight, Droplet, Heart, HeartHandshake, Monitor, Music, Shirt, type LucideIcon } from "lucide-react";
 import { normalizeColor, normalizeLook, useNookName } from "../../lib/look";
 import { latestNote } from "../../lib/notes";
 import { studioGo } from "../../lib/studio";
-import { DECK_ICONS, useDeck } from "../../lib/deck";
+import { keyVisual, useDeck, useQuickState } from "../../lib/deck";
 import { pickGreeting } from "../../lib/greet";
 import { dayKey, EMPTY_DAY, isSleeping, SULK_BELOW, useNook, type DayStats } from "../../store/nook";
 import { NookFigure } from "../../components/mascot/Figure";
@@ -45,6 +45,7 @@ export function HomePage() {
   const g = weekGrade(days);
   const note = latestNote();
   const deck = useDeck();
+  const quick = useQuickState();
   const h = new Date().getHours();
   const greet = h < 5 ? tt("İyi geceler") : h < 12 ? tt("Günaydın") : h < 18 ? tt("Merhaba") : tt("İyi akşamlar");
   const mood = asleep ? tt("Uykuda") : affection < SULK_BELOW ? tt("Biraz küs") : affection < 50 ? tt("Durgun") : affection < 80 ? tt("Keyfi yerinde") : tt("Çok mutlu");
@@ -53,7 +54,7 @@ export function HomePage() {
     <Page wide>
       <div className="mb-4 grid grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)] gap-4">
         {/* Kahraman: selam balonlu Nook */}
-        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={SPRING} className="nook-card relative z-10 flex items-center gap-7 rounded-[28px] px-8 py-7">
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={SPRING} className="nook-card relative z-10 flex min-w-0 items-center gap-5 rounded-[28px] px-5 py-6 xl:gap-7 xl:px-8 xl:py-7">
           {/* Işıklar kartın içinde kalır; arama sonuçları kartın dışına taşabilsin diye kartın kendisi kesmez */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
             <div className="absolute -left-24 -top-28 h-[380px] w-[440px] rounded-full opacity-70" style={{ background: `radial-gradient(circle, ${tintBg(color, 42)}, transparent 65%)` }} />
@@ -70,23 +71,23 @@ export function HomePage() {
             <p className="text-[13px] font-semibold" style={{ color: tintText(ACCENT.pink) }}>
               {new Date().toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" })}
             </p>
-            <h1 className="mt-1 text-[34px] font-extrabold leading-[1.05] tracking-[-0.03em] text-label">
+            <h1 className="mt-1 truncate text-[26px] font-extrabold leading-[1.08] tracking-[-0.03em] text-label xl:text-[34px]">
               {greet}
               {user ? `, ${user}` : ""}
             </h1>
             <p className="mt-2 max-w-[440px] text-[14px] leading-relaxed text-label-2">
               {today.active ? tt("{0} bugün {1} seninle.", name, hm(today.active)) : tt("{0} seni bekliyordu.", name)}
             </p>
-            <div className="mt-3 flex items-center gap-2.5">
+            <div className="mt-3 flex min-w-0 items-center gap-2.5">
               <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold" style={{ background: tintBg(ACCENT.pink, 16), color: tintText(ACCENT.pink) }}>
                 <Heart size={11} fill="currentColor" /> {mood}
               </span>
-              <div className="h-[6px] w-[160px] min-w-0 overflow-hidden rounded-full bg-white/[0.07]" title={tt("Keyfi %{0}", Math.round(affection))}>
+              <div className="h-[6px] min-w-[48px] max-w-[160px] flex-1 overflow-hidden rounded-full bg-white/[0.07]" title={tt("Keyfi %{0}", Math.round(affection))}>
                 <motion.span className="block h-full rounded-full" initial={{ width: 0 }} animate={{ width: `${Math.max(3, affection)}%` }} transition={{ duration: 0.8, delay: 0.2 }} style={{ background: `linear-gradient(90deg, ${ACCENT.pink}, ${ACCENT.yellow})` }} />
               </div>
             </div>
             {/* Arama burada (sonuçlar altında açılır); yanında görünüm */}
-            <div className="mt-5 flex items-center gap-2">
+            <div className="mt-5 flex min-w-0 items-center gap-2">
               <HomeSearch />
               <Action icon={Shirt} color={ACCENT.pink} title={tt("Görünümü değiştir")} onClick={() => studioGo("look")} />
             </div>
@@ -145,16 +146,16 @@ export function HomePage() {
         <Panel title={tt("Kısayol tuşların")} hint={tt("{0} tuş", deck.length)} delay={0.18} right={<Arrow onClick={() => studioGo("keys")} />}>
           <div className="grid grid-cols-4 gap-1.5">
             {deck.slice(0, 8).map((k) => {
-              const Icon = DECK_ICONS[k.icon] ?? Zap;
+              const { Icon, color: kColor, muted } = keyVisual(k, quick);
               return (
                 <span
                   key={k.id}
-                  title={k.label}
+                  title={muted ? tt("{0} kapalı", k.label) : k.label}
                   className="flex h-12 flex-col items-center justify-center gap-0.5 rounded-[12px] border"
-                  style={{ background: `linear-gradient(150deg, ${tintBg(k.color, 14)}, ${tintBg(k.color, 4)})`, borderColor: tintBg(k.color, 26), color: tintText(k.color) }}
+                  style={{ background: `linear-gradient(150deg, ${tintBg(kColor, 14)}, ${tintBg(kColor, 4)})`, borderColor: tintBg(kColor, 26), color: tintText(kColor) }}
                 >
                   <Icon size={15} strokeWidth={2.3} />
-                  <span className="w-full truncate px-1 text-center text-[9px] font-semibold">{k.label}</span>
+                  <span className="w-full truncate px-1 text-center text-[9px] font-semibold">{muted ? tt("{0} kapalı", k.label) : k.label}</span>
                 </span>
               );
             })}
