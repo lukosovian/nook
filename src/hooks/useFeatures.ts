@@ -33,6 +33,7 @@ import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
 import { logDiaryMinute } from "../lib/diary";
 import { isWhatsAppNotif, useWhatsApp } from "../lib/whatsapp";
+import { useHabits } from "../lib/habits";
 
 /** Odak sayacı: faz bitince sıradakine geçer. */
 export function useFocusTimer() {
@@ -68,6 +69,9 @@ export function waterInfo() {
   };
 }
 
+let stretchMinutes = 0;
+let eyeMinutes = 0;
+
 /** "İçtim": Nook da bardağıyla içer, sonra hatırlatma kapanır. Hatırlatma yokken de (Bugün'den) kaydedilebilir. */
 export function drankWater() {
   const s = useNook.getState();
@@ -84,25 +88,77 @@ export function drankWater() {
   }, 2400);
 }
 
-/** "Sonra": 15 dakika sonra yeniden hatırlat. */
-export function snoozeWater() {
+/** "Sonra": Hatırlatmayı ertele (Su: 15 dk, Göz: 10 dk, Esneme: 45 dk). */
+export function snoozeReminder(kind?: "water" | "eye" | "stretch") {
   const s = useNook.getState();
-  waterMinutes = Math.max(0, s.settings.waterEvery - SNOOZE_MIN);
+  const k = kind ?? s.reminder?.kind ?? "water";
+  if (k === "water") {
+    waterMinutes = Math.max(0, s.settings.waterEvery - SNOOZE_MIN);
+  } else if (k === "eye") {
+    eyeMinutes = 10;
+  } else if (k === "stretch") {
+    stretchMinutes = 45;
+  }
   s.setReminder(null);
   playAntic("nod");
+}
+
+/** "Sonra": 15 dakika sonra yeniden hatırlat. */
+export function snoozeWater() {
+  snoozeReminder("water");
+}
+
+/** Göz Dinlendirme tamamlandı (20-20-20 kuralı) */
+export function doneEye(autoFinished?: boolean) {
+  const s = useNook.getState();
+  eyeMinutes = 0;
+  useHabits.getState().completeHabit("eyes");
+  s.care(4);
+  playAntic("wink");
+  if (!autoFinished) {
+    s.setReminder(null);
+    playAntic("love");
+  } else {
+    window.setTimeout(() => {
+      useNook.getState().setReminder(null);
+      playAntic("love");
+    }, 1800);
+  }
+}
+
+/** Duruş & Esneme tamamlandı */
+export function doneStretch() {
+  const s = useNook.getState();
+  stretchMinutes = 0;
+  s.setReminder({ kind: "stretch", phase: "stretching" });
+  useHabits.getState().completeHabit("stretch");
+  s.care(4);
+  playAntic("stretch");
+  window.setTimeout(() => {
+    useNook.getState().setReminder(null);
+    playAntic("love");
+  }, 2400);
+}
+
+/** Doğrudan adada hatırlatıcı kartını tetikler (deneme / başlat için) */
+export function triggerReminder(kind: "water" | "eye" | "stretch") {
+  const s = useNook.getState();
+  s.setReminder({ kind, phase: "due" });
+  if (kind === "eye") playAntic("wink");
+  else if (kind === "stretch") playAntic("stretch");
+  else playAntic("surprised");
 }
 
 /**
  * Dakikada bir: bugünün istatistiği (Karne) ve mola hatırlatıcıları.
  *  - 20-20-20: 20 dk kesintisiz kullanımda "20 sn uzağa bak"
- *  - Su: ayardaki aralıkla; cevaplanana kadar adada durur (bilgisayar başında değilken ya da
- *    tam ekrandayken kaybolmaz — dönünce seni bekler)
- * Bilgisayar boştaysa (uyku) göz sayacı sıfırlanır; oyunda/tam ekranda göz hatırlatması yapılmaz.
+ *  - Su: ayardaki aralıkla; cevaplanana kadar adada durur
+ *  - Duruş & Esneme: 90 dakikada bir adada sevimli esneme kartı
+ * Bilgisayar boştaysa (uyku) sayaçlar sıfırlanır; oyunda/tam ekranda hatırlatma yapılmaz.
  */
 export function useDayTracker() {
   useEffect(() => {
     if (!isPrimary) return;
-    let eye = 0;
     const t = window.setInterval(() => {
       const s = useNook.getState();
       const away = isSleeping(s);
@@ -117,21 +173,37 @@ export function useDayTracker() {
       void logDiaryMinute(away);
 
       if (away) {
-        eye = 0;
+        eyeMinutes = 0;
         return;
       }
-      eye += 1;
+      eyeMinutes += 1;
       // Hatırlatma ekranda beklerken sayaç ilerlemez
-      if (!s.reminder) waterMinutes += 1;
+      if (!s.reminder) {
+        waterMinutes += 1;
+        stretchMinutes += 1;
+      }
       const resting = !!s.focus && s.focus.phase !== "work";
       const quiet = s.fullscreen || !!s.ringing || resting || isQuiet(s);
-      if (s.settings.eyeBreak && eye >= 20) {
-        eye = 0;
-        if (!quiet) {
-          s.pushToast({ kind: "eye", title: tt("Göz molası"), detail: tt("20 saniye boyunca uzağa bak"), ms: 7000 });
-          playAntic("suspicious");
+
+      // Göz Dinlendirme Hatırlatması (20-20-20 Kuralı)
+      if (s.settings.eyeBreak && eyeMinutes >= 20) {
+        eyeMinutes = 0;
+        if (!quiet && !s.reminder) {
+          s.setReminder({ kind: "eye", phase: "due" });
+          playAntic("wink");
         }
       }
+
+      // Duruş & Esneme Hatırlatması (90 dakikada bir)
+      if (stretchMinutes >= 90) {
+        stretchMinutes = 0;
+        if (!quiet && !s.reminder) {
+          s.setReminder({ kind: "stretch", phase: "due" });
+          playAntic("stretch");
+        }
+      }
+
+      // Su Hatırlatması
       if (s.settings.waterEvery > 0 && waterMinutes >= s.settings.waterEvery && !s.reminder && !isQuiet(s)) {
         waterMinutes = 0;
         s.setReminder({ kind: "water", phase: "due" });
@@ -154,7 +226,17 @@ export function useNotificationFeed() {
       s.track({ notifs: 1 });
       const focusing = s.settings.focusMute && s.focus?.phase === "work" && s.focus.endsAt !== null;
       if (s.fullscreen || focusing || n.quiet) return;
+
+      // Kullanıcının kendi gönderdiği mesajlar ("Sen: ...") bildirim kartı oluşturmasın
+      const rawBody = (n.body ?? "").trim();
+      const rawTitle = (n.title ?? "").trim();
+      // Kullanıcının kendi gönderdiği mesajları (Sen: / Siz: / You:) bildirim kartı olarak fırlatma
+      if (/^(sen|siz|you)\s*:/i.test(rawBody) || /^(sen|siz|you)\s*:/i.test(rawTitle)) return;
+
       const wa = isWhatsAppNotif(n);
+      // WhatsApp bildirim kartları kapatıldıysa / sessize alındıysa adada kart çıkarma
+      if (wa && s.settings.whatsappNotify === false) return;
+
       const replyKey = n.replyKey ?? null;
       s.pushToast({
         kind: "notify",

@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Download, Plus, Sparkles, X, type LucideIcon } from "lucide-react";
-import { drankWater } from "../../hooks/useFeatures";
+import { useHabits, getTodayWater } from "../../lib/habits";
 import { generateOnce, pickQuickModel } from "../../lib/ai";
 import { systemPrompt } from "../../lib/aiTools";
 import { clock } from "../../lib/alarm";
@@ -355,7 +355,7 @@ function useTiles(): TileData[] {
   const y = new Date(now);
   y.setDate(y.getDate() - 1);
   const yesterday = s.days[dayKey(y)];
-  const water = s.days[dayKey()]?.water ?? 0;
+  const water = getTodayWater();
   const night = s.notifications.filter((n) => n.at > Date.now() - 12 * 3600_000).length;
   const wd = now.getDay();
   const devs = [s.devices?.headset && { name: tt("Kulaklık"), pct: s.devices.headset.percent }, s.devices?.mouse && { name: tt("Mouse"), pct: s.devices.mouse.percent }].filter(
@@ -371,7 +371,7 @@ function useTiles(): TileData[] {
       eyes: alarms.length ? "open" : "closed",
       open: "alarm",
     },
-    { label: tt("Su"), value: water ? tt("{0} bardak içtin", water) : tt("Henüz içmedin"), color: ACCENT.blue, eyes: water ? "happy" : "side", action: drankWater },
+    { label: tt("Su"), value: water ? tt("{0} bardak içtin", water) : tt("Henüz içmedin"), color: ACCENT.blue, eyes: water ? "happy" : "side", action: () => useHabits.getState().drinkGlass() },
     {
       label: tt("Dün"),
       value: [yesterday?.focus && `${mins(yesterday.focus)} odak`, yesterday?.game && `${mins(yesterday.game)} oyun`].filter(Boolean).join(" · ") || tt("Dinlenme günüydü"),

@@ -40,6 +40,9 @@ import { Panels } from "./panels/Panels";
 import { Brief } from "./brief/Brief";
 import { SearchPanel } from "./search/SearchPanel";
 import { Tour, useTourSteps } from "./tour/Tour";
+import { IslandAtmosphere } from "./atmosphere/IslandAtmosphere";
+import { isHalloweenActive } from "../lib/halloween";
+import { HangingSpider, PumpkinGlow, TrickOrTreatOverlay } from "./halloween/HalloweenElements";
 
 /**
  * Dış gölge yok: şeffaf pencerede yarı saydam siyah, WebView2'nin zemini ara sıra "saydam beyaz"a
@@ -280,6 +283,12 @@ export function Island() {
             if (tab) useNook.getState().setPendingTab(tab);
           }}
         >
+          {/* Canlı hava durumu & gece atmosferi */}
+          <IslandAtmosphere width={width} height={height} />
+
+          {/* Cadılar Bayramı: Balkabağı parıltısı */}
+          {isHalloweenActive(settings) && <PumpkinGlow />}
+
           <AnimatePresence>
             {mode === "expanded" && <Panels key="panels" />}
             {mode === "search" && <SearchPanel key="search" />}
@@ -338,7 +347,12 @@ export function Island() {
             {mode === "guard" && <GuardView key="guard" />}
             {mode === "gate" && <GateView key="gate" />}
           </AnimatePresence>
+
+          {/* Cadılar Bayramı: Şeker mi şaka mı kapı tıklatması & etkileşimi */}
+          {isHalloweenActive(settings) && mode === "collapsed" && <TrickOrTreatOverlay width={width} />}
         </motion.div>
+        {/* Cadılar Bayramı: Adanın sağ üst köşesinden sarkan örümcek (yalnızca ada kapalıyken) */}
+        {isHalloweenActive(settings) && mode === "collapsed" && <HangingSpider islandRef={ref} />}
         </div>
         {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}
         <AnimatePresence>

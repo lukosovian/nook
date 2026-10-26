@@ -40,6 +40,7 @@ import {
   useFullscreenFeed,
   usePrivacyFeed,
   useWeatherFeed,
+  useHalloweenFeed,
   useEventFeed,
   useFocusRelease,
   useIdleFeed,
@@ -86,6 +87,7 @@ export default function App() {
   usePrivacyFeed();
   useDownloadsFeed();
   useWeatherFeed();
+  useHalloweenFeed();
   useAffection();
   useEventFeed();
   useScreenshotFeed();

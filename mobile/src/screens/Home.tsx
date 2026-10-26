@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
-import { cached, getMedia, wakePc, type Pairing, type NowPlaying, type PcNote, type Status } from "../lib/pc";
+import { cached, getMedia, wakePc, drinkWater, type Pairing, type NowPlaying, type PcNote, type Status } from "../lib/pc";
 import { ChipNook, errText, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
 import { installUpdate, useInstallProgress, useMobileUpdate } from "../lib/update";
@@ -137,6 +137,9 @@ export function HomeScreen({
 
       {/* PC'deki adadaki gibi canlı Nook; altında bilgisayarın durumu (dokununca Bilgisayar) */}
       <Hero status={online ? status : null} nook={status?.nook} online={online} playing={!!playing?.playing} sub={subtitle(TILES[0])} onLook={() => online && onOpen("look")} onPc={() => onOpen("pc")} />
+
+      {/* Su Takibi ve Hızlı Bardak Ekleme */}
+      <WaterCard pairing={pairing} status={status} />
 
       {conn === "auth" && (
         <div className="rounded-3xl bg-red/10 p-4 text-[13.5px] text-red">PC'de eşleşme sıfırlanmış. Menüden “Eşleşmeyi kaldır”a bas ve kodu yeniden okut.</div>
@@ -356,6 +359,66 @@ function useNowPlaying(pairing: Pairing, online: boolean) {
   return np;
 }
 
+function WaterCard({ pairing, status }: { pairing: Pairing; status: Status | null }) {
+  const [localWater, setLocalWater] = useState<number | null>(null);
+  const [drinking, setDrinking] = useState(false);
+
+  // PC'den taze su durumu geldiğinde iyimser yerel sayacı temizle
+  useEffect(() => {
+    if (status?.water?.count !== undefined) {
+      setLocalWater(null);
+    }
+  }, [status?.water?.count]);
+
+  const waterCount = localWater ?? status?.water?.count ?? 0;
+  const waterGoal = status?.water?.goal ?? 8;
+
+  const onDrink = async () => {
+    setDrinking(true);
+    setLocalWater(waterCount + 1);
+    try {
+      await drinkWater(pairing);
+    } catch {
+      // ignore
+    }
+    setTimeout(() => setDrinking(false), 800);
+  };
+
+  return (
+    <div className="flex items-center justify-between rounded-3xl border border-edge bg-card p-3.5">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
+          💧
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[15px] font-bold text-white">Su Takibi</span>
+            <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300">
+              {waterCount}/{waterGoal} bardak
+            </span>
+          </div>
+          <p className="mt-0.5 truncate text-[11.5px] text-label-3">
+            {waterCount >= waterGoal ? "Harika! Günlük hedefe ulaştın 🎉" : `${waterGoal - waterCount} bardak daha içmelisin`}
+          </p>
+        </div>
+      </div>
+
+      <motion.button
+        whileTap={{ scale: 0.92 }}
+        onClick={onDrink}
+        className="flex shrink-0 items-center gap-1.5 rounded-2xl px-4 py-2.5 text-[13.5px] font-bold text-black shadow-md transition-colors"
+        style={{
+          background: drinking ? "#67e8f9" : "#2fd4c0",
+          boxShadow: "0 2px 12px rgba(47, 212, 192, 0.35)",
+        }}
+      >
+        <span>+1</span>
+        <span>İçtim</span>
+      </motion.button>
+    </div>
+  );
+}
+
 /** Ana ekranın tepesi: canlı Nook (dokununca Görünüm), altında Bilgisayar satırı ve açık kalma, işlemci, bellek, boş disk */
 function Hero({ status, nook, online, playing, sub, onLook, onPc }: { status: Status | null; nook: Status["nook"]; online: boolean; playing: boolean; sub: string; onLook: () => void; onPc: () => void }) {
   const st = status?.stats;
@@ -366,7 +429,7 @@ function Hero({ status, nook, online, playing, sub, onLook, onPc }: { status: St
       className="overflow-hidden rounded-[32px] border border-edge"
       style={{ background: `radial-gradient(120% 75% at 50% 0%, ${tintBg(nook?.color ?? "#ffffff", 10)}, transparent 70%), var(--color-card)` }}
     >
-      <div className={`flex justify-center pt-1 ${online ? "" : "opacity-60 grayscale"}`} onClick={onLook}>
+      <div className={`flex justify-center pt-3.5 pb-0.5 ${online ? "" : "opacity-60 grayscale"}`} onClick={onLook}>
         <LiveNook look={nook?.look} color={nook?.color} online={online} playing={playing} />
       </div>
       <motion.button whileTap={{ scale: 0.98 }} onClick={onPc} className="block w-full px-3 pb-3 text-left">

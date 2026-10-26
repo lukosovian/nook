@@ -178,7 +178,7 @@ export function ModulesGrid({ manage = false }: { manage?: boolean }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <div ref={scroller} className="relative -mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5" style={{ overflowAnchor: "none" }}>
+      <div ref={scroller} className="relative -mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5 pt-1.5 pb-1" style={{ overflowAnchor: "none" }}>
         <div className="grid gap-1.5" style={{ gridAutoRows: TILE_H, gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {modules.map((m, i) => {
             const st = sub[m.id];

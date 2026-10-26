@@ -466,6 +466,12 @@ export interface Settings extends NativeSettings {
   uiSounds: boolean;
   /** Arayüz seslerinin yüksekliği (0–1) */
   uiVolume: number;
+  /** Adada canlı hava durumu ve gece atmosferi (yağmur, kar, yapraklar, yıldızlar) */
+  weatherAtmosphere: boolean;
+  /** Cadılar Bayramı sezonu etkinlikleri (25-31 Ekim; 1 Kasım'da otomatik kapanır) */
+  halloweenSeason: boolean;
+  /** WhatsApp mesajlarında adada bildirim kartı fırlasın mı */
+  whatsappNotify: boolean;
   /** Ana sayfa profilleri ("Hepsi" hariç); yoksa varsayılanlar (lib/profiles) */
   profiles?: import("../lib/profiles").ProfileDef[];
 }
@@ -633,6 +639,9 @@ export const DEFAULT_SETTINGS: Settings = {
   localStt: true,
   uiSounds: true,
   uiVolume: 0.6,
+  weatherAtmosphere: true,
+  halloweenSeason: true,
+  whatsappNotify: true,
 };
 
 export interface Osd {
@@ -707,8 +716,8 @@ interface NookState {
   grabbed: boolean;
   /** Açılış animasyonu sürüyor */
   intro: boolean;
-  /** Kalıcı hatırlatma (su): kullanıcı cevaplayana kadar adada durur */
-  reminder: { kind: "water"; phase: "due" | "drinking" } | null;
+  /** Kalıcı hatırlatma (su, göz, esneme): kullanıcı cevaplayana kadar adada durur */
+  reminder: { kind: "water" | "eye" | "stretch"; phase: "due" | "drinking" | "resting" | "stretching" } | null;
   /** Claude Code izin/soru kartı adada (bkz. lib/claude) */
   claudeCard: boolean;
   /** Açık adanın "tam ekran" hâli: ada ekrana yayılır (boyutu pencere büyüyünce ölçülür) */

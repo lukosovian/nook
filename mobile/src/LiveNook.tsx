@@ -51,7 +51,7 @@ export function LiveNook({ look, color, online, playing, scale = 3 }: { look?: u
   const box = FACE * scale;
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: box * 2.4, height: box * 1.25 }}>
+    <div className="relative flex items-center justify-center pt-3 pb-1" style={{ width: box * 2.4, height: box * 1.55 }}>
       <div style={{ transform: `scale(${scale})` }}>
         <Nook
           expression={expression}

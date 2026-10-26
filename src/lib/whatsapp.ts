@@ -96,25 +96,30 @@ export const useWhatsApp = create<WhatsAppStore>((set) => ({
     set((s) => {
       if (!isWhatsAppNotif(n)) return {};
       const title = (n.title || "WhatsApp").trim();
-      const text = (n.body || "").trim();
-      if (!text) return {};
+      const rawText = (n.body || "").trim();
+      if (!rawText) return {};
+
+      // Kullanıcının kendi gönderdiği mesajları tanı ("Sen: ...", "Siz: ..." veya "You: ...")
+      const isMe = /^(sen|siz|you)\s*:/i.test(rawText);
+      const text = isMe ? rawText.replace(/^(sen|siz|you)\s*:\s*/i, "") : rawText;
+
       const prev = s.localChats[title];
       const time = nowHm();
       const msg: WaMessage = {
         id: `notif_${n.id || Date.now()}`,
-        sender: title,
+        sender: isMe ? "Sen" : title,
         text,
         time,
-        fromMe: false,
+        fromMe: isMe,
       };
       const existing = prev?.messages ?? [];
-      const dup = existing.length > 0 && existing[existing.length - 1].text === text && !existing[existing.length - 1].fromMe;
+      const dup = existing.length > 0 && existing[existing.length - 1].text === text && existing[existing.length - 1].fromMe === isMe;
       const messages = dup ? existing : [...existing, msg].slice(-40);
       const chat: LocalWaChat = {
         title,
         lastText: text,
         time,
-        unread: s.selectedChat === title ? 0 : (prev?.unread ?? 0) + (dup ? 0 : 1),
+        unread: isMe || s.selectedChat === title ? 0 : (prev?.unread ?? 0) + (dup ? 0 : 1),
         updatedAt: Date.now(),
         replyKey: n.replyKey ?? prev?.replyKey ?? null,
         icon: n.icon ?? prev?.icon ?? null,

@@ -267,10 +267,21 @@ export function matchTitle(snap: ArgusSnapshot | null, text: string, pool?: Argu
   return best?.item ?? null;
 }
 
+/**
+ * Fragman, tanıtım, klip, inceleme, özet, sahne veya kesit gibi bölüm olmayan videolar:
+ * Süresi 45 dk / 1 saat bile olsa adı Argus'taki bir diziyle eşleşse de "bölüm" sanılmaz ve şarkı eklenmez.
+ */
+export const EXTRA =
+  /(^|[^\p{L}])(trailer|teaser|fragman\p{L}*|tanıtım\p{L}*|tanitim\p{L}*|promo|recap|özet|ozet|review|inceleme\p{L}*|reaction|tepki\p{L}*|explained|analiz\p{L}*|behind the scenes|kamera arkası|featurette|sneak peek|first look|ilk bakış|interview|röportaj\p{L}*|roportaj\p{L}*|soundtrack|easter eggs?|bloopers?|shorts|sahne\p{L}*|kesit\p{L}*|klip\p{L}*|derleme\p{L}*|kurgu\p{L}*|scene\p{L}*|clip\p{L}*|compilation|highlights?|moments?|edit\p{L}*|montaj\p{L}*|en iyi\p{L}*|en komik\p{L}*|unutulmaz\p{L}*|replik\p{L}*)(?=$|[^\p{L}])/iu;
+
 /** Kayıt + metindeki bölüm → öneri */
 function suggestFor(item: ArgusItem, text: string): ArgusSuggestion | null {
   if (!item.series) return { itemId: item.id };
-  const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1) ?? item.series.next;
+  // Başlıkta sahne, kesit, klip, derleme vb. ibareler varsa asla dizi bölümü sayma
+  if (EXTRA.test(text)) return null;
+  // Dizilerde başlıkta açıkça bir bölüm numarası ("1. Bölüm", "S01E03" vb.) bulunmalıdır.
+  // Açık bölüm bilgisi yoksa (örn: "Muhteşem Yüzyıl Hürrem Sahnesi") asla ilk/sıradaki bölüme bağlama.
+  const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1);
   return ep ? { itemId: item.id, season: ep.season, episode: ep.episode } : null;
 }
 
@@ -610,12 +621,6 @@ export function answerSuggestion(sug: ArgusSuggestion | null = useArgus.getState
   savePlayed(store);
   useArgus.setState({ suggestion: null });
 }
-/**
- * Fragman, tanıtım, klip, inceleme, özet gibi bölüm olmayan videolar: adı Argus'taki bir diziyle eşleşse de
- * "bitti mi?" diye sorulmaz (YouTube'da "Silo 2. Sezon Fragmanı" izlenince bölüm sanılıyordu).
- */
-const EXTRA =
-  /(^|[^\p{L}])(trailer|teaser|fragman\p{L}*|tanıtım\p{L}*|tanitim\p{L}*|promo|recap|özet|ozet|review|inceleme\p{L}*|reaction|tepki\p{L}*|explained|analiz\p{L}*|behind the scenes|kamera arkası|featurette|sneak peek|first look|ilk bakış|interview|röportaj\p{L}*|roportaj\p{L}*|soundtrack|easter eggs?|bloopers?|shorts)(?=$|[^\p{L}])/iu;
 /** Bölüm olamayacak kadar kısa videolar (dizi bölümü en az 8 dk, film en az 40 dk) */
 const MIN_EPISODE_MS = 8 * 60_000;
 const MIN_MOVIE_MS = 40 * 60_000;

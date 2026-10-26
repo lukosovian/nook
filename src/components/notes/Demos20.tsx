@@ -3,7 +3,7 @@
  * çubuk kaybolunca Nook "Yayın bitti" demiyor, CANLI kalıyor. Studio'da yama notu kartında oynar.
  */
 import { AnimatePresence, motion } from "motion/react";
-import { Bug, Check, Gamepad2, MessageCircle, MessageSquare, Mic, MicOff, Play, Search, Send, Shirt, Zap } from "lucide-react";
+import { Bell, BellOff, Bug, Check, Gamepad2, MessageCircle, MessageSquare, Mic, MicOff, Play, Search, Send, Shirt, Zap } from "lucide-react";
 import { DEFAULT_LOOK } from "../../lib/look";
 import { NookFigure } from "../mascot/Figure";
 import { FEED_STYLES, Nook } from "../mascot/Nook";
@@ -11,6 +11,7 @@ import type { FeedStyle } from "../mascot/Props";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 import { Fit, Pc, Stage, useTick } from "./Demos6";
+import { IslandAtmosphere, type AtmosphereKind } from "../atmosphere/IslandAtmosphere";
 
 /** Tarayıcının paylaşım çubuğunda "Gizle"ye basılır ve çubuk kaybolur; adadaki CANLI hiç sönmez */
 function ShareHoldDemo() {
@@ -622,6 +623,384 @@ function FeedbackDemo() {
   );
 }
 
+/** 0.3.3 yama notu demosu: Adada canlı hava durumu ve gece atmosferleri */
+function AtmosDemo() {
+  const step = useTick(2800) % 4;
+  const modes: { kind: AtmosphereKind; label: string; icon: string; color: string }[] = [
+    { kind: "rain", label: tt("Canlı Yağmur & Sıçramalar"), icon: "🌧️", color: ACCENT.blue },
+    { kind: "snow", label: tt("Süzülen Kar Kristalleri"), icon: "❄️", color: ACCENT.teal },
+    { kind: "autumn", label: tt("Uçuşan Sonbahar Yaprakları"), icon: "🍂", color: ACCENT.orange },
+    { kind: "night", label: tt("Gece Yıldızları & Ateş Böceği"), icon: "🌙", color: ACCENT.purple },
+  ];
+  const cur = modes[step];
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            {/* Mini Ada Kapsülü */}
+            <div className="relative flex h-[34px] w-[184px] items-center justify-between overflow-hidden rounded-[16px] border border-white/10 bg-black px-3 shadow-md">
+              <IslandAtmosphere width={184} height={34} override={cur.kind} />
+
+              <div className="relative z-10 flex items-center gap-1.5">
+                <NookFigure look={DEFAULT_LOOK} color="#F4F4F6" size={17} expression={cur.kind === "rain" ? "shy" : cur.kind === "snow" ? "surprised" : "happy"} />
+                <span className="text-[10px] font-bold text-white/90">Nook</span>
+              </div>
+
+              <div className="relative z-10 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 backdrop-blur-sm">
+                <span className="text-[10px]">{cur.icon}</span>
+                <span className="text-[8px] font-semibold text-white/80">{cur.label.split(" ")[0]}</span>
+              </div>
+            </div>
+
+            {/* Alt Etiket */}
+            <div
+              className="flex items-center gap-1.5 rounded-full px-3 py-1"
+              style={{ background: tintBg(cur.color, 18) }}
+            >
+              <span className="text-[9px]">{cur.icon}</span>
+              <span className="text-[7.5px] font-bold" style={{ color: tintText(cur.color) }}>
+                {cur.label}
+              </span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
+/** 0.3.3 yama notu demosu: Su takibi ve tek tıkla bardak ekleme */
+function HabitsDemo() {
+  const step = useTick(1400) % 6; // 0-5 arası bardak sayısı artar
+  const count = 3 + (step % 4);
+  const goal = 8;
+  const C = ACCENT.teal;
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            <div className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[16px]">💧</span>
+                <div>
+                  <span className="block text-[8px] font-bold text-white">{tt("Su Takibi")}</span>
+                  <span className="block text-[6.5px] font-semibold text-cyan-300">
+                    {count} / {goal} {tt("bardak")} ({count * 250} ml)
+                  </span>
+                </div>
+              </div>
+
+              <motion.div
+                animate={{ scale: step % 2 === 1 ? [1, 1.08, 1] : 1 }}
+                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[7px] font-bold text-black"
+                style={{ background: "#2fd4c0" }}
+              >
+                <span>+1</span>
+                <span>{tt("İçtim")}</span>
+              </motion.div>
+            </div>
+
+            {/* Bardaklar */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: goal }, (_, i) => (
+                <motion.span
+                  key={i}
+                  animate={{ scale: i < count ? [0.8, 1.1, 1] : 1 }}
+                  className={`flex h-4 w-4 items-center justify-center rounded-[5px] text-[8px] ${
+                    i < count ? "bg-cyan-500/25 border border-cyan-400/50" : "bg-white/5 opacity-35"
+                  }`}
+                >
+                  {i < count ? "💧" : "⚪"}
+                </motion.span>
+              ))}
+            </div>
+
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[6.5px] font-bold"
+              style={{ background: tintBg(C, 18), color: tintText(C) }}
+            >
+              <span>💧</span>
+              <span>{tt("PC ve mobilde tek dokunuşla anında senkronize")}</span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
+/** 0.3.3 yama notu demosu: Mobil bağlantı takibi ve anında bildirim testi */
+function PhoneTestDemo() {
+  const tick = useTick(1600) % 4;
+  const isSent = tick >= 2;
+  const B = ACCENT.blue;
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            <div className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-green-400" style={{ boxShadow: "0 0 6px #4ade80" }} />
+                <div>
+                  <span className="block text-[8px] font-bold text-white">{tt("Telefon Bağlı (Canlı)")}</span>
+                  <span className="block text-[6.5px] text-white/50">192.168.1.42 · Port 47391</span>
+                </div>
+              </div>
+
+              <motion.div
+                animate={{ scale: tick === 1 ? 0.94 : 1 }}
+                className="rounded-full px-2.5 py-1 text-[7px] font-bold"
+                style={{
+                  background: isSent ? tintBg(ACCENT.green, 25) : tintBg(B, 25),
+                  color: isSent ? tintText(ACCENT.green) : tintText(B),
+                }}
+              >
+                {isSent ? tt("Gönderildi ✓") : tt("Bildirimi Test Et")}
+              </motion.div>
+            </div>
+
+            {/* Test Bildirimi Kartı */}
+            <AnimatePresence>
+              {isSent && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex w-[210px] items-center gap-2 rounded-lg border border-green-500/30 bg-black/80 px-2 py-1 backdrop-blur-sm"
+                >
+                  <span className="text-[11px]">📱</span>
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <span className="block truncate text-[7px] font-bold text-white">Nook Mobil Bildirim Testi</span>
+                    <span className="block truncate text-[6px] text-green-300">PC ile telefon sorunsuz haberleşiyor ✨</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
+/** 0.3.3 yama notu demosu: WhatsApp bildirim kartlarını sessize alma */
+function WaMuteDemo() {
+  const step = useTick(1800) % 4; // 0-1: açık (zil var) · 2-3: sessizde (üstü çizili zil)
+  const muted = step >= 2;
+  const G = "#25D366";
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            <div className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: tintBg(G, 22), color: tintText(G) }}>
+                  <MessageCircle size={11} />
+                </span>
+                <div>
+                  <span className="block text-[8px] font-bold text-white">WhatsApp</span>
+                  <span className="block text-[6.5px] text-white/50">
+                    {muted ? tt("Bildirim kartları sessizde") : tt("Bildirim kartları açık")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Zil Butonu */}
+              <motion.div
+                animate={{ scale: step % 2 === 0 ? [1, 1.15, 1] : 1 }}
+                className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
+                  muted ? "border-red/40 bg-red/20 text-red" : "border-white/10 bg-white/10 text-white"
+                }`}
+              >
+                {muted ? <BellOff size={11} strokeWidth={2.4} /> : <Bell size={11} strokeWidth={2.4} />}
+              </motion.div>
+            </div>
+
+            {/* Alt Etiket */}
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[6.5px] font-bold"
+              style={{
+                background: muted ? tintBg(ACCENT.orange, 18) : tintBg(G, 18),
+                color: muted ? tintText(ACCENT.orange) : tintText(G),
+              }}
+            >
+              <span>{muted ? "🔕" : "🔔"}</span>
+              <span>
+                {muted
+                  ? tt("Mesajlar adada fırlamaz, yalnızca modülde birikir")
+                  : tt("Mesaj gelince adada hızlı yanıt kartı açılır")}
+              </span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
+/** 0.3.3 yama notu demosu: Dizi sahnelerinde akıllı Argus ve Hum filtrelemesi */
+function SceneFilterDemo() {
+  const step = useTick(2200) % 2; // 0: Sahne / Kesit · 1: Gerçek Bölüm
+  const isScene = step === 0;
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            <div className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[14px]">{isScene ? "🎬" : "📺"}</span>
+                <div className="min-w-0">
+                  <span className="block truncate text-[7.5px] font-bold text-white">
+                    {isScene
+                      ? tt("Muhteşem Yüzyıl · En İyi Sahneler (55 dk)")
+                      : tt("Muhteşem Yüzyıl 45. Bölüm Full HD")}
+                  </span>
+                  <span className="block truncate text-[6px] text-white/50">
+                    {isScene ? tt("Kesit / Sahne derlemesi") : tt("Doğrulanmış tam bölüm")}
+                  </span>
+                </div>
+              </div>
+
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[6.5px] font-bold"
+                style={{
+                  background: isScene ? tintBg(ACCENT.red, 25) : tintBg(ACCENT.green, 25),
+                  color: isScene ? tintText(ACCENT.red) : tintText(ACCENT.green),
+                }}
+              >
+                {isScene ? tt("Bölüm Değil") : tt("45. Bölüm")}
+              </span>
+            </div>
+
+            {/* Alt Bilgi */}
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[6.5px] font-bold"
+              style={{
+                background: isScene ? tintBg(ACCENT.orange, 18) : tintBg(ACCENT.blue, 18),
+                color: isScene ? tintText(ACCENT.orange) : tintText(ACCENT.blue),
+              }}
+            >
+              <span>{isScene ? "🛡️" : "🎵"}</span>
+              <span>
+                {isScene
+                  ? tt("Hum şarkıyı rastgele 1. bölüme eklemez, atlar")
+                  : tt("Çalan şarkı doğru bölüme (S01E45) eklenir")}
+              </span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
+function Polish033Demo() {
+  const step = useTick(2000) % 3; // 0: Tarihe Tıkla Takvim · 1: Modüller Hover Taşma Yok · 2: Studio Boyutu Sakla
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            {step === 0 && (
+              <motion.div
+                key="step0"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px]">📅</span>
+                  <div>
+                    <span className="block text-[7.5px] font-bold text-white underline decoration-white/40">
+                      26 Ekim Pazartesi
+                    </span>
+                    <span className="block text-[6px] text-white/50">{tt("Tıklanınca doğrudan Takvim açılır")}</span>
+                  </div>
+                </div>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[6.5px] font-bold"
+                  style={{ background: tintBg(ACCENT.purple, 25), color: tintText(ACCENT.purple) }}
+                >
+                  {tt("Takvim")}
+                </span>
+              </motion.div>
+            )}
+
+            {step === 1 && (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px]">🎛️</span>
+                  <div>
+                    <span className="block text-[7.5px] font-bold text-white">{tt("Modüller Izgarası")}</span>
+                    <span className="block text-[6px] text-white/50">{tt("Hover olunca üst kenar kesilmez")}</span>
+                  </div>
+                </div>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[6.5px] font-bold"
+                  style={{ background: tintBg(ACCENT.teal, 25), color: tintText(ACCENT.teal) }}
+                >
+                  {tt("Pürüzsüz")}
+                </span>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex w-[210px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px]">📐</span>
+                  <div>
+                    <span className="block text-[7.5px] font-bold text-white">{tt("Nook Studio")}</span>
+                    <span className="block text-[6px] text-white/50">{tt("Son bıraktığın pencere boyutunda açılır")}</span>
+                  </div>
+                </div>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[6.5px] font-bold"
+                  style={{ background: tintBg(ACCENT.blue, 25), color: tintText(ACCENT.blue) }}
+                >
+                  {tt("Hatırlandı")}
+                </span>
+              </motion.div>
+            )}
+
+            {/* Alt Etiket */}
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[6.5px] font-bold"
+              style={{
+                background: tintBg(ACCENT.yellow, 18),
+                color: tintText(ACCENT.yellow),
+              }}
+            >
+              <span>✨</span>
+              <span>{tt("Ada ve Studio arayüz cilaları")}</span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
 export const DEMOS20 = {
   sharehold: ShareHoldDemo,
   feedstyles: FeedStylesDemo,
@@ -630,4 +1009,10 @@ export const DEMOS20 = {
   deckfix: DeckFixDemo,
   whatsapp: WhatsAppDemo,
   feedback: FeedbackDemo,
+  atmos: AtmosDemo,
+  habits: HabitsDemo,
+  phonetest: PhoneTestDemo,
+  wamute: WaMuteDemo,
+  scenefilter: SceneFilterDemo,
+  polish033: Polish033Demo,
 };

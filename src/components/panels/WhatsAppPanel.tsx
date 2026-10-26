@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { ExternalLink, Link2, MessageCircle, QrCode, SendHorizontal, Smartphone, Unlink } from "lucide-react";
+import { Bell, BellOff, ExternalLink, Link2, MessageCircle, QrCode, SendHorizontal, Smartphone, Unlink } from "lucide-react";
+import { useNook } from "../../store/nook";
 import {
   connectWhatsAppWeb,
   disconnectWhatsAppWeb,
@@ -20,6 +21,7 @@ export function WhatsAppPanel() {
   const selectChat = useWhatsApp((s) => s.selectChat);
   const sending = useWhatsApp((s) => s.sending);
   const error = useWhatsApp((s) => s.error);
+  const whatsappNotify = useNook((s) => s.settings.whatsappNotify);
   const chats = useUnifiedWaChats();
   const activeChat = selected ?? chats[0]?.title ?? null;
   const activeInfo = chats.find((c) => c.title.toLowerCase() === (activeChat ?? "").toLowerCase()) ?? null;
@@ -90,6 +92,17 @@ export function WhatsAppPanel() {
           </span>
 
           <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => useNook.getState().updateSettings({ whatsappNotify: !whatsappNotify })}
+              title={whatsappNotify ? tt("WhatsApp bildirim kartlarını sessize al") : tt("WhatsApp bildirim kartlarını aç")}
+              className={`flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
+                whatsappNotify
+                  ? "bg-well text-label-2 hover:bg-well-hi hover:text-label"
+                  : "bg-red/15 text-red hover:bg-red/25"
+              }`}
+            >
+              {whatsappNotify ? <Bell size={10.5} strokeWidth={2.4} /> : <BellOff size={10.5} strokeWidth={2.4} />}
+            </button>
             {web.enabled ? (
               <>
                 <button

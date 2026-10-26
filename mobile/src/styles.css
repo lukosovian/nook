@@ -42,7 +42,7 @@ body,
 
 /* Android'de durum çubuğu ve hareket çubuğu altına taşmasın */
 .safe {
-  padding-top: max(env(safe-area-inset-top), 14px);
+  padding-top: max(env(safe-area-inset-top), 18px);
   padding-bottom: max(env(safe-area-inset-bottom), 14px);
 }
 

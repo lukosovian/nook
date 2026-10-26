@@ -53,6 +53,21 @@ static MIRROR: Mutex<Value> = Mutex::new(Value::Null);
 static PATCH_NOTES: Mutex<Value> = Mutex::new(Value::Null);
 /// Son iki dakikada görülen imzalar (aynı isteğin tekrar gönderilmesine karşı)
 static SEEN: Mutex<VecDeque<(i64, String)>> = Mutex::new(VecDeque::new());
+/// Telefonun en son istek attığı an (milisaniye)
+static LAST_SEEN: Mutex<Option<u64>> = Mutex::new(None);
+/// Son bağlanan telefonun IP adresi
+static LAST_CLIENT_IP: Mutex<Option<String>> = Mutex::new(None);
+
+fn touch_client(ip: Option<String>) {
+    if let Ok(mut g) = LAST_SEEN.lock() {
+        *g = Some(now_ms() as u64);
+    }
+    if let Some(ip) = ip {
+        if let Ok(mut g) = LAST_CLIENT_IP.lock() {
+            *g = Some(ip);
+        }
+    }
+}
 /// Telefondan ekran kapatıldıysa ne zaman (o andan beri klavye/fare kullanılmadıysa ekran hâlâ kapalı)
 static SCREEN_OFF_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 /// Telefondan ev ağı (Tailscale değil) üzerinden gelen son istek: uzun aradan sonraki ilki "eve geldi"
@@ -286,6 +301,7 @@ fn handle(mut req: Request) {
     if peer.is_some_and(home_peer) {
         phone_seen_home();
     }
+    touch_client(peer.map(|p| p.to_string()));
     let url = req.url().to_owned();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
     // Raftaki dosya telefona: büyük olabilir, belleğe alınmadan akışla
@@ -980,6 +996,10 @@ pub struct Info {
     app_qr: Option<String>,
     /// Telefondan uzaktan kontrol açık mı
     control: bool,
+    /// Telefonun son istek attığı an (ms epoch)
+    pub last_seen: Option<u64>,
+    /// Son bağlanan telefonun IP adresi
+    pub last_ip: Option<String>,
 }
 
 fn pair_url(cfg: &Config, hosts: &[String], mac: Option<&str>) -> String {
@@ -1005,6 +1025,8 @@ pub fn remote_info() -> Info {
     let hosts = net::addresses();
     let mac = net::primary_mac();
     let qr = cfg.enabled.then(|| qr_svg(&pair_url(&cfg, &hosts, mac.as_deref()))).flatten();
+    let last_seen = LAST_SEEN.lock().ok().and_then(|g| *g);
+    let last_ip = LAST_CLIENT_IP.lock().ok().and_then(|g| g.clone());
     Info {
         enabled: cfg.enabled,
         running: RUNNING.load(Ordering::SeqCst),
@@ -1016,7 +1038,18 @@ pub fn remote_info() -> Info {
         qr,
         app_qr: qr_svg("https://github.com/lukosovian/nook/releases/latest/download/NookMobil.apk"),
         control: cfg.control,
+        last_seen,
+        last_ip,
     }
+}
+
+#[tauri::command]
+pub fn remote_test_notification() -> Result<(), String> {
+    if let Some(app) = APP.lock().unwrap().as_ref() {
+        crate::system::emit_event(app, "phone", "Nook Mobil Bağlantı Testi", "PC ile telefon başarıyla haberleşiyor ✨");
+    }
+    let _ = queue_reply("test_ping".to_owned(), "Bağlantı başarılı! PC ile telefon sorunsuz haberleşiyor ✨".to_owned());
+    Ok(())
 }
 
 #[tauri::command]

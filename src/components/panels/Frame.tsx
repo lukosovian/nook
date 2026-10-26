@@ -88,7 +88,7 @@ export function Frame({ view, title, color, children }: { view: View; title?: st
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
     >
       <Dock />
-      <motion.div className="absolute right-0 top-0" initial={false} animate={{ left: ex.dock }} transition={CARD_SPRING} style={{ height: ex.header }}>
+      <motion.div className="absolute right-0 top-0 z-20" initial={false} animate={{ left: ex.dock }} transition={CARD_SPRING} style={{ height: ex.header }}>
         <div className="absolute inset-0" style={{ zoom: z }}>
           <TopBar view={view} title={title} color={color} />
         </div>
@@ -421,9 +421,16 @@ function StatusBar() {
           {battery.percent <= 20 && !battery.charging ? <BatteryLow size={12} /> : <BatteryFull size={12} />}
         </span>
       )}
-      {/* Tarih ve saat: saat kalın */}
+      {/* Tarih ve saat: tarihe tıklayınca Takvim açılır */}
       <span className="flex items-baseline gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.06] px-2.5 py-[1px]">
-        <span className="text-[10px] text-label-3">{now.toLocaleDateString(locale(), { day: "numeric", month: "short", weekday: "short" })}</span>
+        <button
+          type="button"
+          onClick={() => useNook.getState().setTab("calendar")}
+          title={tt("Takvimi aç")}
+          className="text-[10px] text-label-3 transition-colors hover:text-label hover:underline"
+        >
+          {now.toLocaleDateString(locale(), { day: "numeric", month: "short", weekday: "short" })}
+        </button>
         <span className="text-[13px] font-extrabold tracking-tight text-label">{now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
       </span>
       <LiveBadge />
@@ -512,7 +519,11 @@ function SoundToggle() {
   const on = useNook((s) => s.settings.soundCard);
   return (
     <button
-      onClick={() => useNook.getState().updateSettings({ soundCard: !on })}
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        useNook.getState().updateSettings({ soundCard: !on });
+      }}
       title={on ? tt("Ses kartını kapat") : tt("Ses kartını aç")}
       className="flex h-[22px] w-[22px] items-center justify-center rounded-full transition-colors hover:bg-white/[0.08]"
       style={{ color: on ? tintText(ACCENT.pink) : "var(--color-label-3)", background: on ? tintBg(ACCENT.pink, 14) : undefined }}

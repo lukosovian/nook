@@ -412,8 +412,12 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null });
   } else if (mode === "gate") {
     useNook.setState({ media: null, gate: true, notesSeen: "999", settings: { ...useNook.getState().settings, lockHash: "a:b" } });
-  } else if (mode === "reminder" || mode === "drinking") {
+  } else if (mode === "reminder" || mode === "drinking" || mode === "water") {
     useNook.setState({ media: null, reminder: { kind: "water", phase: mode === "drinking" ? "drinking" : "due" }, antic: mode === "drinking" ? "drink" : null });
+  } else if (mode === "eye" || mode === "eyerest") {
+    useNook.setState({ media: null, reminder: { kind: "eye", phase: mode === "eyerest" ? "resting" : "due" }, antic: "wink" });
+  } else if (mode === "stretch" || mode === "stretching") {
+    useNook.setState({ media: null, reminder: { kind: "stretch", phase: mode === "stretching" ? "stretching" : "due" }, antic: "stretch" });
   } else if (mode === "homeq") {
     // Müziksiz ana sayfa (çipler)
     useNook.setState({ media: null, hovered: true, tab: "home" });
@@ -456,6 +460,15 @@ export function applyPreview(mode: string) {
     // Güncelleme kapsülü: ?p=yüzde
     useNook.setState({ media: null });
     void import("../lib/update").then((m) => m.useUpdate.setState({ available: "0.3.1", progress: mode === "restarting" ? 100 : Number(params.get("p") ?? 42), restarting: mode === "restarting" }));
+  } else if (mode === "halloween" || mode === "knock" || mode === "candy" || mode === "trick") {
+    useNook.setState({ media: null });
+    void import("../lib/halloween").then((m) => {
+      const p = mode === "candy" ? "candy" : mode === "trick" ? "trick" : mode === "knock" ? "knocking" : "asking";
+      m.useHalloween.setState({ phase: p });
+    });
+  } else if (mode === "atmos") {
+    const sky = (params.get("sky") ?? "rain") as any;
+    useNook.setState({ media: null, weather: { city: "İstanbul", temp: 16, high: 18, low: 12, sky, isDay: params.get("night") !== "1", rainChance: 40, at: Date.now() } });
   }
   // "music": kapalı ada + mini oynatıcı (varsayılan veriler)
 

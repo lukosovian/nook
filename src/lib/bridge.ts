@@ -512,7 +512,13 @@ export interface RemoteInfo {
   appQr: string | null;
   /** Telefondan uzaktan kontrol (ekran, fare, klavye) açık mı */
   control?: boolean;
+  /** Telefonun son istek attığı an (ms epoch) */
+  lastSeen?: number | null;
+  /** Son bağlanan telefonun IP adresi */
+  lastIp?: string | null;
 }
+export const remoteTestNotification = () =>
+  inTauri ? invoke<void>("remote_test_notification") : Promise.resolve();
 export const remoteInfo = () =>
   inTauri
     ? invoke<RemoteInfo>("remote_info")

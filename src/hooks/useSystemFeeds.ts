@@ -33,6 +33,7 @@ import { detectSensitive, SENSITIVE_CLEAR_MS, SENSITIVE_LABEL } from "../lib/sen
 import { fetchWeather } from "../lib/weather";
 import { MOVE_ANTIC, pickMove } from "../lib/moveFx";
 import { isLive, isSleeping, SULK_BELOW, useNook, type Antic, type Settings } from "../store/nook";
+import { isHalloweenActive, useHalloween } from "../lib/halloween";
 import { islandModeOf } from "./useIslandMode";
 import { playAntic } from "./useAntics";
 import { dec, locale, tt } from "../lib/i18n";
@@ -708,6 +709,37 @@ export function useAffection() {
       unsub();
     };
   }, []);
+}
+
+/**
+ * Cadılar Bayramı (Halloween) periyodik etkinlikleri (25–31 Ekim):
+ * - Belli aralıklarla (15–20 dakikada bir) Nook adada "tık tık" kapıya vurur.
+ * - Ada boştayken (idle) tetiklenir; uyurken veya tam ekrandayken rahatsız etmez.
+ */
+export function useHalloweenFeed() {
+  const enabled = useNook((s) => s.settings.halloweenSeason);
+  useEffect(() => {
+    if (!isPrimary || !isHalloweenActive()) return;
+
+    const checkAndTrigger = () => {
+      const s = useNook.getState();
+      if (!isHalloweenActive(s.settings) || isSleeping(s) || islandModeOf(s) !== "collapsed" || s.fullscreen) return;
+      const hw = useHalloween.getState();
+      const elapsed = Date.now() - hw.lastKnockAt;
+      // En az 15 dakikada bir çalar
+      if (elapsed >= 15 * 60_000 && hw.phase === "idle") {
+        hw.triggerKnock();
+      }
+    };
+
+    // İlk 1.5 dakika sonra kontrol et, ardından dakikada bir bak
+    const firstTimer = window.setTimeout(checkAndTrigger, 90_000);
+    const interval = window.setInterval(checkAndTrigger, 60_000);
+    return () => {
+      window.clearTimeout(firstTimer);
+      window.clearInterval(interval);
+    };
+  }, [enabled]);
 }
 
 /** Ayarları Rust'a ve Windows başlangıcına uygula (yalnızca ana ada; açılışta ve her değişimde). */

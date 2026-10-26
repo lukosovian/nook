@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { argusAddSong, EVENTS, inTauri, isPrimary, subscribe } from "../lib/bridge";
-import { epLabel, findItem, useArgus } from "../lib/argus";
+import { epLabel, findItem, useArgus, EXTRA } from "../lib/argus";
 import { DJ_MOVES, humCancel, humListen, humWatching, type HumTrack } from "../lib/hum";
 import { tt } from "../lib/i18n";
 import { useNook } from "../store/nook";
@@ -89,10 +89,15 @@ async function toArgus(track: HumTrack, agoMs: number) {
   const item = findItem(live?.itemId);
   if (!s.settings.humWatch || !live || !item) return;
   const m = s.media;
+  const mediaText = `${m?.title ?? ""} ${m?.artist ?? ""}`;
+  // Başlıkta sahne, kesit, klip, derleme vb. varsa şarkıyı Argus bölümüne ekleme
+  if (EXTRA.test(mediaText)) return;
+  const ep = live.season && live.episode ? { season: live.season, episode: live.episode } : null;
+  // Dizilerde kesin sezon/bölüm numarası olmadan şarkı rastgele bölüme (1. bölüme) eklenmesin
+  if (item.series && !ep) return;
   const timeline = !!m && m.durationMs > 0 && m.positionMs > 0;
   const pos = timeline ? m.positionMs + (m.playing ? performance.now() - m.at : 0) : live.playedMs;
   const atMs = Math.max(0, Math.round(pos - agoMs));
-  const ep = live.season && live.episode ? { season: live.season, episode: live.episode } : null;
   try {
     const r = await argusAddSong(item.id, ep?.season ?? null, ep?.episode ?? null, atMs, !timeline, track);
     if (r.duplicate) return;

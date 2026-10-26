@@ -1,25 +1,57 @@
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Clock, Droplet, Play, X, Zap } from "lucide-react";
+import { Check, Clock, Droplet, Eye, Play, Sparkles, X, Zap } from "lucide-react";
 import { answerAsk } from "../../lib/automations";
-import { drankWater, snoozeWater } from "../../hooks/useFeatures";
+import { doneEye, doneStretch, snoozeReminder } from "../../hooks/useFeatures";
+import { getTodayWater, useHabits } from "../../lib/habits";
 import { spring } from "../../lib/motion";
-import { dayKey, useNook } from "../../store/nook";
+import { useNook } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
-const COLOR = ACCENT.blue;
-
 /**
- * Su hatırlatması: "İçtim" diyene kadar adada durur; içince Nook da bardağıyla içer. Su yoksa aynı yerde
- * "çalışsın mı?" diye soran otomasyon.
+ * Sağlık ve Mola Hatırlatması (Su, 20-20-20 Göz Molası, Duruş & Esneme).
+ * Kullanıcı cevaplayana kadar adada bekler; içince/yapınca Nook da eşlik eder.
  */
 export function ReminderView() {
   const reminder = useNook((s) => s.reminder);
   const ask = useNook((s) => s.autoAsk);
-  const today = useNook((s) => s.days[dayKey()]?.water ?? 0);
+  const todayWater = getTodayWater();
+
+  // 20 saniye geri sayım (Göz dinlendirme modu)
+  const [eyeCountdown, setEyeCountdown] = useState(20);
+
+  useEffect(() => {
+    if (reminder?.kind === "eye" && reminder.phase === "resting") {
+      setEyeCountdown(20);
+      const iv = window.setInterval(() => {
+        setEyeCountdown((c) => {
+          if (c <= 1) {
+            window.clearInterval(iv);
+            doneEye(true);
+            return 0;
+          }
+          return c - 1;
+        });
+      }, 1000);
+      return () => window.clearInterval(iv);
+    }
+  }, [reminder?.kind, reminder?.phase]);
+
   if (ask) return <AskView label={ask.label} detail={ask.detail} />;
   if (!reminder) return null;
-  const drinking = reminder.phase === "drinking";
+
+  const kind = reminder.kind ?? "water";
+  const phase = reminder.phase;
+
+  const isWorking = phase === "drinking" || phase === "resting" || phase === "stretching";
+
+  const theme =
+    kind === "eye"
+      ? { color: ACCENT.purple, icon: Eye, title: tt("Göz dinlendirme vakti"), activeTitle: tt("Gözlerin dinleniyor…") }
+      : kind === "stretch"
+        ? { color: "#FF5C8A", icon: Sparkles, title: tt("Duruş & Esneme vakti"), activeTitle: tt("Omuzlar rahatladı!") }
+        : { color: ACCENT.blue, icon: Droplet, title: tt("Su içme vakti"), activeTitle: tt("Afiyet olsun!") };
 
   return (
     <motion.div
@@ -30,29 +62,97 @@ export function ReminderView() {
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
-          key={reminder.phase}
+          key={`${kind}-${phase}`}
           className="min-w-0 flex-1"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.16 }}
         >
-          <p className="flex items-center gap-1.5 text-[14px] font-medium leading-tight" style={{ color: tintText(COLOR) }}>
-            <motion.span animate={drinking ? { y: [0, -2, 0] } : { y: [0, -2.5, 0] }} transition={{ duration: 1.2, repeat: Infinity }} className="flex">
-              <Droplet size={14} strokeWidth={2.4} fill="currentColor" />
+          <p className="flex items-center gap-1.5 text-[14px] font-medium leading-tight" style={{ color: tintText(theme.color) }}>
+            <motion.span
+              animate={isWorking ? { y: [0, -2, 0], scale: [1, 1.15, 1] } : { y: [0, -2.5, 0] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+              className="flex"
+            >
+              <theme.icon size={14} strokeWidth={2.4} fill="currentColor" />
             </motion.span>
-            {drinking ? tt("Afiyet olsun!") : tt("Su içme vakti")}
+            <span>{isWorking ? theme.activeTitle : theme.title}</span>
           </p>
+
           <p className="mt-0.5 truncate text-[11px] text-label-2">
-            {drinking ? tt("Bugün {0}. bardak", today) : today ? tt("Bugün {0} bardak içtin, bir tane daha?", today) : tt("Benimle bir bardak su içer misin?")}
+            {kind === "water" && (
+              isWorking
+                ? tt("Bugün {0}. bardak", todayWater)
+                : todayWater
+                  ? tt("Bugün {0} bardak içtin, bir tane daha?", todayWater)
+                  : tt("Benimle bir bardak su içer misin?")
+            )}
+            {kind === "eye" && (
+              phase === "resting"
+                ? tt("En az 6 metre uzağa bakıyorsun · {0} sn kaldı", eyeCountdown)
+                : tt("20 saniye boyunca uzağa bak, gözlerin tazelensin")
+            )}
+            {kind === "stretch" && (
+              phase === "stretching"
+                ? tt("Harika bir esneme! Derin bir nefes al ✨")
+                : tt("Omuzları geriye at, dik dur ve derin nefes al")
+            )}
           </p>
         </motion.div>
       </AnimatePresence>
-      {!drinking && (
+
+      {!isWorking ? (
         <>
-          <Action icon={Clock} label={tt("Sonra")} title={tt("15 dakika sonra hatırlat")} color={ACCENT.gray} onClick={snoozeWater} />
-          <Action icon={Droplet} label={tt("İçtim")} title={tt("İçtim / içiyorum")} color={COLOR} onClick={drankWater} strong />
+          <Action
+            icon={Clock}
+            label={tt("Sonra")}
+            title={tt("Ertele")}
+            color={ACCENT.gray}
+            onClick={() => snoozeReminder(kind)}
+          />
+          {kind === "water" && (
+            <Action
+              icon={Droplet}
+              label={tt("İçtim")}
+              title={tt("İçtim / içiyorum")}
+              color={theme.color}
+              onClick={() => useHabits.getState().drinkGlass()}
+              strong
+            />
+          )}
+          {kind === "eye" && (
+            <Action
+              icon={Eye}
+              label={tt("Dinlendir")}
+              title={tt("20 saniyelik göz molasını başlat")}
+              color={theme.color}
+              onClick={() => useNook.getState().setReminder({ kind: "eye", phase: "resting" })}
+              strong
+            />
+          )}
+          {kind === "stretch" && (
+            <Action
+              icon={Sparkles}
+              label={tt("Esnedim")}
+              title={tt("Esnedim ve dik durdum")}
+              color={theme.color}
+              onClick={doneStretch}
+              strong
+            />
+          )}
         </>
+      ) : (
+        kind === "eye" && phase === "resting" && (
+          <Action
+            icon={Check}
+            label={tt("Tamam")}
+            title={tt("Göz dinlendirmeyi bitir")}
+            color={theme.color}
+            onClick={() => doneEye(false)}
+            strong
+          />
+        )
       )}
     </motion.div>
   );

@@ -5,7 +5,7 @@
  * da oradaysa onun ötesine).
  */
 import { useEffect, useState } from "react";
-import { emitTo, listen } from "@tauri-apps/api/event";
+import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { setHitExtra } from "../hooks/useHitRect";
 import { useNook } from "../store/nook";
 import { inTauri, isPrimary, sideCard, subscribe, type CardPlace } from "./bridge";
@@ -46,6 +46,7 @@ export const openWidth = () => {
 let last: SoundCardData = { visible: false, detached: false };
 const send = (d: SoundCardData) => {
   last = d;
+  void emit("nook://sound-card", d).catch(() => {});
   return emitTo("sound-card", "nook://sound-card", d).catch(() => {});
 };
 if (isPrimary && inTauri) void listen("nook://sound-card-ready", () => void send(last));

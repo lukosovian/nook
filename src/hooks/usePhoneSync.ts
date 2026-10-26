@@ -8,7 +8,8 @@ import { fileIcon, inTauri, isPrimary, subscribe } from "../lib/bridge";
 import { useNook, type Pad } from "../store/nook";
 import { normalizeColor, normalizeLook, type Look } from "../lib/look";
 import { useClaude } from "../lib/claude";
-import { drankWater, snoozeWater, waterInfo } from "./useFeatures";
+import { snoozeWater, waterInfo } from "./useFeatures";
+import { getTodayWater, useHabits } from "../lib/habits";
 import { appPathOf, getDeck, getQuickState, isDangerous, keyVisual, refreshQuickState, runKey } from "../lib/deck";
 import { getAutomations, runAutomationNow, saveAutomations, triggerLabel, triggerMeta } from "../lib/automations";
 import { NOTES } from "../lib/notes";
@@ -55,7 +56,8 @@ function mirror() {
       pads: pads.map((p) => ({ id: p.id, title: p.title, text: p.text, at: p.at })),
       padId,
       claude: claudeMirror(),
-      water: waterInfo(),
+      water: { ...waterInfo(), count: getTodayWater(), goal: useHabits.getState().waterGoal },
+      habits: useHabits.getState().habits,
       shelf: shelf.map((i) => ({ id: i.id, name: i.name, ext: i.ext, size: i.size, isDir: i.isDir, isImage: i.isImage, pinned: !!i.pinned, addedAt: i.addedAt, path: i.path })),
       // Nook'un günlüğü: son iki hafta, en yeni önce
       diary: Object.keys(diary)
@@ -157,15 +159,22 @@ export function usePhoneSync() {
         mirror();
       } else if (st.sessions !== prev.sessions || st.plan !== prev.plan || st.setup !== prev.setup) schedule();
     });
+    const unsubHabits = useHabits.subscribe(schedule);
     const off = subscribe<{ kind: string; cmd: NoteCmd; op?: string; own?: boolean; on?: boolean; id?: string; look?: Partial<Look>; color?: string | null }>("nook://remote", (e) => {
       if (e.kind === "note") applyNote(e.cmd);
       if (e.kind === "shelf" && e.op === "remove" && e.id) useNook.getState().removeShelf(e.id);
       // Telefondaki su hatırlatmasına cevap: yalnızca PC'de de hatırlatma bekliyorsa (iki kez sayılmasın)
       if (e.kind === "water") {
         const due = waterInfo().due;
-        // Telefon kendi sayacıyla hatırlattıysa (PC'nin başında değilken) içilen yine sayılır
-        if (e.op === "drank" && (due || e.own)) drankWater();
-        if (e.op === "snooze" && due) snoozeWater();
+        // Telefon kendi sayacıyla hatırlattıysa veya direkt içtim dendiyse sayılır
+        if (e.op === "drank" || e.op === "drink") {
+          useHabits.getState().drinkGlass();
+        } else if (e.op === "snooze" && due) {
+          snoozeWater();
+        }
+      }
+      if (e.kind === "habit" && e.id) {
+        useHabits.getState().completeHabit(e.id);
       }
       // Telefondan kısayol tuşuna basıldı, otomasyon şimdi çalıştırıldı ya da açılıp kapandı
       if (e.kind === "deck" && e.op === "run") {
@@ -188,6 +197,7 @@ export function usePhoneSync() {
       window.clearInterval(tick);
       unsub();
       unsubClaude();
+      unsubHabits();
       off();
     };
   }, []);

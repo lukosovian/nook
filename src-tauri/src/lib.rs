@@ -254,6 +254,7 @@ pub fn run() {
         .on_window_event(|win, event| {
             shield::on_window_event(win, event);
             whatsapp::on_window_event(win, event);
+            studio::on_window_event(win, event);
             let shared = win.state::<Arc<Shared>>();
             match event {
                 // Tracker, imleci pencere-yerel koordinata çevirmek için konum/ölçeği önbellekte tutar.

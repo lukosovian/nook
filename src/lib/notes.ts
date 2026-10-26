@@ -194,7 +194,13 @@ export type DemoId =
   | "gamescreen"
   | "deckfix"
   | "whatsapp"
-  | "feedback";
+  | "feedback"
+  | "atmos"
+  | "habits"
+  | "phonetest"
+  | "wamute"
+  | "scenefilter"
+  | "polish033";
 
 export interface NoteItem {
   title: string;
@@ -213,6 +219,43 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.3",
+    date: tt("26 Ekim 2026"),
+    headline: tt("Canlı hava durumu atmosferleri, su ve alışkanlık takibi, WhatsApp sessize alma ve Nook Mobil bağlantı kontrolü"),
+    items: [
+      {
+        title: tt("Adada canlı hava durumu ve gece atmosferi"),
+        text: tt("Bulunduğun şehrin hava durumuna ve günün saatine göre ada artık canlanıyor! Yağmurlu günlerde eğik yağmur damlaları ve taban sıçramaları, karlı havalarda süzülen kar kristalleri ve köşe kırağıları, fırtınada şimşek parlamaları, sonbahar günlerinde rüzgarda uçuşan sarı-kızıl yapraklar, gece vakti ise parıldayan mikro yıldızlar ve etrafta salınan sevimli bir ateş böceği adaya eşlik ediyor. Dilersen Ayarlar › Ada ve Nook veya Modüller › Hava durumu altındaki “Canlı hava ve gece atmosferi” anahtarıyla dilediğin an kapatabilirsin."),
+        demo: "atmos",
+      },
+      {
+        title: tt("Tek tıkla su takibi ve sağlıklı alışkanlıklar"),
+        text: tt("Artık su içmek için hatırlatmanın gelmesini beklemek zorunda değilsin! Hem bilgisayarda Ayarlar › Sağlık panelinden ve günün özetinden hem de telefonda Nook Mobil ana ekranından tek dokunuşla “+1 Bardak İçtim” diyebilirsin. Günlük 8 bardak hedefin bardak bardak dolar, iki taraf anında senkronize olur. Ayrıca 20-20-20 göz dinlendirme ve duruş-esneme molaları da adada canlı geri sayım ve sevimli Nook animasyonlarıyla karşına çıkar; Nook gözlerini dinlendirirken ya da esnerken sana eşlik eder."),
+        demo: "habits",
+      },
+      {
+        title: tt("WhatsApp bildirimlerini sessize alma ve giden mesaj filtresi"),
+        text: tt("WhatsApp modülünün üst köşesine eklenen zil simgesiyle veya Ayarlar › Bildirimler altındaki “WhatsApp bildirim kartları” anahtarıyla dilediğin an mesaj bildirimlerini sessize alabilirsin. Sessize aldığında adada bildirim kartı fırlamaz, dikkatini dağıtmaz; mesajlar sadece modülün içinde sessizce birikir. Ayrıca kendi gönderdiğin giden mesajların yanlışlıkla gelen bildirimmiş gibi adada açılması da engellendi."),
+        demo: "wamute",
+      },
+      {
+        title: tt("Nook Mobil canlı bağlantı takibi ve bildirim testi"),
+        text: tt("Telefon ile bilgisayar arasındaki bağlantıyı kontrol etmek artık çok kolay. Ayarlar › Telefon sekmesinde telefonunun canlı bağlantı durumunu (yeşil ışık, son görülme süresi ve yerel IP) görebilir, “Bildirimi Test Et” düğmesiyle telefonuna anında bir test bildirimi fırlatarak iletimin sorunsuz çalıştığını tek tıkla doğrulayabilirsin."),
+        demo: "phonetest",
+      },
+      {
+        title: tt("Dizi sahneleri ve uzun kesitlerde akıllı Argus & Hum filtrelemesi"),
+        text: tt("YouTube veya internette bir dizinin 45 dakika ya da 1 saat süren sahnelerini, kesitlerini, özel kurgularını veya derlemelerini izlerken Nook artık bunları tam bir bölüm sanmıyor. Başlıkta sahne, kesit, klip, derleme gibi ifadeler geçen veya açık bir bölüm numarası (örn: 14. Bölüm) bulunmayan videolar için Hum çalan müzikleri Argus'taki rastgele bölümlere (1. bölüme) eklemiyor ve video bitince 'bitti mi?' diye sormuyor."),
+        demo: "scenefilter",
+      },
+      {
+        title: tt("Ada ve Studio arayüz cilaları"),
+        text: tt("Adanın üst çubuğundaki tarihe tıklayarak doğrudan Takvim sekmesine geçebilirsin. Tüm modüller açıldığında en üstteki kartların fareyle üzerine gelince kırpılması düzeltildi. Ayrıca Nook Studio penceresi artık en son bıraktığın boyutları hatırlıyor ve yeniden açıldığında kaldığı ölçülerle ekrana geliyor."),
+        demo: "polish033",
+      },
+    ],
+  },
   {
     version: "0.3.2",
     date: tt("25 Ekim 2026"),

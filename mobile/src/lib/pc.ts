@@ -60,6 +60,10 @@ export interface Status {
   powerTimer?: PowerTimer | null;
   /** Gizlilik kalkanı şu an açık mı (eski PC sürümlerinde yok) */
   shield?: boolean;
+  /** Su takibi durumu */
+  water?: { due: boolean; nextAt: number | null; last: number; count?: number; goal?: number } | null;
+  /** Sağlıklı alışkanlıklar listesi */
+  habits?: { id: string; title: string; desc: string; icon: string; color: string; intervalMin: number; targetDaily: number; enabled: boolean; lastDoneAt: number }[];
 }
 
 export type TimerAction = "shutdown" | "restart" | "sleep";
@@ -907,3 +911,11 @@ export const runPcAuto = (p: Pairing, id: string) => (DEMO(p) ? Promise.resolve(
 
 /** Otomasyonu aç / kapa */
 export const setPcAuto = (p: Pairing, id: string, on: boolean) => (DEMO(p) ? Promise.resolve() : request(p, "POST", "/v1/deck", { op: "auto", id, on }).then(() => undefined));
+
+/** PC'ye 1 bardak su içildiğini bildir */
+export const drinkWater = (p: Pairing) =>
+  request(p, "POST", "/v1/water", { op: "drank", own: true }).then(() => undefined);
+
+/** Su durumunu PC'den sorgula */
+export const getWaterStatus = (p: Pairing) =>
+  request(p, "GET", "/v1/water").then((r) => r.json() as Promise<{ due: boolean; nextAt: number | null; last: number; count?: number; goal?: number }>);

@@ -4,7 +4,7 @@ import { useGemini } from "../../hooks/useGemini";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
 import { INVESTORS, refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
 import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
-import { alarmRing, listMonitors, openPath, quickState, remoteControlSet, remoteInfo, remoteReset, remoteSet, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
+import { alarmRing, listMonitors, openPath, quickState, remoteControlSet, remoteInfo, remoteReset, remoteSet, remoteTestNotification, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
 import { syncFeeds } from "../../lib/ics";
 import { shortName } from "./ControlPanel";
@@ -28,6 +28,8 @@ import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 import { conflictOf, duplicateOf, SHORTCUTS, useInstalledApps } from "../../lib/shortcuts";
 import { FeedbackSection } from "./FeedbackSection";
+import { useHabits, getTodayWater } from "../../lib/habits";
+import { triggerReminder } from "../../hooks/useFeatures";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: tt("Ana") },
@@ -237,6 +239,12 @@ export function CategoryBody({ id }: { id: CatId }) {
             <Row label={tt("Sıkılınca oyun teklif etsin")}>
               <Toggle on={s.playOffers} onChange={(v) => update({ playOffers: v })} />
             </Row>
+            <Row label={tt("Canlı hava ve gece atmosferi")} hint={tt("Yağmur, kar, sonbahar yaprakları ve gece yıldızları adada canlanır")}>
+              <Toggle on={s.weatherAtmosphere} onChange={(v) => update({ weatherAtmosphere: v })} color={ACCENT.blue} />
+            </Row>
+            <Row label={tt("Cadılar Bayramı etkinlikleri")} hint={tt("25–31 Ekim: Adada şeker mi şaka mı ve sevimli örümcek")}>
+              <Toggle on={s.halloweenSeason} onChange={(v) => update({ halloweenSeason: v })} color={ACCENT.orange} />
+            </Row>
           </Section>
           <Section title={tt("Animasyonlar")}>
             <Row label={tt("Ekranlar arası geçiş")}>
@@ -282,6 +290,9 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Row label={tt("Windows bildirimleri")} hint={tt("Gelen bildirimler adada kart olarak görünür")}>
             <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} />
           </Row>
+          <Row label={tt("WhatsApp bildirim kartları")} hint={tt("Mesaj gelince adada hızlı yanıt kartı çıkar; kapatırsan yalnızca modülde birikir")}>
+            <Toggle on={s.whatsappNotify} onChange={(v) => update({ whatsappNotify: v })} color={ACCENT.green} />
+          </Row>
           <Row label={tt("Olay kartları")} hint={tt("Şarj, USB, kulaklık, internet gibi olaylar")}>
             <Toggle on={s.events} onChange={(v) => update({ events: v })} />
           </Row>
@@ -304,6 +315,9 @@ export function CategoryBody({ id }: { id: CatId }) {
     case "health":
       return (
         <>
+          <Section title={tt("Su ve Alışkanlıklar")}>
+            <HabitsTracker />
+          </Section>
           <Section title={tt("Mola hatırlatıcıları")}>
             <Row label={tt("Su hatırlatıcısı")} hint={tt("Oyunda ve tam ekranda susar; telefonda da çıkar")}>
               <Segmented id="settings-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
@@ -386,6 +400,9 @@ export function CategoryBody({ id }: { id: CatId }) {
                 <TextInput value={s.weatherCity} placeholder={tt("Otomatik")} onChange={(v) => update({ weatherCity: v })} />
               </Row>
             )}
+            <Row label={tt("Adada canlı atmosfer")} hint={tt("Hava durumuna göre adada yağmur, kar veya güneş efektleri")}>
+              <Toggle on={s.weatherAtmosphere} onChange={(v) => update({ weatherAtmosphere: v })} color={ACCENT.blue} />
+            </Row>
           </Section>
           <Section title="Hum">
             <Row label={tt("Otomatik Hum")} hint={tt("Bilgisayarda çalan şarkıları arkada tanıyıp kaydeder; mikrofon kullanmaz")}>
@@ -551,6 +568,7 @@ function PhoneSection() {
   const [showQr, setShowQr] = useState(false);
   const [appQr, setAppQr] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   useEffect(() => void remoteInfo().then(setInfo), []);
   useEffect(() => {
     if (!showQr) return;
@@ -580,6 +598,44 @@ function PhoneSection() {
       )}
       {info.enabled && (
         <>
+          {/* Mobil Bağlantı & Bildirim Sağlığı */}
+          <div className="my-2 rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    background: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "#3ccf6e" : "#ffd23f",
+                    boxShadow: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "0 0 8px #3ccf6e" : "none",
+                  }}
+                />
+                <div className="min-w-0">
+                  <span className="block truncate text-[11.5px] font-bold text-white">
+                    {info.lastSeen && Date.now() - info.lastSeen < 60_000
+                      ? tt("Telefon Bağlı (Canlı)")
+                      : info.lastSeen
+                        ? tt("Son görülme: {0} dk önce", Math.max(1, Math.round((Date.now() - info.lastSeen) / 60_000)))
+                        : tt("Telefon bekleniyor")}
+                  </span>
+                  <span className="block truncate text-[9.5px] text-label-3">
+                    {info.lastIp ? `${info.lastIp} · Port ${info.port}` : tt("Henüz bağlantı isteği gelmedi")}
+                  </span>
+                </div>
+              </div>
+
+              <TextButton
+                onClick={async () => {
+                  setTesting(true);
+                  await remoteTestNotification();
+                  await remoteInfo().then(setInfo);
+                  setTimeout(() => setTesting(false), 2000);
+                }}
+              >
+                {testing ? tt("Gönderildi ✓") : tt("Bildirimi Test Et")}
+              </TextButton>
+            </div>
+          </div>
+
           <Row label={tt("Telefona Nook Mobil'i kur (Android)")}>
             <TextButton onClick={() => setAppQr((v) => !v)}>{appQr ? tt("Gizle") : tt("Kodu göster")}</TextButton>
           </Row>
@@ -626,6 +682,110 @@ function PhoneSection() {
         </>
       )}
     </Section>
+  );
+}
+
+function HabitsTracker() {
+  const habits = useHabits((s) => s.habits);
+  const waterGoal = useHabits((s) => s.waterGoal);
+  const drinkGlass = useHabits((s) => s.drinkGlass);
+  const undoGlass = useHabits((s) => s.undoGlass);
+  const completeHabit = useHabits((s) => s.completeHabit);
+  const todayWater = getTodayWater();
+
+  return (
+    <div className="space-y-3 pb-2">
+      {/* Su Takibi Kartı */}
+      <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-cyan-950/20 to-transparent p-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💧</span>
+            <div>
+              <span className="block text-[13px] font-bold text-white">
+                {tt("Su Takibi")}
+              </span>
+              <span className="block text-[10px] text-cyan-300">
+                {todayWater} / {waterGoal} {tt("bardak")} ({todayWater * 250} ml)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {todayWater > 0 && (
+              <TextButton onClick={undoGlass} tone="danger">
+                {tt("Geri al")}
+              </TextButton>
+            )}
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={drinkGlass}
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold text-black"
+              style={{ background: "#2fd4c0", boxShadow: "0 2px 10px rgba(47,212,192,0.3)" }}
+            >
+              <span>+1</span>
+              <span>{tt("Bardak İçtim")}</span>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Bardak İkonları */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {Array.from({ length: waterGoal }, (_, i) => {
+            const filled = i < todayWater;
+            return (
+              <span
+                key={i}
+                className={`flex h-6 w-6 items-center justify-center rounded-lg text-[13px] transition-transform ${
+                  filled ? "bg-cyan-500/25 border border-cyan-400/40" : "bg-white/5 border border-white/5 opacity-40"
+                }`}
+                title={filled ? tt("{0}. bardak içildi", i + 1) : tt("{0}. bardak", i + 1)}
+              >
+                {filled ? "💧" : "⚪"}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Diğer Alışkanlıklar */}
+      <div className="space-y-1.5">
+        <span className="block px-1 text-[11px] font-semibold text-label-3">
+          {tt("Sağlıklı Alışkanlıklar")}
+        </span>
+        {habits.filter((h) => h.id !== "water").map((h) => (
+          <div
+            key={h.id}
+            className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-base">{h.icon}</span>
+              <div className="min-w-0">
+                <span className="block truncate text-[12px] font-semibold text-white">
+                  {h.title}
+                </span>
+                <span className="block truncate text-[9.5px] text-label-3">
+                  {h.desc}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {(h.id === "eyes" || h.id === "stretch") && (
+                <TextButton
+                  onClick={() => triggerReminder(h.id === "eyes" ? "eye" : "stretch")}
+                >
+                  {tt("Başlat ▶")}
+                </TextButton>
+              )}
+              <TextButton onClick={() => completeHabit(h.id)}>
+                {tt("Yaptım ✓")}
+              </TextButton>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
