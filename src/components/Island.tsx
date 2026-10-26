@@ -42,7 +42,7 @@ import { SearchPanel } from "./search/SearchPanel";
 import { Tour, useTourSteps } from "./tour/Tour";
 import { IslandAtmosphere } from "./atmosphere/IslandAtmosphere";
 import { isHalloweenActive } from "../lib/halloween";
-import { HangingSpider, PumpkinGlow, TrickOrTreatOverlay } from "./halloween/HalloweenElements";
+import { HangingSpider, PumpkinGlow, HalloweenView } from "./halloween/HalloweenElements";
 
 /**
  * Dış gölge yok: şeffaf pencerede yarı saydam siyah, WebView2'nin zemini ara sıra "saydam beyaz"a
@@ -286,8 +286,8 @@ export function Island() {
           {/* Canlı hava durumu & gece atmosferi */}
           <IslandAtmosphere width={width} height={height} />
 
-          {/* Cadılar Bayramı: Balkabağı parıltısı */}
-          {isHalloweenActive(settings) && <PumpkinGlow />}
+          {/* Cadılar Bayramı: Balkabağı parıltısı (yalnızca kapalı adada) */}
+          {isHalloweenActive(settings) && settings.halloweenGlow !== false && mode === "collapsed" && <PumpkinGlow />}
 
           <AnimatePresence>
             {mode === "expanded" && <Panels key="panels" />}
@@ -342,17 +342,15 @@ export function Island() {
             {mode === "toast" && <ToastView key="toast" />}
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
+            {mode === "halloween" && <HalloweenView key="halloween" />}
             {mode === "claude" && <ClaudeView key="claude" />}
             {mode === "hum" && <HumView key="hum" />}
             {mode === "guard" && <GuardView key="guard" />}
             {mode === "gate" && <GateView key="gate" />}
           </AnimatePresence>
-
-          {/* Cadılar Bayramı: Şeker mi şaka mı kapı tıklatması & etkileşimi */}
-          {isHalloweenActive(settings) && mode === "collapsed" && <TrickOrTreatOverlay width={width} />}
         </motion.div>
         {/* Cadılar Bayramı: Adanın sağ üst köşesinden sarkan örümcek (yalnızca ada kapalıyken) */}
-        {isHalloweenActive(settings) && mode === "collapsed" && <HangingSpider islandRef={ref} />}
+        {isHalloweenActive(settings) && settings.halloweenGlow !== false && mode === "collapsed" && <HangingSpider islandRef={ref} />}
         </div>
         {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}
         <AnimatePresence>

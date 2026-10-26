@@ -343,14 +343,15 @@ export function useEventFeed() {
 
   // Kuyruğun başındaki kartı süre dolunca kaldır. Süre yalnızca kart gerçekten ekrandayken işler:
   // alarm çalarken, oyunda ada gizliyken ya da ada açıkken gelen bildirim beklemede kalır, sonra gösterilir.
+  // Fare adanın üzerindeyse (hovered) kullanıcı okuyor veya tıklayacaktır; fare gidene kadar bildirim bekler.
   const head = useNook((s) => s.toasts[0]);
   const showing = useNook((s) => !s.fullscreen && islandModeOf(s) === "toast");
-  const holdReplyToast = useNook((s) => s.hovered && !!(s.toasts[0]?.replyKey || s.toasts[0]?.whatsappChat));
+  const holdToast = useNook((s) => s.hovered);
   useEffect(() => {
-    if (!head || !showing || holdReplyToast) return;
-    const t = window.setTimeout(() => useNook.getState().shiftToast(), head.ms ?? 3200);
+    if (!head || !showing || holdToast) return;
+    const t = window.setTimeout(() => useNook.getState().shiftToast(), head.ms ?? 3400);
     return () => window.clearTimeout(t);
-  }, [head?.id, showing, holdReplyToast]);
+  }, [head?.id, showing, holdToast]);
 }
 
 /** Yeni ekran görüntüsü → rafa düşer, Nook sevinir (yalnızca ana ada). */

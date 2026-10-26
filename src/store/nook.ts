@@ -142,6 +142,7 @@ export type Tab =
   | "claude"
   | "whatsapp"
   | "hum"
+  | "habits"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -443,6 +444,8 @@ export interface Settings extends NativeSettings {
   colorFormat: "hex" | "rgb" | "hsl";
   /** HEX'i # olmadan kopyala */
   colorNoHash: boolean;
+  /** Cadılar Bayramı balkabağı ışığı ve örümcek efekti */
+  halloweenGlow?: boolean;
   /** Raftan dışarı bırakılan öğe raftan kalksın (sabitlenenler kalır) */
   shelfRemoveAfterDrop: boolean;
   /** Ses karıştırıcıda gizlenen / sabitlenen uygulamalar (anahtar) */
@@ -563,6 +566,7 @@ export const DEFAULT_SETTINGS: Settings = {
   introStyle: "random",
   moveStyle: "random",
   updateAnim: "cycle",
+  halloweenGlow: true,
   powerSaver: true,
   argusProfile: "",
   argusPromo: true,
@@ -717,7 +721,7 @@ interface NookState {
   /** Açılış animasyonu sürüyor */
   intro: boolean;
   /** Kalıcı hatırlatma (su, göz, esneme): kullanıcı cevaplayana kadar adada durur */
-  reminder: { kind: "water" | "eye" | "stretch"; phase: "due" | "drinking" | "resting" | "stretching" } | null;
+  reminder: { kind: "water" | "eye" | "stretch" | "habit"; phase: "due" | "drinking" | "resting" | "stretching"; habitId?: string; title?: string; icon?: string } | null;
   /** Claude Code izin/soru kartı adada (bkz. lib/claude) */
   claudeCard: boolean;
   /** Açık adanın "tam ekran" hâli: ada ekrana yayılır (boyutu pencere büyüyünce ölçülür) */
@@ -1266,7 +1270,7 @@ export const useNook = create<NookState>()(
         set((s) => {
           const key = dayKey();
           const cur = { ...EMPTY_DAY, ...s.days[key] };
-          for (const [k, v] of Object.entries(patch) as [keyof DayStats, number][]) cur[k] += v;
+          for (const [k, v] of Object.entries(patch) as [keyof DayStats, number][]) cur[k] = Math.max(0, cur[k] + v);
           // Yalnızca son 30 gün tutulur
           const keep = Object.keys(s.days).filter((k) => k !== key).sort().slice(-29);
           // Yıl özeti: aynı sayaçlar + saat dağılımı, günler, sanatçılar

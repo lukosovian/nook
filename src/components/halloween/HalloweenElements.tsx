@@ -108,21 +108,20 @@ export function HangingSpider({ islandRef }: { islandRef?: React.RefObject<HTMLD
   );
 }
 
-/** Jack-o'-lantern fenerinin titreyen sıcak turuncu/mor mum ışığı */
+/** Jack-o'-lantern fenerinin titreyen sıcak turuncu/mor mum ışığı (yalnızca kapalı adada yumuşak bir parıltı) */
 export function PumpkinGlow() {
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
       <motion.div
-        className="absolute -top-12 left-1/2 h-36 w-64 -translate-x-1/2 rounded-full opacity-35"
+        className="absolute inset-0 rounded-[inherit]"
         style={{
-          background: "radial-gradient(ellipse at 50% 30%, #ff8a1f 0%, #9b7bff 45%, transparent 75%)",
+          background: "radial-gradient(ellipse at 50% 50%, rgba(255,138,31,0.22) 0%, rgba(155,123,255,0.08) 45%, transparent 75%)",
         }}
         animate={{
-          scale: [1, 1.06, 0.97, 1.03, 1],
-          opacity: [0.32, 0.42, 0.28, 0.38, 0.32],
+          opacity: [0.7, 1, 0.65, 0.9, 0.7],
         }}
         transition={{
-          duration: 3.6,
+          duration: 3.2,
           repeat: Infinity,
           ease: "easeInOut",
         }}
@@ -131,8 +130,8 @@ export function PumpkinGlow() {
   );
 }
 
-/** Şeker mi Şaka mı Bildirimi ve Etkileşimi */
-export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
+/** Şeker mi Şaka mı Bildirimi ve Etkileşimi (Adanın içinde ferah ve tıklanabilir kart) */
+export function HalloweenView() {
   const phase = useHalloween((s) => s.phase);
   const openAsking = useHalloween((s) => s.openAsking);
   const chooseCandy = useHalloween((s) => s.chooseCandy);
@@ -142,55 +141,54 @@ export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
   if (phase === "idle") return null;
 
   return (
-    <div className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center">
+    <motion.div
+      className="pointer-events-auto absolute inset-y-0 left-[62px] right-3 flex items-center justify-between"
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 8 }}
+      transition={{ duration: 0.18 }}
+    >
       <AnimatePresence mode="wait">
         {phase === "knocking" && (
           <motion.div
             key="knocking"
-            initial={{ opacity: 0, scale: 0.88, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.88 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             onClick={openAsking}
-            onMouseEnter={openAsking}
-            className="flex cursor-pointer items-center gap-2 rounded-full border border-orange-500/40 bg-black/90 px-3 py-1 shadow-lg backdrop-blur-md"
-            style={{
-              boxShadow: "0 4px 18px rgba(255,138,31,0.35)",
-            }}
+            className="flex flex-1 cursor-pointer items-center justify-between min-w-0"
           >
-            <motion.span
-              className="text-[13px]"
-              animate={{ rotate: [-8, 8, -8], scale: [1, 1.15, 1] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-            >
-              🎃
-            </motion.span>
-            <div className="leading-tight">
-              <span className="block text-[11px] font-bold text-white">
-                {tt("Tık tık! Kapı çalıyor…")}
+            <div className="min-w-0">
+              <span className="block truncate text-[12.5px] font-extrabold text-orange-200">
+                🎃 {tt("Tık tık! Kapı çalıyor…")}
               </span>
-              <span className="block text-[9px] text-orange-300">
+              <span className="block truncate text-[10px] text-orange-300/80">
                 {tt("Dokun: Şeker mi şaka mı?")}
               </span>
             </div>
+            <motion.span
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.94 }}
+              className="shrink-0 rounded-full bg-orange-500/20 px-3 py-1 text-[11px] font-bold text-orange-300 shadow-sm border border-orange-500/30"
+            >
+              {tt("Aç ▶")}
+            </motion.span>
           </motion.div>
         )}
 
         {phase === "asking" && (
           <motion.div
             key="asking"
-            initial={{ opacity: 0, scale: 0.9, y: 3 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="flex max-w-[92%] items-center justify-between gap-2.5 rounded-[14px] border border-orange-500/50 bg-[#0e0a16]/95 px-3 py-1.5 shadow-2xl backdrop-blur-md"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="flex flex-1 items-center justify-between gap-2 min-w-0"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[16px]">🎃</span>
-              <div className="min-w-0">
-                <p className="truncate text-[11.5px] font-extrabold text-orange-200">
-                  {tt("Şeker mi şaka mı?")}
-                </p>
-                <p className="text-[9px] text-white/50">{tt("Nook kapına geldi!")}</p>
-              </div>
+            <div className="min-w-0">
+              <span className="block truncate text-[12px] font-extrabold text-orange-200">
+                {tt("Şeker mi şaka mı?")}
+              </span>
+              <span className="block truncate text-[9.5px] text-white/50">{tt("Nook kapına geldi!")}</span>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -199,7 +197,7 @@ export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={chooseCandy}
-                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-bold text-black"
+                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-bold text-black shadow-md"
                 style={{ background: "#ff8a1f", boxShadow: "0 2px 10px rgba(255,138,31,0.4)" }}
               >
                 <span>🍬</span>
@@ -211,7 +209,7 @@ export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={chooseTrick}
-                className="flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-950/60 px-2 py-1 text-[10.5px] font-bold text-purple-200"
+                className="flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-950/60 px-2.5 py-1 text-[10.5px] font-bold text-purple-200"
               >
                 <span>👻</span>
                 <span>{tt("Şaka Yap")}</span>
@@ -222,7 +220,7 @@ export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
                 onClick={dismiss}
                 className="ml-0.5 rounded-full p-1 text-white/40 hover:bg-white/10 hover:text-white"
               >
-                <X size={11} />
+                <X size={12} />
               </button>
             </div>
           </motion.div>
@@ -231,23 +229,17 @@ export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
         {phase === "candy" && (
           <motion.div
             key="candy"
-            initial={{ opacity: 0, scale: 0.85 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            className="flex items-center gap-2 rounded-full border border-green-500/40 bg-black/90 px-3.5 py-1.5 shadow-lg"
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="flex flex-1 items-center gap-2 min-w-0"
           >
-            <motion.span
-              animate={{ y: [-4, 0, -4] }}
-              transition={{ duration: 0.6, repeat: Infinity }}
-              className="text-[14px]"
-            >
-              🍬
-            </motion.span>
-            <div className="leading-tight">
-              <span className="block text-[11px] font-bold text-white">
+            <span className="text-xl">🍬</span>
+            <div className="min-w-0">
+              <span className="block truncate text-[12px] font-bold text-white">
                 {tt("Nefis! Çok teşekkürler! ♥")}
               </span>
-              <span className="block text-[9px] text-green-300 font-semibold">
+              <span className="block truncate text-[10px] text-green-300 font-semibold">
                 +15 {tt("Sevgi puanı kazandın")}
               </span>
             </div>
@@ -257,29 +249,25 @@ export function TrickOrTreatOverlay({ width: _width }: { width?: number }) {
         {phase === "trick" && (
           <motion.div
             key="trick"
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="flex items-center gap-2 rounded-full border border-purple-500/40 bg-[#160b24]/95 px-3.5 py-1.5 shadow-lg"
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="flex flex-1 items-center gap-2 min-w-0"
           >
-            <motion.span
-              animate={{ rotate: [-14, 14, -14], scale: [1, 1.2, 1] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-              className="text-[16px]"
-            >
-              👻
-            </motion.span>
-            <div className="leading-tight">
-              <span className="block text-[11.5px] font-extrabold text-purple-200">
+            <span className="text-xl">👻</span>
+            <div className="min-w-0">
+              <span className="block truncate text-[12.5px] font-extrabold text-purple-200">
                 {tt("BÖÖÖÖ! Korktun mu? 👻")}
               </span>
-              <span className="block text-[9px] text-purple-300">
+              <span className="block truncate text-[10px] text-purple-300">
                 {tt("Şakanın tadı damağımızda kaldı!")}
               </span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
+
+export const TrickOrTreatOverlay = HalloweenView;

@@ -51,7 +51,9 @@ export function ReminderView() {
       ? { color: ACCENT.purple, icon: Eye, title: tt("Göz dinlendirme vakti"), activeTitle: tt("Gözlerin dinleniyor…") }
       : kind === "stretch"
         ? { color: "#FF5C8A", icon: Sparkles, title: tt("Duruş & Esneme vakti"), activeTitle: tt("Omuzlar rahatladı!") }
-        : { color: ACCENT.blue, icon: Droplet, title: tt("Su içme vakti"), activeTitle: tt("Afiyet olsun!") };
+        : kind === "habit"
+          ? { color: ACCENT.teal, icon: Sparkles, title: reminder.title ?? tt("Alışkanlık vakti"), activeTitle: tt("Harika gidiyorsun!") }
+          : { color: ACCENT.blue, icon: Droplet, title: tt("Su içme vakti"), activeTitle: tt("Afiyet olsun!") };
 
   return (
     <motion.div
@@ -98,6 +100,9 @@ export function ReminderView() {
                 ? tt("Harika bir esneme! Derin bir nefes al ✨")
                 : tt("Omuzları geriye at, dik dur ve derin nefes al")
             )}
+            {kind === "habit" && (
+              tt("Bu alışkanlığın için vakit ayırma zamanı geldi ✨")
+            )}
           </p>
         </motion.div>
       </AnimatePresence>
@@ -138,6 +143,19 @@ export function ReminderView() {
               title={tt("Esnedim ve dik durdum")}
               color={theme.color}
               onClick={doneStretch}
+              strong
+            />
+          )}
+          {kind === "habit" && (
+            <Action
+              icon={Check}
+              label={tt("Yaptım")}
+              title={tt("Tamamla")}
+              color={theme.color}
+              onClick={() => {
+                if (reminder.habitId) useHabits.getState().completeHabit(reminder.habitId);
+                useNook.getState().setReminder(null);
+              }}
               strong
             />
           )}

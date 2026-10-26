@@ -1001,6 +1001,113 @@ function Polish033Demo() {
   );
 }
 
+function HabitsModuleDemo() {
+  const step = useTick(2000) % 2; // 0: Su Takibi & Geri Al · 1: Özel Alışkanlıklar & Mobil Bildirim
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            {step === 0 ? (
+              <motion.div
+                key="step0"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex w-[214px] items-center justify-between rounded-xl border border-teal-500/30 bg-teal-950/20 p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px]">💧</span>
+                  <div>
+                    <span className="block text-[7.5px] font-bold text-white">5 / 8 bardak (1250 ml)</span>
+                    <span className="block text-[6px] text-teal-300">{tt("Tek tıkla +1 Bardak & Geri Al")}</span>
+                  </div>
+                </div>
+                <span className="rounded-full bg-teal-400 px-2 py-0.5 text-[6.5px] font-bold text-black">
+                  +1 İçtim
+                </span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex w-[214px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px]">⭐</span>
+                  <div>
+                    <span className="block text-[7.5px] font-bold text-white">{tt("Özel Alışkanlık Ekle")}</span>
+                    <span className="block text-[6px] text-white/50">{tt("Hatırlatma aralığı & 📱 Telefona bildir")}</span>
+                  </div>
+                </div>
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[6.5px] font-bold text-white">
+                  60 dk · 📱
+                </span>
+              </motion.div>
+            )}
+
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[6.5px] font-bold"
+              style={{ background: tintBg(ACCENT.teal, 20), color: tintText(ACCENT.teal) }}
+            >
+              <span>🌿</span>
+              <span>{tt("Yeni Alışkanlıklar & Sağlık Modülü")}</span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
+function NotifHoldDemo() {
+  const step = useTick(2200) % 2; // 0: Normal Bildirim · 1: İmleç Geldi (Tam Metin & Zaman Durdu)
+
+  return (
+    <Stage>
+      <Fit w={240} h={100}>
+        <Pc w={240}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pt-1.5">
+            <motion.div
+              animate={{ borderColor: step === 1 ? "rgba(59,130,246,0.6)" : "rgba(255,255,255,0.1)" }}
+              className="flex w-[214px] items-center justify-between rounded-xl border bg-black/40 p-2.5"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="block text-[7.5px] font-bold text-blue-300">
+                  {step === 1 ? tt("Murat: Toplantı notlarını gönderdim…") : tt("Murat: Toplantı notları…")}
+                </span>
+                <span className={`block text-[6px] text-white/70 ${step === 1 ? "line-clamp-2" : "truncate"}`}>
+                  {step === 1
+                    ? tt("Yarın sabah 10:00'da sunum üzerinden geçeceğiz, dosyaları inceleyebilirsin.")
+                    : tt("Yarın sabah 10:00'da sunum…")}
+                </span>
+              </div>
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[6.5px] font-bold"
+                style={{
+                  background: step === 1 ? tintBg(ACCENT.blue, 28) : tintBg(ACCENT.gray, 20),
+                  color: step === 1 ? tintText(ACCENT.blue) : "white",
+                }}
+              >
+                {step === 1 ? tt("İmleç Durdurdu ⏸") : "3.4s"}
+              </span>
+            </motion.div>
+
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[6.5px] font-bold"
+              style={{ background: tintBg(ACCENT.blue, 18), color: tintText(ACCENT.blue) }}
+            >
+              <span>🔔</span>
+              <span>{tt("Fare gelince tam metin · Tıkla Bildirimler'e git")}</span>
+            </div>
+          </div>
+        </Pc>
+      </Fit>
+    </Stage>
+  );
+}
+
 export const DEMOS20 = {
   sharehold: ShareHoldDemo,
   feedstyles: FeedStylesDemo,
@@ -1015,4 +1122,6 @@ export const DEMOS20 = {
   wamute: WaMuteDemo,
   scenefilter: SceneFilterDemo,
   polish033: Polish033Demo,
+  habitsmod: HabitsModuleDemo,
+  notifhold: NotifHoldDemo,
 };

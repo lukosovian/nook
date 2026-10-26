@@ -33,6 +33,7 @@ import { ShelfPanel } from "./ShelfPanel";
 import { StatsPanel } from "./StatsPanel";
 import { ClaudePanel } from "./ClaudePanel";
 import { WhatsAppPanel } from "./WhatsAppPanel";
+import { HabitsPanel } from "./HabitsPanel";
 
 const PANEL: Record<Module, () => React.JSX.Element> = {
   chat: () => <ChatPanel />,
@@ -43,6 +44,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   alarm: AlarmPanel,
   calendar: CalendarPanel,
   remind: RemindPanel,
+  habits: HabitsPanel,
   focus: FocusPanel,
   apps: AppsPanel,
   notify: NotifyPanel,

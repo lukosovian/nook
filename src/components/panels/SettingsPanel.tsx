@@ -28,8 +28,8 @@ import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 import { conflictOf, duplicateOf, SHORTCUTS, useInstalledApps } from "../../lib/shortcuts";
 import { FeedbackSection } from "./FeedbackSection";
-import { useHabits, getTodayWater } from "../../lib/habits";
-import { triggerReminder } from "../../hooks/useFeatures";
+import { isHalloweenSeason } from "../../lib/halloween";
+import { HabitsPanel } from "./HabitsPanel";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: tt("Ana") },
@@ -242,9 +242,11 @@ export function CategoryBody({ id }: { id: CatId }) {
             <Row label={tt("Canlı hava ve gece atmosferi")} hint={tt("Yağmur, kar, sonbahar yaprakları ve gece yıldızları adada canlanır")}>
               <Toggle on={s.weatherAtmosphere} onChange={(v) => update({ weatherAtmosphere: v })} color={ACCENT.blue} />
             </Row>
-            <Row label={tt("Cadılar Bayramı etkinlikleri")} hint={tt("25–31 Ekim: Adada şeker mi şaka mı ve sevimli örümcek")}>
-              <Toggle on={s.halloweenSeason} onChange={(v) => update({ halloweenSeason: v })} color={ACCENT.orange} />
-            </Row>
+            {isHalloweenSeason() && (
+              <Row label={tt("Cadılar Bayramı etkinlikleri")} hint={tt("25–31 Ekim: Balkabağı parıltısı ve sevimli örümcek (1 Kasım'da kendiliğinden kapanır)")}>
+                <Toggle on={s.halloweenSeason !== false} onChange={(v) => update({ halloweenSeason: v })} color={ACCENT.orange} />
+              </Row>
+            )}
           </Section>
           <Section title={tt("Animasyonlar")}>
             <Row label={tt("Ekranlar arası geçiş")}>
@@ -686,107 +688,7 @@ function PhoneSection() {
 }
 
 function HabitsTracker() {
-  const habits = useHabits((s) => s.habits);
-  const waterGoal = useHabits((s) => s.waterGoal);
-  const drinkGlass = useHabits((s) => s.drinkGlass);
-  const undoGlass = useHabits((s) => s.undoGlass);
-  const completeHabit = useHabits((s) => s.completeHabit);
-  const todayWater = getTodayWater();
-
-  return (
-    <div className="space-y-3 pb-2">
-      {/* Su Takibi Kartı */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-cyan-950/20 to-transparent p-3.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">💧</span>
-            <div>
-              <span className="block text-[13px] font-bold text-white">
-                {tt("Su Takibi")}
-              </span>
-              <span className="block text-[10px] text-cyan-300">
-                {todayWater} / {waterGoal} {tt("bardak")} ({todayWater * 250} ml)
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {todayWater > 0 && (
-              <TextButton onClick={undoGlass} tone="danger">
-                {tt("Geri al")}
-              </TextButton>
-            )}
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={drinkGlass}
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold text-black"
-              style={{ background: "#2fd4c0", boxShadow: "0 2px 10px rgba(47,212,192,0.3)" }}
-            >
-              <span>+1</span>
-              <span>{tt("Bardak İçtim")}</span>
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Bardak İkonları */}
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {Array.from({ length: waterGoal }, (_, i) => {
-            const filled = i < todayWater;
-            return (
-              <span
-                key={i}
-                className={`flex h-6 w-6 items-center justify-center rounded-lg text-[13px] transition-transform ${
-                  filled ? "bg-cyan-500/25 border border-cyan-400/40" : "bg-white/5 border border-white/5 opacity-40"
-                }`}
-                title={filled ? tt("{0}. bardak içildi", i + 1) : tt("{0}. bardak", i + 1)}
-              >
-                {filled ? "💧" : "⚪"}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Diğer Alışkanlıklar */}
-      <div className="space-y-1.5">
-        <span className="block px-1 text-[11px] font-semibold text-label-3">
-          {tt("Sağlıklı Alışkanlıklar")}
-        </span>
-        {habits.filter((h) => h.id !== "water").map((h) => (
-          <div
-            key={h.id}
-            className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-base">{h.icon}</span>
-              <div className="min-w-0">
-                <span className="block truncate text-[12px] font-semibold text-white">
-                  {h.title}
-                </span>
-                <span className="block truncate text-[9.5px] text-label-3">
-                  {h.desc}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              {(h.id === "eyes" || h.id === "stretch") && (
-                <TextButton
-                  onClick={() => triggerReminder(h.id === "eyes" ? "eye" : "stretch")}
-                >
-                  {tt("Başlat ▶")}
-                </TextButton>
-              )}
-              <TextButton onClick={() => completeHabit(h.id)}>
-                {tt("Yaptım ✓")}
-              </TextButton>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <HabitsPanel />;
 }
 
 /** Tarif kutusu: numaralı adımlar ve alttaki not (wakeGuide.ts; telefonda da aynısı görünür) */

@@ -1,6 +1,7 @@
 import { isPrimary } from "../lib/bridge";
 import type { IslandMode } from "../lib/layout";
 import { useNook } from "../store/nook";
+import { useHalloween, isHalloweenActive } from "../lib/halloween";
 
 type State = ReturnType<typeof useNook.getState>;
 
@@ -28,8 +29,10 @@ export function islandModeOf(s: State): IslandMode {
   if (s.reminder || (s.autoAsk && isPrimary)) return "reminder";
   // Claude Code izin istiyor: cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
   if (s.claudeCard && isPrimary) return "claude";
-  // Yanıtlanabilir bildirim kartı (WhatsApp / Nook Mobil hızlı yanıt): üstüne gelince kapanmasın ki doğrudan yanıt yazılabilsin
-  if (s.toasts.length && (s.toasts[0].replyKey || s.toasts[0].whatsappChat) && !s.pinned && !s.grabbed && !s.holds.length) {
+  // Cadılar Bayramı: Şeker mi şaka mı kartı aktifken ada bu karta genişlesin
+  if (isHalloweenActive(s.settings) && useHalloween.getState().phase !== "idle") return "halloween";
+  // Bildirim kartı: üstüne gelince (hover) ana sayfa açılmasın; kart durup tam metni göstersin ve tıklanınca Bildirimler'e gitsin
+  if (s.toasts.length && !s.pinned && !s.grabbed && !s.holds.length) {
     return "toast";
   }
   if (s.hovered || s.grabbed || s.pinned || s.holds.length) return "expanded";
@@ -39,5 +42,9 @@ export function islandModeOf(s: State): IslandMode {
 }
 
 export function useIslandMode(): IslandMode {
-  return useNook(islandModeOf);
+  const hwPhase = useHalloween((s) => s.phase);
+  return useNook((s) => {
+    if (isHalloweenActive(s.settings) && hwPhase !== "idle") return "halloween";
+    return islandModeOf(s);
+  });
 }

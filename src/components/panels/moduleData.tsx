@@ -42,6 +42,7 @@ export const MODULES: ModuleDef[] = [
   { id: "note", label: tt("Not"), color: ACCENT.orange, desc: tt("Hızlı karalama") },
   { id: "alarm", label: tt("Alarm"), color: ACCENT.yellow, desc: tt("Alarm kur, uyandır") },
   { id: "remind", label: tt("Hatırlatıcı"), color: ACCENT.orange, desc: tt("Şunu şu saatte hatırlat") },
+  { id: "habits", label: tt("Alışkanlıklar"), color: ACCENT.teal, desc: tt("Su, göz dinlendirme, esneme") },
   { id: "calendar", label: tt("Takvim"), color: ACCENT.blue, desc: tt("Etkinlikler, geri sayım") },
   { id: "apps", label: tt("Kısayollar"), color: ACCENT.blue, desc: tt("Sık açtığın uygulamalar") },
   { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple, desc: tt("Windows ve telefon bildirimleri") },
@@ -201,6 +202,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
   const apps = useNook((s) => s.pinnedApps.length + (s.deck?.length ?? 4));
   const notifs = useNook((s) => s.notifications);
   const active = useNook((s) => s.days[dayKey()]?.active ?? 0);
+  const water = useNook((s) => s.days[dayKey()]?.water ?? 0);
   const argusSnap = useArgus((s) => s.snap);
   const events = useNook((s) => s.events);
   const live = useNook(isLive);
@@ -385,6 +387,13 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
       state: humListening ? "active" : lastHum || humAuto ? "idle" : "empty",
       value: humCount ? String(humCount) : undefined,
       foot: lastHum ? [lastHum.title, lastHum.artist] : [tt("Ctrl+Alt+M ile dinlet")],
+    },
+    habits: {
+      text: water > 0 ? tt("{0} bardak su içildi", water) : tt("Su ve mola hedefleri"),
+      state: water >= 8 ? "active" : water > 0 ? "idle" : "empty",
+      value: `${water}/8`,
+      progress: Math.min(1, water / 8),
+      foot: [tt("Alışkanlıklar & Sağlık"), tt("{0} bardak", water)],
     },
   };
 }

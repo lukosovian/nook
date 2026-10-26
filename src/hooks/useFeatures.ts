@@ -8,6 +8,7 @@ import {
   EVENTS,
   isPrimary,
   onlineState,
+  remoteTestNotification,
   subscribe,
   voiceStart,
   voiceStop,
@@ -89,7 +90,7 @@ export function drankWater() {
 }
 
 /** "Sonra": Hatırlatmayı ertele (Su: 15 dk, Göz: 10 dk, Esneme: 45 dk). */
-export function snoozeReminder(kind?: "water" | "eye" | "stretch") {
+export function snoozeReminder(kind?: "water" | "eye" | "stretch" | "habit") {
   const s = useNook.getState();
   const k = kind ?? s.reminder?.kind ?? "water";
   if (k === "water") {
@@ -208,6 +209,27 @@ export function useDayTracker() {
         waterMinutes = 0;
         s.setReminder({ kind: "water", phase: "due" });
         playAntic("surprised");
+        const waterHabit = useHabits.getState().habits.find((h) => h.id === "water");
+        if (waterHabit?.notifyOnMobile) {
+          void remoteTestNotification().catch(() => {});
+        }
+      }
+
+      // Kullanıcının Özel ve Aktif Alışkanlık Hatırlatmaları
+      const habits = useHabits.getState().habits;
+      const nowTs = Date.now();
+      for (const h of habits) {
+        if (!h.enabled || h.intervalMin <= 0 || h.id === "water" || h.id === "eyes" || h.id === "stretch") continue;
+        const elapsedMin = h.lastDoneAt ? (nowTs - h.lastDoneAt) / 60_000 : 999;
+        if (elapsedMin >= h.intervalMin && !s.reminder && !quiet) {
+          useHabits.getState().updateHabit(h.id, { lastDoneAt: nowTs });
+          s.setReminder({ kind: "habit", phase: "due", habitId: h.id, title: h.title, icon: h.icon });
+          playAntic("nod");
+          if (h.notifyOnMobile) {
+            void remoteTestNotification().catch(() => {});
+          }
+          break;
+        }
       }
     }, 60_000);
     return () => window.clearInterval(t);

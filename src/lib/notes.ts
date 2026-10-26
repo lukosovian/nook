@@ -200,7 +200,9 @@ export type DemoId =
   | "phonetest"
   | "wamute"
   | "scenefilter"
-  | "polish033";
+  | "polish033"
+  | "habitsmod"
+  | "notifhold";
 
 export interface NoteItem {
   title: string;
@@ -219,6 +221,23 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.4",
+    date: tt("26 Ekim 2026"),
+    headline: tt("Bağımsız Alışkanlıklar modülü, akıllı bildirim kartları, su ve mola takibi senkronizasyonu"),
+    items: [
+      {
+        title: tt("Adada bağımsız Alışkanlıklar modülü ve su takibi"),
+        text: tt("Adadaki yeni Alışkanlıklar modülüyle günlük su hedefini tek tıkla takip edebilir, yanlışlıkla basınca geri alabilirsin. 20-20-20 göz dinlendirme ve esneme molalarını canlı başlatabilir, dilediğin gibi özel alışkanlık ekleyerek hatırlatma sıklığını ve telefona da bildirim gitmesini ayarlayabilirsin."),
+        demo: "habitsmod",
+      },
+      {
+        title: tt("Akıllı bildirim kartları: Tam metin ve duraklatma"),
+        text: tt("Adada bir bildirim belirdiğinde fareyle üzerine geldiğinde kapanma sayacı durur; fareyi çekene kadar ekranda kalır. Metinler kırpılmadan tam olarak açılır ve karta tıkladığında doğrudan Bildirimler modülü açılarak tüm detayları gösterir."),
+        demo: "notifhold",
+      },
+    ],
+  },
   {
     version: "0.3.3",
     date: tt("26 Ekim 2026"),

@@ -98,6 +98,7 @@ const LIVE_MASKED = new Set<SysEventKind>(["notify", "translate", "sensitive", "
 export function ToastView() {
   const raw = useNook((s) => s.toasts[0]);
   const live = useNook(isLive);
+  const hovered = useNook((s) => s.hovered);
   const waReady = useWhatsApp((s) => s.web.status === "ready");
   const masked = !!(raw && live && LIVE_MASKED.has(raw.kind));
   const toast = masked
@@ -135,6 +136,17 @@ export function ToastView() {
     const s = useNook.getState();
     s.noteModuleUse("whatsapp");
     s.setTab("whatsapp");
+    s.shiftToast();
+  };
+
+  const handleClick = () => {
+    if (isWa) {
+      openWaChat();
+      return;
+    }
+    const s = useNook.getState();
+    s.noteModuleUse("notify");
+    s.setTab("notify");
     s.shiftToast();
   };
 
@@ -207,14 +219,18 @@ export function ToastView() {
             ) : (
               <>
                 <div
-                  className={`min-w-0 flex-1 ${isWa ? "cursor-pointer" : ""}`}
-                  onClick={isWa ? openWaChat : undefined}
-                  title={isWa ? tt("WhatsApp sohbetini aç") : undefined}
+                  className="min-w-0 flex-1 cursor-pointer select-none"
+                  onClick={handleClick}
+                  title={toast.detail ? `${toast.title}\n${toast.detail}\n(${tt("Tıkla: Bildirimler modülünü aç")})` : `${toast.title}\n(${tt("Tıkla: Bildirimler modülünü aç")})`}
                 >
-                  <p className="truncate text-[13px] font-medium leading-tight" style={{ color: tintText(accentColor) }}>
+                  <p className={`font-semibold leading-tight ${hovered ? "line-clamp-2 text-[12px]" : "truncate text-[13px]"}`} style={{ color: tintText(accentColor) }}>
                     {toast.title}
                   </p>
-                  {toast.detail && <p className="mt-0.5 truncate text-[11px] leading-tight text-label-2">{toast.detail}</p>}
+                  {toast.detail && (
+                    <p className={`mt-0.5 leading-snug text-label-2 ${hovered ? "line-clamp-2 text-[10.5px]" : "truncate text-[11px]"}`}>
+                      {toast.detail}
+                    </p>
+                  )}
                 </div>
 
                 {(canReply || isWa) && (

@@ -1,12 +1,13 @@
 /**
  * Alışkanlıklar ve Sağlık Takibi (Habits & Health Tracker).
- * - Günlük su takibi (bardak sayısı, hedef, tek tıkla "+1 Bardak İçtim").
- * - Göz dinlendirme (20-20-20 kuralı), duruş/esneme ve hareket alışkanlıkları.
- * - PC ve Nook Mobil arasında iki yönlü anlık senkronizasyon.
+ * - Günlük su takibi (bardak sayısı, hedef, tek tıkla "+1 Bardak İçtim", geri alma).
+ * - Göz dinlendirme (20-20-20), duruş/esneme, yürüyüş ve kullanıcının özel alışkanlıkları.
+ * - Hatırlatma aralığı belirleme, doğrudan adada canlı başlatma.
+ * - PC ve Nook Mobil arasında iki yönlü anlık bildirim ve senkronizasyon.
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useNook } from "../store/nook";
+import { useNook, dayKey } from "../store/nook";
 import { playSfx } from "./sfx";
 import { tt } from "./i18n";
 import { drankWater } from "../hooks/useFeatures";
@@ -17,15 +18,16 @@ export interface HabitItem {
   desc: string;
   icon: string;
   color: string;
-  intervalMin: number;
+  intervalMin: number; // 0 = otomatik hatırlatma yok, >0 = dakika
   targetDaily: number;
   enabled: boolean;
+  notifyOnMobile: boolean; // Telefona da bildirim fırlatılsın mı?
   lastDoneAt: number;
+  isCustom?: boolean;
 }
 
 export interface DayHabitStats {
-  water: number; // bardak
-  custom: Record<string, number>; // habitId -> count
+  custom: Record<string, number>; // habitId -> kaç kez yapıldı
 }
 
 interface HabitsStore {
@@ -35,14 +37,13 @@ interface HabitsStore {
   drinkGlass: () => void;
   undoGlass: () => void;
   completeHabit: (id: string) => void;
+  undoHabit: (id: string) => void;
   setWaterGoal: (goal: number) => void;
   toggleHabit: (id: string, enabled?: boolean) => void;
   setHabitInterval: (id: string, min: number) => void;
-}
-
-export function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  addHabit: (item: { title: string; desc: string; icon: string; color: string; intervalMin: number; targetDaily: number; notifyOnMobile?: boolean }) => void;
+  removeHabit: (id: string) => void;
+  updateHabit: (id: string, patch: Partial<HabitItem>) => void;
 }
 
 export const DEFAULT_HABITS: HabitItem[] = [
@@ -55,17 +56,19 @@ export const DEFAULT_HABITS: HabitItem[] = [
     intervalMin: 60,
     targetDaily: 8,
     enabled: true,
+    notifyOnMobile: true,
     lastDoneAt: 0,
   },
   {
     id: "eyes",
     title: tt("Göz Dinlendir"),
-    desc: tt("20 dakikada bir 20 saniye uzağa bak"),
+    desc: tt("20 dakikada bir 20 saniye uzağa bak (20-20-20)"),
     icon: "👀",
     color: "#9B7BFF",
     intervalMin: 20,
     targetDaily: 12,
     enabled: true,
+    notifyOnMobile: false,
     lastDoneAt: 0,
   },
   {
@@ -77,17 +80,19 @@ export const DEFAULT_HABITS: HabitItem[] = [
     intervalMin: 90,
     targetDaily: 4,
     enabled: true,
+    notifyOnMobile: false,
     lastDoneAt: 0,
   },
   {
     id: "walk",
     title: tt("Ayağa Kalk & Yürü"),
-    desc: tt("Kısa bir tur at, bacakları esnet"),
+    desc: tt("Kısa bir tur at, bacakları ve omurgayı hareket ettir"),
     icon: "🚶",
     color: "#3CCF6E",
     intervalMin: 120,
     targetDaily: 3,
     enabled: false,
+    notifyOnMobile: false,
     lastDoneAt: 0,
   },
 ];
@@ -100,37 +105,19 @@ export const useHabits = create<HabitsStore>()(
       history: {},
 
       drinkGlass: () => {
-        const k = todayKey();
-        const prev = get().history[k] ?? { water: 0, custom: {} };
-        const newWater = prev.water + 1;
-
+        // Nook'un merkezi su takip ve animasyon fonksiyonunu çağırır
+        drankWater();
         set({
-          history: {
-            ...get().history,
-            [k]: { ...prev, water: newWater },
-          },
           habits: get().habits.map((h) => (h.id === "water" ? { ...h, lastDoneAt: Date.now() } : h)),
         });
-
-        // Nook ana motorundaki su sayacını da senkronize et
-        try {
-          drankWater();
-        } catch {
-          // ignore
-        }
         playSfx("pop", true);
       },
 
       undoGlass: () => {
-        const k = todayKey();
-        const prev = get().history[k] ?? { water: 0, custom: {} };
-        if (prev.water <= 0) return;
-        set({
-          history: {
-            ...get().history,
-            [k]: { ...prev, water: Math.max(0, prev.water - 1) },
-          },
-        });
+        const s = useNook.getState();
+        const current = getTodayWater();
+        if (current <= 0) return;
+        s.track({ water: -1 });
         playSfx("pop", true);
       },
 
@@ -139,8 +126,8 @@ export const useHabits = create<HabitsStore>()(
           get().drinkGlass();
           return;
         }
-        const k = todayKey();
-        const prev = get().history[k] ?? { water: 0, custom: {} };
+        const k = dayKey();
+        const prev = get().history[k] ?? { custom: {} };
         const count = (prev.custom[id] ?? 0) + 1;
 
         set({
@@ -156,6 +143,27 @@ export const useHabits = create<HabitsStore>()(
         playSfx("happy", true);
       },
 
+      undoHabit: (id: string) => {
+        if (id === "water") {
+          get().undoGlass();
+          return;
+        }
+        const k = dayKey();
+        const prev = get().history[k] ?? { custom: {} };
+        const current = prev.custom[id] ?? 0;
+        if (current <= 0) return;
+        set({
+          history: {
+            ...get().history,
+            [k]: {
+              ...prev,
+              custom: { ...prev.custom, [id]: current - 1 },
+            },
+          },
+        });
+        playSfx("pop", true);
+      },
+
       setWaterGoal: (waterGoal: number) => set({ waterGoal }),
 
       toggleHabit: (id: string, enabled?: boolean) => {
@@ -169,6 +177,36 @@ export const useHabits = create<HabitsStore>()(
           habits: get().habits.map((h) => (h.id === id ? { ...h, intervalMin } : h)),
         });
       },
+
+      addHabit: (item) => {
+        const id = "custom_" + Date.now();
+        const newHabit: HabitItem = {
+          id,
+          title: item.title,
+          desc: item.desc,
+          icon: item.icon || "⭐",
+          color: item.color || "#2FD4C0",
+          intervalMin: item.intervalMin,
+          targetDaily: item.targetDaily || 1,
+          enabled: true,
+          notifyOnMobile: item.notifyOnMobile ?? true,
+          lastDoneAt: 0,
+          isCustom: true,
+        };
+        set({ habits: [...get().habits, newHabit] });
+        playSfx("pop", true);
+      },
+
+      removeHabit: (id: string) => {
+        set({ habits: get().habits.filter((h) => h.id !== id) });
+        playSfx("pop", true);
+      },
+
+      updateHabit: (id: string, patch: Partial<HabitItem>) => {
+        set({
+          habits: get().habits.map((h) => (h.id === id ? { ...h, ...patch } : h)),
+        });
+      },
     }),
     {
       name: "nook-habits",
@@ -176,12 +214,17 @@ export const useHabits = create<HabitsStore>()(
   ),
 );
 
-/** Bugün içilen su miktarı (bardak) */
+/** Bugün içilen su miktarı (bardak) — tek ve güvenilir kaynak useNook.days */
 export function getTodayWater(): number {
-  const k = todayKey();
-  const hist = useHabits.getState().history[k];
-  if (hist) return hist.water;
-  // Geriye dönük uyumluluk: useNook içindeki günün verisine bak
+  const k = dayKey();
   const d = useNook.getState().days[k];
   return d?.water ?? 0;
+}
+
+/** Belirli bir alışkanlığın bugün kaç kez yapıldığı */
+export function getTodayHabitCount(id: string): number {
+  if (id === "water") return getTodayWater();
+  const k = dayKey();
+  const hist = useHabits.getState().history[k];
+  return hist?.custom?.[id] ?? 0;
 }

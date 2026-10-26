@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum" | "halloween";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -14,12 +14,14 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   search: { width: 664, height: 300, radius: 32 },
   /** Ses/parlaklık göstergesi */
   osd: { width: 280, height: 34, radius: 14 },
-  /** Sistem olayı kartı (şarj, USB, kulaklık…) */
-  toast: { width: 310, height: 52, radius: 20 },
+  /** Sistem olayı kartı (şarj, USB, kulaklık, bildirimler) */
+  toast: { width: 360, height: 58, radius: 22 },
   /** Çalan alarm */
   alarm: { width: 360, height: 70, radius: 26 },
   /** Su hatırlatması: cevaplanana kadar durur */
   reminder: { width: 440, height: 66, radius: 26 },
+  /** Cadılar Bayramı: Şeker mi şaka mı kartı */
+  halloween: { width: 380, height: 60, radius: 24 },
   /** Odak bekçisi: Nook cama vurup saati gösterir */
   guard: { width: 500, height: 78, radius: 28 },
   /** Açılış kilidi: parola adada yazılır */
@@ -108,8 +110,8 @@ export interface Expanded {
 export const DOCK = 46;
 /** Ana sayfa (bento) */
 export const HOME_SIZE: IslandSize = { width: 724, height: 304 };
-/** Bütün modüllerin ızgarası */
-export const MODULES_SIZE: IslandSize = { width: 780, height: 304 };
+/** Bütün modüllerin ızgarası (bütün kartlar kaydırmasız rahatça sığar) */
+export const MODULES_SIZE: IslandSize = { width: 800, height: 340 };
 /** Boyutu ayrıca verilmemiş bölüm */
 export const MODULE_DEFAULT: IslandSize = { width: 664, height: 300 };
 /**
@@ -129,6 +131,7 @@ export const MODULE_SIZE: Partial<Record<string, IslandSize>> = {
   alarm: { width: 740, height: 300 },
   calendar: { width: 724, height: 330 },
   remind: { width: 700, height: 316 },
+  habits: { width: 724, height: 330 },
   apps: { width: 690, height: 300 },
   notify: { width: 690, height: 320 },
   control: { width: 680, height: 320 },
@@ -232,6 +235,7 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
       return center(28, height / 2, 1.15);
     case "alarm":
     case "reminder":
+    case "halloween":
       return center(36, height / 2 + 2, 1.45);
     case "claude":
       return center(40, height / 2, 1.5);
