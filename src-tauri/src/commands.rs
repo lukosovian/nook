@@ -49,6 +49,7 @@ pub fn release_focus(shared: State<'_, Arc<Shared>>) {
 #[tauri::command]
 pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_, Arc<Shared>>) -> Result<(), String> {
     *shared.settings.lock().unwrap() = settings.clone();
+    crate::log::set_keep_days(settings.log_days);
     window::set_zoom(&app, settings.ui_scale);
     window::set_tray_labels(&settings.tray_labels);
     window::apply_monitor_mode(&app, &settings);

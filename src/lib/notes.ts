@@ -214,7 +214,8 @@ export type DemoId =
   | "nookfit"
   | "weatherlevel"
   | "phonecall"
-  | "wallpapers";
+  | "wallpapers"
+  | "logs";
 
 export interface NoteItem {
   title: string;
@@ -233,6 +234,18 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.6",
+    date: tt("3 Kasım 2026"),
+    headline: tt("Gün gün tutulan günlük kayıtları"),
+    items: [
+      {
+        title: tt("Günlük kayıtları gün gün"),
+        text: tt("Nook'un kayıtları her gün için ayrı bir dosyada, her satırın başında saatiyle tutuluyor; açılış, kapanış, ekranlar, adanın yeri, donmalar ve çökmeler de yazılıyor. Studio › Ayarlar › Hakkında › Günlük kayıtları'ndan kaç gün saklanacağını seçebilirsin (3 gün, 1 hafta, 2 hafta, 1 ay); daha eskiler kendiliğinden silinir. \"Klasörü aç\" ile dosyalara bakabilirsin."),
+        demo: "logs",
+      },
+    ],
+  },
   {
     version: "0.3.5",
     date: tt("3 Kasım 2026"),

@@ -488,6 +488,8 @@ export interface NativeSettings {
   humShortcut: string;
   /** Otomatik Hum: arkada dinler, bulduklarını kaydeder */
   humAuto: boolean;
+  /** Günlük kayıtları kaç gün saklansın */
+  logDays: number;
   /** Kısayol tuşlarının klavye kısayolları */
   deckHotkeys?: { id: string; accel: string }[];
 }
@@ -659,6 +661,8 @@ export const fetchText = (url: string) => (inTauri ? invoke<string>("fetch_text"
 /** Geribildirime eklemek için son günlük satırlarını getir */
 export const recentLogs = (max = 25) =>
   inTauri ? invoke<string[]>("recent_logs", { max }) : Promise.resolve<string[]>([]);
+/** Günlük kayıtlarının klasörü */
+export const logDir = () => (inTauri ? invoke<string>("log_dir") : Promise.resolve(""));
 
 /** Bilgisayardaki birimler (C:, D:, USB) */
 export interface DiskVolume {

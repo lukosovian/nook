@@ -4,7 +4,7 @@ import { useGemini } from "../../hooks/useGemini";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
 import { INVESTORS, refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
 import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
-import { alarmRing, listMonitors, openPath, quickState, remoteControlSet, remoteInfo, remoteReset, remoteSet, remoteTestNotification, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
+import { alarmRing, listMonitors, logDir, openPath, quickState, remoteControlSet, remoteInfo, remoteReset, remoteSet, remoteTestNotification, shieldOn, outsideFixFirewall, outsideInstallTailscale, outsideOpenTailscale, outsideStatus, wakeOutsideSet, wakeOutsideStatus, wolFix, wolStatus, type AudioOutput, type MonitorInfo, type OutsideStatus, type RemoteInfo, type WakeOutside, type WolStatus } from "../../lib/bridge";
 import { autoLogonGuide, biosGuide, routerGuide, type Guide } from "../../lib/wakeGuide";
 import { syncFeeds } from "../../lib/ics";
 import { shortName } from "./ControlPanel";
@@ -57,6 +57,13 @@ const GAME_BREAK: { id: number; label: string }[] = [
   { id: 180, label: tt("3 sa") },
 ];
 
+const LOG_DAYS: { id: number; label: string }[] = [
+  { id: 3, label: tt("3 gün") },
+  { id: 7, label: tt("1 hafta") },
+  { id: 14, label: tt("2 hafta") },
+  { id: 30, label: tt("1 ay") },
+];
+
 const SCALES: { id: number; label: string }[] = [
   { id: 0.8, label: "%80" },
   { id: 0.9, label: "%90" },
@@ -100,7 +107,7 @@ export const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; c
   { id: "modules", title: tt("Modüller"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
   { id: "shortcuts", title: tt("Kısayollar"), hint: tt("Klavye kısayolları"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Kısayollar")] },
   { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.teal, sections: [tt("Telefon")] },
-  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, geribildirim, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Geribildirim"), tt("Destekçiler")] },
+  { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, geribildirim, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Günlük kayıtları"), tt("Geribildirim"), tt("Destekçiler")] },
 ];
 
 /** Bölüm başlığından kategorisi ("Ayarlar › Kısayollar"a gönderme gibi) */
@@ -437,6 +444,14 @@ export function CategoryBody({ id }: { id: CatId }) {
             {!isStudio && <UpdateRow />}
             <Row label="Instagram">
               <TextButton onClick={() => void openPath("https://www.instagram.com/nooktheblob/")}>@nooktheblob</TextButton>
+            </Row>
+          </Section>
+          <Section title={tt("Günlük kayıtları")}>
+            <Row label={tt("Kaç gün saklansın")} hint={tt("Her gün ayrı dosya; daha eskiler kendiliğinden silinir")}>
+              <Segmented id="settings-log-days" options={LOG_DAYS} value={s.logDays ?? 14} onChange={(v) => update({ logDays: v })} color={ACCENT.gray} />
+            </Row>
+            <Row label={tt("Kayıtlar")} hint={tt("Bir sorun olursa o günün dosyasını gönderebilirsin")}>
+              <TextButton onClick={() => void logDir().then((d) => (d ? openPath(d) : undefined))}>{tt("Klasörü aç")}</TextButton>
             </Row>
           </Section>
           <FeedbackSection />

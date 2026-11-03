@@ -106,6 +106,18 @@ pub fn place_on(win: &WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
         None => (origin.x + (mw - width) / 2, origin.y),
     };
     win.set_position(PhysicalPosition::new(x, y))?;
+    crate::log::write(
+        "info",
+        &format!(
+            "ada yerleşti ({}): ekran \"{}\" {mw}x{mh} @{},{} ölçek %{:.0} → ada {x},{y} {width}x{height}{}",
+            win.label(),
+            monitor_name(monitor),
+            origin.x,
+            origin.y,
+            scale * 100.0,
+            if pos.is_some() { " (sürüklenmiş yer)" } else { "" }
+        ),
+    );
     // Ekran değişince (ölçek, HDR) WebView2 beyaz zemine dönebiliyor
     clear_background(win);
     Ok(())

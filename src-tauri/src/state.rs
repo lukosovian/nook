@@ -125,6 +125,8 @@ pub struct Settings {
     pub hum_auto: bool,
     /// Kısayol tuşlarının klavye kısayolları (basılınca ön yüz o tuşu çalıştırır)
     pub deck_hotkeys: Vec<DeckHotkey>,
+    /// Günlük kayıtları kaç gün saklansın
+    pub log_days: u32,
 }
 
 /// Bir kısayol tuşunun klavye kısayolu
@@ -188,6 +190,7 @@ impl Default for Settings {
             hum_shortcut: "Ctrl+Alt+M".into(),
             hum_auto: false,
             deck_hotkeys: Vec::new(),
+            log_days: 14,
         }
     }
 }

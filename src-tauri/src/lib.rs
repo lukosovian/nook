@@ -45,9 +45,10 @@ pub mod wol;
 use std::sync::Arc;
 
 use state::Shared;
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 pub fn run() {
+    log::install_panic_hook();
     tauri::Builder::default()
         // İkinci kez açılırsa (örn. başlangıçta + elle) yeni bir kopya başlatma.
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
@@ -181,6 +182,7 @@ pub fn run() {
             net::online_state,
             log::log_line,
             log::recent_logs,
+            log::log_dir,
             claude::claude_decide,
             claude::claude_setup,
             claude::claude_connect,
@@ -210,6 +212,15 @@ pub fn run() {
             outside::wake_outside_set,
         ])
         .setup(|app| {
+            log::write("info", &format!("Nook {} açıldı", app.package_info().version));
+            let monitors: Vec<String> = app
+                .available_monitors()
+                .unwrap_or_default()
+                .iter()
+                .map(|m| format!("\"{}\" {}x{} @{},{} ölçek %{:.0}", window::monitor_name(m), m.size().width, m.size().height, m.position().x, m.position().y, m.scale_factor() * 100.0))
+                .collect();
+            log::write("info", &format!("ekranlar ({}): {}", monitors.len(), monitors.join(" · ")));
+            log::watch_main_thread(app.handle().clone());
             let island = app
                 .get_webview_window(window::ISLAND)
                 .expect("island penceresi tauri.conf.json'da tanımlı olmalı");
@@ -275,6 +286,12 @@ pub fn run() {
                 _ => {}
             }
         })
-        .run(tauri::generate_context!())
-        .expect("Nook başlatılamadı");
+        .build(tauri::generate_context!())
+        .expect("Nook başlatılamadı")
+        // Günlükte "kapandı" yoksa Nook çökmüş ya da zorla kapatılmış demektir
+        .run(|_, event| {
+            if let RunEvent::Exit = event {
+                log::write("info", "Nook kapandı");
+            }
+        });
 }

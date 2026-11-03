@@ -563,6 +563,7 @@ export const DEFAULT_SETTINGS: Settings = {
   gameSummary: true,
   gameIntro: true,
   breakReminderMin: 120,
+  logDays: 14,
   playOffers: true,
   welcomeBack: 10,
   introStyle: "random",

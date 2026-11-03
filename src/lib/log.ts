@@ -1,9 +1,9 @@
 /**
- * Uygulamada konsol görünmediği için uyarı/hatalar %LOCALAPPDATA%\Nook\nook.log dosyasına da yazılır.
+ * Uygulamada konsol görünmediği için uyarı/hatalar %LOCALAPPDATA%\Nook\logs\<gün>.log dosyasına da yazılır.
  * `note()` ile önemli adımlar (çeviri, ekrana sor…) iz bırakır.
  */
 import { invoke } from "@tauri-apps/api/core";
-import { inTauri } from "./bridge";
+import { inTauri, windowLabel } from "./bridge";
 
 const send = (level: string, args: unknown[]) => {
   if (!inTauri) return;
@@ -35,5 +35,20 @@ export function installLogging() {
   };
   window.addEventListener("error", (e) => send("error", [`${e.message} @ ${e.filename}:${e.lineno}`]));
   window.addEventListener("unhandledrejection", (e) => send("error", ["unhandled", e.reason]));
-  note("başladı", navigator.userAgent.match(/Edg\/[\d.]+/)?.[0] ?? "");
+  note(`sayfa başladı (${windowLabel})`, navigator.userAgent.match(/Edg\/[\d.]+/)?.[0] ?? "");
+  watchFreezes();
+}
+
+/**
+ * Sayfa takılırsa (saniyelik sayaç geç kalırsa) kaç saniye donduğunu yazar. Görünmeyen sayfada sayaç
+ * zaten yavaşlar; iki dakikadan uzun boşluk da büyük ihtimalle uyku, sayılmaz.
+ */
+function watchFreezes() {
+  let last = performance.now();
+  window.setInterval(() => {
+    const now = performance.now();
+    const gap = (now - last) / 1000;
+    last = now;
+    if (gap > 5 && gap < 120 && document.visibilityState === "visible") send("warn", [`DONMA: arayüz (${windowLabel}) ${Math.round(gap)} sn takıldı`]);
+  }, 1000);
 }

@@ -590,6 +590,7 @@ const native = (s: Settings, deck: DeckKey[] | null) => ({
   liveShortcut: s.liveShortcut ?? "",
   humShortcut: s.humShortcut ?? "",
   humAuto: s.humAuto ?? false,
+  logDays: s.logDays ?? 14,
   // Klavye kısayolu atanmış kısayol tuşları
   deckHotkeys: (deck ?? []).filter((k) => k.hotkey).map((k) => ({ id: k.id, accel: k.hotkey! })),
 });
