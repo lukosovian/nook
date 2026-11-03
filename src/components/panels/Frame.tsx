@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { formatSize } from "../../lib/format";
+import { create } from "zustand";
 import { expandedLayout, FACE, mascotPose, sizeFor, type View } from "../../lib/layout";
 import { useExpanded } from "../../hooks/useExpanded";
 import { toggleBig } from "../../lib/big";
@@ -156,7 +157,8 @@ function Greeting({ view }: { view: View }) {
     return () => window.clearTimeout(t);
   }, [text]);
   useEffect(() => () => void (greetedAt = Date.now()), []);
-  const pose = mascotPose("expanded", ex.width, view, ex);
+  const heroRows = useHeroRows((s) => s.n);
+  const pose = mascotPose("expanded", ex.width, view, ex, heroRows);
   const cx = pose.left + FACE / 2;
   const head = pose.top + FACE / 2 - (FACE * pose.scale) / 2;
   return (
@@ -713,12 +715,18 @@ function useActivityItems(): Item[] {
 }
 
 /** Bölüm görünümünde dar Nook kartının altı: en önemli üç iş */
+/** Bölüm görünümünde Nook'un altındaki "şu an" satırı sayısı (-1: satır yok, Nook üstte kalır). Nook bu satırların üstündeki boşluğun ortasına oturur. */
+export const useHeroRows = create<{ n: number }>(() => ({ n: -1 }));
+
 function Activity() {
   // Hava ve alarm sağ üstte; medyadayken çalan şarkı zaten yanda
   const tab = useNook((s) => s.tab);
   const shown = useActivityItems()
     .filter((it) => it.id !== "weather" && it.id !== "alarm" && !(tab === "media" && it.id === "music"))
     .slice(0, 3);
+  const n = shown.length;
+  useEffect(() => useHeroRows.setState({ n }), [n]);
+  useEffect(() => () => useHeroRows.setState({ n: -1 }), []);
   return (
     <motion.div className="absolute inset-x-2 bottom-2 flex flex-col gap-1" layout transition={CARD_SPRING}>
       <AnimatePresence initial={false} mode="popLayout">

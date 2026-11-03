@@ -289,6 +289,15 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
         act.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    /** Gelen aramayı PC'den sessize alma izni (Rahatsız Etmeyin erişimi) */
+    @JavascriptInterface
+    fun callMuteAccess(): Boolean = NookNotifService.canMute(ctx)
+
+    @JavascriptInterface
+    fun openCallMuteAccess() {
+        act.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     /** { on, muted: [paket], apps: {paket: ad} } */
     @JavascriptInterface
     fun notifPrefs(): String {

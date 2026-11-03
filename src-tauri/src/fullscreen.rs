@@ -3,8 +3,9 @@
 //! bir pencere olarak oyunun görüntüsünü ya da performansını etkilemesin diye gerçekten gizlenir.
 //!
 //! Oyun modu: tam ekran uygulama bir tarayıcı/video oynatıcı değilse "oyun" sayılır; çıkınca
-//! süre ve en yüksek işlemci/bellek kullanımı "nook://game" ile bildirilir. "Oyunda ikinci ekrana geç"
-//! açıksa ve başka bir ekran varsa ada gizlenmek yerine diğer ekrana taşınır; oyun kapanınca geri döner.
+//! süre ve en yüksek işlemci/bellek kullanımı "nook://game" ile bildirilir. "Tam ekranda ikinci ekrana geç"
+//! açıksa ve başka bir ekran varsa ada (oyunda da tam ekran videoda da) gizlenmek yerine diğer ekrana
+//! taşınır; tam ekran bitince geri döner.
 
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
@@ -65,7 +66,8 @@ struct Session {
     pid: u32,
     hwnd: isize,
     monitor: (i32, i32, i32, i32),
-    started: Instant,
+    /// Oyunun gerçekten oynandığı süre: yalnızca oyun öndeyken sayılır (arkada açık kalınca saymaz)
+    played: Duration,
     /// Gösterilen mola hatırlatması sayısı
     breaks: u64,
     peak_cpu: f32,
@@ -110,14 +112,21 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut session: Option<Session> = None;
             // Oyun yüzünden 2. ekrana taşındıysa önceki ekranı hatırla; oyun kapanınca geri dön
             let mut game_displaced: Option<Monitor> = None;
+            // Tam ekran video (oyun olmayan): penceresi ve ekranı. 2. ekrandaki Nook'a tıklanınca video öndeki
+            // pencere olmaktan çıkar ama ekranı kaplamayı sürdürür; o sürece ada geri sıçramasın.
+            let mut video: Option<(isize, (i32, i32, i32, i32))> = None;
             // Ada oyunun üstünde kısa süre görünsün (açılış özeti, mola hatırlatması)
             let mut peek_until: Option<Instant> = None;
             // Vakti gelen alarm bir kez bildirilir: gizliyken sayfanın saati yavaşlar (Chromium arka plan kısıtlaması)
             let mut rung_for: i64 = 0;
             let mut last_fg: isize = 0;
             let mut tick: u32 = 0;
+            let mut last_loop = Instant::now();
             loop {
                 thread::sleep(POLL);
+                // Uyku/hazırda bekleme arası oyun süresine eklenmesin
+                let dt = last_loop.elapsed().min(Duration::from_secs(2));
+                last_loop = Instant::now();
                 let settings = shared.settings();
                 let alarm = crate::alarm::imminent(&shared);
                 let next = shared.next_alarm.load(Ordering::Relaxed);
@@ -151,7 +160,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         s.monitor = mon;
                         s.peak_cpu = s.peak_cpu.max(f32::from_bits(shared.cpu.load(Ordering::Relaxed)));
                         s.peak_mem = s.peak_mem.max(shared.mem.load(Ordering::Relaxed));
-                        let mins = s.started.elapsed().as_secs() / 60;
+                        s.played += dt;
+                        let mins = s.played.as_secs() / 60;
                         let every = settings.break_reminder_min;
                         if every > 0 && mins >= every * (s.breaks + 1) {
                             s.breaks = mins / every;
@@ -163,7 +173,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         if let Some(s) = cur.take() {
                             let _ = app.emit(
                                 "nook://game",
-                                GameSession { app: pretty(&s.exe), secs: s.started.elapsed().as_secs(), peak_cpu: s.peak_cpu, peak_mem: s.peak_mem },
+                                GameSession { app: pretty(&s.exe), secs: s.played.as_secs(), peak_cpu: s.peak_cpu, peak_mem: s.peak_mem },
                             );
                         }
                         if let Some((_, _, _, exe)) = &next {
@@ -177,7 +187,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                             pid,
                             hwnd,
                             monitor,
-                            started: Instant::now(),
+                            played: Duration::ZERO,
                             breaks: 0,
                             peak_cpu: 0.0,
                             peak_mem: 0,
@@ -197,9 +207,17 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 };
                 *shared.game_screen.lock().unwrap() = game_mon;
 
-                // "Oyunda ikinci ekrana geç" açıksa ve başka bir monitör varsa, Nook gizlenmek yerine diğer ekrana geçer
+                video = match (game_mon, detected.as_ref()) {
+                    (Some(_), _) => None,
+                    (None, Some(d)) => Some((d.1, d.0)),
+                    (None, None) => video.filter(|(h, m)| imp::window_covers(*h, *m)),
+                };
+                let full_mon = game_mon.or(video.map(|v| v.1));
+                *shared.full_screen.lock().unwrap() = full_mon;
+
+                // "Tam ekranda ikinci ekrana geç" açıksa ve başka bir monitör varsa, Nook gizlenmek yerine diğer ekrana geçer
                 let can_move_second = settings.game_second_screen && settings.monitor_mode != MonitorMode::All;
-                if let (true, Some((gl, gt, _, _))) = (can_move_second, game_mon) {
+                if let (true, Some((gl, gt, _, _))) = (can_move_second, full_mon) {
                     let monitors = app.available_monitors().unwrap_or_default();
                     if let Some(cur_mon) = crate::window::monitor_of(&shared, crate::window::ISLAND, &monitors) {
                         if cur_mon.position().x == gl && cur_mon.position().y == gt {

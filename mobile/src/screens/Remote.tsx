@@ -152,7 +152,12 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
             bmp.close();
           }
           setLocked(f.locked);
-          if (f.cursor && Date.now() - touchedAt.current > 700) setCursor({ x: f.cursor[0], y: f.cursor[1] });
+          // İmleç başka ekrandaysa yerel imleç de yok sayılır: ilk dokunuş onu bu ekrana getirir
+          if (Date.now() - touchedAt.current > 700) {
+            const c = f.cursor ? { x: f.cursor[0], y: f.cursor[1] } : null;
+            st.current.cursor = c;
+            setCursor(c);
+          }
           setError(null);
         } catch (e) {
           if (!alive) break;
@@ -212,7 +217,11 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
     setCursor(n);
     push({ t: "move", x: n.x, y: n.y });
   };
-  const click = (b: "l" | "r") => push({ t: "down", b }, { t: "up", b });
+  const click = (b: "l" | "r") => {
+    // Fare kipinde PC'nin imleci başka ekrandaysa tıklama oraya gitmesin: önce bu ekranın ortasına gelir
+    if (!st.current.cursor) moveCursor({ x: 0.5, y: 0.5 });
+    push({ t: "down", b }, { t: "up", b });
+  };
   /** Fare kipinde yakınlaşmışken imleç görüntünün kenarına yaklaşınca görüntü onu izler */
   const follow = (n: Pt) => {
     const { box, img, view } = st.current;
@@ -544,6 +553,9 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
                       setMon(i);
                       setImg(null);
                       setView({ s: 1, tx: 0, ty: 0 });
+                      // PC'nin imleci de seçilen ekrana geçsin; yoksa dokunuşlar eski ekrana tıklıyordu
+                      st.current.mon = i;
+                      moveCursor({ x: 0.5, y: 0.5 });
                     }}
                     className={`h-9 rounded-full px-3 text-[12.5px] font-semibold ${mon === i ? "bg-blue text-white" : "text-label-2"}`}
                   >

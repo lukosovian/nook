@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum" | "halloween";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -20,8 +20,6 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   alarm: { width: 360, height: 70, radius: 26 },
   /** Su hatırlatması: cevaplanana kadar durur */
   reminder: { width: 440, height: 66, radius: 26 },
-  /** Cadılar Bayramı: Şeker mi şaka mı kartı */
-  halloween: { width: 380, height: 60, radius: 24 },
   /** Odak bekçisi: Nook cama vurup saati gösterir */
   guard: { width: 500, height: 78, radius: 28 },
   /** Açılış kilidi: parola adada yazılır */
@@ -204,7 +202,8 @@ export function expandedLayout(big: IslandSize | null = null, sound = false, siz
 export const EXPANDED = expandedLayout();
 
 
-export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: View = "module", ex: Expanded = EXPANDED) {
+/** `rows`: bölüm görünümünde Nook'un altındaki "şu an" satırı sayısı (Frame › Activity); -1 bilinmiyor */
+export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: View = "module", ex: Expanded = EXPANDED, rows = -1) {
   const { height } = ISLAND[mode];
   const center = (cx: number, cy: number, scale: number) => ({ left: cx - FACE / 2, top: cy - FACE / 2, scale });
   switch (mode) {
@@ -219,7 +218,14 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
         : ex.soundH
           ? // Büyük adada altta ses kutusu: Nook üstteki boşluğun ortasında
             center(h.x + h.w / 2, h.y + (h.h - ex.soundH) / 2, s)
-          : center(h.x + h.w / 2, h.y + (24 * s) / 2.6 + (FACE * s) / 2, s);
+          : (() => {
+              // Altta satır yoksa (ya da az satır varsa) Nook tepeye yapışık kalmasın: satırların üstündeki
+              // boşluğun ortasına iner, ama hiçbir zaman eskisinden yukarı çıkmaz
+              const top = (24 * s) / 2.6 + (FACE * s) / 2;
+              if (rows < 0) return center(h.x + h.w / 2, h.y + top, s);
+              const rowsH = rows ? (16 + rows * 28 + (rows - 1) * 4) * ex.zoom : 0;
+              return center(h.x + h.w / 2, h.y + Math.max(top, (h.h - rowsH) / 2), s);
+            })();
     }
     case "brief":
     case "notes":
@@ -235,7 +241,6 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
       return center(28, height / 2, 1.15);
     case "alarm":
     case "reminder":
-    case "halloween":
       return center(36, height / 2 + 2, 1.45);
     case "claude":
       return center(40, height / 2, 1.5);

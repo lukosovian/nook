@@ -26,6 +26,9 @@ interface NookNativeApi {
   askBatteryFree?(): void;
   openAutostart?(): void;
   hasAutostart?(): boolean;
+  /** Gelen aramayı PC'den sessize alma izni (Rahatsız Etmeyin erişimi; eski uygulama sürümlerinde yok) */
+  callMuteAccess?(): boolean;
+  openCallMuteAccess?(): void;
   peekShare(): string;
   clearShare(): void;
   uploadShared(host: string): void;

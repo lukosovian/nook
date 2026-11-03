@@ -14,12 +14,24 @@ import { useNook } from "../../store/nook";
 import type { Weather } from "../../lib/weather";
 
 export type AtmosphereKind = "sunny" | "rain" | "snow" | "storm" | "autumn" | "night" | "fog" | "none";
+export type AtmosphereLevel = "low" | "mid" | "high";
+
+/** Sıklık: parçacık çarpanı, her turdan sonra bekleme (sn), katmanın genel opaklığı */
+const LEVELS: Record<AtmosphereLevel, { n: number; rest: number; alpha: number }> = {
+  low: { n: 0.4, rest: 7, alpha: 0.7 },
+  mid: { n: 0.7, rest: 2.5, alpha: 0.85 },
+  high: { n: 1, rest: 0, alpha: 1 },
+};
+type Lv = (typeof LEVELS)[AtmosphereLevel];
+const count = (base: number, lv: Lv) => Math.max(2, Math.round(base * lv.n));
 
 interface IslandAtmosphereProps {
   width?: number;
   height?: number;
   /** Demo ve önizleme için zorunlu atmosfer türü */
   override?: AtmosphereKind;
+  /** Demo için zorunlu sıklık; yoksa ayardaki */
+  level?: AtmosphereLevel;
 }
 
 /** Mevcut hava durumu, saat ve mevsime göre atmosfer türünü belirler */
@@ -60,29 +72,32 @@ export function resolveAtmosphere(weather: Weather | null, override?: Atmosphere
   return "sunny";
 }
 
-export function IslandAtmosphere({ width: _width = 240, height: _height = 36, override }: IslandAtmosphereProps) {
+export function IslandAtmosphere({ width: _width = 240, height: _height = 36, override, level }: IslandAtmosphereProps) {
   const weather = useNook((s) => s.weather);
   const settings = useNook((s) => s.settings);
-  const powerSaver = settings.powerSaver;
+  // "Pilde yavaşla" açıkken yalnızca gerçekten pildeyken / Windows tasarrufundayken susar
+  const saving = useNook((s) => !!s.stats?.saver && s.settings.powerSaver);
 
   // Ayarlardan kapatıldıysa veya tasarruf modundaysa çizme
-  if (!override && (!settings.weatherAtmosphere || powerSaver)) {
+  if (!override && (!settings.weatherAtmosphere || saving)) {
     return null;
   }
 
   const kind = resolveAtmosphere(weather, override);
+  const lv = LEVELS[level ?? (override ? "high" : settings.weatherLevel)] ?? LEVELS.low;
 
   return (
     <div
       className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit] select-none"
       aria-hidden="true"
+      style={{ opacity: lv.alpha }}
     >
       <AnimatePresence mode="wait">
         {kind === "sunny" && <SunnyLayer key="sunny" />}
-        {kind === "rain" && <RainLayer key="rain" heavy={false} />}
-        {kind === "storm" && <RainLayer key="storm" heavy={true} />}
-        {kind === "snow" && <SnowLayer key="snow" />}
-        {kind === "autumn" && <AutumnLayer key="autumn" />}
+        {kind === "rain" && <RainLayer key="rain" heavy={false} lv={lv} />}
+        {kind === "storm" && <RainLayer key="storm" heavy={true} lv={lv} />}
+        {kind === "snow" && <SnowLayer key="snow" lv={lv} />}
+        {kind === "autumn" && <AutumnLayer key="autumn" lv={lv} />}
         {kind === "night" && <NightLayer key="night" />}
         {kind === "fog" && <FogLayer key="fog" />}
       </AnimatePresence>
@@ -138,7 +153,7 @@ function SunnyLayer() {
 }
 
 /** 2. YAĞMUR & FIRTINA (Rain & Storm) */
-function RainLayer({ heavy }: { heavy?: boolean }) {
+function RainLayer({ heavy, lv }: { heavy?: boolean; lv: Lv }) {
   const [flash, setFlash] = useState(false);
 
   // Fırtınada rastgele şimşek çakması
@@ -146,7 +161,7 @@ function RainLayer({ heavy }: { heavy?: boolean }) {
     if (!heavy) return;
     let t: number;
     const scheduleFlash = () => {
-      const wait = 3000 + Math.random() * 5000;
+      const wait = 3000 + lv.rest * 1500 + Math.random() * 5000;
       t = window.setTimeout(() => {
         setFlash(true);
         setTimeout(() => setFlash(false), 90);
@@ -162,18 +177,18 @@ function RainLayer({ heavy }: { heavy?: boolean }) {
     };
     scheduleFlash();
     return () => clearTimeout(t);
-  }, [heavy]);
+  }, [heavy, lv]);
 
   const drops = useMemo(() => {
-    const count = heavy ? 14 : 9;
-    return Array.from({ length: count }, (_, i) => ({
+    const n = count(heavy ? 14 : 9, lv);
+    return Array.from({ length: n }, (_, i) => ({
       id: i,
-      left: `${(i / count) * 94 + (Math.sin(i) * 3 + 3)}%`,
+      left: `${(i / n) * 94 + (Math.sin(i) * 3 + 3)}%`,
       delay: (i * 0.17) % 0.85,
       duration: heavy ? 0.45 + (i % 3) * 0.05 : 0.65 + (i % 3) * 0.08,
       height: heavy ? 9 + (i % 4) * 2 : 6 + (i % 3) * 2,
     }));
-  }, [heavy]);
+  }, [heavy, lv]);
 
   return (
     <motion.div
@@ -209,6 +224,7 @@ function RainLayer({ heavy }: { heavy?: boolean }) {
             duration: d.duration,
             delay: d.delay,
             repeat: Infinity,
+            repeatDelay: lv.rest * 0.3,
             ease: "linear",
           }}
         />
@@ -222,17 +238,18 @@ function RainLayer({ heavy }: { heavy?: boolean }) {
 }
 
 /** 3. KAR (Snow) */
-function SnowLayer() {
+function SnowLayer({ lv }: { lv: Lv }) {
   const flakes = useMemo(() => {
-    return Array.from({ length: 10 }, (_, i) => ({
+    const n = count(10, lv);
+    return Array.from({ length: n }, (_, i) => ({
       id: i,
-      left: `${(i / 10) * 90 + 5}%`,
+      left: `${(i / n) * 90 + 5}%`,
       size: 2 + (i % 3),
       delay: (i * 0.35) % 1.8,
       duration: 2.2 + (i % 4) * 0.4,
       sway: (i % 2 === 0 ? 1 : -1) * (4 + (i % 3) * 2),
     }));
-  }, []);
+  }, [lv]);
 
   return (
     <motion.div
@@ -269,6 +286,7 @@ function SnowLayer() {
             duration: f.duration,
             delay: f.delay,
             repeat: Infinity,
+            repeatDelay: lv.rest * 0.5,
             ease: "easeInOut",
           }}
         />
@@ -278,18 +296,20 @@ function SnowLayer() {
 }
 
 /** 4. SONBAHAR YAPRAKLARI (Autumn Leaves) */
-function AutumnLayer() {
+function AutumnLayer({ lv }: { lv: Lv }) {
   const leaves = useMemo(() => {
     const colors = ["#ff7a29", "#e55039", "#f6b93b", "#d35400"];
-    return Array.from({ length: 6 }, (_, i) => ({
+    const n = count(6, lv);
+    return Array.from({ length: n }, (_, i) => ({
       id: i,
-      left: `${(i / 6) * 85 + 8}%`,
+      left: `${(i / n) * 85 + 8}%`,
       color: colors[i % colors.length],
-      delay: (i * 0.45) % 2.2,
+      // Az ve Orta'da yapraklar birbirinden ayrı, ara ara düşer
+      delay: lv.rest ? i * (lv.rest / n + 1.5) : (i * 0.45) % 2.2,
       duration: 3.2 + (i % 3) * 0.6,
       rotateDir: i % 2 === 0 ? 1 : -1,
     }));
-  }, []);
+  }, [lv]);
 
   return (
     <motion.div
@@ -314,6 +334,7 @@ function AutumnLayer() {
             duration: l.duration,
             delay: l.delay,
             repeat: Infinity,
+            repeatDelay: lv.rest,
             ease: "easeInOut",
           }}
         >
@@ -389,8 +410,8 @@ function NightLayer() {
           boxShadow: "0 0 8px 1px #a3e635, 0 0 16px 2px #4ade80",
         }}
         animate={{
-          x: ["18%", "45%", "72%", "35%", "18%"],
-          y: ["30%", "70%", "35%", "20%", "30%"],
+          left: ["18%", "45%", "72%", "35%", "18%"],
+          top: ["30%", "70%", "35%", "20%", "30%"],
           opacity: [0.3, 0.95, 0.2, 0.85, 0.3],
           scale: [0.8, 1.2, 0.7, 1.1, 0.8],
         }}

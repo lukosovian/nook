@@ -97,11 +97,11 @@ export function ReminderView() {
             )}
             {kind === "stretch" && (
               phase === "stretching"
-                ? tt("Harika bir esneme! Derin bir nefes al ✨")
+                ? tt("Harika bir esneme! Derin bir nefes al")
                 : tt("Omuzları geriye at, dik dur ve derin nefes al")
             )}
             {kind === "habit" && (
-              tt("Bu alışkanlığın için vakit ayırma zamanı geldi ✨")
+              tt("Bu alışkanlığın için vakit ayırma zamanı geldi")
             )}
           </p>
         </motion.div>
@@ -109,6 +109,12 @@ export function ReminderView() {
 
       {!isWorking ? (
         <>
+          <Action
+            icon={X}
+            title={tt("Kapat")}
+            color={ACCENT.gray}
+            onClick={() => useNook.getState().setReminder(null)}
+          />
           <Action
             icon={Clock}
             label={tt("Sonra")}
@@ -199,14 +205,14 @@ function AskView({ label, detail }: { label: string; detail: string }) {
   );
 }
 
-function Action({ icon: Icon, label, title, color, onClick, strong }: { icon: typeof Clock; label: string; title: string; color: string; onClick: () => void; strong?: boolean }) {
+function Action({ icon: Icon, label, title, color, onClick, strong }: { icon: typeof Clock; label?: string; title: string; color: string; onClick: () => void; strong?: boolean }) {
   return (
     <motion.button
       whileTap={{ scale: 0.92 }}
       transition={spring.pop}
       onClick={onClick}
       title={title}
-      className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium"
+      className={`flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border ${label ? "px-3" : "w-9 px-0"} text-[12px] font-medium`}
       style={{
         background: tintBg(color, strong ? 26 : 12),
         borderColor: tintBg(color, strong ? 60 : 32),
@@ -215,7 +221,7 @@ function Action({ icon: Icon, label, title, color, onClick, strong }: { icon: ty
       }}
     >
       <Icon size={13} strokeWidth={2.5} fill={strong ? "currentColor" : "none"} />
-      {label}
+      {label && <span>{label}</span>}
     </motion.button>
   );
 }

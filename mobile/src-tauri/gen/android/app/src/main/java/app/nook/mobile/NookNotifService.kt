@@ -1,7 +1,9 @@
 package app.nook.mobile
 
 import android.app.ActivityOptions
+import android.app.KeyguardManager
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.BroadcastReceiver
@@ -16,8 +18,11 @@ import android.net.NetworkRequest
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Parcelable
+import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
@@ -35,8 +40,15 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Servis sürekli açık durduğu için otomasyonların telefon olaylarını da buradan gönderir: şarja takıldı /
  * çıkarıldı ve Wi-Fi'ye bağlandı (PC, isteğin ev ağından gelmesine bakıp "eve geldi"yi anlar).
  *
+ * Telefonda görülen bildirim PC'de bir daha çıkmaz: telefon kullanılırken (ekran açık, kilit açık) gelenler
+ * gönderilmez; telefonda kapatılan, açılan ya da uygulamanın kendisinin kaldırdığı (okundu) bildirim PC'den
+ * de kalkar. Bildirimden yazılan yanıtla güncellenen (yanıtı gösteren) bildirim de gönderilmez.
+ *
  * Mesajlaşma bildirimlerinin (WhatsApp, Telegram, Mesajlar…) içindeki RemoteInput yanıt eylemlerini saklar;
  * PC'deki Nook'tan yazılan yanıtları doğrudan bildirimin kendi PendingIntent'i üzerinden gönderir.
+ *
+ * Gelen arama PC'de kart olarak çıkar: "Reddet" aramanın kendi reddet eylemine basar (akıllı saatler gibi),
+ * "Sessize al" zili kısar (Rahatsız Etmeyin erişimi verildiyse). Arama açılınca ya da bitince kart kalkar.
  */
 class NookNotifService : NotificationListenerService() {
     private val icons = HashMap<String, String?>()
@@ -117,12 +129,50 @@ class NookNotifService : NotificationListenerService() {
         }
     }
 
+    /** Telefonda kapatıldı, açıldı ya da uygulama kaldırdı (okundu): PC'deki kopyası da kalksın */
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        try {
+            if (sbn.key != null && sbn.key == call?.key) endCall(applicationContext)
+            if (!PcLink.prefs(this).getBoolean("notifOn", true)) return
+            val key = sbn.key ?: return
+            val ctx = applicationContext
+            PcLink.io.execute {
+                PcLink.dropQueued(ctx, key)
+                PcLink.post(ctx, "/v1/notify/removed", JSONObject().put("key", key).toString().toByteArray())
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Telefon şu an kullanılıyor (ekran açık, kilit açık): gelen bildirimi kullanıcı zaten telefonda görüyor */
+    private fun phoneInUse(): Boolean = runCatching {
+        getSystemService(PowerManager::class.java).isInteractive && !getSystemService(KeyguardManager::class.java).isKeyguardLocked
+    }.getOrDefault(false)
+
+    /**
+     * Bildirimden yanıt yazılınca uygulama bildirimi yanıtla günceller (WhatsApp "Sen: …", yanıt geçmişi):
+     * bu yeni bir mesaj değil. Mesajlaşma bildiriminde son mesajı gönderen yoksa o mesaj kullanıcınındır.
+     */
+    @Suppress("DEPRECATION")
+    private fun ownReply(ex: Bundle): Boolean {
+        val history = ex.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+        if (!history.isNullOrEmpty()) return true
+        val msgs: Array<Parcelable>? = ex.getParcelableArray(Notification.EXTRA_MESSAGES)
+        val last = msgs?.lastOrNull() as? Bundle ?: return false
+        return last.getCharSequence("sender") == null && last.get("sender_person") == null
+    }
+
     private fun handle(sbn: StatusBarNotification) {
         val prefs = PcLink.prefs(this)
         if (!prefs.getBoolean("notifOn", true)) return
         val pkg = sbn.packageName
         if (pkg == packageName || pkg == "com.tailscale.ipn" || pkg == "android" || pkg == "com.android.systemui") return
         val n = sbn.notification
+        // Arama bildirimi süren iş sayılır; gelen aramayı ayrıca ele al
+        if (n.category == Notification.CATEGORY_CALL) {
+            handleCall(sbn)
+            return
+        }
         val f = n.flags
         if (f and Notification.FLAG_ONGOING_EVENT != 0 || f and Notification.FLAG_GROUP_SUMMARY != 0 || f and Notification.FLAG_FOREGROUND_SERVICE != 0) return
         if (n.category in SKIP_CATEGORIES) return
@@ -130,6 +180,12 @@ class NookNotifService : NotificationListenerService() {
         if ((0 until muted.length()).any { muted.optString(it) == pkg }) return
 
         val ex = n.extras
+        if (ownReply(ex)) return
+        // Telefonu kullanırken gelen bildirimi kullanıcı orada görüyor; yanıt eylemi yine de saklansın
+        if (phoneInUse()) {
+            captureReplyAction(pkg, ex.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty(), n, System.currentTimeMillis())
+            return
+        }
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
         val text = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim().orEmpty()
         if (title.isEmpty() && text.isEmpty()) return
@@ -154,10 +210,61 @@ class NookNotifService : NotificationListenerService() {
             .put("title", title.take(200))
             .put("text", text.take(1000))
             .put("at", now)
+            .put("key", sbn.key)
         if (replyKey != null) json.put("replyKey", replyKey)
         icon(pkg, info)?.let { json.put("icon", it) }
         PcLink.sendNotification(this, json)
         if (replyKey != null) startReplyPoller(applicationContext)
+    }
+
+    /** Gelen arama PC'ye kart olarak gider (kuyruğa girmez: PC kapalıyken çalan arama sonradan anlamsız) */
+    private fun handleCall(sbn: StatusBarNotification) {
+        val n = sbn.notification
+        val ex = n.extras
+        // Android 12+ arama bildirimi türü: 1 gelen, 2 süren, 3 tarama; eskilerde gelen aramanın tam ekranı olur
+        val type = ex.getInt("android.callType", 0)
+        val incoming = if (type != 0) type == 1 else n.fullScreenIntent != null
+        val ctx = applicationContext
+        if (!incoming) {
+            // Açıldı: aynı bildirim süren aramaya döndü, PC'deki kart kalksın
+            if (sbn.key == call?.key) {
+                endCall(ctx)
+                val key = sbn.key
+                PcLink.io.execute { PcLink.post(ctx, "/v1/notify/removed", JSONObject().put("key", key).toString().toByteArray()) }
+            }
+            return
+        }
+        if (sbn.key == call?.key) return
+        val decline = declineIntent(n)
+        call = Call(sbn.key, decline)
+        if (phoneInUse()) return
+        val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
+        val info = appInfo(sbn)
+        val json = JSONObject()
+            .put("app", info?.let { packageManager.getApplicationLabel(it).toString() } ?: "Telefon")
+            .put("pkg", sbn.packageName)
+            .put("title", title.ifEmpty { "?" }.take(200))
+            .put("text", "")
+            .put("at", System.currentTimeMillis())
+            .put("key", sbn.key)
+            .put("call", true)
+            .put("canDecline", decline != null)
+            .put("canMute", canMute(ctx))
+        icon(sbn.packageName, info)?.let { json.put("icon", it) }
+        PcLink.io.execute { PcLink.post(ctx, "/v1/notify", json.toString().toByteArray()) }
+        startReplyPoller(ctx)
+    }
+
+    /** Aramanın reddet eylemi: Android 12+ arama bildiriminde hazır, eskilerde eylemin adından bulunur */
+    @Suppress("DEPRECATION")
+    private fun declineIntent(n: Notification): PendingIntent? {
+        val ex = n.extras
+        for (k in listOf("android.declineIntent", "android.hangUpIntent")) {
+            val pi: PendingIntent? = if (Build.VERSION.SDK_INT >= 33) ex.getParcelable(k, PendingIntent::class.java) else ex.getParcelable(k)
+            if (pi != null) return pi
+        }
+        val words = listOf("reddet", "decline", "reject", "dismiss", "sonlandır", "hang up")
+        return n.actions?.firstOrNull { a -> a.actionIntent != null && words.any { a.title?.toString()?.lowercase()?.contains(it) == true } }?.actionIntent
     }
 
     private fun captureReplyAction(pkg: String, title: String, n: Notification, now: Long): String? {
@@ -211,6 +318,32 @@ class NookNotifService : NotificationListenerService() {
         private class ReplyTarget(val intent: PendingIntent, val inputs: Array<RemoteInput>, @Volatile var at: Long)
 
         private val replies = ConcurrentHashMap<String, ReplyTarget>()
+
+        /** Çalan arama: PC'den reddet / sessize al gelebilir */
+        private class Call(val key: String, val decline: PendingIntent?, @Volatile var muted: Boolean = false)
+        @Volatile private var call: Call? = null
+
+        /** Zili kısmak Rahatsız Etmeyin erişimi ister */
+        fun canMute(ctx: Context): Boolean =
+            runCatching { ctx.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted }.getOrDefault(false)
+
+        private fun ring(ctx: Context, dir: Int) =
+            runCatching { ctx.getSystemService(AudioManager::class.java).adjustStreamVolume(AudioManager.STREAM_RING, dir, 0) }.isSuccess
+
+        private fun endCall(ctx: Context) {
+            val c = call ?: return
+            call = null
+            if (c.muted) ring(ctx, AudioManager.ADJUST_UNMUTE)
+        }
+
+        private fun callAction(ctx: Context, key: String, action: String) {
+            val c = call ?: return
+            if (key.isNotEmpty() && key != c.key) return
+            when (action) {
+                "decline" -> c.decline?.let { pi -> runCatching { pi.send() } }
+                "mute" -> if (!c.muted && canMute(ctx) && ring(ctx, AudioManager.ADJUST_MUTE)) c.muted = true
+            }
+        }
         private val polling = AtomicBoolean(false)
 
         /**
@@ -221,10 +354,10 @@ class NookNotifService : NotificationListenerService() {
             if (!polling.compareAndSet(false, true)) return
             Thread {
                 try {
-                    while (replies.isNotEmpty()) {
+                    while (replies.isNotEmpty() || call != null) {
                         val now = System.currentTimeMillis()
                         replies.entries.removeAll { now - it.value.at > REPLY_TTL_MS }
-                        if (replies.isEmpty()) break
+                        if (replies.isEmpty() && call == null) break
                         val res = PcLink.get(ctx, "/v1/notify/replies", 3000, 26_000)
                         if (res == null) {
                             Thread.sleep(5000)
@@ -233,6 +366,11 @@ class NookNotifService : NotificationListenerService() {
                         val arr = runCatching { JSONObject(res).optJSONArray("replies") }.getOrNull() ?: continue
                         for (i in 0 until arr.length()) {
                             val item = arr.optJSONObject(i) ?: continue
+                            val act = item.optString("call")
+                            if (act.isNotEmpty()) {
+                                callAction(ctx, item.optString("key"), act)
+                                continue
+                            }
                             val key = item.optString("replyKey")
                             val text = item.optString("text").trim()
                             if (key.isEmpty() || text.isEmpty()) continue
@@ -242,7 +380,7 @@ class NookNotifService : NotificationListenerService() {
                 } catch (_: Exception) {
                 } finally {
                     polling.set(false)
-                    if (replies.isNotEmpty()) startReplyPoller(ctx)
+                    if (replies.isNotEmpty() || call != null) startReplyPoller(ctx)
                 }
             }.apply { isDaemon = true; start() }
         }

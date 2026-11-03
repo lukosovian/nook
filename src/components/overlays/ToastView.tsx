@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   LockKeyhole,
   Bell,
+  BellOff,
+  PhoneOff,
   Bluetooth,
   Coffee,
   Droplet,
@@ -41,7 +43,7 @@ import {
   Smartphone,
   Power,
 } from "lucide-react";
-import { setInteractive, type SysEventKind } from "../../lib/bridge";
+import { phoneCallAction, setInteractive, type SysEventKind } from "../../lib/bridge";
 import { isLive, useNook } from "../../store/nook";
 import { tt } from "../../lib/i18n";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
@@ -108,12 +110,14 @@ export function ToastView() {
   const [replying, setReplying] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [ringMuted, setRingMuted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setReplying(false);
     setText("");
     setSending(false);
+    setRingMuted(false);
   }, [toast?.id]);
 
   useEffect(() => {
@@ -139,16 +143,42 @@ export function ToastView() {
     s.shiftToast();
   };
 
+  // Telefonda çalan arama: Reddet / Sessize al
+  const call = toast?.call && toast.phoneKey ? toast.call : null;
+  const callAction = (action: "decline" | "mute") => {
+    if (!toast?.phoneKey) return;
+    void phoneCallAction(toast.phoneKey, action).catch(() => {});
+    if (action === "decline") dismiss();
+    else setRingMuted(true);
+  };
+
+  // Yalnızca bildirimler tıklanınca bir yere gider; sistem kartlarının (şarj, USB…) tıklanacak yeri yok
+  const clickable = isWa || (toast?.kind === "notify" && !call);
+  // Üstüne gelinince ada büyür (Island.tsx toastOpenHeight): metin kırpılmadan alt satırlara geçer
+  const open = hovered && !!toast && (toast.kind === "notify" || !!toast.replyKey || !!toast.whatsappChat);
+
   const handleClick = () => {
+    if (dragged.current) return;
     if (isWa) {
       openWaChat();
       return;
     }
+    if (!clickable) return;
     const s = useNook.getState();
     s.noteModuleUse("notify");
     s.setTab("notify");
     s.shiftToast();
   };
+
+  // Kapatılan kartın ardından imleç hâlâ adanın üstünde: ada kendiliğinden açılmasın (imleç çıkıp
+  // yeniden gelince açılır)
+  const dismiss = () => {
+    const s = useNook.getState();
+    s.shiftToast();
+    if (!s.pinned && !s.holds.length) s.setHovered(false);
+  };
+  // Kaydırarak kapatma: sürüklendiyse bırakınca tıklama sayılmasın
+  const dragged = useRef(false);
 
   const sendReply = async () => {
     if (!toast || !text.trim() || sending) return;
@@ -158,9 +188,7 @@ export function ToastView() {
       text.trim(),
     );
     setSending(false);
-    if (ok) {
-      useNook.getState().shiftToast();
-    }
+    if (ok) dismiss();
   };
 
   return (
@@ -174,11 +202,20 @@ export function ToastView() {
         {toast && (
           <motion.div
             key={toast.id}
-            className="flex h-full items-center gap-2.5"
+            className={`flex h-full gap-2.5 ${open ? "items-start pt-2.5" : "items-center"}`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
+            drag={replying ? false : "x"}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.7}
+            dragSnapToOrigin
+            onDragStart={() => (dragged.current = true)}
+            onDragEnd={(_, info) => {
+              window.setTimeout(() => (dragged.current = false), 0);
+              if (Math.abs(info.offset.x) > 60 || Math.abs(info.velocity.x) > 500) dismiss();
+            }}
           >
             {replying ? (
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -218,23 +255,39 @@ export function ToastView() {
               </div>
             ) : (
               <>
-                <div
-                  className="min-w-0 flex-1 cursor-pointer select-none"
-                  onClick={handleClick}
-                  title={toast.detail ? `${toast.title}\n${toast.detail}\n(${tt("Tıkla: Bildirimler modülünü aç")})` : `${toast.title}\n(${tt("Tıkla: Bildirimler modülünü aç")})`}
-                >
-                  <p className={`font-semibold leading-tight ${hovered ? "line-clamp-2 text-[12px]" : "truncate text-[13px]"}`} style={{ color: tintText(accentColor) }}>
+                <div className={`min-w-0 flex-1 select-none ${clickable ? "cursor-pointer" : ""}`} onClick={handleClick}>
+                  <p className={`text-[13px] font-semibold leading-[17px] ${open ? "line-clamp-2" : "truncate"}`} style={{ color: tintText(accentColor) }}>
                     {toast.title}
                   </p>
                   {toast.detail && (
-                    <p className={`mt-0.5 leading-snug text-label-2 ${hovered ? "line-clamp-2 text-[10.5px]" : "truncate text-[11px]"}`}>
+                    <p className={`mt-0.5 text-[11px] leading-[15px] text-label-2 ${open ? "line-clamp-6 break-words" : "truncate"}`}>
                       {toast.detail}
                     </p>
                   )}
                 </div>
 
-                {(canReply || isWa) && (
+                {(canReply || isWa || clickable || call) && (
                   <div className="flex shrink-0 items-center gap-1">
+                    {call?.canDecline && (
+                      <button
+                        onClick={() => callAction("decline")}
+                        className="flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold transition-transform active:scale-95"
+                        style={{ background: tintBg(ACCENT.red, 20), borderColor: tintBg(ACCENT.red, 46), color: tintText(ACCENT.red) }}
+                      >
+                        <PhoneOff size={11.5} strokeWidth={2.5} />
+                        {tt("Reddet")}
+                      </button>
+                    )}
+                    {call?.canMute && (
+                      <button
+                        disabled={ringMuted}
+                        onClick={() => callAction("mute")}
+                        className="flex h-7 items-center gap-1 rounded-full bg-well px-2.5 text-[11px] font-medium text-label-2 transition-transform hover:bg-well-hi hover:text-label active:scale-95 disabled:opacity-50"
+                      >
+                        <BellOff size={11.5} strokeWidth={2.4} />
+                        {ringMuted ? tt("Sessiz") : tt("Sessize al")}
+                      </button>
+                    )}
                     {canReply && (
                       <button
                         onClick={() => setReplying(true)}
@@ -259,7 +312,7 @@ export function ToastView() {
                       </button>
                     )}
                     <button
-                      onClick={() => useNook.getState().shiftToast()}
+                      onClick={dismiss}
                       title={tt("Kapat")}
                       className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-white/10 hover:text-label"
                     >

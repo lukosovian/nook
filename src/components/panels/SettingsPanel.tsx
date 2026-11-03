@@ -28,8 +28,6 @@ import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 import { conflictOf, duplicateOf, SHORTCUTS, useInstalledApps } from "../../lib/shortcuts";
 import { FeedbackSection } from "./FeedbackSection";
-import { isHalloweenSeason } from "../../lib/halloween";
-import { HabitsPanel } from "./HabitsPanel";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
   { id: "primary", label: tt("Ana") },
@@ -73,6 +71,12 @@ const VISION: { id: Settings["colorVision"]; label: string }[] = [
   { id: "protan", label: tt("Protanopi (kırmızı zayıf)") },
   { id: "deutan", label: tt("Döteranopi (yeşil zayıf)") },
   { id: "tritan", label: tt("Tritanopi (mavi-sarı zayıf)") },
+];
+
+const WEATHER_LEVEL: { id: "low" | "mid" | "high"; label: string }[] = [
+  { id: "low", label: tt("Az") },
+  { id: "mid", label: tt("Orta") },
+  { id: "high", label: tt("Çok") },
 ];
 
 const WATER: { id: number; label: string }[] = [
@@ -196,7 +200,7 @@ export function CategoryBody({ id }: { id: CatId }) {
             <Row label={tt("Adanın yeri")} hint={s.islandPos ? tt("Taşındı · üstteki ✥ ile sürükle") : tt("Üst orta · üstteki ✥ ile sürükle")}>
               <TextButton disabled={!s.islandPos} onClick={() => update({ islandPos: null })}>{tt("Ortala")}</TextButton>
             </Row>
-            <Row label={tt("Oyunda ikinci ekrana geç")} hint={tt("Oyun açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
+            <Row label={tt("Tam ekranda ikinci ekrana geç")} hint={tt("Oyun ya da tam ekran video açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
               <Toggle on={s.gameSecondScreen} onChange={(v) => update({ gameSecondScreen: v })} color={ACCENT.blue} />
             </Row>
           </Section>
@@ -239,14 +243,6 @@ export function CategoryBody({ id }: { id: CatId }) {
             <Row label={tt("Sıkılınca oyun teklif etsin")}>
               <Toggle on={s.playOffers} onChange={(v) => update({ playOffers: v })} />
             </Row>
-            <Row label={tt("Canlı hava ve gece atmosferi")} hint={tt("Yağmur, kar, sonbahar yaprakları ve gece yıldızları adada canlanır")}>
-              <Toggle on={s.weatherAtmosphere} onChange={(v) => update({ weatherAtmosphere: v })} color={ACCENT.blue} />
-            </Row>
-            {isHalloweenSeason() && (
-              <Row label={tt("Cadılar Bayramı etkinlikleri")} hint={tt("25–31 Ekim: Balkabağı parıltısı ve sevimli örümcek (1 Kasım'da kendiliğinden kapanır)")}>
-                <Toggle on={s.halloweenSeason !== false} onChange={(v) => update({ halloweenSeason: v })} color={ACCENT.orange} />
-              </Row>
-            )}
           </Section>
           <Section title={tt("Animasyonlar")}>
             <Row label={tt("Ekranlar arası geçiş")}>
@@ -317,15 +313,15 @@ export function CategoryBody({ id }: { id: CatId }) {
     case "health":
       return (
         <>
-          <Section title={tt("Su ve Alışkanlıklar")}>
-            <HabitsTracker />
-          </Section>
           <Section title={tt("Mola hatırlatıcıları")}>
             <Row label={tt("Su hatırlatıcısı")} hint={tt("Oyunda ve tam ekranda susar; telefonda da çıkar")}>
               <Segmented id="settings-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
             </Row>
             <Row label={tt("Göz molası")} hint={tt("20 dakikada bir 20 saniye uzağa bak")}>
               <Toggle on={s.eyeBreak} onChange={(v) => update({ eyeBreak: v })} />
+            </Row>
+            <Row label={tt("Duruş & esneme")} hint={tt("90 dakikada bir dik dur, omuzlarını aç")}>
+              <Toggle on={s.stretchBreak !== false} onChange={(v) => update({ stretchBreak: v })} color={ACCENT.pink} />
             </Row>
           </Section>
           <Section title={tt("Odak bekçisi")}>
@@ -350,7 +346,7 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Row label={tt("Oyunda / tam ekranda gizlen")}>
             <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
           </Row>
-          <Row label={tt("Oyunda ikinci ekrana geç")} hint={tt("Oyun açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
+          <Row label={tt("Tam ekranda ikinci ekrana geç")} hint={tt("Oyun ya da tam ekran video açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
             <Toggle on={s.gameSecondScreen} onChange={(v) => update({ gameSecondScreen: v })} color={ACCENT.blue} />
           </Row>
           <Row label={tt("Oyun açılınca özet")} hint={tt("Kısa süre oyunun üstünde merhaba der")}>
@@ -405,6 +401,11 @@ export function CategoryBody({ id }: { id: CatId }) {
             <Row label={tt("Adada canlı atmosfer")} hint={tt("Hava durumuna göre adada yağmur, kar veya güneş efektleri")}>
               <Toggle on={s.weatherAtmosphere} onChange={(v) => update({ weatherAtmosphere: v })} color={ACCENT.blue} />
             </Row>
+            {s.weatherAtmosphere && (
+              <Row label={tt("Sıklık")} hint={tt("Az: yaprak, kar ve yağmur ara ara düşer")}>
+                <Segmented id="weather-level" options={WEATHER_LEVEL} value={s.weatherLevel} onChange={(v) => update({ weatherLevel: v })} color={ACCENT.blue} />
+              </Row>
+            )}
           </Section>
           <Section title="Hum">
             <Row label={tt("Otomatik Hum")} hint={tt("Bilgisayarda çalan şarkıları arkada tanıyıp kaydeder; mikrofon kullanmaz")}>
@@ -685,10 +686,6 @@ function PhoneSection() {
       )}
     </Section>
   );
-}
-
-function HabitsTracker() {
-  return <HabitsPanel />;
 }
 
 /** Tarif kutusu: numaralı adımlar ve alttaki not (wakeGuide.ts; telefonda da aynısı görünür) */

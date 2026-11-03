@@ -30,6 +30,7 @@ import { NavIcon } from "./ui";
 import { TourPage } from "./pages/TourPage";
 import { ArgusPage } from "./pages/ArgusPage";
 import { AquariumPage } from "./pages/AquariumPage";
+import { WallpaperPage } from "./pages/WallpaperPage";
 import { useArgus, useArgusFeed } from "../lib/argus";
 import { useUpdateCheck } from "../lib/update";
 
@@ -46,6 +47,7 @@ const PAGES: Record<StudioPage, (p: { arg: string | null }) => React.JSX.Element
   settings: SettingsPage,
   tour: TourPage,
   aquarium: AquariumPage,
+  wallpaper: WallpaperPage,
 };
 
 export function Studio() {

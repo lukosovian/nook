@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { normalizeColor, normalizeLook } from "../lib/look";
+import { SPAN, useBodyImage, useContentBox, type ContentBox } from "../lib/nook3d";
 import { AnimatePresence, motion, useAnimationControls, type TargetAndTransition } from "motion/react";
 import { playAntic } from "../hooks/useAntics";
 import { CHEW_MS } from "../hooks/useFeeding";
 import { useHitRect } from "../hooks/useHitRect";
 import { boostFrames } from "../lib/frameCap";
-import { useIslandMode } from "../hooks/useIslandMode";
+import { holdsOnHover, useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
 import { useSoundCard } from "../lib/soundCard";
 import { clearBackground, isPrimary } from "../lib/bridge";
@@ -37,12 +38,11 @@ import { ClaudeView } from "./overlays/ClaudeView";
 import { HumView, HumWave } from "./overlays/HumView";
 import { ToastView } from "./overlays/ToastView";
 import { Panels } from "./panels/Panels";
+import { useHeroRows } from "./panels/Frame";
 import { Brief } from "./brief/Brief";
 import { SearchPanel } from "./search/SearchPanel";
 import { Tour, useTourSteps } from "./tour/Tour";
 import { IslandAtmosphere } from "./atmosphere/IslandAtmosphere";
-import { isHalloweenActive } from "../lib/halloween";
-import { HangingSpider, PumpkinGlow, HalloweenView } from "./halloween/HalloweenElements";
 
 /**
  * Dış gölge yok: şeffaf pencerede yarı saydam siyah, WebView2'nin zemini ara sıra "saydam beyaz"a
@@ -121,13 +121,47 @@ const measure = (() => {
     return ctx.measureText(text).width;
   };
 })();
-function toastFit(title?: string, detail?: string, replyable?: boolean) {
+function toastFit(title?: string, detail?: string, replyable?: boolean, closable?: boolean) {
   if (!title) return ISLAND.toast.width;
   const text = Math.max(measure(title, "500 13px 'Inter Variable', sans-serif"), detail ? measure(detail, "11px 'Inter Variable', sans-serif") : 0);
   // Solda Nook (52) + sağda avatar ve boşluklar (~56); yanıtlanabilir bildirimlerde yanıt kutusu/düğmeleri için ek pay
-  const extra = replyable ? 190 : 60;
+  // Bildirimlerde kapatma (×) düğmesi için 28 px daha
+  const extra = replyable ? 190 : closable ? 88 : 60;
   const minW = replyable ? 440 : ISLAND.toast.width;
   return Math.round(Math.min(580, Math.max(minW, 52 + text + extra)));
+}
+/** Üstüne gelinince bildirim kartı tam metni sığacak kadar uzar (ToastView'daki line-clamp-2 / line-clamp-6 ile aynı) */
+const TOAST_TITLE_LINES = 2;
+const TOAST_DETAIL_LINES = 6;
+function toastOpenHeight(width: number, title?: string, detail?: string, replyable?: boolean, closable?: boolean) {
+  if (!title) return ISLAND.toast.height;
+  // Metin alanı: soldaki Nook (52), sağ boşluk (12), avatar (28), aralıklar ve yanıt düğmeleri
+  const area = width - 52 - 12 - 28 - 12 - (replyable ? 150 : closable ? 28 : 0);
+  // Sözcük kaydırma satırı biraz erken bitirir: %8 pay
+  const lines = (w: number, max: number) => Math.min(max, Math.max(1, Math.ceil((w * 1.08) / area)));
+  const t = lines(measure(title, "600 13px 'Inter Variable', sans-serif"), TOAST_TITLE_LINES);
+  const d = detail ? lines(measure(detail, "11px 'Inter Variable', sans-serif"), TOAST_DETAIL_LINES) : 0;
+  return Math.max(ISLAND.toast.height, Math.round(22 + t * 17 + d * 15));
+}
+
+/** Alçak hâller (kapalı ada, kapsül, ses göstergesi, kart): Nook'un başı üst kenarda kesilebilir */
+const LOW = new Set(["collapsed", "osd", "toast"]);
+/** 3B resmin ekrandaki boyu (Nook.tsx'teki IMG ile aynı) */
+const IMG = (FACE * SPAN) / 2;
+/**
+ * Şapka, peruk, ananas yaprağı gibi tepeden taşan görünümlerde Nook'u alçak adanın içine sığdır:
+ * gerekirse biraz küçült, dolu kısmı üstte ve altta 2 px pay kalacak şekilde ortala.
+ * Düz kürede (ve sığan her görünümde) yeri değişmez.
+ */
+function fitLow(p: { left: number; top: number; scale: number }, h: number, box: ContentBox | null) {
+  if (!box) return p;
+  const PAD = 2;
+  const cy = p.top + FACE / 2;
+  const scale = Math.min(p.scale, (h - PAD * 2) / ((box.bottom - box.top) * IMG));
+  const top = cy + (box.top - 0.5) * IMG * scale;
+  const bottom = cy + (box.bottom - 0.5) * IMG * scale;
+  const shift = top < PAD ? PAD - top : bottom > h - PAD ? h - PAD - bottom : 0;
+  return { left: p.left, top: p.top + shift, scale };
 }
 
 export function Island() {
@@ -202,20 +236,31 @@ export function Island() {
   const lookTab = useNook((s) => s.tab === "look");
   // Kapalı ada bir işin kapsülüne dönüşür (müzik, odak, Claude…); iki iş varsa yanda baloncuk
   const cap = useCapsule(mode === "collapsed");
-  const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail, !!(s.toasts[0]?.replyKey || s.toasts[0]?.whatsappChat)));
+  const toastWidth = useNook((s) => toastFit(s.toasts[0]?.title, s.toasts[0]?.detail, !!(s.toasts[0]?.replyKey || s.toasts[0]?.whatsappChat || s.toasts[0]?.call), s.toasts[0]?.kind === "notify"));
+  const toastHeight = useNook((s) => {
+    const t = s.toasts[0];
+    if (!t || !s.hovered || !holdsOnHover(t)) return ISLAND.toast.height;
+    return toastOpenHeight(toastWidth, t.title, t.detail, !!(t.replyKey || t.whatsappChat || t.call), t.kind === "notify");
+  });
   const width = cap ? cap.width : mode === "toast" ? toastWidth : shape.width;
-  const height = cap ? cap.height : shape.height;
+  const height = cap ? cap.height : mode === "toast" ? toastHeight : shape.height;
   const radius = cap ? Math.round(cap.height * 0.45) : shape.radius;
   const transition = mode === "feeding" ? spring.stretch : spring.island;
   const view = useNook((s) => viewOf(s.tab, s.searching));
+  const heroRows = useHeroRows((s) => s.n);
   const tourStep = useNook((s) => s.tourStep);
   const tourSteps = useTourSteps();
+  const nookLook = humming ? { ...normalizeLook(settings.look), head: "headphones" as const } : normalizeLook(settings.look);
+  const nookColor = normalizeColor(settings.faceColor);
+  const box = useContentBox(useBodyImage(nookLook, nookColor, 512));
   const pose =
     mode === "tour"
       ? tourPose(!!tourSteps[tourStep]?.centered)
       : cap?.nook
-        ? { left: cap.nook.x - FACE / 2, top: cap.height / 2 - FACE / 2, scale: cap.nook.scale }
-        : mascotPose(mode, width, view, ex);
+        ? fitLow({ left: cap.nook.x - FACE / 2, top: cap.height / 2 - FACE / 2, scale: cap.nook.scale }, cap.height, box)
+        : LOW.has(mode)
+          ? fitLow(mascotPose(mode, width, view, ex, heroRows), height, box)
+          : mascotPose(mode, width, view, ex, heroRows);
 
   const ref = useRef<HTMLDivElement>(null);
   useHitRect(ref);
@@ -286,9 +331,6 @@ export function Island() {
           {/* Canlı hava durumu & gece atmosferi */}
           <IslandAtmosphere width={width} height={height} />
 
-          {/* Cadılar Bayramı: Balkabağı parıltısı (yalnızca kapalı adada) */}
-          {isHalloweenActive(settings) && settings.halloweenGlow !== false && mode === "collapsed" && <PumpkinGlow />}
-
           <AnimatePresence>
             {mode === "expanded" && <Panels key="panels" />}
             {mode === "search" && <SearchPanel key="search" />}
@@ -308,8 +350,8 @@ export function Island() {
                 expression={expression}
                 status={status}
                 grooving={playing && !(mode === "expanded" && lookTab)}
-                color={normalizeColor(settings.faceColor)}
-                look={humming ? { ...normalizeLook(settings.look), head: "headphones" } : normalizeLook(settings.look)}
+                color={nookColor}
+                look={nookLook}
                 bounds={ref}
               />
               </motion.div>
@@ -342,15 +384,12 @@ export function Island() {
             {mode === "toast" && <ToastView key="toast" />}
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
-            {mode === "halloween" && <HalloweenView key="halloween" />}
             {mode === "claude" && <ClaudeView key="claude" />}
             {mode === "hum" && <HumView key="hum" />}
             {mode === "guard" && <GuardView key="guard" />}
             {mode === "gate" && <GateView key="gate" />}
           </AnimatePresence>
         </motion.div>
-        {/* Cadılar Bayramı: Adanın sağ üst köşesinden sarkan örümcek (yalnızca ada kapalıyken) */}
-        {isHalloweenActive(settings) && settings.halloweenGlow !== false && mode === "collapsed" && <HangingSpider islandRef={ref} />}
         </div>
         {/* Adanın dışında: iple sarkan ya da kenarda balık tutan Nook */}
         <AnimatePresence>

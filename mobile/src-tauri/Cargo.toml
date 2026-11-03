@@ -1,6 +1,6 @@
 [package]
 name = "nook-mobile"
-version = "0.3.4"
+version = "0.3.5"
 description = "Nook Mobil — telefondan PC'deki Nook"
 edition = "2021"
 

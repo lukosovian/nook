@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Bildirimler arka planda PC'ye gidebilsin: pil kısıtlamasından muaf olmayı sormak için -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Gelen aramayı PC'deki Nook'tan sessize almak (zili kısmak Rahatsız Etmeyin erişimi ister) -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <!-- Eski Android'de ekran görüntüsünü galeriye kaydetmek -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 

@@ -8,7 +8,6 @@ import {
   EVENTS,
   isPrimary,
   onlineState,
-  remoteTestNotification,
   subscribe,
   voiceStart,
   voiceStop,
@@ -34,7 +33,7 @@ import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
 import { logDiaryMinute } from "../lib/diary";
 import { isWhatsAppNotif, useWhatsApp } from "../lib/whatsapp";
-import { useHabits } from "../lib/habits";
+import { habitOn, useHabits } from "../lib/habits";
 
 /** Odak sayacı: faz bitince sıradakine geçer. */
 export function useFocusTimer() {
@@ -186,53 +185,79 @@ export function useDayTracker() {
       const resting = !!s.focus && s.focus.phase !== "work";
       const quiet = s.fullscreen || !!s.ringing || resting || isQuiet(s);
 
+      // Su, göz ve esneme molalarının tek kaynağı ayarlar (waterEvery, eyeBreak, stretchBreak);
+      // Alışkanlıklar modülü, Ayarlar, Odak ve tanıtım hep aynı ayarları değiştirir.
       // Göz Dinlendirme Hatırlatması (20-20-20 Kuralı)
-      if (s.settings.eyeBreak && eyeMinutes >= 20) {
-        eyeMinutes = 0;
-        if (!quiet && !s.reminder) {
-          s.setReminder({ kind: "eye", phase: "due" });
-          playAntic("wink");
+      if (s.settings.eyeBreak) {
+        if (eyeMinutes >= 20) {
+          eyeMinutes = 0;
+          if (!quiet && !s.reminder) {
+            s.setReminder({ kind: "eye", phase: "due" });
+            playAntic("wink");
+          }
         }
+      } else {
+        eyeMinutes = 0;
       }
 
       // Duruş & Esneme Hatırlatması (90 dakikada bir)
-      if (stretchMinutes >= 90) {
+      if (s.settings.stretchBreak !== false) {
+        if (stretchMinutes >= 90) {
+          stretchMinutes = 0;
+          if (!quiet && !s.reminder) {
+            s.setReminder({ kind: "stretch", phase: "due" });
+            playAntic("stretch");
+          }
+        }
+      } else {
         stretchMinutes = 0;
-        if (!quiet && !s.reminder) {
-          s.setReminder({ kind: "stretch", phase: "due" });
-          playAntic("stretch");
-        }
       }
 
-      // Su Hatırlatması
-      if (s.settings.waterEvery > 0 && waterMinutes >= s.settings.waterEvery && !s.reminder && !isQuiet(s)) {
+      // Su Hatırlatması (telefona waterInfo() ile gider; Nook Mobil kendi bildirimini çıkarır)
+      if (s.settings.waterEvery > 0) {
+        if (waterMinutes >= s.settings.waterEvery && !s.reminder && !isQuiet(s)) {
+          waterMinutes = 0;
+          s.setReminder({ kind: "water", phase: "due" });
+          playAntic("surprised");
+        }
+      } else {
         waterMinutes = 0;
-        s.setReminder({ kind: "water", phase: "due" });
-        playAntic("surprised");
-        const waterHabit = useHabits.getState().habits.find((h) => h.id === "water");
-        if (waterHabit?.notifyOnMobile) {
-          void remoteTestNotification().catch(() => {});
-        }
       }
 
-      // Kullanıcının Özel ve Aktif Alışkanlık Hatırlatmaları
+      // Kullanıcının kendi alışkanlıkları: aralığı 0 ise kapalı
       const habits = useHabits.getState().habits;
       const nowTs = Date.now();
       for (const h of habits) {
-        if (!h.enabled || h.intervalMin <= 0 || h.id === "water" || h.id === "eyes" || h.id === "stretch") continue;
+        if (!habitOn(h)) continue;
         const elapsedMin = h.lastDoneAt ? (nowTs - h.lastDoneAt) / 60_000 : 999;
         if (elapsedMin >= h.intervalMin && !s.reminder && !quiet) {
           useHabits.getState().updateHabit(h.id, { lastDoneAt: nowTs });
           s.setReminder({ kind: "habit", phase: "due", habitId: h.id, title: h.title, icon: h.icon });
           playAntic("nod");
-          if (h.notifyOnMobile) {
-            void remoteTestNotification().catch(() => {});
-          }
           break;
         }
       }
     }, 60_000);
-    return () => window.clearInterval(t);
+    // Bir mola kapatılınca (nereden olursa olsun) adada bekleyen kartı da kalksın
+    const off = useNook.subscribe((st, prev) => {
+      const r = st.reminder;
+      if (!r || r.phase !== "due") return;
+      if (st.settings === prev.settings && st.reminder === prev.reminder) return;
+      if ((r.kind === "water" && st.settings.waterEvery === 0) || (r.kind === "eye" && !st.settings.eyeBreak) || (r.kind === "stretch" && st.settings.stretchBreak === false)) {
+        st.setReminder(null);
+      }
+    });
+    const offHabits = useHabits.subscribe((h) => {
+      const r = useNook.getState().reminder;
+      if (r?.kind !== "habit" || r.phase !== "due") return;
+      const item = h.habits.find((x) => x.id === r.habitId);
+      if (!item || !habitOn(item)) useNook.getState().setReminder(null);
+    });
+    return () => {
+      window.clearInterval(t);
+      off();
+      offHabits();
+    };
   }, []);
 }
 
@@ -259,6 +284,12 @@ export function useNotificationFeed() {
       // WhatsApp bildirim kartları kapatıldıysa / sessize alındıysa adada kart çıkarma
       if (wa && s.settings.whatsappNotify === false) return;
 
+      if (n.call) {
+        // Arama beklemez: sıradaki kartların önüne geçer, arama açılınca ya da bitince kalkar
+        s.pushToast({ kind: "notify", title: n.title, detail: tt("Arıyor…"), icon: n.icon, phoneKey: n.phoneKey ?? null, call: n.call, ms: 60_000 });
+        playAntic("surprised");
+        return;
+      }
       const replyKey = n.replyKey ?? null;
       s.pushToast({
         kind: "notify",
@@ -267,9 +298,21 @@ export function useNotificationFeed() {
         icon: n.icon,
         replyKey,
         whatsappChat: wa ? n.title : null,
+        phoneKey: n.phoneKey ?? null,
         ms: replyKey || wa ? 6500 : 4500,
       });
       playAntic("surprised");
+    });
+  }, []);
+
+  // Telefonda görülen (kapatılan, açılan, okunan) bildirim: listeden ve adadaki karttan kalksın
+  useEffect(() => {
+    if (!isPrimary) return;
+    return subscribe<{ phoneKey: string }>(EVENTS.notificationRemoved, ({ phoneKey }) => {
+      useNook.setState((s) => ({
+        notifications: s.notifications.filter((n) => n.phoneKey !== phoneKey),
+        toasts: s.toasts.filter((t) => t.phoneKey !== phoneKey),
+      }));
     });
   }, []);
 }

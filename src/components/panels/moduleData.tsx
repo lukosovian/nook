@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { dayKey, isLive, moduleScore, remindAt, useNook, type Tab } from "../../store/nook";
+import { useHabits } from "../../lib/habits";
 import type { ProfileDef } from "../../lib/profiles";
 import { ACCENT, levelColor, MiniNook } from "../ui/primitives";
 import { ARGUS_BLUE } from "../ArgusPromo";
@@ -203,6 +204,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
   const notifs = useNook((s) => s.notifications);
   const active = useNook((s) => s.days[dayKey()]?.active ?? 0);
   const water = useNook((s) => s.days[dayKey()]?.water ?? 0);
+  const waterGoal = useHabits((s) => s.waterGoal);
   const argusSnap = useArgus((s) => s.snap);
   const events = useNook((s) => s.events);
   const live = useNook(isLive);
@@ -390,9 +392,9 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
     },
     habits: {
       text: water > 0 ? tt("{0} bardak su içildi", water) : tt("Su ve mola hedefleri"),
-      state: water >= 8 ? "active" : water > 0 ? "idle" : "empty",
-      value: `${water}/8`,
-      progress: Math.min(1, water / 8),
+      state: water >= waterGoal ? "active" : water > 0 ? "idle" : "empty",
+      value: `${water}/${waterGoal}`,
+      progress: Math.min(1, water / waterGoal),
       foot: [tt("Alışkanlıklar & Sağlık"), tt("{0} bardak", water)],
     },
   };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { ChevronRight, Droplet, MoreHorizontal } from "lucide-react";
 import { cached, getMedia, wakePc, drinkWater, type Pairing, type NowPlaying, type PcNote, type Status } from "../lib/pc";
 import { ChipNook, errText, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
@@ -387,8 +387,8 @@ function WaterCard({ pairing, status }: { pairing: Pairing; status: Status | nul
   return (
     <div className="flex items-center justify-between rounded-3xl border border-edge bg-card p-3.5">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
-          💧
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-300">
+          <Droplet size={20} strokeWidth={2.3} fill="currentColor" />
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -398,7 +398,7 @@ function WaterCard({ pairing, status }: { pairing: Pairing; status: Status | nul
             </span>
           </div>
           <p className="mt-0.5 truncate text-[11.5px] text-label-3">
-            {waterCount >= waterGoal ? "Harika! Günlük hedefe ulaştın 🎉" : `${waterGoal - waterCount} bardak daha içmelisin`}
+            {waterCount >= waterGoal ? "Bugünkü hedef tamam" : `${waterGoal - waterCount} bardak daha içmelisin`}
           </p>
         </div>
       </div>

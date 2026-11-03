@@ -9,6 +9,7 @@ import type {
   FileMeta,
   NotificationPayload,
   MediaPayload,
+  PhoneCall,
   NativeSettings,
   PrivacyPayload,
   StatsPayload,
@@ -364,6 +365,8 @@ export interface Settings extends NativeSettings {
   focusLong: number;
   /** 20-20-20 göz molası */
   eyeBreak: boolean;
+  /** Duruş & esneme molası */
+  stretchBreak?: boolean;
   /** Su hatırlatıcısı (dakika; 0 = kapalı) */
   waterEvery: number;
   /** Günün ilk açılışında özet */
@@ -444,8 +447,6 @@ export interface Settings extends NativeSettings {
   colorFormat: "hex" | "rgb" | "hsl";
   /** HEX'i # olmadan kopyala */
   colorNoHash: boolean;
-  /** Cadılar Bayramı balkabağı ışığı ve örümcek efekti */
-  halloweenGlow?: boolean;
   /** Raftan dışarı bırakılan öğe raftan kalksın (sabitlenenler kalır) */
   shelfRemoveAfterDrop: boolean;
   /** Ses karıştırıcıda gizlenen / sabitlenen uygulamalar (anahtar) */
@@ -471,8 +472,8 @@ export interface Settings extends NativeSettings {
   uiVolume: number;
   /** Adada canlı hava durumu ve gece atmosferi (yağmur, kar, yapraklar, yıldızlar) */
   weatherAtmosphere: boolean;
-  /** Cadılar Bayramı sezonu etkinlikleri (25-31 Ekim; 1 Kasım'da otomatik kapanır) */
-  halloweenSeason: boolean;
+  /** Atmosferin sıklığı: az (ara ara), orta, çok */
+  weatherLevel: import("../components/atmosphere/IslandAtmosphere").AtmosphereLevel;
   /** WhatsApp mesajlarında adada bildirim kartı fırlasın mı */
   whatsappNotify: boolean;
   /** Ana sayfa profilleri ("Hepsi" hariç); yoksa varsayılanlar (lib/profiles) */
@@ -555,6 +556,7 @@ export const DEFAULT_SETTINGS: Settings = {
   focusBreak: 5,
   focusLong: 15,
   eyeBreak: true,
+  stretchBreak: true,
   waterEvery: 60,
   dailySummary: true,
   diary: true,
@@ -566,7 +568,6 @@ export const DEFAULT_SETTINGS: Settings = {
   introStyle: "random",
   moveStyle: "random",
   updateAnim: "cycle",
-  halloweenGlow: true,
   powerSaver: true,
   argusProfile: "",
   argusPromo: true,
@@ -644,7 +645,7 @@ export const DEFAULT_SETTINGS: Settings = {
   uiSounds: true,
   uiVolume: 0.6,
   weatherAtmosphere: true,
-  halloweenSeason: true,
+  weatherLevel: "low",
   whatsappNotify: true,
 };
 
@@ -666,6 +667,10 @@ export interface Toast extends SysEvent {
   replyKey?: string | null;
   /** WhatsApp mesajıysa sohbet başlığı */
   whatsappChat?: string | null;
+  /** Telefon bildiriminin anahtarı: telefonda görülünce kart da kalkar */
+  phoneKey?: string | null;
+  /** Telefonda çalan arama (açılınca ya da bitince phoneKey ile kalkar) */
+  call?: PhoneCall | null;
 }
 
 const MAX_SHELF = 24;
@@ -861,7 +866,7 @@ interface NookState {
   setStats: (stats: StatsPayload) => void;
   setDevices: (devices: DevicesPayload) => void;
   setOsd: (osd: Osd | null) => void;
-  pushToast: (event: SysEvent & { icon?: string | null; ms?: number; replyKey?: string | null; whatsappChat?: string | null }) => void;
+  pushToast: (event: SysEvent & { icon?: string | null; ms?: number; replyKey?: string | null; whatsappChat?: string | null; phoneKey?: string | null; call?: PhoneCall | null }) => void;
   shiftToast: () => void;
   updateSettings: (patch: Partial<Settings>) => void;
   setFullscreen: (fullscreen: boolean) => void;
@@ -1177,7 +1182,7 @@ export const useNook = create<NookState>()(
       pushToast: (event) =>
         set((s) => ({
           nookNotifs: logToast(s.nookNotifs, event),
-          ...(isQuiet(s) && !QUIET_ALLOWED.has(event.kind) ? {} : { toasts: [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) }),
+          ...(isQuiet(s) && !QUIET_ALLOWED.has(event.kind) ? {} : { toasts: event.call ? [{ ...event, id: crypto.randomUUID() }, ...s.toasts].slice(0, 5) : [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) }),
         })),
       shiftToast: () => set((s) => ({ toasts: s.toasts.slice(1) })),
 

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { argusAddSong, EVENTS, inTauri, isPrimary, subscribe } from "../lib/bridge";
-import { epLabel, findItem, useArgus, EXTRA } from "../lib/argus";
+import { findItem, useArgus, EXTRA } from "../lib/argus";
 import { DJ_MOVES, humCancel, humListen, humWatching, type HumTrack } from "../lib/hum";
 import { tt } from "../lib/i18n";
 import { useNook } from "../store/nook";
@@ -99,17 +99,8 @@ async function toArgus(track: HumTrack, agoMs: number) {
   const pos = timeline ? m.positionMs + (m.playing ? performance.now() - m.at : 0) : live.playedMs;
   const atMs = Math.max(0, Math.round(pos - agoMs));
   try {
-    const r = await argusAddSong(item.id, ep?.season ?? null, ep?.episode ?? null, atMs, !timeline, track);
-    if (r.duplicate) return;
-    const t = Math.floor(atMs / 1000);
-    const at = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-    s.pushToast({
-      kind: "argus",
-      title: `${track.title} · ${track.artist}`,
-      detail: tt("{0} · {1} · Argus'a eklendi", ep ? `${item.title} ${epLabel(ep)}` : item.title, `${timeline ? "" : "~"}${at}`),
-      icon: track.cover ?? null,
-      ms: 5000,
-    });
+    // İzlerken kart çıkmaz (bölüm boyunca art arda gelip rahatsız ediyordu); şarkı sessizce Müzikler'e yazılır
+    await argusAddSong(item.id, ep?.season ?? null, ep?.episode ?? null, atMs, !timeline, track);
   } catch (e) {
     const old = String(e) === "old";
     if (old && oldArgusWarned) return;

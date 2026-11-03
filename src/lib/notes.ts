@@ -202,7 +202,19 @@ export type DemoId =
   | "scenefilter"
   | "polish033"
   | "habitsmod"
-  | "notifhold";
+  | "notifhold"
+  | "habitsfix"
+  | "notifgrow"
+  | "atmosplug"
+  | "argusscene"
+  | "notifclose"
+  | "phoneseen"
+  | "fullsecond"
+  | "gametime"
+  | "nookfit"
+  | "weatherlevel"
+  | "phonecall"
+  | "wallpapers";
 
 export interface NoteItem {
   title: string;
@@ -221,6 +233,73 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.5",
+    date: tt("3 Kasım 2026"),
+    headline: tt("Nook'lu duvar kağıtları, telefon araması kartı, kapatılabilen bildirimler, ayarlanabilir hava efektleri"),
+    items: [
+      {
+        title: tt("Studio'da duvar kağıtları"),
+        text: tt("Studio › Duvar kağıtları'nda 38 Nook'lu masaüstü arka planı var: Maceralar, Çalışma köşesi, Müzik ve renk, NOOK yazısı ve Sade. Birini seçip \"Masaüstüne uygula\"ya basınca tam boyu bir kez indirilir, Resimler › Nook klasörüne kaydedilir ve masaüstünün arka planı olur."),
+        demo: "wallpapers",
+      },
+      {
+        title: tt("Alışkanlıklar ve su için tek anahtar"),
+        text: tt("Su, göz ve esneme molaları tek ayardan yönetiliyor: Alışkanlıklar modülünde, Ayarlar'da ya da Odak'ta nereden açıp kapatırsan her yerde aynı, kapatınca adada bekleyen hatırlatma da kalkar. Su kartından hatırlatma aralığını seçebilirsin (Kapalı, 45 dk, 1 sa, 90 dk). Kendi alışkanlıklarında tek seçim var; Kapalı seçince hatırlatmaz. Alışkanlıklar Nook'un kendi simgeleriyle görünüyor, telefondan \"İçtim\" dediğin su da bir kez sayılıyor."),
+        demo: "habitsfix",
+      },
+      {
+        title: tt("Bildirim kartı üstüne gelince büyüyor"),
+        text: tt("Bir bildirimin üstüne gelince ada, bildirimin tam metni sığacak kadar büyür ve imleç oradayken kapanmaz; tıklayınca Bildirimler açılır. \"Üstüme gel\" diyen kartlar (oyun teklifi, Argus, yıl özeti) üstüne gelince ilgili bölümü açar."),
+        demo: "notifgrow",
+      },
+      {
+        title: tt("Canlı hava prizdeyken de adada"),
+        text: tt("Yağmur, kar, sis, sonbahar yaprakları ve gece yıldızları bilgisayar prizdeyken de adada canlanır; \"Pilde yavaşla\" açıksa yalnızca pildeyken ya da Windows tasarruf modundayken durur. Gece ateş böceği adada gezinir. Anahtarı Modüller › Hava durumu altında."),
+        demo: "atmosplug",
+      },
+      {
+        title: tt("Argus sahneyi bölümden, filmi sahneden ayırıyor"),
+        text: tt("YouTube'da bir diziden sahne, kesit ya da dizi müzikleri izlerken bunlar bölüm sayılmaz; Hum'un bulduğu şarkılar da bir bölüme yazılmaz. Başlığında bölüm yazmayan dizi videosu ancak bölüm uzunluğundaysa (20 dk ve üstü) sıradaki bölüm sayılır. Film sitelerinde başlıkta tür ya da site sloganı (\"Bilim Kurgu\", \"En iyi film sitesi\") geçse de izlediğin film tanınır. İzlerken Hum'un bulduğu şarkılar adada kart çıkarmadan Müzikler listesine yazılır."),
+        demo: "argusscene",
+      },
+      {
+        title: tt("Hava efektleri ara ara"),
+        text: tt("Adadaki yaprak, kar ve yağmur artık habire düşmüyor: Modüller › Hava durumu altındaki Sıklık ayarıyla Az, Orta ya da Çok seçebilirsin. Az'da (yeni varsayılan) birkaç yaprak ara ara süzülür, efektler de daha soluk görünür; Çok eskisi gibi dolu dolu."),
+        demo: "weatherlevel",
+      },
+      {
+        title: tt("Bildirimi kapat: × ya da kaydır"),
+        text: tt("Gelen bildirim kartının sağında kapatma düğmesi var; kartı yana kaydırarak da kapatabilirsin. Kartı kapatınca ya da bir yanıt gönderince imleç adanın üstünde kalsa da ada kendiliğinden açılmaz."),
+        demo: "notifclose",
+      },
+      {
+        title: tt("Telefonda gördüğün bildirim PC'de çıkmaz"),
+        text: tt("Telefonu kullanırken gelen bildirimler PC'de çıkmaz. Telefonda kapattığın, açtığın ya da okuduğun bildirim Nook'un listesinden ve adadaki karttan da kalkar. Bildirimden yazdığın yanıt PC'ye yeni bir bildirim olarak gelmez. Nook Mobil'in yeni sürümüyle çalışır."),
+        demo: "phoneseen",
+      },
+      {
+        title: tt("Telefon çalınca adada arama kartı"),
+        text: tt("Telefonuna arama gelince adada kimin aradığı görünür. \"Reddet\" aramayı telefonda reddeder, \"Sessize al\" zili kısar; aramayı telefonda açınca ya da arama bitince kart kalkar. Zili PC'den kısmak için Nook Mobil › Bildirimler'den bir kez izin vermen yeterli. Nook Mobil'in yeni sürümüyle çalışır."),
+        demo: "phonecall",
+      },
+      {
+        title: tt("Tam ekran videoda da ikinci ekran"),
+        text: tt("İkinci bir ekran varsa Nook yalnızca oyunda değil, tam ekran izlediğin videoda da gizlenmek yerine öbür ekrana geçer; tam ekrandan çıkınca geri döner. Ayarlar'daki anahtarın adı \"Tam ekranda ikinci ekrana geç\"."),
+        demo: "fullsecond",
+      },
+      {
+        title: tt("Oyun süresi yalnızca oynarken sayılır"),
+        text: tt("Oyun arkada açık kalırken geçen süre oyun süresine eklenmez: Oyunlar, karne, yıl özeti ve mola hatırlatması yalnızca oyun öndeyken geçen süreyi sayar."),
+        demo: "gametime",
+      },
+      {
+        title: tt("Nook adaya tam sığar"),
+        text: tt("Şapkalı, peruklu ya da ananas gibi tepesi uzun görünümlerde Nook kapalı adada ve kartlarda başı kesilmeden sığar. Açık adada Nook'un altında iş yoksa Nook kartın ortasına iner."),
+        demo: "nookfit",
+      },
+    ],
+  },
   {
     version: "0.3.4",
     date: tt("26 Ekim 2026"),

@@ -10,8 +10,8 @@ import { EVENTS, inTauri, openStudioWindow, subscribe, windowLabel } from "./bri
 import { useNook } from "../store/nook";
 import { exitBig } from "./big";
 
-export type StudioPage = "home" | "look" | "keys" | "modules" | "argus" | "report" | "year" | "games" | "notes" | "settings" | "tour" | "aquarium";
-export const STUDIO_PAGES: StudioPage[] = ["home", "look", "keys", "modules", "argus", "report", "year", "games", "notes", "settings", "tour", "aquarium"];
+export type StudioPage = "home" | "look" | "keys" | "modules" | "argus" | "report" | "year" | "games" | "notes" | "settings" | "tour" | "aquarium" | "wallpaper";
+export const STUDIO_PAGES: StudioPage[] = ["home", "look", "keys", "modules", "argus", "report", "year", "games", "notes", "settings", "tour", "aquarium", "wallpaper"];
 
 export const isStudio = windowLabel === "studio" || (import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "studio");
 

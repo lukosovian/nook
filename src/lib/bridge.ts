@@ -39,6 +39,7 @@ export const EVENTS = {
   downloads: "nook://downloads",
   downloadDone: "nook://download-done",
   notification: "nook://notification",
+  notificationRemoved: "nook://notification-removed",
   voice: "nook://voice",
   wakeHeard: "nook://wake-heard",
   sttProgress: "nook://stt-progress",
@@ -110,7 +111,20 @@ export interface NotificationPayload {
   replyKey?: string | null;
   /** PC kapalıyken telefonda bekleyip sonradan geldi: adada kart açılmaz */
   quiet?: boolean;
+  /** Telefondaki bildirimin anahtarı: telefonda kalkınca (görüldü) burada da kalkar */
+  phoneKey?: string | null;
+  /** Telefonda çalan arama: kartta Reddet / Sessize al */
+  call?: PhoneCall | null;
 }
+
+export interface PhoneCall {
+  canDecline: boolean;
+  canMute: boolean;
+}
+
+/** Telefonda çalan aramayı reddet ya da zilini kıs */
+export const phoneCallAction = (key: string, action: "decline" | "mute") =>
+  inTauri ? invoke<void>("phone_call_action", { key, action }) : Promise.resolve();
 
 export interface WaChat {
   id: string;
@@ -188,6 +202,9 @@ export interface GamePayload {
 }
 
 /** Windows Hello (PIN, parmak izi, yüz) ile doğrula; Hello yoksa "unavailable" hatası */
+/** Studio › Duvar kağıtları: resmi (JPEG, base64) Resimler › Nook'a kaydedip masaüstü arka planı yap */
+export const setWallpaper = (id: string) => (inTauri ? invoke<string>("set_wallpaper", { id }) : Promise.reject(new Error("yalnızca masaüstü uygulamasında")));
+
 export const verifyWindowsUser = (message: string) => (inTauri ? invoke<boolean>("verify_windows_user", { message }) : Promise.resolve(true));
 /** Windows'un bildirim kaydı okunabiliyor mu (null: henüz denenmedi) */
 export const notifyStatus = () => (inTauri ? invoke<boolean | null>("notify_status") : Promise.resolve(true));

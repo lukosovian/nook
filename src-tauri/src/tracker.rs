@@ -297,9 +297,9 @@ fn follow(
         *candidate = None;
         return;
     }
-    // Oyun açıkken "Oyunda ikinci ekrana geç" etkinse imleç oyunun ekranına gitse bile Nook oyun ekranına dönmez
+    // Oyun ya da tam ekran video açıkken "Tam ekranda ikinci ekrana geç" etkinse imleç o ekrana gitse bile Nook dönmez
     if shared.settings().game_second_screen {
-        if let Some((gl, gt, _, _)) = *shared.game_screen.lock().unwrap() {
+        if let Some((gl, gt, _, _)) = *shared.full_screen.lock().unwrap() {
             if target.position().x == gl && target.position().y == gt {
                 *candidate = None;
                 return;

@@ -396,6 +396,9 @@ function readiness(look: Look): "wait" | "ok" | "none" {
   return p.state === "pending" ? "wait" : p.state === "ready" ? "ok" : "none";
 }
 
+/** Görünüm çizilebilir mi: "wait" derleniyor, "ok" hazır, "none" WebGL yok ya da derlenemedi */
+export const lookState = (look: Look) => readiness(look);
+
 /** Görünümün programını şimdiden derlemeye başla (ör. "Şaşırt beni"nin sıradaki görünümü) */
 export function warmLook(look: Look) {
   void readiness(look);
@@ -588,3 +591,54 @@ if (import.meta.env.DEV && typeof window !== "undefined") (window as { __nook3dB
 
 /** Yalnızca geliştirme: derleme süresi ölçümü (görünümün program anahtarı ve kaynağı) */
 export const __programOf = import.meta.env.DEV ? (look: Look) => ({ key: progKey(look), src: pruned(progKey(look)) }) : undefined;
+
+// ------------------------------------------------------------------ dolu alan
+
+/** Resmin dolu (saydam olmayan) kısmının üst ve alt sınırı, resmin boyuna oranla (0 üst, 1 alt) */
+export interface ContentBox {
+  top: number;
+  bottom: number;
+}
+const boxes = new Map<string, ContentBox>();
+
+/**
+ * Gövde resminin dolu kısmı: şapka, ananas yaprağı, peruk gibi tepeden taşan parçalar dahil. Kapalı ada
+ * gibi alçak yerlerde Nook bu kutuya göre yerleştirilir ki başı adanın üst kenarında kesilmesin.
+ */
+export function useContentBox(url: string | null): ContentBox | null {
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!url || boxes.has(url)) return;
+    let gone = false;
+    const im = new Image();
+    im.onload = () => {
+      const n = 96;
+      const c = document.createElement("canvas");
+      c.width = c.height = n;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      if (!g) return;
+      g.drawImage(im, 0, 0, n, n);
+      const a = g.getImageData(0, 0, n, n).data;
+      let top = -1;
+      let bottom = -1;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          if (a[(y * n + x) * 4 + 3] > 60) {
+            if (top < 0) top = y;
+            bottom = y;
+            break;
+          }
+        }
+      }
+      if (top < 0) return;
+      if (boxes.size > 16) boxes.delete(boxes.keys().next().value!);
+      boxes.set(url, { top: top / n, bottom: (bottom + 1) / n });
+      if (!gone) bump();
+    };
+    im.src = url;
+    return () => {
+      gone = true;
+    };
+  }, [url]);
+  return url ? (boxes.get(url) ?? null) : null;
+}

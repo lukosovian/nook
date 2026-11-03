@@ -74,6 +74,8 @@ export interface ArgusSuggestion {
   itemId: string;
   season?: number;
   episode?: number;
+  /** Başlıkta bölüm yazmıyor, sıradaki bölüm tahmin edildi (yalnızca bölüm uzunluğundaki videolarda geçerli) */
+  guess?: boolean;
 }
 
 interface ArgusState {
@@ -268,21 +270,26 @@ export function matchTitle(snap: ArgusSnapshot | null, text: string, pool?: Argu
 }
 
 /**
- * Fragman, tanıtım, klip, inceleme, özet, sahne veya kesit gibi bölüm olmayan videolar:
- * Süresi 45 dk / 1 saat bile olsa adı Argus'taki bir diziyle eşleşse de "bölüm" sanılmaz ve şarkı eklenmez.
+ * Bölüm/film olmayan videolar: fragman, inceleme, sahne, kesit, klip, derleme, dizi müzikleri…
+ * Adı Argus'taki bir kayıtla eşleşse de izlenen bölüm/film sayılmaz, Hum şarkıları da eklenmez.
+ * Film sitelerinin başlıklarında sık geçen genel sözcükler ("bilim kurgu", "en iyi", "editör") burada yok:
+ * onlar yüzünden düpedüz film izlerken de tanınmıyordu.
  */
 export const EXTRA =
-  /(^|[^\p{L}])(trailer|teaser|fragman\p{L}*|tanıtım\p{L}*|tanitim\p{L}*|promo|recap|özet|ozet|review|inceleme\p{L}*|reaction|tepki\p{L}*|explained|analiz\p{L}*|behind the scenes|kamera arkası|featurette|sneak peek|first look|ilk bakış|interview|röportaj\p{L}*|roportaj\p{L}*|soundtrack|easter eggs?|bloopers?|shorts|sahne\p{L}*|kesit\p{L}*|klip\p{L}*|derleme\p{L}*|kurgu\p{L}*|scene\p{L}*|clip\p{L}*|compilation|highlights?|moments?|edit\p{L}*|montaj\p{L}*|en iyi\p{L}*|en komik\p{L}*|unutulmaz\p{L}*|replik\p{L}*)(?=$|[^\p{L}])/iu;
+  /(^|[^\p{L}])(trailer|teaser|fragman\p{L}*|tanıtım\p{L}*|tanitim\p{L}*|promo|recap|özet|ozet|review|inceleme\p{L}*|reaction|tepki\p{L}*|explained|analiz\p{L}*|behind the scenes|kamera arkası|featurette|sneak peek|first look|ilk bakış|interview|röportaj\p{L}*|roportaj\p{L}*|soundtrack|ost|playlist|müzikleri|müziği|muzikleri|muzigi|easter eggs?|bloopers?|shorts|sahne\p{L}*|kesit\p{L}*|klip\p{L}*|derleme\p{L}*|scenes?|clips?|compilation|highlights?|edits?|montaj\p{L}*|replik\p{L}*)(?=$|[^\p{L}])/iu;
 
-/** Kayıt + metindeki bölüm → öneri */
+/**
+ * Kayıt + metindeki bölüm → öneri. Dizide başlıkta bölüm yazmıyorsa (Netflix gibi) sıradaki bölüm tahmin
+ * edilir ama `guess` işaretlenir: izleme takibi bunu yalnızca bölüm uzunluğundaki videolarda kullanır,
+ * YouTube'daki kısa sahneler ilk/sıradaki bölüme yazılmaz.
+ */
 function suggestFor(item: ArgusItem, text: string): ArgusSuggestion | null {
   if (!item.series) return { itemId: item.id };
-  // Başlıkta sahne, kesit, klip, derleme vb. ibareler varsa asla dizi bölümü sayma
   if (EXTRA.test(text)) return null;
-  // Dizilerde başlıkta açıkça bir bölüm numarası ("1. Bölüm", "S01E03" vb.) bulunmalıdır.
-  // Açık bölüm bilgisi yoksa (örn: "Muhteşem Yüzyıl Hürrem Sahnesi") asla ilk/sıradaki bölüme bağlama.
   const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1);
-  return ep ? { itemId: item.id, season: ep.season, episode: ep.episode } : null;
+  if (ep) return { itemId: item.id, season: ep.season, episode: ep.episode };
+  const next = item.series.next;
+  return next ? { itemId: item.id, season: next.season, episode: next.episode, guess: true } : null;
 }
 
 /** Çalan medya → Argus kaydı + bölüm (yalnızca Argus'taki adlarla) */
@@ -624,8 +631,12 @@ export function answerSuggestion(sug: ArgusSuggestion | null = useArgus.getState
 /** Bölüm olamayacak kadar kısa videolar (dizi bölümü en az 8 dk, film en az 40 dk) */
 const MIN_EPISODE_MS = 8 * 60_000;
 const MIN_MOVIE_MS = 40 * 60_000;
-const notAnEpisode = (text: string, durationMs: number, series: boolean) =>
-  EXTRA.test(text) || (durationMs > 0 && durationMs < (series ? MIN_EPISODE_MS : MIN_MOVIE_MS));
+/** Başlıkta bölüm yazmayan dizi videosu ancak bu kadar uzunsa bölüm sayılır (süre bilinmiyorsa hiç) */
+const MIN_GUESS_MS = 20 * 60_000;
+const notAnEpisode = (text: string, durationMs: number, sug: ArgusSuggestion) =>
+  EXTRA.test(text) ||
+  (durationMs > 0 && durationMs < (sug.season != null ? MIN_EPISODE_MS : MIN_MOVIE_MS)) ||
+  (!!sug.guess && durationMs < MIN_GUESS_MS);
 
 // 15 dk'dan kısa bölümlerde neredeyse tamamı yeter
 const needFor = (duration: number) => (duration > 0 ? Math.min(MIN_WATCH_MS, duration * 0.9) : MIN_WATCH_MS);
@@ -740,7 +751,7 @@ ${m.artist}`;
         }
         const { fresh, nokey } = lastMatch;
         // Fragman, klip, inceleme ya da çok kısa video: bölüm/film sayılmaz
-        const sug = lastMatch.sug && notAnEpisode(text, m.durationMs, lastMatch.sug.season != null) ? null : lastMatch.sug;
+        const sug = lastMatch.sug && notAnEpisode(text, m.durationMs, lastMatch.sug) ? null : lastMatch.sug;
         if (fresh && !sug) offerFresh(fresh, step, m.durationMs);
         if (nokey && !sug) hintNoKey(step, m.durationMs);
         if (!sug) {

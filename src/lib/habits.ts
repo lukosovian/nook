@@ -16,6 +16,7 @@ export interface HabitItem {
   id: string;
   title: string;
   desc: string;
+  /** Simge anahtarı (HabitsPanel HABIT_ICONS); eski kayıtlardaki emoji yok sayılır */
   icon: string;
   color: string;
   intervalMin: number; // 0 = otomatik hatırlatma yok, >0 = dakika
@@ -51,7 +52,7 @@ export const DEFAULT_HABITS: HabitItem[] = [
     id: "water",
     title: tt("Su İç"),
     desc: tt("Günde en az 8 bardak taze su"),
-    icon: "💧",
+    icon: "water",
     color: "#2FD4C0",
     intervalMin: 60,
     targetDaily: 8,
@@ -63,7 +64,7 @@ export const DEFAULT_HABITS: HabitItem[] = [
     id: "eyes",
     title: tt("Göz Dinlendir"),
     desc: tt("20 dakikada bir 20 saniye uzağa bak (20-20-20)"),
-    icon: "👀",
+    icon: "eye",
     color: "#9B7BFF",
     intervalMin: 20,
     targetDaily: 12,
@@ -75,7 +76,7 @@ export const DEFAULT_HABITS: HabitItem[] = [
     id: "stretch",
     title: tt("Duruş & Esneme"),
     desc: tt("Omuzları geriye at, dik dur ve derin nefes al"),
-    icon: "🧘",
+    icon: "stretch",
     color: "#FF5C8A",
     intervalMin: 90,
     targetDaily: 4,
@@ -87,7 +88,7 @@ export const DEFAULT_HABITS: HabitItem[] = [
     id: "walk",
     title: tt("Ayağa Kalk & Yürü"),
     desc: tt("Kısa bir tur at, bacakları ve omurgayı hareket ettir"),
-    icon: "🚶",
+    icon: "walk",
     color: "#3CCF6E",
     intervalMin: 120,
     targetDaily: 3,
@@ -184,7 +185,7 @@ export const useHabits = create<HabitsStore>()(
           id,
           title: item.title,
           desc: item.desc,
-          icon: item.icon || "⭐",
+          icon: item.icon || "sparkle",
           color: item.color || "#2FD4C0",
           intervalMin: item.intervalMin,
           targetDaily: item.targetDaily || 1,
@@ -227,4 +228,12 @@ export function getTodayHabitCount(id: string): number {
   const k = dayKey();
   const hist = useHabits.getState().history[k];
   return hist?.custom?.[id] ?? 0;
+}
+
+/** Hazır molalar (su, göz, esneme) ayarlardan yönetilir; alışkanlık listesindeki kayıtları yalnızca sayaç içindir */
+export const BUILTIN_HABITS = new Set(["water", "eyes", "stretch"]);
+
+/** Kullanıcının alışkanlığı hatırlatılıyor mu: aralık 0 ise kapalı */
+export function habitOn(h: HabitItem): boolean {
+  return !BUILTIN_HABITS.has(h.id) && h.enabled && h.intervalMin > 0;
 }

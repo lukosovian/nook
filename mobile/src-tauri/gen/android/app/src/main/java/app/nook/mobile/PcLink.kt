@@ -252,6 +252,18 @@ object PcLink {
         p.edit().putString("outbox", keep.toString()).apply()
     }
 
+    /** Telefonda görülüp kalkan bildirim kuyrukta bekliyorsa PC'ye hiç gitmesin */
+    fun dropQueued(ctx: Context, key: String) {
+        val p = prefs(ctx)
+        val arr = runCatching { JSONArray(p.getString("outbox", "[]")) }.getOrDefault(JSONArray())
+        val keep = JSONArray()
+        for (i in 0 until arr.length()) {
+            val n = arr.optJSONObject(i) ?: continue
+            if (n.optString("key") != key) keep.put(n)
+        }
+        if (keep.length() != arr.length()) p.edit().putString("outbox", keep.toString()).apply()
+    }
+
     private fun flushLocked(ctx: Context) {
         val p = prefs(ctx)
         val arr = runCatching { JSONArray(p.getString("outbox", "[]")) }.getOrDefault(JSONArray())

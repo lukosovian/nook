@@ -143,3 +143,49 @@ pub fn drag_icon_path(app: AppHandle) -> Result<String, String> {
     }
     Ok(file.to_string_lossy().into_owned())
 }
+
+/// Studio › Duvar kağıtları: tam boy resim GitHub'daki "duvar-kagitlari" sürümünden bir kez indirilip
+/// Resimler › Nook'a kaydedilir ve Windows'un masaüstü arka planı yapılır (SystemParametersInfoW; betik
+/// çalıştırmaz). Kaydedilen dosyanın yolunu döner.
+#[tauri::command]
+pub async fn set_wallpaper(app: AppHandle, id: String) -> Result<String, String> {
+    let safe: String = id.chars().filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '-').take(40).collect();
+    if safe.is_empty() || safe != id {
+        return Err("geçersiz duvar kağıdı".into());
+    }
+    let dir = app.path().picture_dir().map_err(|e| e.to_string())?.join("Nook");
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let path = dir.join(format!("nook-{safe}.jpg"));
+        if !path.exists() {
+            let url = format!("https://github.com/lukosovian/nook/releases/download/duvar-kagitlari/{safe}.jpg");
+            let res = ureq::get(&url).timeout(std::time::Duration::from_secs(60)).call().map_err(|_| "İndirilemedi; internet bağlantını kontrol et".to_string())?;
+            let mut bytes = Vec::new();
+            std::io::Read::read_to_end(&mut std::io::Read::take(res.into_reader(), 30 << 20), &mut bytes).map_err(|e| e.to_string())?;
+            let tmp = path.with_extension("part");
+            std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+            std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+        }
+        apply_wallpaper(&path)?;
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(windows)]
+fn apply_wallpaper(path: &std::path::Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETDESKWALLPAPER};
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let ok = unsafe { SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, wide.as_ptr() as *mut _, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE) };
+    if ok == 0 {
+        return Err("Windows duvar kağıdını değiştiremedi".into());
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn apply_wallpaper(_path: &std::path::Path) -> Result<(), String> {
+    Err("yalnızca Windows".into())
+}

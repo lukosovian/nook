@@ -9,7 +9,7 @@ import { useArgus, type ArgusItem } from "../lib/argus";
 import { usePowerTimer } from "../lib/powerTimer";
 import { useClaude, type ClaudeAsk } from "../lib/claude";
 
-const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "whatsapp", "hum"];
+const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "whatsapp", "hum", "habits"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -263,6 +263,9 @@ export function applyPreview(mode: string) {
   if (expr) useNook.setState({ media: null });
   // ?busy → Nook düşünür (yörünge gözler + mavi rozet)
   if (params.has("busy")) useNook.setState({ busy: ["preview"] });
+  // ?wear=pineapple,clownwig → gövde ve başlık (kapalı adada başın sığması gibi kontroller için)
+  const wear = params.get("wear")?.split(",");
+  if (wear) useNook.setState({ settings: { ...useNook.getState().settings, look: { ...useNook.getState().settings.look, shape: wear[0] as never, ...(wear[1] ? { head: wear[1] as never } : {}) } } });
   // Açılış animasyonu yalnızca ?preview=intro'da
   useNook.setState({ intro: mode === "intro", toured: true, settings: { ...useNook.getState().settings, weather: false, dailySummary: false } });
   // Yeni sürümün notu kendiliğinden açılıp önizlenen paneli örtmesin
@@ -397,7 +400,7 @@ export function applyPreview(mode: string) {
     // ?bigstate → büyük adanın düzeni doğrudan (tarayıcıda pencere büyütülemez)
     if (params.has("bigstate")) useNook.setState({ big: { width: Math.min(1360, window.innerWidth - 56), height: Math.min(820, window.innerHeight - 48) } });
     // Panels açılınca çalan müzik yüzünden medyaya geçer; istenen sekmeye geri dön
-    window.setTimeout(() => useNook.getState().setTab(mode as Tab), 50);
+    for (const ms of [50, 600]) window.setTimeout(() => useNook.getState().setTab(mode as Tab), ms);
   } else if (mode.startsWith("osd")) {
     s.setMedia(null);
     const v = { osd: [0.62, false, 1], osddown: [0.3, false, -1], osdloud: [0.92, false, 1], osdmute: [0.4, true, -1], osdlight: [0.7, false, 1] }[mode] ?? [0.62, false, 1];
@@ -406,6 +409,9 @@ export function applyPreview(mode: string) {
     useNook.setState({ media: null, toasts: [{ id: "w", kind: "welcome", title: "Az daha kayıp ilanı veriyordum, 1 saat 20 dakikadır yoktun", detail: "Luko, bir daha bu kadar uzun gitme, tamam mı?", ms: 99999 }] });
   } else if (mode === "toast") {
     useNook.setState({ media: null, toasts: [{ id: "t", kind: "device-low", title: "Mouse pili azalıyor", detail: "%10 kaldı" }] });
+  } else if (mode === "call") {
+    // Telefonda çalan arama kartı
+    useNook.setState({ media: null, toasts: [{ id: "c", kind: "notify", title: "Annem", detail: "Arıyor…", phoneKey: "k", call: { canDecline: true, canMute: true }, ms: 600_000 }] });
   } else if (mode === "search") {
     useNook.setState({ searching: true });
   } else if (mode === "collapsed" || mode === "privacy") {
@@ -452,6 +458,9 @@ export function applyPreview(mode: string) {
     });
   } else if (mode === "listen") {
     useNook.setState({ media: null, listening: true });
+  } else if (mode === "notifyopen") {
+    // Uzun bildirim, imleç üstünde: ada metni sığacak kadar büyür
+    useNook.setState({ media: null, hovered: true, toasts: [{ id: "n", kind: "notify", title: "Ayşe Yılmaz · Proje grubu", detail: "Akşam maça geliyor musun? Biletleri ben alırım, 19.30'da stadın önünde buluşalım. Gelmeyeceksen haber ver ki Mehmet'e sorayım, o da çok istiyordu.", ms: 99999 }] });
   } else if (mode === "notifytoast") {
     useNook.setState({ media: null, toasts: [{ id: "n", kind: "notify", title: "Ayşe", detail: "Akşam maça geliyor musun?", ms: 99999 }] });
   } else if (mode === "download") {
@@ -460,12 +469,6 @@ export function applyPreview(mode: string) {
     // Güncelleme kapsülü: ?p=yüzde
     useNook.setState({ media: null });
     void import("../lib/update").then((m) => m.useUpdate.setState({ available: "0.3.1", progress: mode === "restarting" ? 100 : Number(params.get("p") ?? 42), restarting: mode === "restarting" }));
-  } else if (mode === "halloween" || mode === "knock" || mode === "candy" || mode === "trick") {
-    useNook.setState({ media: null });
-    void import("../lib/halloween").then((m) => {
-      const p = mode === "candy" ? "candy" : mode === "trick" ? "trick" : mode === "knock" ? "knocking" : "asking";
-      m.useHalloween.setState({ phase: p });
-    });
   } else if (mode === "atmos") {
     const sky = (params.get("sky") ?? "rain") as any;
     useNook.setState({ media: null, weather: { city: "İstanbul", temp: 16, high: 18, low: 12, sky, isDay: params.get("night") !== "1", rainChance: 40, at: Date.now() } });

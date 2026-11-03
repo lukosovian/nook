@@ -35,12 +35,14 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
   // Pil tasarrufu Nook'u arka planda kısıtlıyorsa bildirimler ancak uygulama açılınca topluca gider
   const [batteryFree, setBatteryFree] = useState(() => native?.batteryFree?.() ?? true);
   const autostart = native?.hasAutostart?.() ?? false;
+  const [callMute, setCallMute] = useState(() => native?.callMuteAccess?.() ?? true);
 
   // Ayarlardan izin verip dönünce
   useEffect(() => {
     const check = () => {
       if (document.visibilityState !== "visible") return;
       setAccess(native?.notifAccess() ?? !!import.meta.env.DEV);
+      setCallMute(native?.callMuteAccess?.() ?? true);
       setPrefs(read());
       setBatteryFree(native?.batteryFree?.() ?? true);
     };
@@ -111,7 +113,17 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
           <section className="rounded-3xl bg-card p-1.5">
             <Row label="PC'ye gönder" sub={prefs.on ? "Açık" : "Kapalı"} on={prefs.on} onChange={(on) => save({ ...prefs, on })} />
           </section>
-          {prefs.queued > 0 && <p className="-mt-2 px-2 text-[12px] text-label-3">{prefs.queued} bildirim PC açılınca gönderilecek.</p>}
+          {prefs.on && !callMute && (
+            <section className="rounded-3xl bg-card p-3">
+              <p className="px-1 text-[13px] leading-snug text-label-2">
+                Telefon çalınca PC'deki Nook'ta kart çıkar; oradan aramayı reddedebilirsin. Zili de PC'den kısmak için Nook'a Rahatsız Etmeyin erişimi ver.
+              </p>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => native?.openCallMuteAccess?.()} className="mt-2.5 w-full rounded-2xl bg-well py-3 text-[14.5px] font-semibold">
+                Aramayı sessize almaya izin ver
+              </motion.button>
+            </section>
+          )}
+          {prefs.queued > 0 &&<p className="-mt-2 px-2 text-[12px] text-label-3">{prefs.queued} bildirim PC açılınca gönderilecek.</p>}
           {prefs.on && (!batteryFree || autostart) && (
             <section className="rounded-3xl p-4" style={{ background: tintBg("#FFB547", 9), border: `1px solid ${tintBg("#FFB547", 26)}` }}>
               <div className="flex items-start gap-3">

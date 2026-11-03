@@ -711,10 +711,26 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
                     "icon": b["icon"].as_str().filter(|i| i.starts_with("data:image/")),
                     "phone": true,
                     "replyKey": b["replyKey"].as_str().filter(|k| !k.is_empty()),
+                    // Telefondaki bildirimin anahtarı: telefonda kalkınca PC'den de kalksın
+                    "phoneKey": b["key"].as_str().filter(|k| !k.is_empty()),
                     // PC kapalıyken telefonda bekleyip şimdi gelen: listeye girsin, adada kart açmasın
                     "quiet": b["at"].as_i64().is_some_and(|at| now_ms() - at > 120_000),
+                    // Gelen arama: kartta Reddet / Sessize al (telefon yapabiliyorsa)
+                    "call": b["call"].as_bool().unwrap_or(false).then(|| json!({
+                        "canDecline": b["canDecline"].as_bool().unwrap_or(false),
+                        "canMute": b["canMute"].as_bool().unwrap_or(false),
+                    })),
                 }),
             );
+            json_res(200, json!({ "ok": true }))
+        }
+        // Telefonda kapatılan / açılan / okunan bildirim PC'deki listeden ve adadan da kalksın
+        (Method::Post, "/v1/notify/removed") => {
+            let b = body_json(body);
+            let Some(app) = APP.lock().unwrap().clone() else { return err(503, "Nook hazır değil") };
+            let Some(key) = b["key"].as_str().filter(|k| !k.is_empty()) else { return err(400, "anahtar yok") };
+            use tauri::Emitter;
+            let _ = app.emit("nook://notification-removed", json!({ "phoneKey": key }));
             json_res(200, json!({ "ok": true }))
         }
         // PC'den yazılan bildirim yanıtlarını (WhatsApp, Telegram…) telefona uzun-yoklamayla ilet
@@ -1139,6 +1155,22 @@ pub fn queue_reply(reply_key: String, text: String) -> Result<(), String> {
 #[tauri::command]
 pub fn reply_notification(reply_key: String, text: String) -> Result<(), String> {
     queue_reply(reply_key, text)
+}
+
+/// Telefonda çalan arama: "decline" (reddet) ya da "mute" (zili kıs). Yanıtlarla aynı uzun-yoklamadan gider.
+#[tauri::command]
+pub fn phone_call_action(key: String, action: String) -> Result<(), String> {
+    if !RUNNING.load(Ordering::SeqCst) {
+        return Err("Telefon köprüsü kapalı".into());
+    }
+    if action != "decline" && action != "mute" {
+        return Err("bilinmeyen eylem".into());
+    }
+    let (lock, cvar) = &REPLIES;
+    lock.lock().unwrap().push(json!({ "call": action, "key": key, "at": now_ms() }));
+    cvar.notify_all();
+    crate::log::write("info", &format!("telefon araması: {action}"));
+    Ok(())
 }
 
 /// Yeni anahtar: eşleşmiş telefon(lar) bağlantıyı kaybeder, QR yeniden okutulmalı.

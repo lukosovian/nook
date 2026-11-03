@@ -166,8 +166,9 @@ export function usePhoneSync() {
       // Telefondaki su hatırlatmasına cevap: yalnızca PC'de de hatırlatma bekliyorsa (iki kez sayılmasın)
       if (e.kind === "water") {
         const due = waterInfo().due;
-        // Telefon kendi sayacıyla hatırlattıysa veya direkt içtim dendiyse sayılır
-        if (e.op === "drank" || e.op === "drink") {
+        // PC'de hatırlatma bekliyorsa ya da telefon kendi sayacıyla / ana ekrandan saydıysa (own) sayılır;
+        // PC'de zaten "İçtim" denmiş bir hatırlatmaya telefondan gelen ikinci cevap sayılmaz
+        if ((e.op === "drank" || e.op === "drink") && (due || e.own)) {
           useHabits.getState().drinkGlass();
         } else if (e.op === "snooze" && due) {
           snoozeWater();
