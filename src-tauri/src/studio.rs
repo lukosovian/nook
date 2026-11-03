@@ -11,50 +11,84 @@ pub const STUDIO: &str = "studio";
 /// Pencere yeni oluşturulurken istenen bölüm: sayfa yüklenince alır (henüz olay dinlemiyor)
 static PENDING: Mutex<Option<String>> = Mutex::new(None);
 
-#[derive(serde::Serialize, serde::Deserialize)]
+/// Studio'nun son hâli: boyutu, yeri (fiziksel piksel) ve büyütülmüş mü
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
+#[serde(default)]
 struct StudioSize {
     width: f64,
     height: f64,
+    x: Option<i32>,
+    y: Option<i32>,
+    maximized: bool,
 }
+
+impl Default for StudioSize {
+    fn default() -> Self {
+        Self { width: 1180.0, height: 760.0, x: None, y: None, maximized: false }
+    }
+}
+
+static LAST: Mutex<Option<StudioSize>> = Mutex::new(None);
 
 fn config_path() -> Option<PathBuf> {
     Some(PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Nook").join("studio_size.json"))
 }
 
-fn load_saved_size() -> Option<(f64, f64)> {
-    let p = config_path()?;
-    let s = std::fs::read_to_string(p).ok()?;
-    let sz = serde_json::from_str::<StudioSize>(&s).ok()?;
-    let w = sz.width.max(940.0);
-    let h = sz.height.max(620.0);
-    Some((w, h))
+fn load() -> StudioSize {
+    let mut sz = config_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str::<StudioSize>(&s).ok())
+        .unwrap_or_default();
+    sz.width = sz.width.max(940.0);
+    sz.height = sz.height.max(620.0);
+    sz
 }
 
-fn save_size(width: f64, height: f64) {
+fn save(sz: StudioSize) {
+    *LAST.lock().unwrap() = Some(sz);
     let Some(p) = config_path() else { return };
     if let Some(dir) = p.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    if let Ok(s) = serde_json::to_string(&StudioSize { width, height }) {
-        let _ = std::fs::write(p, s);
+    if let Ok(s) = serde_json::to_string(&sz) {
+        if let Err(e) = std::fs::write(&p, s) {
+            crate::log::write("warn", &format!("Studio boyutu kaydedilemedi: {e}"));
+        }
     }
 }
 
-/// Studio penceresi yeniden boyutlandırıldığında son boyutu hatırla (maksimize değilken)
+/// Studio boyutlanınca, taşınınca ya da büyütülünce son hâlini hatırla; bir dahaki açılışta öyle açılır
 pub fn on_window_event(win: &Window, event: &WindowEvent) {
-    if win.label() != STUDIO {
+    if win.label() != STUDIO || !matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_)) {
         return;
     }
-    if let WindowEvent::Resized(phys) = event {
-        if !win.is_maximized().unwrap_or(false) && !win.is_minimized().unwrap_or(false) {
-            let scale = win.scale_factor().unwrap_or(1.0);
-            let w = phys.width as f64 / scale;
-            let h = phys.height as f64 / scale;
+    if win.is_minimized().unwrap_or(false) {
+        return;
+    }
+    let mut sz = LAST.lock().unwrap().unwrap_or_else(load);
+    sz.maximized = win.is_maximized().unwrap_or(false);
+    // Büyütülmüşken boyutu ve yeri değil yalnızca "büyük" olduğunu sakla; küçültünce eski boyuta döner
+    if !sz.maximized {
+        let scale = win.scale_factor().unwrap_or(1.0);
+        if let Ok(size) = win.inner_size() {
+            let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
             if w >= 940.0 && h >= 620.0 {
-                save_size(w, h);
+                sz.width = w;
+                sz.height = h;
             }
         }
+        if let Ok(pos) = win.outer_position() {
+            sz.x = Some(pos.x);
+            sz.y = Some(pos.y);
+        }
     }
+    save(sz);
+}
+
+/// Kaydedilen yer hâlâ bir ekranın içinde mi (ekran çıkarıldıysa ortaya açılır)
+fn on_screen(app: &AppHandle, x: i32, y: i32) -> bool {
+    let monitors = app.available_monitors().unwrap_or_default();
+    crate::window::monitor_at(&monitors, x as f64 + 60.0, y as f64 + 20.0).is_some()
 }
 
 /// Studio açılınca ilk gideceği bölüm (bir kez verilir)
@@ -84,19 +118,29 @@ pub fn open(app: &AppHandle, section: Option<String>) -> tauri::Result<()> {
     if let Ok(mut p) = PENDING.lock() {
         *p = section;
     }
-    let (width, height) = load_saved_size().unwrap_or((1180.0, 760.0));
-    let win = WebviewWindowBuilder::new(app, STUDIO, WebviewUrl::App("index.html".into()))
+    let sz = load();
+    *LAST.lock().unwrap() = Some(sz);
+    let mut builder = WebviewWindowBuilder::new(app, STUDIO, WebviewUrl::App("index.html".into()))
         .title("Nook Studio")
-        .inner_size(width, height)
+        .inner_size(sz.width, sz.height)
         .min_inner_size(940.0, 620.0)
         .resizable(true)
         .decorations(false)
         .shadow(true)
-        .center()
         .focused(true)
         .visible(true)
-        .background_color(tauri::window::Color(14, 14, 16, 255))
-        .build()?;
+        .background_color(tauri::window::Color(14, 14, 16, 255));
+    let placed = matches!((sz.x, sz.y), (Some(x), Some(y)) if on_screen(app, x, y));
+    if !placed {
+        builder = builder.center();
+    }
+    let win = builder.build()?;
+    if let (true, Some(x), Some(y)) = (placed, sz.x, sz.y) {
+        let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+    if sz.maximized {
+        let _ = win.maximize();
+    }
     bring_front(&win);
     Ok(())
 }

@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import type { Settings } from "../store/nook";
-import { inTauri, listApps } from "./bridge";
+import { EVENTS, inTauri, listApps, shortcutFailures, subscribe } from "./bridge";
 import { tt } from "./i18n";
 
 export type ShortcutKey =
@@ -85,6 +85,28 @@ export function useInstalledApps(): string[] {
   const [names, setNames] = useState<string[]>([]);
   useEffect(() => void loadAppNames().then(setNames), []);
   return names;
+}
+
+/**
+ * Windows'un kaydetmeye izin vermediği kısayollar: başka bir program o tuşları tutuyor (hangisi olduğunu
+ * Windows söylemez). Nook arkada yeniden dener; tutan program bırakınca liste boşalır.
+ */
+export function useShortcutFailures(): string[] {
+  const [list, setList] = useState<string[]>([]);
+  useEffect(() => {
+    void shortcutFailures().then(setList);
+    return subscribe<string[]>(EVENTS.shortcutFailed, setList);
+  }, []);
+  return list;
+}
+
+export const isFailed = (combo: string, failed: string[]) => !!combo && failed.some((f) => norm(f) === norm(combo));
+
+/** Tutulan kısayolun yerine önerilecek, Nook'ta ve bilinen programlarda boş bir kombinasyon */
+const SPARE = ["Ctrl+Alt+Space", "Alt+Shift+Space", "Ctrl+Alt+N", "Ctrl+Alt+K", "Ctrl+Shift+Alt+N"];
+export function spareShortcut(settings: Settings, failed: string[]): string | null {
+  const used = SHORTCUTS.map((x) => settings[x.key]).filter(Boolean).map(norm);
+  return SPARE.find((c) => !used.includes(norm(c)) && !isFailed(c, failed) && !KNOWN[norm(c)]) ?? null;
 }
 
 /** Bu kombinasyon bu bilgisayardaki bilinen bir programın işini elinden alıyor mu? Alıyorsa o iş. */

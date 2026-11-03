@@ -591,6 +591,7 @@ const native = (s: Settings, deck: DeckKey[] | null) => ({
   humShortcut: s.humShortcut ?? "",
   humAuto: s.humAuto ?? false,
   logDays: s.logDays ?? 14,
+  wallpaperCycle: s.wallpaperCycle ?? null,
   // Klavye kısayolu atanmış kısayol tuşları
   deckHotkeys: (deck ?? []).filter((k) => k.hotkey).map((k) => ({ id: k.id, accel: k.hotkey! })),
 });
@@ -723,7 +724,7 @@ export function useSettingsSync() {
       console.warn("[nook] ayarlar", e);
       // Kısayolu başka bir program tutuyorsa sessizce çalışmamak yerine söyle
       const m = /Kısayol kaydedilemedi \(([^:]+):/.exec(String(e));
-      if (m) useNook.getState().pushToast({ kind: "chat", title: tt("{0} kullanılamıyor", m[1]), detail: tt("Başka bir program tutuyor — Ayarlar'dan değiştir"), ms: 7000 });
+      if (m) useNook.getState().pushToast({ kind: "chat", title: tt("{0} kullanılamıyor", m[1]), detail: tt("Başka bir program tutuyor — Studio › Ayarlar › Kısayollar'dan değiştir"), ms: 9000 });
     });
   }, [key]);
   useEffect(() => {

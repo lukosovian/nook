@@ -23,6 +23,8 @@ use crate::window::{self, ISLAND};
 
 /// Ayarlar art arda uygulanınca kayıtlar yarışmasın; aynı set tekrar kaydedilmesin.
 static REGISTERED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// Windows'un kaydetmeye izin vermediği (başka bir programın tuttuğu) kısayollar; arkada yeniden denenir
+static FAILED: Mutex<Vec<(String, Role)>> = Mutex::new(Vec::new());
 
 #[derive(Clone)]
 enum Role {
@@ -76,6 +78,7 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     registered.clear();
 
     let mut errors = Vec::new();
+    let mut failed: Vec<(String, Role)> = Vec::new();
     let mut seen: Vec<String> = Vec::new();
     for (accel, role) in list {
         if accel.trim().is_empty() {
@@ -88,7 +91,65 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             continue;
         }
         seen.push(norm);
-        let res = gs.on_shortcut(accel, move |app, _shortcut, event| match (&role, event.state()) {
+        if let Err(e) = bind(app, accel, role.clone()) {
+            errors.push(format!("{accel}: {e}"));
+            failed.push((accel.to_string(), role));
+        }
+        crate::log::write("info", &format!("kısayol kaydı {accel}: {}", if errors.iter().any(|x| x.starts_with(accel)) { "HATA" } else { "tamam" }));
+    }
+    *registered = wanted;
+    drop(registered);
+    set_failed(app, failed);
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("Kısayol kaydedilemedi ({})", errors.join(", ")))
+    }
+}
+
+/// Başka bir programın tuttuğu kısayollar (Windows kaydetmeye izin vermedi)
+fn set_failed(app: &AppHandle, list: Vec<(String, Role)>) {
+    let accels: Vec<String> = list.iter().map(|(a, _)| a.clone()).collect();
+    *FAILED.lock().unwrap() = list;
+    let _ = app.emit("nook://shortcut-failed", accels);
+}
+
+/// Studio açılınca: şu an kaydedilemeyen kısayollar
+#[tauri::command]
+pub fn shortcut_failures() -> Vec<String> {
+    FAILED.lock().unwrap().iter().map(|(a, _)| a.clone()).collect()
+}
+
+/// Kaydedilemeyen kısayollar 20 sn'de bir yeniden denenir: tutan program bırakınca Nook geri alır.
+/// Yalnızca o kısayollar denenir; çalışanlar bırakılmaz (boşluğu başka bir program kapmasın).
+pub fn spawn_retry(app: AppHandle) {
+    let _ = std::thread::Builder::new().name("nook-shortcut-retry".into()).spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        let guard = REGISTERED.lock().unwrap();
+        let pending = FAILED.lock().unwrap().clone();
+        if pending.is_empty() {
+            continue;
+        }
+        let still: Vec<(String, Role)> = pending
+            .into_iter()
+            .filter(|(accel, role)| {
+                let ok = bind(&app, accel, role.clone()).is_ok();
+                if ok {
+                    crate::log::write("info", &format!("kısayol kaydı {accel}: sonradan tamam (tutan program bıraktı)"));
+                }
+                !ok
+            })
+            .collect();
+        if still.len() != FAILED.lock().unwrap().len() {
+            drop(guard);
+            set_failed(&app, still);
+        }
+    });
+}
+
+fn bind(app: &AppHandle, accel: &str, role: Role) -> Result<(), String> {
+    app.global_shortcut()
+        .on_shortcut(accel, move |app, _shortcut, event| match (&role, event.state()) {
             (Role::Search, ShortcutState::Pressed) => {
                 if let Some(label) = open_island(app) {
                     let _ = app.emit_to(label.as_str(), "nook://search", ());
@@ -116,18 +177,8 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
                 let _ = app.emit_to(ISLAND, "nook://deck-key", id.clone());
             }
             _ => {}
-        });
-        if let Err(e) = res {
-            errors.push(format!("{accel}: {e}"));
-        }
-        crate::log::write("info", &format!("kısayol kaydı {accel}: {}", if errors.iter().any(|x| x.starts_with(accel)) { "HATA" } else { "tamam" }));
-    }
-    *registered = wanted;
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("Kısayol kaydedilemedi ({})", errors.join(", ")))
-    }
+        })
+        .map_err(|e| e.to_string())
 }
 
 /// İmlecin olduğu ekrandaki adanın etiketi; yoksa ana ada.

@@ -74,6 +74,8 @@ export const EVENTS = {
   studioGo: "nook://studio-go",
   /** Kısayol tuşunun klavye kısayoluna basıldı (tuşun kimliği) */
   deckKey: "nook://deck-key",
+  /** Başka bir programın tuttuğu (Nook'un kaydedemediği) kısayollar */
+  shortcutFailed: "nook://shortcut-failed",
   /** Nook Mobil: telefon eve geldi / şarja takıldı / çıkarıldı */
   phoneEvent: "nook://phone-event",
   /** WhatsApp Web köprüsü durum ve mesaj güncellemesi */
@@ -490,6 +492,8 @@ export interface NativeSettings {
   humAuto: boolean;
   /** Günlük kayıtları kaç gün saklansın */
   logDays: number;
+  /** Açık duvar kağıdı döngüsü: resimler sırayla, `everyMin` dakikada bir; `since` döngünün açıldığı an */
+  wallpaperCycle: { ids: string[]; everyMin: number; since: number } | null;
   /** Kısayol tuşlarının klavye kısayolları */
   deckHotkeys?: { id: string; accel: string }[];
 }
@@ -661,6 +665,8 @@ export const fetchText = (url: string) => (inTauri ? invoke<string>("fetch_text"
 /** Geribildirime eklemek için son günlük satırlarını getir */
 export const recentLogs = (max = 25) =>
   inTauri ? invoke<string[]>("recent_logs", { max }) : Promise.resolve<string[]>([]);
+/** Başka bir programın tuttuğu için kaydedilemeyen kısayollar ("Ctrl+Shift+Space") */
+export const shortcutFailures = () => (inTauri ? invoke<string[]>("shortcut_failures") : Promise.resolve<string[]>([]));
 /** Günlük kayıtlarının klasörü */
 export const logDir = () => (inTauri ? invoke<string>("log_dir") : Promise.resolve(""));
 

@@ -183,6 +183,7 @@ pub fn run() {
             log::log_line,
             log::recent_logs,
             log::log_dir,
+            shortcut::shortcut_failures,
             claude::claude_decide,
             claude::claude_setup,
             claude::claude_connect,
@@ -221,6 +222,8 @@ pub fn run() {
                 .collect();
             log::write("info", &format!("ekranlar ({}): {}", monitors.len(), monitors.join(" · ")));
             log::watch_main_thread(app.handle().clone());
+            shortcut::spawn_retry(app.handle().clone());
+            commands::spawn_wallpaper_cycle(app.handle().clone(), app.state::<Arc<Shared>>().inner().clone());
             let island = app
                 .get_webview_window(window::ISLAND)
                 .expect("island penceresi tauri.conf.json'da tanımlı olmalı");

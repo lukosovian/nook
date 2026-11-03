@@ -34,6 +34,7 @@ import {
   autoSafe,
   CONDITIONS,
   conditionId,
+  conditionHint,
   conditionLabel,
   getAutomations,
   runAutomationNow,
@@ -806,6 +807,7 @@ function TriggerEdit({ when, onChange }: { when: Trigger; onChange: (t: Trigger)
         <Wand2 size={13} className="text-label-3" />
         <span className="text-[11px] font-semibold text-label-3">{tt("Değiştir")}</span>
       </button>
+      {!picking && <p className="px-1 text-[11px] leading-snug text-label-3">{m.hint}</p>}
       <AnimatePresence>
         {picking && (
           <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid grid-cols-2 gap-1.5">
@@ -818,13 +820,17 @@ function TriggerEdit({ when, onChange }: { when: Trigger; onChange: (t: Trigger)
                     if (t.id !== cur) onChange(t.make());
                     setPicking(false);
                   }}
+                  title={t.hint}
                   className="flex items-center gap-2 rounded-[10px] border px-2 py-1.5 text-left"
                   style={t.id === cur ? { background: tintBg(t.color, 16), borderColor: tintBg(t.color, 45) } : { background: "rgb(255 255 255 / 0.03)", borderColor: "rgb(255 255 255 / 0.05)" }}
                 >
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px]" style={{ background: tintBg(t.color, 18), color: tintText(t.color) }}>
                     <TIcon size={12} />
                   </span>
-                  <span className="truncate text-[12px] font-medium text-label">{t.label}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12px] font-medium text-label">{t.label}</span>
+                    <span className="block truncate text-[10px] text-label-3">{t.hint}</span>
+                  </span>
                 </button>
               );
             })}
@@ -918,7 +924,10 @@ function ConditionsEdit({ only, onChange }: { only: Condition[]; onChange: (c: C
               <span className="text-label-3">{tt("arası")}</span>
             </span>
           ) : (
-            <span className="flex-1 text-[12.5px] font-medium text-label">{conditionLabel(c)}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12.5px] font-medium text-label">{conditionLabel(c)}</span>
+              <span className="block text-[10.5px] leading-snug text-label-3">{conditionHint(c)}</span>
+            </span>
           )}
           <button onClick={() => onChange(only.filter((_, k) => k !== i))} className="flex h-6 w-6 items-center justify-center rounded-full text-label-3 hover:bg-white/10 hover:text-label" title={tt("Koşulu sil")}>
             <X size={12} />
@@ -932,6 +941,7 @@ function ConditionsEdit({ only, onChange }: { only: Condition[]; onChange: (c: C
             {free.map((c) => (
               <button
                 key={c.id}
+                title={c.hint}
                 onClick={() => {
                   onChange([...only, c.make()]);
                   setAdding(false);

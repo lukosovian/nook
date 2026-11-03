@@ -215,7 +215,13 @@ export type DemoId =
   | "weatherlevel"
   | "phonecall"
   | "wallpapers"
-  | "logs";
+  | "logs"
+  | "hotkeyheld"
+  | "wallpreview"
+  | "wallcycle"
+  | "studiosize"
+  | "autohints"
+  | "phonemic";
 
 export interface NoteItem {
   title: string;
@@ -234,6 +240,43 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.7",
+    date: tt("3 Kasım 2026"),
+    headline: tt("Duvar kağıdı döngüleri ve büyük önizleme, Studio bıraktığın boyutta, otomasyon açıklamaları, kısayol uyarıları"),
+    items: [
+      {
+        title: tt("Duvar kağıtlarında büyük önizleme"),
+        text: tt("Studio › Duvar kağıtları'nda bir resme tıklayınca büyük önizlemesi açılır; oklarla gezip \"Masaüstüne uygula\"ya basabilirsin. Çift tıklayınca ya da üstüne gelince çıkan \"Uygula\"ya basınca resim hemen masaüstüne geçer, yukarı çıkmana gerek kalmaz."),
+        demo: "wallpreview",
+      },
+      {
+        title: tt("Duvar kağıdı döngüleri"),
+        text: tt("\"Yeni döngü\"ye bas, resimlere istediğin sırayla tıkla, aralığı seç (15 dk, 1 sa, 3 sa, 1 gün) ve kaydet. Döngüyü açınca masaüstü bu sırayla değişir. Birden fazla döngü kurabilirsin, aynı anda biri açık olur. Değiştirme işi arka planda yarım dakikada bir kısa bir kontrolle yapılır, bilgisayarı yormaz. Elle bir resim uygulayınca döngü durur."),
+        demo: "wallcycle",
+      },
+      {
+        title: tt("Studio bıraktığın gibi açılır"),
+        text: tt("Nook Studio kapattığın boyutta ve yerde açılır; büyütülmüş bıraktıysan büyütülmüş açılır. O ekran artık takılı değilse ekranın ortasında açılır."),
+        demo: "studiosize",
+      },
+      {
+        title: tt("Otomasyonlarda kısa açıklamalar"),
+        text: tt("Kısayollar › Otomasyonlar'da her tetikleyicinin ve koşulun altında ne zaman çalıştığı yazar: \"Boşta kalınca\" fareye ve klavyeye uyuma süresi kadar dokunmayınca, \"Telefon eve gelince\" telefon en az 20 dakika uzak kalıp ev Wi-Fi'ına bağlanınca gibi."),
+        demo: "autohints",
+      },
+      {
+        title: tt("Telefondan mikrofon tuşu"),
+        text: tt("Nook Mobil'deki kısayol tuşlarından mikrofonu açıp kapatınca telefondaki simge hemen yeni hâli gösterir. Art arda basınca da her basış sırayla çalışır, mikrofon eski hâline dönmez."),
+        demo: "phonemic",
+      },
+      {
+        title: tt("Kısayolu başka bir program tutunca"),
+        text: tt("Bir kısayolu başka bir program tuttuğu için Nook kullanamıyorsa Studio › Ayarlar › Kısayollar'da o satırda kırmızı uyarı çıkar ve tek tıkla boş bir kısayol önerilir. Nook o tuşları arada yeniden dener; tutan program bırakınca kısayol kendiliğinden yeniden çalışır."),
+        demo: "hotkeyheld",
+      },
+    ],
+  },
   {
     version: "0.3.6",
     date: tt("3 Kasım 2026"),

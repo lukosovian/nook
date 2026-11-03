@@ -26,7 +26,7 @@ import { LangDropdown } from "../ui/LangPicker";
 import { isTurkish, tt } from "../../lib/i18n";
 import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
-import { conflictOf, duplicateOf, SHORTCUTS, useInstalledApps } from "../../lib/shortcuts";
+import { conflictOf, duplicateOf, isFailed, prettyKeys, SHORTCUTS, spareShortcut, useInstalledApps, useShortcutFailures } from "../../lib/shortcuts";
 import { FeedbackSection } from "./FeedbackSection";
 
 const MONITOR_MODES: { id: Settings["monitorMode"]; label: string }[] = [
@@ -1216,18 +1216,28 @@ function ShortcutsSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const apps = useInstalledApps();
+  const failed = useShortcutFailures();
   return (
     <Section title={tt("Kısayollar")}>
       {SHORTCUTS.map((k) => {
         const combo = s[k.key];
         const dup = duplicateOf(s, k.key);
         const clash = conflictOf(combo, apps);
+        const held = !dup && isFailed(combo, failed);
+        const spare = held ? spareShortcut(s, failed) : null;
         return (
           <div key={k.key}>
             <Row label={k.label}>
               <ShortcutInput value={combo} onChange={(v) => update({ [k.key]: v } as Partial<Settings>)} clearable={k.clearable} />
             </Row>
-            {(dup || clash) && (
+            {held ? (
+              <div className="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pb-1.5">
+                <p className="text-[10px]" style={{ color: tintText(ACCENT.red) }}>
+                  {tt("Bu tuşları başka bir program tutuyor; Nook kullanamıyor. Nook arada yeniden dener ama farklı bir kısayol seçmek en kolayı.")}
+                </p>
+                {spare && <TextButton onClick={() => update({ [k.key]: spare } as Partial<Settings>)}>{tt("{0} yap", prettyKeys(spare))}</TextButton>}
+              </div>
+            ) : (dup || clash) && (
               <p className="-mt-1 pb-1 text-[10px]" style={{ color: tintText(ACCENT.orange) }}>
                 {dup ? tt("Bu tuşlar \"{0}\" için de kullanılıyor; bu kısayol çalışmaz", dup.label) : tt("Bu tuşlarla {0} çalışmaz", clash)}
               </p>

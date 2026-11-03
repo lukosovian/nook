@@ -76,9 +76,12 @@ export function KeysScreen({ pairing, conn, onBack }: { pairing: Pairing; conn: 
             online={online}
             say={say}
             onRan={() => {
-              window.setTimeout(() => {
-                void getDeck(pairing).then(setDeck).catch(() => {});
-              }, 350);
+              // PC tuşu çalıştırıp yeni hâli (mikrofon kapalı mı) okuyana kadar biraz geçer: iki kez tazele
+              for (const ms of [400, 1500]) {
+                window.setTimeout(() => {
+                  void getDeck(pairing).then(setDeck).catch(() => {});
+                }, ms);
+              }
             }}
           />
         ))}

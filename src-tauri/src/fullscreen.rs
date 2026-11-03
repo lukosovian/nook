@@ -270,6 +270,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     let covered = full.is_some_and(|(l, t, r, b)| cx >= l as f64 && cx < r as f64 && ws.geom.y + 1.0 >= t as f64 && ws.geom.y < b as f64);
 
                     if covered && hidden.insert(label.clone()) {
+                        crate::log::write("info", &format!("ada gizlendi ({label}): tam ekran {}", foreground_app().unwrap_or_else(|| "?".into())));
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", true);
                         let hwnd = ws.hwnd;
                         let (app, label) = (app.clone(), label.clone());
@@ -279,6 +280,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                             webview_visible(&app, &label, false);
                         });
                     } else if !covered && hidden.remove(&label) {
+                        crate::log::write("info", &format!("ada yeniden göründü ({label}): tam ekran bitti"));
                         // Önce WebView2 uyansın (çizim ve zamanlayıcılar hemen dönsün), sonra pencere
                         webview_visible(&app, &label, true);
                         imp::show(ws.hwnd, true);

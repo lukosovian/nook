@@ -127,6 +127,17 @@ pub struct Settings {
     pub deck_hotkeys: Vec<DeckHotkey>,
     /// Günlük kayıtları kaç gün saklansın
     pub log_days: u32,
+    /// Açık duvar kağıdı döngüsü (yoksa döngü kapalı)
+    pub wallpaper_cycle: Option<WallCycle>,
+}
+
+/// Duvar kağıdı döngüsü: `ids` sırayla, `every_min` dakikada bir; `since` (ms) döngünün açıldığı an, ilk resim o an
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct WallCycle {
+    pub ids: Vec<String>,
+    pub every_min: u64,
+    pub since: u64,
 }
 
 /// Bir kısayol tuşunun klavye kısayolu
@@ -191,6 +202,7 @@ impl Default for Settings {
             hum_auto: false,
             deck_hotkeys: Vec::new(),
             log_days: 14,
+            wallpaper_cycle: None,
         }
     }
 }

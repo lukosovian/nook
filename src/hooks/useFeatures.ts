@@ -272,6 +272,7 @@ export function useNotificationFeed() {
       s.pushNotification(n);
       s.track({ notifs: 1 });
       const focusing = s.settings.focusMute && s.focus?.phase === "work" && s.focus.endsAt !== null;
+      if (n.call) note(`arama kartı: ${s.fullscreen ? "tam ekran yüzünden gösterilmedi" : focusing ? "odak yüzünden gösterilmedi" : n.quiet ? "eski, gösterilmedi" : "gösterildi"}`);
       if (s.fullscreen || focusing || n.quiet) return;
 
       // Kullanıcının kendi gönderdiği mesajlar ("Sen: ...") bildirim kartı oluşturmasın
@@ -309,6 +310,7 @@ export function useNotificationFeed() {
   useEffect(() => {
     if (!isPrimary) return;
     return subscribe<{ phoneKey: string }>(EVENTS.notificationRemoved, ({ phoneKey }) => {
+      if (useNook.getState().toasts.some((t) => t.phoneKey === phoneKey && t.call)) note("arama kartı: telefon bildirimi kaldırdı (açıldı, reddedildi ya da bitti)");
       useNook.setState((s) => ({
         notifications: s.notifications.filter((n) => n.phoneKey !== phoneKey),
         toasts: s.toasts.filter((t) => t.phoneKey !== phoneKey),

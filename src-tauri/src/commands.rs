@@ -155,23 +155,53 @@ pub async fn set_wallpaper(app: AppHandle, id: String) -> Result<String, String>
         return Err("geçersiz duvar kağıdı".into());
     }
     let dir = app.path().picture_dir().map_err(|e| e.to_string())?.join("Nook");
-    tauri::async_runtime::spawn_blocking(move || {
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let path = dir.join(format!("nook-{safe}.jpg"));
-        if !path.exists() {
-            let url = format!("https://github.com/lukosovian/nook/releases/download/duvar-kagitlari/{safe}.jpg");
-            let res = ureq::get(&url).timeout(std::time::Duration::from_secs(60)).call().map_err(|_| "İndirilemedi; internet bağlantını kontrol et".to_string())?;
-            let mut bytes = Vec::new();
-            std::io::Read::read_to_end(&mut std::io::Read::take(res.into_reader(), 30 << 20), &mut bytes).map_err(|e| e.to_string())?;
-            let tmp = path.with_extension("part");
-            std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
-            std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || fetch_and_apply(&dir, &safe)).await.map_err(|e| e.to_string())?
+}
+
+/// Resmi (yoksa bir kez indirip) Resimler › Nook'a kaydeder ve masaüstü arka planı yapar
+fn fetch_and_apply(dir: &std::path::Path, id: &str) -> Result<String, String> {
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("nook-{id}.jpg"));
+    if !path.exists() {
+        let url = format!("https://github.com/lukosovian/nook/releases/download/duvar-kagitlari/{id}.jpg");
+        let res = ureq::get(&url).timeout(std::time::Duration::from_secs(60)).call().map_err(|_| "İndirilemedi; internet bağlantını kontrol et".to_string())?;
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut std::io::Read::take(res.into_reader(), 30 << 20), &mut bytes).map_err(|e| e.to_string())?;
+        let tmp = path.with_extension("part");
+        std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    }
+    apply_wallpaper(&path)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Duvar kağıdı döngüsü: yarım dakikada bir sıradaki resmin vakti geldi mi bakar, geldiyse yalnızca bir kez
+/// uygular (Windows'un kendi slayt gösterisi gibi; arkada başka iş yapmaz, bilgisayarı yormaz).
+pub fn spawn_wallpaper_cycle(app: AppHandle, shared: Arc<Shared>) {
+    let _ = std::thread::Builder::new().name("nook-wallpaper".into()).spawn(move || {
+        let mut last: Option<String> = None;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(30));
+            let Some(cycle) = shared.settings().wallpaper_cycle.filter(|c| !c.ids.is_empty()) else {
+                last = None;
+                continue;
+            };
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+            let step = cycle.every_min.max(1) * 60_000;
+            let id = &cycle.ids[(now.saturating_sub(cycle.since) / step) as usize % cycle.ids.len()];
+            if last.as_deref() == Some(id.as_str()) || !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+                continue;
+            }
+            let Ok(dir) = app.path().picture_dir().map(|d| d.join("Nook")) else { continue };
+            match fetch_and_apply(&dir, id) {
+                Ok(_) => {
+                    crate::log::write("info", &format!("duvar kağıdı döngüsü: {id}"));
+                    last = Some(id.clone());
+                }
+                Err(e) => crate::log::write("warn", &format!("duvar kağıdı döngüsü: {id}: {e}")),
+            }
         }
-        apply_wallpaper(&path)?;
-        Ok(path.to_string_lossy().into_owned())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    });
 }
 
 #[cfg(windows)]

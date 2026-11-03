@@ -29,6 +29,23 @@ interface NoteCmd {
   title?: string;
 }
 
+/**
+ * Telefondan basılan tuşlar sırayla çalışır: art arda iki "mikrofon aç/kapa" aynı anki hâli okuyup ikisi de
+ * aynı yöne çevirmesin. Bitince güncel hâl okunup telefona gider (simge hemen değişsin); Windows yeni hâli
+ * biraz geç bildirebildiği için bir kez daha tazelenir.
+ */
+let phoneQueue: Promise<unknown> = Promise.resolve();
+function phoneRun(run: () => Promise<unknown>) {
+  phoneQueue = phoneQueue
+    .then(run)
+    .catch(() => {})
+    .then(() => refreshQuickState(false))
+    .then(() => {
+      mirror();
+      window.setTimeout(() => void refreshQuickState(false).then(mirror), 800);
+    });
+}
+
 function mirror() {
   const { clips, pads, padId, hums, shelf, diary } = useNook.getState();
   const deck = getDeck();
@@ -180,7 +197,7 @@ export function usePhoneSync() {
       // Telefondan kısayol tuşuna basıldı, otomasyon şimdi çalıştırıldı ya da açılıp kapandı
       if (e.kind === "deck" && e.op === "run") {
         const k = getDeck().find((x) => x.id === e.id);
-        if (k) void runKey(k).then(() => mirror());
+        if (k) phoneRun(() => runKey(k));
         else if (e.id) void runAutomationNow(e.id).then(() => mirror());
       }
       if (e.kind === "deck" && e.op === "run-auto" && e.id) {

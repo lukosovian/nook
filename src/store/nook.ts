@@ -317,7 +317,19 @@ export interface ExtEvent {
   allDay: boolean;
 }
 
+/** Duvar kağıdı döngüsü: seçilen resimler bu sırayla, `everyMin` dakikada bir */
+export interface WallCycle {
+  id: string;
+  name: string;
+  ids: string[];
+  everyMin: number;
+}
+
 export interface Settings extends NativeSettings {
+  /** Kullanıcının kurduğu duvar kağıdı döngüleri (Studio › Duvar kağıtları); açık olanı `wallpaperCycle`'da */
+  wallCycles: WallCycle[];
+  /** Açık döngünün kimliği */
+  wallCycleOn: string | null;
   autostart: boolean;
   osd: boolean;
   events: boolean;
@@ -564,6 +576,9 @@ export const DEFAULT_SETTINGS: Settings = {
   gameIntro: true,
   breakReminderMin: 120,
   logDays: 14,
+  wallpaperCycle: null,
+  wallCycles: [],
+  wallCycleOn: null,
   playOffers: true,
   welcomeBack: 10,
   introStyle: "random",

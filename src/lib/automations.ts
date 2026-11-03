@@ -62,27 +62,27 @@ export interface AutoRun {
 }
 
 /** Tetikleyici seçicideki sıra: simge (DECK_ICONS), renk ve varsayılan hâli */
-export const TRIGGERS: { id: string; label: string; icon: string; color: string; make: () => Trigger }[] = [
-  { id: "time", label: tt("Saat gelince"), icon: "clock", color: "#ffd23f", make: () => ({ kind: "time", at: "09:00", days: [] }) },
-  { id: "start", label: tt("Nook açılınca"), icon: "sparkle", color: "#8f6bff", make: () => ({ kind: "start" }) },
-  { id: "app", label: tt("Uygulama açılınca"), icon: "app", color: "#3d8bff", make: () => ({ kind: "app", name: "" }) },
-  { id: "game", label: tt("Oyun başlayınca"), icon: "play", color: "#f0545c", make: () => ({ kind: "game", end: false }) },
-  { id: "game-end", label: tt("Oyun bitince"), icon: "play", color: "#f0545c", make: () => ({ kind: "game", end: true }) },
-  { id: "charging", label: tt("Şarj takılınca"), icon: "bolt", color: "#3ccf6e", make: () => ({ kind: "event", event: "charging" }) },
-  { id: "unplugged", label: tt("Şarj çıkınca"), icon: "bolt", color: "#f2a33a", make: () => ({ kind: "event", event: "unplugged" }) },
-  { id: "battery-low", label: tt("Pil azalınca"), icon: "bolt", color: "#f0545c", make: () => ({ kind: "event", event: "battery-low" }) },
-  { id: "bt-in", label: tt("Bluetooth cihaz bağlanınca"), icon: "bluetooth", color: "#3d8bff", make: () => ({ kind: "event", event: "bt-in" }) },
-  { id: "bt-out", label: tt("Bluetooth cihaz ayrılınca"), icon: "bluetooth", color: "#8e8e93", make: () => ({ kind: "event", event: "bt-out" }) },
-  { id: "usb-in", label: tt("USB takılınca"), icon: "bolt", color: "#3fbfa5", make: () => ({ kind: "event", event: "usb-in" }) },
-  { id: "online", label: tt("İnternet gelince"), icon: "wifi", color: "#3ccf6e", make: () => ({ kind: "event", event: "online" }) },
-  { id: "offline", label: tt("İnternet gidince"), icon: "wifi", color: "#8e8e93", make: () => ({ kind: "event", event: "offline" }) },
-  { id: "back", label: tt("Başına dönünce"), icon: "sparkle", color: "#ff5c8a", make: () => ({ kind: "idle", back: true }) },
-  { id: "away", label: tt("Boşta kalınca"), icon: "sleep", color: "#8f6bff", make: () => ({ kind: "idle", back: false }) },
-  { id: "lock", label: tt("Kilitlenince"), icon: "lock", color: "#3fbfa5", make: () => ({ kind: "lock", locked: true }) },
-  { id: "unlock", label: tt("Kilit açılınca"), icon: "lock", color: "#3ccf6e", make: () => ({ kind: "lock", locked: false }) },
-  { id: "phone-home", label: tt("Telefon eve gelince"), icon: "phone", color: "#2fd4c0", make: () => ({ kind: "phone", event: "home" }) },
-  { id: "phone-charging", label: tt("Telefon şarja takılınca"), icon: "phone", color: "#3ccf6e", make: () => ({ kind: "phone", event: "charging" }) },
-  { id: "phone-unplugged", label: tt("Telefon şarjdan çıkınca"), icon: "phone", color: "#f2a33a", make: () => ({ kind: "phone", event: "unplugged" }) },
+export const TRIGGERS: { id: string; label: string; hint: string; icon: string; color: string; make: () => Trigger }[] = [
+  { id: "time", label: tt("Saat gelince"), hint: tt("Seçtiğin saatte, seçtiğin günlerde"), icon: "clock", color: "#ffd23f", make: () => ({ kind: "time", at: "09:00", days: [] }) },
+  { id: "start", label: tt("Nook açılınca"), hint: tt("Nook her açıldığında; Windows açılınca başlıyorsa bilgisayar açılınca da"), icon: "sparkle", color: "#8f6bff", make: () => ({ kind: "start" }) },
+  { id: "app", label: tt("Uygulama açılınca"), hint: tt("Seçtiğin uygulamaya geçince (öne gelince)"), icon: "app", color: "#3d8bff", make: () => ({ kind: "app", name: "" }) },
+  { id: "game", label: tt("Oyun başlayınca"), hint: tt("Bir oyun tam ekran açılınca"), icon: "play", color: "#f0545c", make: () => ({ kind: "game", end: false }) },
+  { id: "game-end", label: tt("Oyun bitince"), hint: tt("En az 15 saniye süren oyundan çıkınca"), icon: "play", color: "#f0545c", make: () => ({ kind: "game", end: true }) },
+  { id: "charging", label: tt("Şarj takılınca"), hint: tt("Laptopun şarj kablosu takılınca"), icon: "bolt", color: "#3ccf6e", make: () => ({ kind: "event", event: "charging" }) },
+  { id: "unplugged", label: tt("Şarj çıkınca"), hint: tt("Laptopun şarj kablosu çıkarılınca"), icon: "bolt", color: "#f2a33a", make: () => ({ kind: "event", event: "unplugged" }) },
+  { id: "battery-low", label: tt("Pil azalınca"), hint: tt("Laptopun pili %20'ye ve %10'a düşünce"), icon: "bolt", color: "#f0545c", make: () => ({ kind: "event", event: "battery-low" }) },
+  { id: "bt-in", label: tt("Bluetooth cihaz bağlanınca"), hint: tt("Kulaklık, hoparlör gibi bir Bluetooth cihaz bağlanınca"), icon: "bluetooth", color: "#3d8bff", make: () => ({ kind: "event", event: "bt-in" }) },
+  { id: "bt-out", label: tt("Bluetooth cihaz ayrılınca"), hint: tt("Bağlı bir Bluetooth cihazın bağlantısı kopunca"), icon: "bluetooth", color: "#8e8e93", make: () => ({ kind: "event", event: "bt-out" }) },
+  { id: "usb-in", label: tt("USB takılınca"), hint: tt("USB bellek ya da başka bir USB cihaz takılınca"), icon: "bolt", color: "#3fbfa5", make: () => ({ kind: "event", event: "usb-in" }) },
+  { id: "online", label: tt("İnternet gelince"), hint: tt("İnternet bağlantısı geri gelince"), icon: "wifi", color: "#3ccf6e", make: () => ({ kind: "event", event: "online" }) },
+  { id: "offline", label: tt("İnternet gidince"), hint: tt("İnternet bağlantısı kopunca"), icon: "wifi", color: "#8e8e93", make: () => ({ kind: "event", event: "offline" }) },
+  { id: "back", label: tt("Başına dönünce"), hint: tt("Nook uyurken fareye ya da klavyeye dokununca"), icon: "sparkle", color: "#ff5c8a", make: () => ({ kind: "idle", back: true }) },
+  { id: "away", label: tt("Boşta kalınca"), hint: tt("Fareye ve klavyeye uyuma süresi kadar dokunmayınca (Ayarlar › Ada ve Nook › Uyuma süresi)"), icon: "sleep", color: "#8f6bff", make: () => ({ kind: "idle", back: false }) },
+  { id: "lock", label: tt("Kilitlenince"), hint: tt("Win+L ile ya da kendiliğinden ekran kilitlenince"), icon: "lock", color: "#3fbfa5", make: () => ({ kind: "lock", locked: true }) },
+  { id: "unlock", label: tt("Kilit açılınca"), hint: tt("Kilit ekranında oturumu açınca"), icon: "lock", color: "#3ccf6e", make: () => ({ kind: "lock", locked: false }) },
+  { id: "phone-home", label: tt("Telefon eve gelince"), hint: tt("Telefon en az 20 dakika evden uzak kalıp ev Wi-Fi'ına yeniden bağlanınca (Nook Mobil gerekir)"), icon: "phone", color: "#2fd4c0", make: () => ({ kind: "phone", event: "home" }) },
+  { id: "phone-charging", label: tt("Telefon şarja takılınca"), hint: tt("Telefon şarja takılınca (Nook Mobil gerekir)"), icon: "phone", color: "#3ccf6e", make: () => ({ kind: "phone", event: "charging" }) },
+  { id: "phone-unplugged", label: tt("Telefon şarjdan çıkınca"), hint: tt("Telefon şarjdan çıkınca (Nook Mobil gerekir)"), icon: "phone", color: "#f2a33a", make: () => ({ kind: "phone", event: "unplugged" }) },
 ];
 
 /** Tetikleyicinin seçicideki karşılığı */
@@ -126,15 +126,17 @@ export function triggerLabel(t: Trigger) {
 }
 
 /** Koşul seçicideki sıra */
-export const CONDITIONS: { id: Condition["kind"] | "battery"; label: string; make: () => Condition }[] = [
-  { id: "notGame", label: tt("Oyunda değilsem"), make: () => ({ kind: "notGame" }) },
-  { id: "between", label: tt("Saat aralığındaysa"), make: () => ({ kind: "between", from: "22:00", to: "08:00" }) },
-  { id: "power", label: tt("Şarjdaysa"), make: () => ({ kind: "power", charging: true }) },
-  { id: "battery", label: tt("Pildeyse"), make: () => ({ kind: "power", charging: false }) },
-  { id: "present", label: tt("Bilgisayarın başındaysam"), make: () => ({ kind: "present" }) },
+export const CONDITIONS: { id: Condition["kind"] | "battery"; label: string; hint: string; make: () => Condition }[] = [
+  { id: "notGame", label: tt("Oyunda değilsem"), hint: tt("O an tam ekran bir oyun açık değilse"), make: () => ({ kind: "notGame" }) },
+  { id: "between", label: tt("Saat aralığındaysa"), hint: tt("Saat bu aralıktaysa (gece yarısını geçebilir)"), make: () => ({ kind: "between", from: "22:00", to: "08:00" }) },
+  { id: "power", label: tt("Şarjdaysa"), hint: tt("Laptop prizdeyse"), make: () => ({ kind: "power", charging: true }) },
+  { id: "battery", label: tt("Pildeyse"), hint: tt("Laptop pildeyse"), make: () => ({ kind: "power", charging: false }) },
+  { id: "present", label: tt("Bilgisayarın başındaysam"), hint: tt("Nook uyumuyorsa, yani son uyuma süresi içinde fareye ya da klavyeye dokunduysan"), make: () => ({ kind: "present" }) },
 ];
 
 export const conditionId = (c: Condition) => (c.kind === "power" && !c.charging ? "battery" : c.kind);
+
+export const conditionHint = (c: Condition) => CONDITIONS.find((x) => x.id === conditionId(c))?.hint ?? "";
 
 export function conditionLabel(c: Condition) {
   if (c.kind === "between") return tt("{0}–{1} arası", c.from, c.to);
