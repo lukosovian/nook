@@ -252,7 +252,7 @@ float acc(vec3 p){
   // Cam yarıçapı R; köprü iki camın iç kenarını yukarıdan kemerle bağlar
   float R=.27;
   float inner=uEye.y-R;
-  if(uGlasses==1||uGlasses==2||uGlasses==4){
+  if(uGlasses==1||uGlasses==2||uGlasses==4||uGlasses==12){
     float side = uEye.y+R;
     d=min(d,sdCaps(p,vec3(-side,uEye.x+.04,uEye.z),vec3(-side-.12,uEye.x+.08,uEye.z-.5),.032));
     d=min(d,sdCaps(p,vec3(side,uEye.x+.04,uEye.z),vec3(side+.12,uEye.x+.08,uEye.z-.5),.032));
@@ -681,6 +681,85 @@ vec2 accC(vec3 p){
      if(an<r.x) r=vec2(an,20.);
      float tip=sdSph(p-vec3(0.,1.32,0.),.09); if(tip<r.x) r=vec2(tip,7.);
      float ring=sdCylZ((e-vec3(1.08,0.,0.)).zyx,.17,.04,.02); if(ring<r.x) r=vec2(ring,2.); }
+  // ---- duvar kağıtlarındaki başlıklar
+  if(uHat==45){ // kürk şapka: kahverengi deri tepe, krem kürk kenar ve sarkık kulaklar
+     vec3 q=p-vec3(0.,.06,-.04);
+     float h=max(sdSph(q,1.07),-(q.y-.5));
+     if(h<r.x) r=vec2(h,6.);
+     vec3 e=q; e.x=abs(e.x);
+     float fur=length(vec2(length(q.xz)-.9,(q.y-.5)*.9))-.14;
+     fur=smin(fur,sdEll(e-vec3(.92,-.02,.02),vec3(.2,.44,.38)),.12);
+     fur-=.035*noise(q*14.);
+     if(fur<r.x) r=vec2(fur,36.); }
+  if(uHat==46){ // yağmur şapkası (sarı): yuvarlak tepe, arkaya doğru sarkan geniş siper
+     vec3 q=p-vec3(0.,.6,-.04); q.xy=rot(.08)*q.xy;
+     float cr=max(sdEll(q-vec3(0.,.04,0.),vec3(.82,.6,.8)),-q.y);
+     float rr=length(q.xz);
+     vec3 bq=q; bq.y+=.36*max(rr-.7,0.)+.34*max(-q.z,0.)*smoothstep(.5,1.,rr);
+     float br=sdEll(bq-vec3(0.,.02,-.06),vec3(1.12,.05,1.12))*.8;
+     float h=smin(cr,br,.06);
+     if(h<r.x) r=vec2(h,4.); }
+  if(uHat==47){ // ter bandı (turkuaz): gövdenin yüzeyini saran kalın bant, hep gözlerin biraz üstünde
+     vec3 q=p+vec3(0.,uHatY,0.);
+     float bd=max(abs(body(q)-.05)-.05,abs(q.y-uEye.x-.46)-.12)-.02;
+     if(bd<r.x) r=vec2(bd,37.); }
+  if(uHat==48||uHat==49){ // balıkçı şapkası: yuvarlak tepe, aşağı eğik siper (adaçayı yeşili ya da gökkuşağı)
+     vec3 q=p-vec3(0.,.6,-.04); q.xy=rot(.08)*q.xy;
+     float cr=sdCylY(q-vec3(0.,.22,0.),.76,.26,.22);
+     vec3 bq=q; bq.y+=.45*max(length(q.xz)-.72,0.);
+     float br=sdEll(bq,vec3(1.08,.05,1.06))*.8;
+     float h=smin(cr,br,.05);
+     if(h<r.x) r=vec2(h,uHat==49?39.:38.); }
+  if(uHat==50){ // gökkuşağı bere: şeritli örgü kubbe, kıvrık kenar, kırmızı ponpon
+     vec3 q=p-vec3(0.,.06,-.04);
+     float dome=max(sdSph(q,1.05),-(q.y-.36));
+     float cuff=length(vec2(length(q.xz)-.95,(q.y-.4)*.85))-.13;
+     float h=smin(dome,cuff,.04);
+     if(h<r.x) r=vec2(h,40.);
+     float pom=sdSph(q-vec3(0.,1.16,-.02),.17);
+     if(pom<r.x) r=vec2(pom,7.); }
+  if(uHat==51){ // tüylü kasket: kabarık koyu tepe, kısa siper, altın şerit, yanda krem tüy
+     vec3 q=p-vec3(0.,.66,-.02); q.xy=rot(.1)*q.xy;
+     float cr=max(sdEll(q-vec3(0.,.14,.08),vec3(.94,.46,.94)),-(q.y+.02));
+     float br=max(sdEll(q-vec3(0.,.02,.72),vec3(.5,.04,.32)),-(q.z-.6));
+     float h=smin(cr,br,.04);
+     if(h<r.x) r=vec2(h,41.);
+     float bd=sdCylY(q-vec3(0.,.08,.08),.95,.04,.01); if(bd<r.x) r=vec2(bd,12.);
+     vec3 f=q-vec3(-.6,.46,.36); f.xy=rot(.6)*f.xy;
+     float fe=sdEll(f,vec3(.09,.42,.05)); if(fe<r.x) r=vec2(fe,17.); }
+  if(uHat==52){ // ay büyücüsü: yıldızlı lacivert koni, altın bant, önde altın hilal
+     vec3 q=p-vec3(.04,.76,-.04); q.xy=rot(.16)*q.xy;
+     float h=witchCone(q);
+     if(h<r.x) r=vec2(h,22.);
+     float band=max(sdCylY(q-vec3(0.,.12,0.),.45,.06,.02),-sdCylY(q-vec3(0.,.12,0.),.36,.2,.0));
+     if(band<r.x) r=vec2(band,12.);
+     vec3 mq=q-vec3(-.06,.42,.3); mq.yz=rot(-.35)*mq.yz;
+     float mn=max(length(mq.xy)-.14,-(length(mq.xy-vec2(.07,.05))-.12));
+     mn=ext(mn,mq.z,.03,.02);
+     if(mn<r.x) r=vec2(mn,12.); }
+  if(uHat==53){ // zümrüt kapüşon: başı ve yanları saran kumaş, önü açık, tepesi arkaya sivrilir; yüz çevresinde altın kenar
+     vec3 q=p-vec3(0.,.04,-.04);
+     float outer=smin(sdSph(q,1.16),sdCaps(q,vec3(0.,.8,-.2),vec3(0.,1.24,-.62),.1),.3);
+     float sh=max(outer,-sdSph(q,1.05));
+     float win=length(vec2(q.x/.86,(q.y+.06)/.82))-1.;
+     float open=max(win,-(q.z-.2));
+     sh=max(sh,-open); sh=max(sh,-(q.y+.72));
+     if(sh<r.x) r=vec2(sh,42.);
+     float trim=max(abs(sdSph(q,1.1))-.08,abs(win)*.5-.035);
+     trim=max(trim,-(q.z-.2)); trim=max(trim,-(q.y+.72));
+     if(trim<r.x) r=vec2(trim,12.); }
+  if(uHat==54){ // kulaklıklı baret: sarı baret, yanlarda koyu kulaklık, solda ağza uzanan mikrofon
+     vec3 q=p-vec3(0.,.8,-.04); q.xy=rot(.06)*q.xy;
+     float dome=max(sdEll(q,vec3(.68,.5,.66)),-q.y);
+     dome=smin(dome,sdCaps(q,vec3(0.,.44,-.5),vec3(0.,.5,.4),.07),.06);
+     float h=smin(dome,sdEll(q-vec3(0.,.01,.14),vec3(.8,.04,.84)),.04);
+     if(h<r.x) r=vec2(h,4.);
+     vec3 e=p; e.x=abs(e.x);
+     float cup=sdCylZ((e-vec3(.98,0.,0.)).zyx,.3,.12,.05);
+     cup=min(cup,sdCaps(e,vec3(1.,.28,0.),vec3(.78,.7,0.),.045));
+     cup=min(cup,sdCaps(p,vec3(-1.02,-.12,.12),vec3(-.62,-.5,.62),.035));
+     cup=min(cup,sdSph(p-vec3(-.58,-.52,.66),.07));
+     if(cup<r.x) r=vec2(cup,41.); }
   p=p0;
   // ---- maskeler ve gözlükler
   if(uGlasses==7||uGlasses==8){ // kahraman maskesi (kırmızı), balo maskesi (mor, altın kenarlı, sivri uçlu)
@@ -715,6 +794,25 @@ vec2 accC(vec3 p){
      float tb=sdCaps(p,vec3(uEye.y+.42,uEye.x-.3,uEye.z-.22),vec3(uEye.y+.52,1.3,uEye.z-.4),.06);
      tb=min(tb,sdCaps(p,vec3(uEye.y+.42,uEye.x-.3,uEye.z-.22),vec3(.1,uEye.x-.5,uEye.z-.02),.06));
      if(tb<r.x) r=vec2(tb,4.); }
+  // ---- duvar kağıtlarındaki gözlükler
+  if(uGlasses==11){ // büyüteç: sağ gözün önünde pirinç çerçeveli büyük cam, aşağı uzanan ahşap sap
+     vec3 c=vec3(uEye.y+.04,uEye.x+.02,uEye.z+.14);
+     float fr=sdTorus(p-c,vec2(.36,.05));
+     if(fr<r.x) r=vec2(fr,12.);
+     float gl=sdCylZ(p-c,.33,.02,.015);
+     if(gl<r.x) r=vec2(gl,26.);
+     float hd=sdCaps(p,c+vec3(.26,-.26,0.),c+vec3(.62,-.78,-.1),.06);
+     if(hd<r.x) r=vec2(hd,6.); }
+  if(uGlasses==12){ // gökkuşağı gözlük: şeritli renkli camlar (sapları siyah, acc'de)
+     float ln=min(sdCylZ(p-vec3(-uEye.y,uEye.x,uEye.z),.29,.05,.04),sdCylZ(p-vec3(uEye.y,uEye.x,uEye.z),.29,.05,.04));
+     if(ln<r.x) r=vec2(ln,43.); }
+  if(uGlasses==13){ // teknoloji gözlüğü: ışıyan turkuaz siperlik, başı saran koyu bant, yanlarda kulak kutuları
+     vec3 m=p-vec3(0.,uEye.x,uEye.z+.02); m.z+=.25*m.x*m.x;
+     float pl=ext(sdBox2(m.xy,vec2(uEye.y+.3,.25),.14),m.z,.06,.04);
+     if(pl<r.x) r=vec2(pl,44.);
+     vec3 q=p-vec3(0.,uEye.x,0.); float band=length(vec2(length(q.xz)-.97,q.y))-.06; band=max(band,-(q.z-.1));
+     vec3 t=p; t.x=abs(t.x); band=min(band,sdCylZ((t-vec3(uEye.y+.45,uEye.x,uEye.z-.25)).zyx,.12,.08,.03));
+     if(band<r.x) r=vec2(band,41.); }
   // ---- yüz ve süs
   if(uFace==2){ // sakal (kızıl, kabarık)
      vec3 e=p; e.x=abs(e.x);
@@ -740,11 +838,11 @@ vec2 accC(vec3 p){
      float lv=sdStar5(q.xz,.62,.4); lv=ext(lv,q.y+.32*dot(q.xz,q.xz),.04,.035);
      lv=smin(lv,sdCaps(q,vec3(0.),vec3(.05,.26,0.),.05),.05);
      if(lv<r.x) r=vec2(lv,5.); }
-  if(uNeck==2){ // atkı (kırmızı): boynu saran kalın halka ve önden sarkan uç
+  if(uNeck>=2){ // atkı (kırmızı, kırmızı-beyaz çizgili ya da yeşil örgü): boynu saran kalın halka ve önden sarkan uç
      vec3 q=p-vec3(0.,-.74,.06);
      float sc=length(vec2(length(q.xz*vec2(1.,.92))-.72,q.y*1.15))-.17;
      sc=smin(sc,sdEll(q-vec3(.3,-.36,.66),vec3(.15,.34,.07)),.07);
-     if(sc<r.x) r=vec2(sc,7.); }
+     if(sc<r.x) r=vec2(sc,uNeck==3?45.:uNeck==4?46.:7.); }
   return r;
 }
 vec2 map(vec3 p){
@@ -792,7 +890,17 @@ vec3 matCol(int k){
   if(k==32) return vec3(.42,.27,.13);
   if(k==33) return vec3(.82,.72,.52);
   if(k==34) return vec3(.15,.5,1.);
+  if(k==36) return vec3(.93,.86,.72);
+  if(k==37) return vec3(.12,.84,.95);
+  if(k==38) return vec3(.6,.7,.5);
+  if(k==41) return vec3(.13,.13,.16);
+  if(k==42) return vec3(.1,.42,.27);
+  if(k==46) return vec3(.36,.62,.24);
   return uColor; }
+
+/** Gökkuşağının altı rengi, t her birimde bir renk ilerler */
+vec3 rainbow(float t){ float i=floor(mod(t,6.));
+  return i<.5?vec3(.95,.2,.2):i<1.5?vec3(1.,.55,.1):i<2.5?vec3(1.,.85,.15):i<3.5?vec3(.3,.8,.3):i<4.5?vec3(.2,.5,1.):vec3(.6,.3,.9); }
 
 vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
   vec3 v=vec3(0.,0.,1.);
@@ -804,6 +912,12 @@ vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
   if(colored){
     int k=int(id+.5);
     vec3 base=matCol(k);
+    // gökkuşağı: balıkçı şapkası (tepeden sipere halkalar), bere (yatay şeritler), gözlük camları
+    if(k==39) base=rainbow((p.y-uHatY)*6.-length(p.xz)*3.);
+    if(k==40) base=rainbow((p.y-uHatY)*7.);
+    if(k==43) base=rainbow((p.y-uEye.x)*9.+3.);
+    // çizgili atkı: kırmızı beyaz şeritler
+    if(k==45) base=mix(vec3(.92,.12,.1),vec3(.97,.96,.94),step(.5,fract(atan(p.z,p.x)*2.2+p.y*4.)));
     // mantar: sap ve şapkanın altı krem, renk yalnızca şapkada
     if(id<.5 && uShape==16) base=mix(vec3(.96,.9,.8),base,smoothstep(-.02,.08,p.y));
     if(id<.5){
@@ -840,6 +954,10 @@ vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
     // ışıyan: neon gözlük, madenci lambası
     if(k==24) return uAcc*1.25+vec3(.25)*pow(clamp(dot(n,v),0.,1.),3.)+rim*uAcc*.6;
     if(k==31) return vec3(1.,.97,.82)*1.15;
+    // teknoloji gözlüğü: turkuaz ışık
+    if(k==44) return vec3(.2,.85,1.)*1.15+vec3(.3)*pow(clamp(dot(n,v),0.,1.),3.)+rim*vec3(.2,.85,1.)*.6;
+    // kürk: tüylü, mat
+    if(k==36){ col*=.8+.3*noise(p*45.); return col+rim*base*.35; }
     // baloncuk: içi neredeyse görünmez, kenarı gökkuşağı
     if(k==26){
       vec3 h=normalize(L+v);
@@ -865,7 +983,7 @@ vec3 shade(vec3 p,vec3 n,float id,float o,float shRaw){
       col+=pow(clamp(dot(n,h),0.,1.),48.)*.9*sh;
       return col+rim*mix(base,vec3(1.),.7)*.2; }
     // örgü bere: dikey örgü ilmekleri, mat yün
-    if(id>12.5 && id<13.5){
+    if((id>12.5 && id<13.5)||k==40||k==46){
       float fx=fract(atan(p.z,p.x)*7.)-.5;
       float row=fract(p.y*11.+abs(fx)*1.6);
       col*=.72+.34*(1.-abs(row-.5)*2.)*(1.-abs(fx)*.9);

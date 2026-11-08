@@ -102,7 +102,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Hadi bilgisayarını ekleyelim",
-    text: "Bilgisayarındaki Nook'ta Ayarlar › Telefon'u aç, köprüyü aç ve Kodu göster'e bas. Sonra buradan kodu okut, hepsi bu.",
+    text: "Bilgisayarındaki Nook'ta Studio › Ayarlar › Telefon'u aç, köprüyü aç ve Kodu göster'e bas. Sonra buradan kodu okut, hepsi bu.",
     color: "#3ccf6e",
     nook: null,
     expression: "love",

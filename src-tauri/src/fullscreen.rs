@@ -25,6 +25,8 @@ const HIDE_AFTER: Duration = Duration::from_millis(260);
 const INTRO_PEEK: Duration = Duration::from_secs(5);
 /// Mola hatırlatıcısı için ada oyunun üstünde bu kadar görünür, sonra yine gizlenir.
 const BREAK_PEEK: Duration = Duration::from_secs(8);
+/// Oyunda alarm çalınca ada bu kadar oyunun üstünde görünür (sürekli üstte tutmak oyunu alta atıyordu).
+const ALARM_PEEK: Duration = Duration::from_secs(10);
 /// Öndeki pencere değişmese de "en üstte" bayrağı bu sıklıkla yeniden verilir.
 const TOPMOST_EVERY: u32 = 8;
 
@@ -39,6 +41,8 @@ const NOT_GAMES: &[&str] = &[
     // Windows'un kendi tam ekran katmanları ve tam ekran açılabilen iş uygulamaları
     "lockapp", "searchhost", "startmenuexperiencehost", "shellexperiencehost", "textinputhost", "photos", "microsoft.photos",
     "ms-teams", "teams", "zoom", "acrord32", "acrobat", "winword", "excel",
+    // Görüntülü konuşma uygulamaları (tam ekran görüşme oyun sayılmasın)
+    "whatsapp", "whatsapp.root", "skype", "skypeapp", "telegram", "signal", "viber", "facetime", "webex", "ciscocollabhost", "slack",
 ];
 
 /// Hep en üstte durması gereken pencereler (etiket önekleri).
@@ -133,14 +137,15 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
                 if next > 0 && now_ms >= next && rung_for != next {
                     rung_for = next;
+                    peek_until = Some(Instant::now() + ALARM_PEEK);
                     let _ = app.emit("nook://alarm-due", next);
                     // Oyunda görünmedi denince nedenini görebilmek için: öndeki tam ekran ne, ada gizli mi
                     let fg = imp::fullscreen_monitor(&shared).and_then(|d| d.2).map(|(_, e)| pretty(&e));
                     crate::log::write("info", &format!("alarm vakti: tam ekran={fg:?}, gizli ada={}", hidden.len()));
                 }
                 let guard = shared.guard.load(Ordering::Relaxed);
-                // Alarm oyunun üstüne çıkmaz: tam ekran oyunun üstüne pencere itmek oyunu alta atıyordu.
-                // Oyunda alarm yalnızca çalar; oyundan çıkınca adada bekler.
+                // Alarm oyunun üstünde sürekli tutulmaz (oyunu alta atıyordu): vakti gelince ALARM_PEEK kadar görünür,
+                // sonra yalnızca çalar (Esc ile kapanır); oyundan çıkınca adada bekler.
                 let enabled = settings.hide_in_fullscreen && !guard;
                 let mut break_due: Option<GamePeek> = None;
                 let detected = imp::fullscreen_monitor(&shared);
@@ -206,6 +211,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         .map(|s| s.monitor)
                 };
                 *shared.game_screen.lock().unwrap() = game_mon;
+                shared.game_front.store(in_session_game, Ordering::Relaxed);
 
                 video = match (game_mon, detected.as_ref()) {
                     (Some(_), _) => None,

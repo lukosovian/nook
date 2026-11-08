@@ -2,10 +2,9 @@
  * Paketle gelen hazır Nook resimleri (Koleksiyon, Cadılar): ilk açılışta da derleme beklemeden görünsünler.
  * scripts/bake-looks.py üretir; gölgelendirici değişince TAG tutmaz ve çizim eskisi gibi çalışma anında yapılır.
  */
-export const BAKED_TAG: string = "8fkitm";
+export const BAKED_TAG: string = "1gjtwu0";
 export const BAKED: Record<string, string> = {
   "acorn|smooth|none|none|none|none|#B5651D|160": "ae53f35cdffd.webp",
-  "bean|plush|none|bat|none|none|#9B7BFF|160": "69a7135955c0.webp",
   "bear|chrome|none|none|none|none|#8A8F99|160": "d8ec9eab1ecb.webp",
   "bear|denim|none|none|none|none|#1E3A8A|160": "05dc8faeff2a.webp",
   "bear|fluffy|none|none|none|none|#FF9EC4|160": "63d2b17c401a.webp",
@@ -19,7 +18,6 @@ export const BAKED: Record<string, string> = {
   "bee|smooth|none|none|none|none|#FFD21F|160": "363ba402ce5e.webp",
   "blob|camo|none|helmet|none|none|#16C47F|160": "54f7f3818d4e.webp",
   "blob|lava|none|none|none|none|#FF6A3D|160": "a05f2fd83d06.webp",
-  "blob|plush|none|witch|none|none|#8FE03A|160": "a7f64dcbb7ba.webp",
   "blob|plush|none|wizard|none|none|#9B7BFF|160": "2f99b4db7c27.webp",
   "cactus|smooth|none|none|none|none|#16C47F|160": "ffd1068baa75.webp",
   "candy|smooth|none|none|none|none|#FF5C8A|160": "6455ee34b485.webp",
@@ -39,7 +37,6 @@ export const BAKED: Record<string, string> = {
   "flame|smooth|none|none|none|none|#FF6A3D|160": "2c012a61dadf.webp",
   "fox|plush|none|none|none|none|#FF8A1F|160": "346607829199.webp",
   "frog|smooth|none|none|none|none|#8FE03A|160": "7237e93cdba2.webp",
-  "ghost|smooth|none|none|none|none|#F4F4F6|160": "5579bdf50601.webp",
   "icecream|smooth|none|none|none|none|#FF9EC4|160": "d95b93eae320.webp",
   "leaf|smooth|none|none|none|none|#16C47F|160": "f17da0db307d.webp",
   "marshmallow|smooth|none|none|none|none|#FFE3A8|160": "8eb42d975a5d.webp",
@@ -50,8 +47,6 @@ export const BAKED: Record<string, string> = {
   "panda|smooth|none|none|none|none|#F4F4F6|160": "b86a3b087a79.webp",
   "penguin|smooth|none|none|none|none|#1E3A8A|160": "9fe4897ae08c.webp",
   "pineapple|smooth|none|none|none|none|#FFD21F|160": "5308bead2c53.webp",
-  "pumpkin|plush|none|witch|none|none|#FF8A1F|160": "4ed8060b9939.webp",
-  "pumpkin|smooth|none|none|none|none|#FF8A1F|160": "c9298610068e.webp",
   "raincloud|smooth|none|none|none|none|#F4F4F6|160": "47e1655ed6d1.webp",
   "rock|smooth|none|none|none|none|#8A8F99|160": "5aad10b24524.webp",
   "sphere|fluffy|none|earmuffs|none|none|#9B7BFF|160": "7038e2d29db7.webp",
@@ -68,7 +63,6 @@ export const BAKED: Record<string, string> = {
   "sphere|smooth|none|clownwig|none|nose|#F4F4F6|160": "c0c0ecd61402.webp",
   "sphere|smooth|none|crown|none|none|#F4F4F6|160": "f1c1e7ca3687.webp",
   "sphere|smooth|none|detective|none|mustache|#FFE3A8|160": "59bb130ed0e8.webp",
-  "sphere|smooth|none|horns|none|none|#E23BD6|160": "61f0d1ccc51b.webp",
   "sphere|smooth|none|knight|none|none|#8A8F99|160": "cc344ae27cce.webp",
   "sphere|smooth|none|miner|none|none|#B5651D|160": "55f18fd71691.webp",
   "sphere|smooth|none|nightcap|none|none|#9B7BFF|160": "7794a3167b6a.webp",

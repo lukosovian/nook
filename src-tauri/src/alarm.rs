@@ -1,25 +1,41 @@
 //! Alarm sesi: Windows'un kendi alarm sesleri (C:\Windows\Media\Alarm01–10.wav), döngüde çalar.
-//! Alarm çalarken tam ekran gizleme devre dışı kalır — oyundayken de görünsün.
+//! Oyundayken ada alarm anında kısa süre oyunun üstünde görünür (fullscreen.rs); çalarken Esc alarmı kapatır.
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use crate::state::Shared;
 
 /// Çal/durdur. `sound`: 1–10 (Alarm01…Alarm10), 0 = sessiz (yalnızca ekranda görünür).
 /// `preview`: döngüsüz, tek sefer dinlet.
 #[tauri::command]
-pub fn alarm_ring(on: bool, sound: u8, preview: bool, shared: State<'_, Arc<Shared>>) {
+pub fn alarm_ring(app: AppHandle, on: bool, sound: u8, preview: bool, shared: State<'_, Arc<Shared>>) {
     if !preview {
         shared.alert.store(on, Ordering::Relaxed);
+        // Ses çaldığı sürece Esc alarmı kapatır (oyunda da); ses susunca Esc başka programlara geri döner
+        esc(&app, on && sound > 0);
     }
     if sound == 0 {
         imp::play(false, 1, false);
         return;
     }
     imp::play(on, sound.min(10), !preview);
+}
+
+fn esc(app: &AppHandle, on: bool) {
+    let gs = app.global_shortcut();
+    if !on {
+        let _ = gs.unregister("Escape");
+    } else if !gs.is_registered("Escape") {
+        let _ = gs.on_shortcut("Escape", |app, _, e| {
+            if e.state() == ShortcutState::Pressed {
+                let _ = app.emit("nook://alarm-stop", ());
+            }
+        });
+    }
 }
 
 /// Frontend sıradaki alarmı bildirir (alarmlar her değiştiğinde).

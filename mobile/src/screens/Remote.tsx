@@ -132,6 +132,8 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
   useEffect(() => {
     let alive = true;
     let hash = "";
+    // Ekran değişince görüntü kutusu sıfırlanır; aynı çözünürlükteki ekranda da ilk karede yeniden kurulsun
+    let first = true;
     void (async () => {
       while (alive) {
         try {
@@ -142,10 +144,11 @@ export function RemoteView({ pairing, status, onClose }: { pairing: Pairing; sta
             const bmp = await createImageBitmap(f.blob);
             const c = canvas.current;
             if (c && alive) {
-              if (c.width !== bmp.width || c.height !== bmp.height) {
+              if (first || c.width !== bmp.width || c.height !== bmp.height) {
                 c.width = bmp.width;
                 c.height = bmp.height;
                 setImg({ w: bmp.width, h: bmp.height });
+                first = false;
               }
               c.getContext("2d")?.drawImage(bmp, 0, 0);
             }

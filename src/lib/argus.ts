@@ -283,13 +283,24 @@ export const EXTRA =
  * edilir ama `guess` işaretlenir: izleme takibi bunu yalnızca bölüm uzunluğundaki videolarda kullanır,
  * YouTube'daki kısa sahneler ilk/sıradaki bölüme yazılmaz.
  */
-function suggestFor(item: ArgusItem, text: string): ArgusSuggestion | null {
+function suggestFor(item: ArgusItem, text: string, title: string): ArgusSuggestion | null {
   if (!item.series) return { itemId: item.id };
   if (EXTRA.test(text)) return null;
   const ep = parseEpisode(text, item.series.next?.season ?? item.series.latest?.season ?? 1);
   if (ep) return { itemId: item.id, season: ep.season, episode: ep.episode };
+  // Tahmin yalnızca başlık dizinin adından ibaretse (Netflix gibi): "Muhteşem Yüzyıl | Hürrem'in intikamı"
+  // gibi 40 dk'lık YouTube derlemeleri ilk/sıradaki bölüme yazılmaz
+  if (!onlyName(item, title, text)) return null;
   const next = item.series.next;
   return next ? { itemId: item.id, season: next.season, episode: next.episode, guess: true } : null;
+}
+
+/** Başlığın her parçası kaydın adı (site adları zaten atılır); fazladan açıklama yok */
+function onlyName(item: ArgusItem, title: string, text: string) {
+  // Başlık yalnızca site adıysa ("Netflix") dizinin adı sanatçı alanındadır
+  let segs = segments(title);
+  if (!segs.length) segs = segments(text);
+  return segs.length > 0 && segs.every((seg) => strength(item, [seg]) >= FRESH_SAME);
 }
 
 /** Çalan medya → Argus kaydı + bölüm (yalnızca Argus'taki adlarla) */
@@ -298,7 +309,7 @@ export function matchMedia(snap: ArgusSnapshot | null, title: string, artist: st
   const text = `${title} ${artist}`;
   // Her durumdaki kayıt — İzlendi olanlar da (tekrar izleme)
   const item = matchTitle(snap, text);
-  return item ? suggestFor(item, text) : null;
+  return item ? suggestFor(item, text, title) : null;
 }
 
 // Başlıktaki ad dışı kalıntılar: site, kalite, dublaj, bölüm yazıları
@@ -367,7 +378,7 @@ export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: s
   let segs = segments(title);
   // Başlık yalnızca "Bölüm 3" gibiyse dizinin adı sanatçı alanındadır
   if (!segs.length) segs = segments(artist);
-  const sure: MediaMatch = { sug: local ? suggestFor(local, text) : null, fresh: null };
+  const sure: MediaMatch = { sug: local ? suggestFor(local, text, title) : null, fresh: null };
   if (local && strength(local, segs.concat(segments(artist))) >= SAME) return sure;
   // Ad yalnızca benziyor ("Avatar" ⊂ "Avatar Aang: Son Havabükücü"): TMDB doğrulamazsa gösterilmez. Dizide
   // başlıkta bölüm yazıyorsa ("Lanterns S1E8 · Bölümün adı") yine de o dizi sayılır.
@@ -399,7 +410,7 @@ export async function resolveMedia(snap: ArgusSnapshot, title: string, artist: s
   const names = hit.names.map(norm);
   const known =
     snap.items.find((i) => i.tmdb === hit.key) ?? snap.items.find((i) => !i.tmdb && [i.title, i.original].some((n) => n && names.includes(norm(n))));
-  if (known) return { sug: suggestFor(known, text), fresh: null };
+  if (known) return { sug: suggestFor(known, text, title), fresh: null };
   // TMDB başka bir şey buldu: zayıf yerel eşleşme ("Avatar") yanlıştı. Listede olmayanı önermek için
   // başlığın tamamı o ad olmalı ya da başlıkta bölüm yazmalı: YouTube'da adı geçen her uzun video
   // ("Dune Part Two Review | Neden bu kadar iyi", "Interstellar 2014 bilimi") sorulmasın

@@ -7,8 +7,14 @@ fn main() {
         nook_lib::claude_hook::run(&mode);
     }
     // Kaldırıcı çağırır (src-tauri/nsis-hooks.nsh): Claude Code'daki Nook hook'larını sil ve çık
+    // Ayrıca Nook'un sistemde bıraktıkları (güvenlik duvarı, modem yönlendirmesi, Tailscale ayarı, anahtar ve günlükler)
     if std::env::args().nth(1).is_some_and(|a| a == "claude-uninstall") {
+        nook_lib::outside::uninstall_cleanup();
         nook_lib::claude_hook::uninstall();
+    }
+    #[cfg(windows)]
+    if std::env::args().nth(1).is_some_and(|a| a == "fw-remove") {
+        std::process::exit(nook_lib::outside::remove_elevated());
     }
     // Ayarlar › Telefon › "Düzelt": Nook kendini yönetici olarak bu argümanla açar (wol.rs)
     #[cfg(windows)]

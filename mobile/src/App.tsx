@@ -25,7 +25,7 @@ import { useToast } from "./ui";
 
 const POLL_MS = 5000;
 
-export type Conn = "connecting" | "online" | "offline" | "auth";
+export type Conn = "connecting" | "online" | "offline" | "auth" | "clock";
 
 /**
  * PC durumu: uygulama öndeyken beş saniyede bir tazelenir. Tek bir kaçan yanıt "ulaşılamıyor" demez
@@ -73,6 +73,7 @@ function useStatus(pairing: Pairing | null, onOnline: () => void) {
       if (changed) savePairing(pairing);
     } catch (e) {
       if (e instanceof PcError && e.kind === "auth") return setConn("auth");
+      if (e instanceof PcError && e.kind === "clock") return setConn("clock");
       fails.current++;
       // Evden uzaktaysak ve Tailscale kapalıysa aç, birkaç saniye sonra yeniden dene
       if (!tunnelTried.current && ensureTunnel(pairing, true)) {

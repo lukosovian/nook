@@ -9,7 +9,7 @@ import { useArgus, type ArgusItem } from "../lib/argus";
 import { usePowerTimer } from "../lib/powerTimer";
 import { useClaude, type ClaudeAsk } from "../lib/claude";
 
-const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "whatsapp", "hum", "habits"];
+const TABS: Tab[] = ["home", "modules", "chat", "media", "shelf", "clip", "note", "alarm", "focus", "apps", "notify", "devices", "control", "stats", "play", "report", "today", "argus", "look", "calendar", "remind", "settings", "year", "claude", "whatsapp", "hum", "habits", "news"];
 
 const ART =
   "data:image/svg+xml;utf8," +
@@ -64,7 +64,7 @@ function demoClaude(mode: string, params: URLSearchParams) {
 }
 
 /** Kapalı ada önizlemeleri: örnek Claude oturumu ve yaklaşan etkinlik kapsülü ezmesin */
-const CLAUDE_IDLE = ["music", "collapsed", "focusmini", "fish", "camp", "sleepcap", "split", "home", "homeq"];
+const CLAUDE_IDLE = ["music", "collapsed", "focusmini", "fish", "camp", "hang", "guard", "sleepcap", "split", "home", "homeq"];
 
 const DEMO_NOTE = "# Hafta\n- [x] Market: **süt**, ekmek\n- [ ] Pazartesi sunum provası\n> `npm run build` unutma";
 
@@ -285,6 +285,22 @@ export function applyPreview(mode: string) {
     st.addEvent({ day: d(0), time: "19:00", title: "Halı saha", remind: 60 });
     st.addEvent({ day: d(3), time: "14:00", title: "Diş hekimi", remind: 1440 });
     st.addEvent({ day: d(9), time: "", title: "Kira", remind: 0 });
+  }
+  if (mode === "news") {
+    // Tarayıcıda RSS CORS'a takılır; örnek başlıklar (uygulamada Rust indirir)
+    void import("../lib/news").then(({ useNews }) => {
+      const ago = (m: number) => Date.now() - m * 60_000;
+      useNews.setState({
+        at: ago(3),
+        items: [
+          { id: "1", source: "bbc", title: "Merkez Bankası faiz kararını açıkladı: politika faizi sabit kaldı", link: "https://example.com/1", at: ago(4) },
+          { id: "2", source: "trt", title: "İstanbul'da hafta sonu sağanak yağış bekleniyor", link: "https://example.com/2", at: ago(12) },
+          { id: "3", source: "dw", title: "Avrupa'da enerji fiyatları üçüncü ay üst üste geriledi", link: "https://example.com/3", at: ago(25) },
+          { id: "4", source: "bbc", title: "Yeni arkeoloji müzesi kapılarını ziyaretçilere açtı", link: "https://example.com/4", at: ago(41) },
+          { id: "5", source: "trt", title: "Milli takımın aday kadrosu açıklandı", link: "https://example.com/5", at: ago(70) },
+        ],
+      });
+    });
   }
   if (mode === "remind" && !useNook.getState().events.length) {
     const st = useNook.getState();

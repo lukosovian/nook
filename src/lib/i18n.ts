@@ -47,8 +47,12 @@ export const LANG_NAME_TR: Record<Lang, string> = {
 
 const DICTS: Partial<Record<Lang, Record<string, string>>> = { en, es, pt, de, fr, ru, zh, ja };
 
-/** Sistem dilinden en yakın desteklenen dil (ilk kurulumda) */
+/** Windows'taki bölge ("TR"); Rust açılışta her pencereye yazar */
+const region = (): string => (typeof window === "undefined" ? "" : String((window as { __NOOK_REGION__?: string }).__NOOK_REGION__ ?? "").toUpperCase());
+
+/** Sistem dilinden en yakın desteklenen dil (ilk kurulumda). Bölgesi Türkiye olan bilgisayarda Türkçe. */
 export function detectLang(): Lang {
+  if (region() === "TR") return "tr";
   for (const l of navigator.languages ?? [navigator.language]) {
     const code = l.toLowerCase().split("-")[0];
     const hit = LANGS.find((x) => x.id === code);
@@ -81,7 +85,8 @@ export const lang: Lang = typeof localStorage === "undefined" ? "tr" : initialLa
 const dict = DICTS[lang] ?? {};
 
 /** Tarih/saat ve sayı biçimi için yerel ayar ("tr-TR", "en-US"…) */
-export const locale = () => LANGS.find((l) => l.id === lang)!.locale;
+// İngilizce arayüz ABD dışındaki bir bölgede: saat 24 saatlik (alarmlarla aynı), tarih gün/ay
+export const locale = () => (lang === "en" && region() && region() !== "US" ? "en-GB" : LANGS.find((l) => l.id === lang)!.locale);
 
 /** Çoğul biçimlerinin sırası (çeviride "|" ile ayrılır) */
 const PLURAL_ORDER: Partial<Record<Lang, Intl.LDMLPluralRule[]>> = {

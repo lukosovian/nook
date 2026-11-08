@@ -53,10 +53,13 @@ export function useAlarms() {
     const t = window.setInterval(check, 1000);
     // Oyunda ada gizliyken sayfanın saati yavaşlar; vakti gelince Rust haber verir, beklemeden çal
     const off = subscribe<number>("nook://alarm-due", () => check());
+    // Çalarken Esc (oyunda da): Rust genel kısayol olarak yakalar
+    const offEsc = subscribe("nook://alarm-stop", () => useNook.getState().ringing && stopAlarm());
 
     return () => {
       window.clearInterval(t);
       off();
+      offEsc();
       window.clearTimeout(autoStop);
       unsub();
     };

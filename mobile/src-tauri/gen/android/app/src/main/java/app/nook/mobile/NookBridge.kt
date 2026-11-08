@@ -123,13 +123,18 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
                 val dir = File(ctx.cacheDir, "update").apply { mkdirs() }
                 dir.listFiles()?.forEach { it.delete() }
                 val file = File(dir, "NookMobil.apk")
-                var c = URL(url).openConnection() as HttpURLConnection
+                // Yavaş ya da kopan bağlantıda süresiz takılmasın: 20 sn bağlanamaz, 30 sn hiç veri gelmezse vazgeç
+                fun open(u: URL) = (u.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 20_000
+                    readTimeout = 30_000
+                }
+                var c = open(URL(url))
                 // GitHub başka bir alan adına yönlendirir
                 var hops = 0
                 while (c.responseCode in 300..399 && hops++ < 5) {
                     val next = c.getHeaderField("Location")
                     c.disconnect()
-                    c = URL(URL(url), next).openConnection() as HttpURLConnection
+                    c = open(URL(URL(url), next))
                 }
                 if (c.responseCode != 200) throw Exception("İndirilemedi (${c.responseCode})")
                 val total = c.contentLengthLong
@@ -159,7 +164,14 @@ class NookBridge(private val act: MainActivity, private val web: WebView) {
                 act.startActivity(i)
                 emit("apk", JSONObject().put("phase", "install"))
             } catch (e: Exception) {
-                emit("apk", JSONObject().put("phase", "error").put("message", e.message ?: "İndirilemedi"))
+                // Ham Java iletisi yerine anlaşılır Türkçe
+                val msg = when (e) {
+                    is java.net.SocketTimeoutException -> "İndirme durdu: bağlantı çok yavaş ya da koptu. Yeniden dene."
+                    is java.net.UnknownHostException, is java.net.ConnectException -> "İnternete ulaşılamadı. Bağlantını kontrol edip yeniden dene."
+                    is java.io.IOException -> if (e.message?.startsWith("İndirilemedi") == true) e.message!! else "İndirme yarıda kaldı. Yeniden dene."
+                    else -> e.message?.takeIf { it.startsWith("İndirilemedi") } ?: "İndirilemedi. Yeniden dene."
+                }
+                emit("apk", JSONObject().put("phase", "error").put("message", msg))
             }
         }.start()
     }

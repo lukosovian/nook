@@ -183,7 +183,8 @@ pub fn heard_nook(samples: &[f32]) -> Option<bool> {
     // "Notebook" yine olduğu gibi kalıyor ("Hey Nook!" ipucu ise "Hey now"u "Hey No!" yapıyordu)
     let text = run(samples.to_vec(), "Nook", "tr").ok()?;
     let ok = says_nook(&text);
-    crate::log::write("info", &format!("hey nook doğrulama: {text:?} → {}", if ok { "evet" } else { "hayır" }));
+    // Duyulan metin günlüğe yazılmaz (toplantı konuşması diske düşmesin), yalnızca sonuç
+    crate::log::write("info", &format!("hey nook doğrulama: {}", if ok { "evet" } else { "hayır" }));
     Some(ok)
 }
 

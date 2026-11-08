@@ -45,7 +45,7 @@ import { useExpanded } from "../../hooks/useExpanded";
 import { toggleBig } from "../../lib/big";
 import { islandDrag } from "../../lib/bridge";
 import { easeOut } from "../../lib/motion";
-import { SKY_LABEL, type Sky } from "../../lib/weather";
+import { SKY_LABEL, staleTime, type Sky } from "../../lib/weather";
 import { isLive, useNook, type Tab } from "../../store/nook";
 import { useAvailable } from "./moduleData";
 import { openStudio } from "../../lib/studio";
@@ -385,6 +385,8 @@ function StatusBar() {
   const battery = useNook((s) => s.stats?.battery);
   const now = useClock();
   const SkyIcon = weather ? (weather.sky === "clear" && !weather.isDay ? Moon : SKY_ICON[weather.sky]) : null;
+  // İnternet yoktuysa bilgi eski: bugünkü gibi değil, alındığı saatle görünür
+  const stale = weather ? staleTime(weather, now.getTime()) : null;
   const inUse = privacy.camera.length
     ? { icon: Video, color: ACCENT.green, apps: privacy.camera, what: tt("kamerayı kullanıyor") }
     : privacy.mic.length
@@ -408,11 +410,14 @@ function StatusBar() {
       {weather && SkyIcon && (
         <span
           className="flex items-center gap-1 rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-[2px]"
-          title={tt("{0} · {1} · {2}° / {3}° · yağış %{4}", weather.city, SKY_LABEL[weather.sky], weather.high, weather.low, weather.rainChance)}
+          title={
+            tt("{0} · {1} · {2}° / {3}° · yağış %{4}", weather.city, SKY_LABEL[weather.sky], weather.high, weather.low, weather.rainChance) +
+            (stale ? ` · ${tt("son bilgi {0}", stale)}` : "")
+          }
         >
           <SkyIcon size={11} strokeWidth={2.4} style={{ color: tintText(ACCENT.blue) }} />
-          {roomy && !inUse && <span className="max-w-[70px] truncate">{weather.city}</span>}
-          <span className="font-semibold text-label">{weather.temp}°</span>
+          {roomy && !inUse && <span className="max-w-[70px] truncate">{stale ? tt("son {0}", stale) : weather.city}</span>}
+          <span className={`font-semibold ${stale ? "text-label-2" : "text-label"}`}>{weather.temp}°</span>
         </span>
       )}
       <AlarmBell />
@@ -690,7 +695,7 @@ function useActivityItems(): Item[] {
   const mic = privacy.mic[0];
   if (cam || mic) items.push({ id: "mic", icon: cam ? Video : Mic, title: (cam ?? mic)!, sub: cam ? tt("Kamerayı kullanıyor") : tt("Mikrofonu kullanıyor"), color: cam ? ACCENT.green : ACCENT.orange });
   for (const [key, label, p] of [
-    ["mouse", tt("Mouse"), devices?.mouse?.percent],
+    ["mouse", tt("Fare"), devices?.mouse?.percent],
     ["headset", tt("Kulaklık"), devices?.headset?.percent],
   ] as const) {
     if (p != null && p <= 20) items.push({ id: `low-${key}`, icon: BatteryLow, title: label, sub: tt("Pil azalıyor"), value: fmtPct(p), progress: p / 100, color: ACCENT.red });
@@ -709,7 +714,9 @@ function useActivityItems(): Item[] {
   }
   if (weather) {
     const Sky = weather.sky === "clear" && !weather.isDay ? Moon : SKY_ICON[weather.sky];
-    items.push({ id: "weather", icon: Sky, title: weather.city, sub: `${SKY_LABEL[weather.sky]} · ${weather.high}° / ${weather.low}°`, value: `${weather.temp}°`, color: ACCENT.blue });
+    const stale = staleTime(weather);
+    const sub = `${SKY_LABEL[weather.sky]} · ${weather.high}° / ${weather.low}°`;
+    items.push({ id: "weather", icon: Sky, title: weather.city, sub: stale ? `${tt("Son bilgi {0}", stale)} · ${sub}` : sub, value: `${weather.temp}°`, color: ACCENT.blue });
   }
   return items;
 }

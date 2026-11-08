@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, BellOff, ChevronLeft, ChevronRight, Link2, Plus, X } from "lucide-react";
+import { Bell, BellOff, ChevronLeft, ChevronRight, Link2, Plus, Repeat, X } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { spring } from "../../lib/motion";
-import { dayKey, remindAt, useNook, type CalEvent, type ExtEvent } from "../../store/nook";
+import { dayKey, occursOn, remindAt, useNook, type CalEvent, type EventRepeat, type ExtEvent } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt, locale } from "../../lib/i18n";
 
@@ -18,6 +18,14 @@ const REMIND: { min: number; label: string }[] = [
   { min: 60, label: tt("1 sa önce") },
   { min: 1440, label: tt("1 gün önce") },
   { min: -1, label: tt("Hatırlatma yok") },
+];
+
+/** Tekrar seçenekleri; tıkladıkça sıradakine geçer */
+const REPEAT: { id: EventRepeat | undefined; label: string }[] = [
+  { id: undefined, label: tt("Bir kez") },
+  { id: "week", label: tt("Her hafta") },
+  { id: "month", label: tt("Her ay") },
+  { id: "year", label: tt("Her yıl") },
 ];
 
 /** "930", "9.30", "09:30" → "09:30"; boş → ""; geçersiz → null */
@@ -49,8 +57,10 @@ export function CalendarPanel() {
   });
 
   const busyDays = useMemo(() => new Set(events.map((e) => e.day)), [events]);
+  // Tekrarlı etkinlikler ızgaradaki her tekrar gününde de nokta koyar
+  const repeating = useMemo(() => events.filter((e) => e.repeat), [events]);
   const extDays = useMemo(() => new Set(ext.map((e) => e.day)), [ext]);
-  const list = events.filter((e) => e.day === day);
+  const list = events.filter((e) => occursOn(e, day));
   const extList = ext.filter((e) => e.day === day);
 
   // Pazartesiyle başlayan 6 haftalık ızgara
@@ -105,6 +115,7 @@ export function CalendarPanel() {
             const other = c.getMonth() !== month.getMonth();
             const sel = k === day;
             const isToday = k === today;
+            const busy = busyDays.has(k) || repeating.some((e) => occursOn(e, k));
             return (
               <button key={k} onClick={() => pick(c)} className="relative flex items-center justify-center">
                 {/* Hücre ne kadar büyürse büyüsün (tam ekran) seçim yuvarlak kalır, noktalar sayının altında */}
@@ -116,9 +127,9 @@ export function CalendarPanel() {
                 >
                   {c.getDate()}
                 </span>
-                {(busyDays.has(k) || extDays.has(k)) && (
+                {(busy || extDays.has(k)) && (
                   <span className="absolute bottom-[1px] flex gap-[2px]">
-                    {busyDays.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(COLOR, 40) : COLOR }} />}
+                    {busy && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(COLOR, 40) : COLOR }} />}
                     {extDays.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(EXT, 40) : EXT }} />}
                   </span>
                 )}
@@ -184,6 +195,11 @@ function DayList({ list, ext }: { list: CalEvent[]; ext: ExtEvent[] }) {
                 {e.time || tt("Gün")}
               </span>
               <span className="min-w-0 flex-1 truncate text-[11.5px] text-label">{e.title}</span>
+              {e.repeat && (
+                <span className="flex shrink-0 items-center text-label-3" title={REPEAT.find((r) => r.id === e.repeat)?.label}>
+                  <Repeat size={10} strokeWidth={2.4} />
+                </span>
+              )}
               {e.remind >= 0 && (
                 <span
                   className="flex shrink-0 items-center"
@@ -213,6 +229,8 @@ function AddRow({ day }: { day: string }) {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
   const [remind, setRemind] = useState(1);
+  const [repeat, setRepeat] = useState(0);
+  const rp = REPEAT[repeat];
   const [bad, setBad] = useState(false);
   const opt = REMIND[remind];
 
@@ -220,7 +238,7 @@ function AddRow({ day }: { day: string }) {
     const t = parseTime(time);
     if (t === null) return setBad(true);
     if (!title.trim()) return;
-    useNook.getState().addEvent({ day, time: t, title: title.trim(), remind: opt.min });
+    useNook.getState().addEvent({ day, time: t, title: title.trim(), remind: opt.min, ...(rp.id ? { repeat: rp.id } : {}) });
     setTitle("");
     setTime("");
   };
@@ -259,6 +277,23 @@ function AddRow({ day }: { day: string }) {
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={remind} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.12 }}>
             {opt.min < 0 ? tt("Yok") : opt.label}
+          </motion.span>
+        </AnimatePresence>
+      </button>
+      <button
+        onClick={() => setRepeat((r) => (r + 1) % REPEAT.length)}
+        title={rp.id ? tt("{0} tekrarlar", rp.label) : tt("Tekrar yok")}
+        className="flex h-7 shrink-0 items-center gap-1 rounded-full border px-2 text-[10.5px] font-medium"
+        style={
+          rp.id
+            ? { background: tintBg(COLOR, 12), borderColor: tintBg(COLOR, 34), color: tintText(COLOR) }
+            : { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-3)" }
+        }
+      >
+        <Repeat size={11} strokeWidth={2.4} />
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span key={repeat} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.12 }}>
+            {rp.label}
           </motion.span>
         </AnimatePresence>
       </button>

@@ -221,7 +221,54 @@ export type DemoId =
   | "wallcycle"
   | "studiosize"
   | "autohints"
-  | "phonemic";
+  | "phonemic"
+  | "gamealarm"
+  | "alarmdays"
+  | "remindtomorrow"
+  | "waterquiet"
+  | "phonepair"
+  | "argusone"
+  | "claudeask"
+  | "micback"
+  | "heypause"
+  | "phonesafe"
+  | "tskeep"
+  | "keyclash"
+  | "regionlang"
+  | "cleanuninstall"
+  | "logmask"
+  | "translatecalm"
+  | "studiozoom"
+  | "tourfit"
+  | "cleartext"
+  | "weatheroffline"
+  | "phonesteps"
+  | "updateretry"
+  | "briefcalm"
+  | "callnotgame"
+  | "pillalarm"
+  | "shorttour"
+  | "geminikey"
+  | "flatnook"
+  | "trinstaller"
+  | "news"
+  | "breakdefault"
+  | "remindweekday"
+  | "calrepeat"
+  | "clearnames"
+  | "claudewrap"
+  | "updatestudio"
+  | "savedlooks"
+  | "lookdefault"
+  | "lookfast"
+  | "lookundo"
+  | "wallwear"
+  | "clipnotep1"
+  | "notifyclaude"
+  | "notifysecs"
+  | "gameclick"
+  | "shieldscenes"
+  | "shieldart";
 
 export interface NoteItem {
   title: string;
@@ -240,6 +287,248 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.8",
+    date: tt("5 Kasım 2026"),
+    headline: tt("Oyunda görünen alarm, alarmda gün seçimi ve ilaç alarmı, büyüyen Studio ve net yazı, kolay telefon eşleştirme, Claude onayında tam komut"),
+    items: [
+      {
+        title: tt("Oyunda alarm görünür"),
+        text: tt("Tam ekran oyundayken alarm çalınca ada 10 saniye oyunun üstüne iner, hangi alarmın çaldığını gösterir, sonra yine çekilir. Alarm çaldığı sürece Esc'ye basmak ya da karta dokunmak onu kapatır; kartın altında da yazar. Ertele ve Kapat düğmeleri yerinde."),
+        demo: "gamealarm",
+      },
+      {
+        title: tt("Alarmda gün seçimi"),
+        text: tt("Alarm kurarken haftanın günlerine dokun: yalnızca salı ve perşembe seçersen her hafta o günlerde çalar. Hiçbirini seçmezsen bir kez, hepsini seçersen her gün çalar; hafta içi ve hafta sonu da kendi adıyla görünür."),
+        demo: "alarmdays",
+      },
+      {
+        title: tt("Hatırlatıcı \"yarın\"ı anlar"),
+        text: tt("Hatırlatıcı'ya \"yarın 21:00 sunum\" yazınca hatırlatma ertesi günün 21:00'ine kurulur, başlığı \"sunum\" olur."),
+        demo: "remindtomorrow",
+      },
+      {
+        title: tt("Su hatırlatması oyunda susar"),
+        text: tt("Göz ve esneme molaları gibi su hatırlatması da tam ekranda ve oyundayken çıkmaz; vakti geldiyse oyundan çıkınca adada bekler."),
+        demo: "waterquiet",
+      },
+      {
+        title: tt("Telefonu eşleştirmek daha kolay"),
+        text: tt("Studio › Ayarlar › Telefon'daki durum kendiliğinden tazelenir: telefon bağlanınca \"Telefon bekleniyor\" birkaç saniyede \"Bağlı\"ya döner. Telefon henüz bağlanmadıysa güvenlik duvarı için \"İzin ver\" düğmesi çıkar. Eşleştirme kodunun yanında, kodun telefonun kamerasıyla değil Nook Mobil'in içinden okutulacağı yazar."),
+        demo: "phonepair",
+      },
+      {
+        title: tt("Argus tek kartta"),
+        text: tt("Argus bu bilgisayarda kurulu değilse yalnızca Modüller'deki kendi kartında tanıtılır; tanıtım turunda, Studio menüsünde ve Ayarlar'da görünmez. Karttaki \"Gösterme\"ye basınca hiçbir yerde çıkmaz. Kartın altında kurulumun bir komut penceresinde adım adım ilerlediği yazar. Argus kuruluysa her şey eskisi gibi."),
+        demo: "argusone",
+      },
+      {
+        title: tt("Claude onayında komutun tamamı"),
+        text: tt("Çok satırlı ya da uzun bir komut kartta \"+2 satır\" rozetiyle gelir; izin vermeden önce \"Tamamını gör\" komutun hepsini büyük adada açar. \"Her zaman\"ın üstüne gelince eklenecek kural yazar, telefonda da görünür. Yayındayken kartta proje ve komut gizlenir, \"Göster\" o kartı açar."),
+        demo: "claudeask",
+      },
+      {
+        title: tt("Mikrofon %0'da kalmaz"),
+        text: tt("Kalkanın kapattığı mikrofonlar diske de yazılır: Nook kalkan açıkken kapansa, güncellense ya da tepsiden çıkılsa bile bir sonraki açılışta mikrofon eski seviyesine döner. Görüşmedeyken Kontrol merkezi, telefon ve tuş takımındaki mikrofon tuşu da cihazı susturmak yerine seviyeyi 0'a indirir; Teams'in kendi düğmesi kapanmaz."),
+        demo: "micback",
+      },
+      {
+        title: tt("Hey Nook görüşmede dinlemez"),
+        text: tt("Başka bir uygulama mikrofonu kullanırken (Teams, Discord, Zoom) ve kalkan açıkken Hey Nook dinlemeyi bırakır, görüşme bitince yeniden dinler. Doğrulamada duyulan söz günlüğe yazılmaz."),
+        demo: "heypause",
+      },
+      {
+        title: tt("Telefon köprüsünde sıkı izinler"),
+        text: tt("Telefon bu PC'nin ekran görüntüsünü yalnızca \"Telefondan uzaktan kontrol\" açıkken alabilir. Kalkan parolayla kilitliyse telefondan kaldırılamaz. Güvenlik duvarı izni ev ağında yalnızca Özel olarak işaretli ağlarda geçerli; kafe gibi Genel ağlarda bağlantı noktası kapalı kalır, Tailscale her yerde çalışır. WhatsApp penceresi Nook'un komutlarına ulaşamaz."),
+        demo: "phonesafe",
+      },
+      {
+        title: tt("Tailscale'i açık tut, isteğe bağlı"),
+        text: tt("Studio › Ayarlar › Telefon › Evden uzaktayken bağlanma'da yeni bir anahtar var. Açıksa Tailscale kapanınca Nook birkaç dakikada yeniden bağlar ve Tailscale'i Windows'a giriş yapılmadan da çalışacak şekilde ayarlar. Kapalıyken Nook Tailscale'e kendiliğinden dokunmaz."),
+        demo: "tskeep",
+      },
+      {
+        title: tt("Teams ve JetBrains kısayolları"),
+        text: tt("Ctrl+Shift+A ya da Ctrl+Shift+D seçilince Studio, bu tuşların Teams'te aramayı kabul etme / reddetme, JetBrains IDE'lerinde Find Action olduğunu yazar. Aynı kısayolu Nook'ta iki işe verince kart \"başka program tutuyor\" değil, \"Nook'ta başka bir işe de verilmiş\" der."),
+        demo: "keyclash",
+      },
+      {
+        title: tt("Bölge Türkiye ise Türkçe"),
+        text: tt("İngilizce Windows'ta bölge Türkiye seçiliyse Nook ilk açılışta Türkçe başlar. İngilizce arayüzde de bölge ABD değilse saatler 24 saatlik görünür, alarmlarla aynı."),
+        demo: "regionlang",
+      },
+      {
+        title: tt("Kaldırınca arkada iz kalmaz"),
+        text: tt("Nook kaldırılınca güvenlik duvarı kuralları (yönetici izniyle), modemdeki uyandırma yönlendirmesi, Nook'un açtığı Tailscale girişsiz çalışma ayarı, telefon eşleştirme anahtarı, günlükler ve indirilen ses modeli de silinir. Güncellemede hiçbirine dokunulmaz."),
+        demo: "cleanuninstall",
+      },
+      {
+        title: tt("Geribildirimde günlükler gizli"),
+        text: tt("Geribildirime \"tanılama ekle\" denince Issue'ya giden günlük satırlarında kullanıcı adı, e-posta, IP adresleri, anahtar benzeri dizgiler, tırnak içindeki metinler ve Hum'un bulduğu şarkılar gizlenir. Sürüm alanı yüklü sürümü yazar. Telefondan gelen dosyanın günlükte yalnızca adı geçer."),
+        demo: "logmask",
+      },
+      {
+        title: tt("Pano çevirisi daha sakin"),
+        text: tt("\"git status\" gibi iki üç kelimelik kopyalar çeviriye gönderilmez; yabancı dilde görünen uzun metinler çevrilir. Yeni kurulumda kopyalanan metni çevirme kapalı başlar, ayarın altında metnin Gemini'ye gideceği yazar. Hassas veri koruyucu uzun metinlerde de anahtarlara bakar; JWT, npm ve GitLab jetonlarını da tanır."),
+        demo: "translatecalm",
+      },
+      {
+        title: tt("Studio da büyür"),
+        text: tt("Ayarlar › Erişilebilirlik › Arayüz boyutu artık Nook Studio'yu da büyütür: ayarlar, yama notları ve karne seçtiğin boyutta görünür. 1366x768 gibi küçük ekranlarda Studio görev çubuğunun arkasına taşmaz, ekrana sığacak kadar açılır."),
+        demo: "studiozoom",
+      },
+      {
+        title: tt("Tanıtım küçük ekrana sığar"),
+        text: tt("Arayüz boyutu büyükken tanıtım ekrandan taşacaksa kesilmez; ekrana sığacak kadar küçülür, alttaki İleri düğmesi hep görünür."),
+        demo: "tourfit",
+      },
+      {
+        title: tt("Net yazı ve daha az hareket"),
+        text: tt("Ayarlar › Erişilebilirlik'te iki yeni anahtar var. Net yazı soluk gri yazıları açar, koyu kartlarda kolay okunur. Daha az hareket kayan, büyüyen animasyonları ve hava efektlerini durdurur; Windows'ta animasyonlar kapalıysa Nook da kendiliğinden sakinleşir."),
+        demo: "cleartext",
+      },
+      {
+        title: tt("İnternet yokken hava durumu"),
+        text: tt("Hava durumu alınamazsa eski bilgi bugünkü gibi görünmez: yanında \"son 08:10\" gibi alındığı saat yazar. Nook iki dakikada bir yeniden dener, internet gelir gelmez de tazeler. Ayarlar'daki Şehir satırı bulunan şehri ya da neden alınamadığını (bağlantı yok, şehir bulunamadı) yazar."),
+        demo: "weatheroffline",
+      },
+      {
+        title: tt("Telefonu adım adım bağla"),
+        text: tt("Studio › Ayarlar › Telefon'da iki adım var: 1. İndirme kodu (Nook Mobil'i telefona indirir), 2. Eşleştirme kodu. Eşleştirme kodu acele ettirmez; telefon bağlanınca ya da Gizle'ye basınca kaybolur. Bildirimi Test Et telefona bir deneme bildirimi gönderir."),
+        demo: "phonesteps",
+      },
+      {
+        title: tt("Güncelleme yarıda kalırsa"),
+        text: tt("Yavaş internette indirme bir dakika hiç ilerlemezse durur ve nedenini yazar (bağlantı koptu, sunucuya ulaşılamadı, dosya doğrulanamadı). Yeniden dene'ye basınca indirme baştan, temiz başlar."),
+        demo: "updateretry",
+      },
+      {
+        title: tt("Güncelleme Studio'da da görünür"),
+        text: tt("Güncelleme inerken adadaki animasyonun aynısı Studio › Ayarlar › Hakkında'daki sürüm kartında da oynar. İndirme ne kadar hızlı biterse bitsin animasyon en az 5 saniye görünür; indirme daha uzun sürerse bitene kadar devam eder. İndirme bunun için yavaşlamaz."),
+        demo: "updatestudio",
+      },
+      {
+        title: tt("Görünümünü kaydet"),
+        text: tt("Studio › Görünüm'de \"Kaydet\"e basınca Nook'un şu anki hâli yeni Kayıtlılar bölümüne eklenir; sonra tek dokunuşla geri giyersin. Adına çift tıklayıp isim verebilirsin; üstüne gelince çıkan çarpıyla silinir."),
+        demo: "savedlooks",
+      },
+      {
+        title: tt("Varsayılana dön"),
+        text: tt("Görünüm'deki \"Varsayılan\" Nook'u ilk hâline döndürür: beyaz, yuvarlak, aksesuarsız. Adı değişmez."),
+        demo: "lookdefault",
+      },
+      {
+        title: tt("Görünümde geri al"),
+        text: tt("Görünüm'deki geri ok, bir önceki görünüme döner: \"Şaşırt beni\" ya da koleksiyondan bir seçim beğendiğin hâli silmez. Son 20 değişikliğe kadar geri gidebilirsin."),
+        demo: "lookundo",
+      },
+      {
+        title: tt("Duvar kağıtlarındaki aksesuarlar"),
+        text: tt("Duvar kağıtlarında Nook'un giydikleri artık Görünüm'de: kürk şapka, yağmur şapkası, ter bandı, balıkçı şapkası, gökkuşağı balıkçı şapkası ve bere, tüylü kasket, ay büyücüsü şapkası, kapüşon, kulaklıklı baret; gözlüklerde büyüteç, gökkuşağı ve teknoloji gözlüğü; boyunda çizgili ve yeşil atkı."),
+        demo: "wallwear",
+      },
+      {
+        title: tt("Görünümler daha çabuk gelir"),
+        text: tt("Bir seçeneğin üstüne gelince Nook onu hem Studio'da hem adada şimdiden hazırlamaya başlar; tıklayınca Studio'nun çizdiği Nook adaya da hemen geçer, ada ayrıca beklemez. Öbür seçeneklerin hazırlığı da seçtiğin görünüm gelene kadar bekler, onunla yarışmaz."),
+        demo: "lookfast",
+      },
+      {
+        title: tt("Günün özeti acele etmez"),
+        text: tt("Günün özeti dokunulmazsa bir dakika açık kalır. İmleç bir anlığına dışarı kaçarsa kapanmaz, biraz bekler. Ada da imleç çıkınca biraz daha uzun açık kalır."),
+        demo: "briefcalm",
+      },
+      {
+        title: tt("Görüntülü konuşma oyun sayılmaz"),
+        text: tt("WhatsApp, Skype, Telegram, Signal, Webex ya da Slack'te tam ekran görüşme yaparken \"iyi oyunlar\" kartı çıkmaz, süre oyun geçmişine yazılmaz."),
+        demo: "callnotgame",
+      },
+      {
+        title: tt("İlaç alarmı"),
+        text: tt("Alarm'daki İlaç düğmesi her gün 09:00'da çalan bir ilaç alarmı hazırlar; saati ve günleri değiştirip Kur'a basarsın. İsminde ilaç, hap ya da vitamin geçen alarm çalınca hap simgesiyle gelir, Kapat yerine Aldım dersin."),
+        demo: "pillalarm",
+      },
+      {
+        title: tt("Kısa tanıtım"),
+        text: tt("İlk tanıtım temel adımlarla kısa biter. Sondaki \"Başka neler yapabildiğimi gör\" gizlilik kalkanını, şarkı bulmayı, giyinmeyi ve öbür özellikleri de anlatır."),
+        demo: "shorttour",
+      },
+      {
+        title: tt("Gemini anahtarı nedir"),
+        text: tt("Ayarlar › Asistan'da anahtar kutusunun altında anahtarın ne olduğu ve aistudio.google.com'dan adım adım nasıl alınacağı yazar. Gemini beklenmedik bir hata verirse ileti İngilizce değil, Türkçe gelir. Anahtar yokken aramadan ya da sesli komutla bir şey sorarsan soru boşa gitmez; önce anahtar gerektiği söylenir."),
+        demo: "geminikey",
+      },
+      {
+        title: tt("Eski ekran kartlarında Nook"),
+        text: tt("Bilgisayarda 3B çizim yoksa ya da ekran kartı sürücüsü çizimi durdurursa tanıtımdaki, Studio'daki küçük Nook'lar boş kalmaz; düz bir küre ve iki gözle görünür."),
+        demo: "flatnook",
+      },
+      {
+        title: tt("Kurulum Türkçe"),
+        text: tt("Windows Türkçeyse Nook'un kurulum penceresi de Türkçe açılır."),
+        demo: "trinstaller",
+      },
+      {
+        title: tt("Haberler"),
+        text: tt("Yeni Haberler modülü BBC Türkçe, DW Türkçe ve TRT Haber'in son başlıklarını resimleriyle bir arada gösterir; AA, CNN Türk ve NTV'yi de soldan açabilirsin. Başlığa basınca haber tarayıcıda açılır. İnternet yokken son liste güncellendiği saatle kalır, bağlantı gelince kendiliğinden yenilenir."),
+        demo: "news",
+      },
+      {
+        title: tt("İlk gün yalnızca su"),
+        text: tt("Yeni kurulumda yalnızca su hatırlatması açık gelir; göz dinlendirme ve esneme molalarını istersen Alışkanlıklar'dan açarsın. Bunları zaten kullanıyorsan ayarın değişmez."),
+        demo: "breakdefault",
+      },
+      {
+        title: tt("Hatırlatıcı gün adlarını anlar"),
+        text: tt("Hatırlatıcı'ya \"salı 10:00 ders\" yazınca hatırlatma sıradaki salının 10:00'una kurulur; saat yazmazsan 09:00 olur. Gece yarısından sonra \"Yarın sabah\"a basınca o sabahın 09:00'u seçilir."),
+        demo: "remindweekday",
+      },
+      {
+        title: tt("Takvimde tekrarlayan etkinlik"),
+        text: tt("Takvime etkinlik eklerken \"Bir kez\" düğmesine dokunup Her hafta, Her ay ya da Her yıl seçebilirsin. Etkinlik takvimde bütün tekrar günlerinde görünür; hatırlatması da her seferinde yeniden kurulur."),
+        demo: "calrepeat",
+      },
+      {
+        title: tt("Daha net adlar"),
+        text: tt("Aynı adı taşıyan bölümler ayrıldı: mini oyunlar \"Mini oyunlar\", uygulama düğmeleri \"Uygulamalar\", Ayarlar'daki oyun ve video bölümü \"Tam ekran\", klavye tuşları \"Klavye kısayolları\", Studio'daki oyun geçmişi \"Oyun süresi\" oldu."),
+        demo: "clearnames",
+      },
+      {
+        title: tt("Kendi durum satırınla plan göstergesi"),
+        text: tt("Claude Code'da kendi durum satırın varsa Claude bölümündeki \"Plan göstergesini aç\"a basınca satırın terminalde aynen kalır, 5 saatlik ve haftalık plan kullanımı da adada görünür. \"Göstergeyi kapat\" satırı eski hâline döndürür."),
+        demo: "claudewrap",
+      },
+      {
+        title: tt("Uzun dizi derlemeleri 1. bölüm sayılmaz"),
+        text: tt("YouTube'da bir dizinin uzun derlemesi, başlığında bölüm numarası yoksa bölüm sayılmaz; Hum'un bulduğu şarkılar da 1. bölüme yazılmaz. Netflix gibi başlıkta yalnızca dizinin adı görünen yerlerde sıradaki bölüm eskisi gibi tanınır."),
+        demo: "clipnotep1",
+      },
+      {
+        title: tt("Bildirim Claude'u beklemez"),
+        text: tt("Claude Code onay kartı adadayken gelen Windows, telefon ve WhatsApp bildirimleri artık sırada beklemez: kart birkaç saniye öne geçer, süresi bitince onay kartı geri gelir."),
+        demo: "notifyclaude",
+      },
+      {
+        title: tt("Bildirim kartının süresi"),
+        text: tt("Studio › Ayarlar › Bildirimler'deki \"Kart ekranda kalma süresi\"nden bildirim kartlarının adada ne kadar kalacağını seç: Otomatik, 3, 6, 10 ya da 20 saniye. Üstüne gelince süre yine durur."),
+        demo: "notifysecs",
+      },
+      {
+        title: tt("Oyundan Alt-Tab'la çıkınca ada tıklanır"),
+        text: tt("Tam ekran oyundan Alt-Tab ile çıkınca oyun arkada açık kalsa da ada ve bildirim kartları hemen tıklanır. Oyun öndeyken ada yine açılmaz, oyun alta düşmez."),
+        demo: "gameclick",
+      },
+      {
+        title: tt("Kalkanda 12 yeni sahne"),
+        text: tt("Gizlilik kalkanına deniz feneri, ay kampı, ramen tezgâhı, masal kitabı, akvaryum, sonbahar ormanı, fener festivali, dağ evi, şelale, retro metro, kek mutfağı ve çatı katı geldi; sahne sayısı 34 oldu. Hepsi Studio'daki sahne listesinde seçilebilir."),
+        demo: "shieldscenes",
+      },
+      {
+        title: tt("Her sahne kendi sanat tarzında"),
+        text: tt("Kalkan sahneleri artık suluboya, oyun hamuru, karakalem, yağlı boya, guaj, kâğıt kolaj, keçe, çizgi roman, risograf, yumuşak 3B ve piksel sanat gibi kendi tarzlarıyla çizilir; saat paneli de sahnenin tarzını alır. Nook'lar yerine oturunca sahne bir daireyle açılır, kapanırken kısa bir geri çekilme yapar. Karakterlerin yer gölgesi, sahnelerin ışık kaynakları var. \"Hareketi azalt\" açıksa geçişler sakinleşir."),
+        demo: "shieldart",
+      },
+    ],
+  },
   {
     version: "0.3.7",
     date: tt("3 Kasım 2026"),

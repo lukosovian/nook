@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 use std::io::Read;
 use std::net::IpAddr;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -44,6 +44,10 @@ struct Config {
 static CONFIG: Mutex<Option<Config>> = Mutex::new(None);
 static SERVER: Mutex<Option<Arc<Server>>> = Mutex::new(None);
 static RUNNING: AtomicBool = AtomicBool::new(false);
+/// Şu an işlenen istek sayısı ve sınırı; büyük dosya yüklemesi aynı anda yalnızca bir tane
+static INFLIGHT: AtomicUsize = AtomicUsize::new(0);
+const MAX_INFLIGHT: usize = 12;
+static UPLOADING: AtomicBool = AtomicBool::new(false);
 static APP: Mutex<Option<AppHandle>> = Mutex::new(None);
 /// PC'deki Nook'un rengi, adı, görünümü ve seçili Argus profili (ön yüz her değişince gönderir)
 static PROFILE: Mutex<Value> = Mutex::new(Value::Null);
@@ -151,8 +155,20 @@ fn start() {
         .name("nook-remote".into())
         .spawn(move || {
             for req in server.incoming_requests() {
+                // Aynı anda en fazla MAX_INFLIGHT istek (imzasız istek yağmuru belleği şişirmesin)
+                if INFLIGHT.fetch_add(1, Ordering::SeqCst) >= MAX_INFLIGHT {
+                    INFLIGHT.fetch_sub(1, Ordering::SeqCst);
+                    let _ = req.respond(err(503, "meşgul"));
+                    continue;
+                }
                 // Ekran görüntüsü gibi yavaş işler diğer istekleri bekletmesin
-                let _ = thread::Builder::new().name("nook-remote-req".into()).spawn(move || handle(req));
+                let spawned = thread::Builder::new().name("nook-remote-req".into()).spawn(move || {
+                    handle(req);
+                    INFLIGHT.fetch_sub(1, Ordering::SeqCst);
+                });
+                if spawned.is_err() {
+                    INFLIGHT.fetch_sub(1, Ordering::SeqCst);
+                }
             }
             RUNNING.store(false, Ordering::SeqCst);
         })
@@ -287,17 +303,61 @@ fn handle(mut req: Request) {
         let _ = req.respond(json_res(200, json!({ "nook": true, "version": env!("CARGO_PKG_VERSION") })));
         return;
     }
-    let limit = if req.url().starts_with("/v1/file") { MAX_FILE } else { MAX_BODY };
-    let mut body = Vec::new();
-    if req.as_reader().take(limit as u64 + 1).read_to_end(&mut body).is_err() || body.len() > limit {
-        let _ = req.respond(err(413, "istek çok büyük"));
-        return;
-    }
-    if let Err(e) = verify(&req, &body) {
-        crate::log::write("warn", &format!("telefon isteği reddedildi ({e}): {} {}", req.method(), req.url()));
+    // Gövde okunmadan önce: imza başlıkları yerinde ve zaman damgası taze mi, boyut sınırın içinde mi
+    if let Err(e) = precheck(&req) {
+        crate::log::write("warn", &format!("telefon isteği reddedildi ({e}): {} {}", req.method(), req.url().split('?').next().unwrap_or("")));
         let _ = req.respond(err(401, e));
         return;
     }
+    let upload = req.url().starts_with("/v1/file");
+    let limit = if upload { MAX_FILE } else { MAX_BODY };
+    if req.body_length().is_some_and(|n| n > limit) {
+        let _ = req.respond(err(413, "istek çok büyük"));
+        return;
+    }
+    if upload && UPLOADING.swap(true, Ordering::SeqCst) {
+        let _ = req.respond(err(503, "başka bir dosya gönderiliyor, biraz sonra yeniden dene"));
+        return;
+    }
+    let mut body = Vec::new();
+    let read = req.as_reader().take(limit as u64 + 1).read_to_end(&mut body);
+    let result = if read.is_err() || body.len() > limit {
+        Err((413, "istek çok büyük"))
+    } else {
+        verify(&req, &body).map_err(|e| (401, e))
+    };
+    if let Err((code, e)) = result {
+        if upload {
+            UPLOADING.store(false, Ordering::SeqCst);
+        }
+        crate::log::write("warn", &format!("telefon isteği reddedildi ({e}): {} {}", req.method(), req.url().split('?').next().unwrap_or("")));
+        let _ = req.respond(err(code, e));
+        return;
+    }
+    if upload {
+        // Dosya diske yazılırken gövde bellekte; yazma bitince sıradaki gelebilir
+        finish(req, peer, body);
+        UPLOADING.store(false, Ordering::SeqCst);
+        return;
+    }
+    finish(req, peer, body)
+}
+
+/// İmza başlıkları gövde okunmadan bakılabilecek kadarıyla doğru mu
+fn precheck(req: &Request) -> Result<(), &'static str> {
+    let ts: i64 = header(req, "x-nook-ts").and_then(|s| s.parse().ok()).ok_or("imza yok")?;
+    let sig = header(req, "x-nook-sig").ok_or("imza yok")?;
+    if sig.len() != 64 || !sig.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("imza geçersiz");
+    }
+    if (now_ms() - ts).abs() > MAX_SKEW_MS {
+        return Err("saat farkı çok büyük");
+    }
+    Ok(())
+}
+
+/// İmzası doğrulanmış isteği yanıtla
+fn finish(req: Request, peer: Option<IpAddr>, body: Vec<u8>) {
     if peer.is_some_and(home_peer) {
         phone_seen_home();
     }
@@ -340,6 +400,7 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
     match (method, path) {
         (Method::Get, "/v1/status") => json_res(200, status()),
         // ?m=0,1… → o ekran (soldan sağa), ?m=all → hepsi yan yana; yoksa ana ekran
+        (Method::Get, "/v1/screenshot") if !load().control => err(403, "Ekranı görmek için PC'de Nook › Ayarlar › Telefon'dan \"Telefondan uzaktan kontrol\"ü aç"),
         (Method::Get, "/v1/screenshot") => match match query_param(query, "m") {
             Some("all") => crate::imaging::capture_monitor_jpeg(None, 2560, 80),
             Some(i) => match i.parse() {
@@ -418,6 +479,8 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             if on {
                 crate::shield::shield_on(app.clone(), false);
                 crate::system::emit_event(&app, "phone", "Telefondan kalkan açıldı", "Nook Mobil");
+            } else if crate::shield::is_locked(&app) {
+                return err(423, "Kalkan parolayla kilitli: PC'de parolayı girerek kaldır");
             } else {
                 crate::shield::shield_off(app);
             }
@@ -541,6 +604,17 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
             };
             crate::claude::claude_decide(id, decision);
             json_res(200, json!({ "ok": true }))
+        }
+        // Telefondan Claude'a istek: { session, text } → oturumun terminaline yazılır, Enter'a basılır
+        (Method::Post, "/v1/claude/send") => {
+            let b = body_json(body);
+            let Some(session) = b["session"].as_str() else { return err(400, "oturum yok") };
+            let text = b["text"].as_str().unwrap_or_default();
+            crate::log::write("info", "telefon: Claude'a istek yazıldı");
+            match crate::claude::send_prompt(session, text) {
+                Ok(()) => json_res(200, json!({ "ok": true })),
+                Err(e) => err(409, &e),
+            }
         }
         // Görünüm: telefondan Nook'un gövdesi, rengi, aksesuarları { look, color }
         (Method::Post, "/v1/look") => {
@@ -814,7 +888,7 @@ fn save_file(app: &AppHandle, name: &str, shots: bool, bytes: &[u8]) -> Result<P
         n += 1;
     }
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
-    crate::log::write("info", &format!("telefondan dosya: {}", path.display()));
+    crate::log::write("info", &format!("telefondan dosya: {}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()));
     Ok(path)
 }
 

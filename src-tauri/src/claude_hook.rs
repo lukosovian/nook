@@ -44,6 +44,12 @@ pub fn run(mode: &str) -> ! {
     let raw = raw.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&raw);
     let payload = serde_json::from_slice::<Value>(raw).ok();
     if mode == "claude-status" {
+        // Sarılmış durum satırı: aynı JSON'u kullanıcının kendi komutuna geçir (Nook kapalı olsa da)
+        if std::env::args().any(|a| a == crate::claude::TEE_ARG) {
+            let mut stdout = std::io::stdout();
+            let _ = stdout.write_all(raw);
+            let _ = stdout.flush();
+        }
         if let Some(line) = payload.as_ref().and_then(|p| status_line(p.as_object()?)) {
             let _ = within(CONNECT_BUDGET, move || talk(&line, false));
         }
@@ -64,6 +70,11 @@ pub fn run(mode: &str) -> ! {
         if let Ok(dir) = std::env::current_dir() {
             map.insert("cwd".into(), Value::String(dir.to_string_lossy().into()));
         }
+    }
+    // Telefondan istek yazılabilsin: bu oturumun Claude Code süreci (terminali onun konsolu)
+    #[cfg(windows)]
+    if let Some(pid) = crate::claude::term::claude_ancestor() {
+        map.insert("claude_pid".into(), json!(pid));
     }
     let mut value = Value::Object(map);
     cap_strings(&mut value);

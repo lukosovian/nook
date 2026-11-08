@@ -5,8 +5,9 @@ import { isSleeping, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 
 /** Niyet gecikmeleri: ekranın tepesinden geçerken ada yanlışlıkla açılmasın. */
-const HOVER_IN_MS = 70;
-const HOVER_OUT_MS = 320;
+const HOVER_IN_MS = 90;
+/** Çıkınca hemen kapanmasın: okurken imleç bir anlığına kaçarsa ada açık kalır */
+const HOVER_OUT_MS = 450;
 /** Ada açılınca Nook selam verir — ama sık sık değil. */
 const GREET_EVERY_MS = 20_000;
 

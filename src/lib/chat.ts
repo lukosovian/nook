@@ -45,6 +45,11 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   const s = useNook.getState();
   if (!q || s.chatBusy) return;
   const key = s.settings.geminiKey.trim();
+  // Anahtar yoksa soruyu gönderip sonra hata vermek yerine baştan söyle (aramadan, sesli komuttan gelince de)
+  if (!key) {
+    s.pushToast({ kind: "chat", title: tt("Önce Gemini anahtarı lazım"), detail: tt("Ücretsiz alınır; Ayarlar › Asistan'da nasıl alınacağı yazıyor"), ms: 6000 });
+    return;
+  }
   let model = s.settings.aiModel;
   // Sesli komut: hızlı model (Flash) — Pro uzun uzun düşünüp bekletmesin
   if (opts.quick && key) model = pickQuickModel(await modelsFor(key).catch(() => [])) ?? model;
@@ -72,7 +77,6 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   controller = new AbortController();
   let reply = "";
   try {
-    if (!key) throw new Error(tt("Ayarlar'a Gemini API anahtarını yapıştırman lazım"));
     if (!model) throw new Error(tt("Ayarlar'dan bir model seç"));
 
     for (let round = 0; round < MAX_ROUNDS; round++) {

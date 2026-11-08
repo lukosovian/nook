@@ -8,6 +8,7 @@ import { clock } from "../../lib/alarm";
 import { mmss, PHASE_LABEL, remaining } from "../../lib/focus";
 import { dayKey, isLive, moduleScore, remindAt, useNook, type Tab } from "../../store/nook";
 import { useHabits } from "../../lib/habits";
+import { useNews } from "../../lib/news";
 import type { ProfileDef } from "../../lib/profiles";
 import { ACCENT, levelColor, MiniNook } from "../ui/primitives";
 import { ARGUS_BLUE } from "../ArgusPromo";
@@ -44,13 +45,14 @@ export const MODULES: ModuleDef[] = [
   { id: "alarm", label: tt("Alarm"), color: ACCENT.yellow, desc: tt("Alarm kur, uyandır") },
   { id: "remind", label: tt("Hatırlatıcı"), color: ACCENT.orange, desc: tt("Şunu şu saatte hatırlat") },
   { id: "habits", label: tt("Alışkanlıklar"), color: ACCENT.teal, desc: tt("Su, göz dinlendirme, esneme") },
+  { id: "news", label: tt("Haberler"), color: ACCENT.red, desc: tt("Son başlıklar") },
   { id: "calendar", label: tt("Takvim"), color: ACCENT.blue, desc: tt("Etkinlikler, geri sayım") },
-  { id: "apps", label: tt("Kısayollar"), color: ACCENT.blue, desc: tt("Sık açtığın uygulamalar") },
+  { id: "apps", label: tt("Uygulamalar"), color: ACCENT.blue, desc: tt("Sık açtığın uygulamalar") },
   { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple, desc: tt("Windows ve telefon bildirimleri") },
   { id: "control", label: tt("Kontrol"), color: ACCENT.green, desc: tt("Wi-Fi, uygulama bazlı ses") },
   { id: "devices", label: "Lukonnect", color: ACCENT.blue, desc: tt("Mouse, kulaklık pili") },
   { id: "stats", label: tt("Sistem"), color: ACCENT.red, desc: tt("İşlemci, bellek, ağ") },
-  { id: "play", label: tt("Oyun"), color: ACCENT.pink, desc: tt("Benimle mini oyunlar") },
+  { id: "play", label: tt("Mini oyunlar"), color: ACCENT.pink, desc: tt("Benimle oyna") },
   { id: "report", label: tt("Karne"), color: ACCENT.teal, desc: tt("Haftalık istatistik") },
   { id: "look", label: tt("Görünüm"), color: ACCENT.pink, desc: tt("Beni giydir") },
   { id: "notes", label: tt("Yama notları"), color: ACCENT.orange, desc: tt("Yeni gelenler") },
@@ -219,6 +221,8 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
   const humListening = useNook((s) => s.hum?.phase === "listening");
   const humAuto = useNook((s) => s.settings.humAuto);
   const weather = useNook((s) => s.weather);
+  const headline = useNews((s) => s.items.find((x) => s.on.includes(x.source)));
+  const newsCount = useNews((s) => s.items.filter((x) => s.on.includes(x.source)).length);
   const newToday = todayEpisodes(argusSnap);
   const watchingList = watching(argusSnap);
   // Pomodoro ve alarm yakınlığı canlı aksın
@@ -315,7 +319,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
       value: lowest !== null ? pct(lowest) : undefined,
       progress: lowest !== null ? lowest / 100 : undefined,
       foot: [
-        [devices?.mouse && tt("Mouse"), devices?.headset && tt("Kulaklık")].filter(Boolean).join(" & ") || tt("Cihaz yok"),
+        [devices?.mouse && tt("Fare"), devices?.headset && tt("Kulaklık")].filter(Boolean).join(" & ") || tt("Cihaz yok"),
         lowest === null ? undefined : lowest <= 20 ? tt("Şarj et") : tt("Pil iyi"),
       ],
     },
@@ -389,6 +393,12 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
       state: humListening ? "active" : lastHum || humAuto ? "idle" : "empty",
       value: humCount ? String(humCount) : undefined,
       foot: lastHum ? [lastHum.title, lastHum.artist] : [tt("Ctrl+Alt+M ile dinlet")],
+    },
+    news: {
+      text: headline ? headline.title : tt("Son başlıklar"),
+      state: headline ? "idle" : "empty",
+      value: newsCount ? String(newsCount) : undefined,
+      foot: [tt("Haberler"), headline?.at ? new Date(headline.at).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }) : undefined],
     },
     habits: {
       text: water > 0 ? tt("{0} bardak su içildi", water) : tt("Su ve mola hedefleri"),

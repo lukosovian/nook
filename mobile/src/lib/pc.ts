@@ -140,11 +140,14 @@ async function sign(secret: string, ts: string, method: string, path: string, bo
   return Array.from(sig, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export const CLOCK_MSG =
+  "Bilgisayarın ya da telefonun saati yanlış. İkisinde de saati otomatik ayarla (bilgisayarda Ayarlar › Saat ve dil › Saati otomatik ayarla), sonra yeniden dene. Kodu yeniden okutmana gerek yok.";
+
 export class PcError extends Error {
   constructor(
     message: string,
-    /** offline: hiçbir adres yanıt vermedi; auth: eşleşme geçersiz */
-    readonly kind: "offline" | "auth" | "server",
+    /** offline: hiçbir adres yanıt vermedi; auth: eşleşme geçersiz; clock: PC ile telefonun saati çok farklı */
+    readonly kind: "offline" | "auth" | "clock" | "server",
   ) {
     super(message);
   }
@@ -236,7 +239,12 @@ export async function request(p: Pairing, method: "GET" | "POST", path: string, 
       host = alive;
       continue;
     }
-    if (res.status === 401) throw new PcError("Eşleşme geçersiz: PC'de kodu yeniden okut.", "auth");
+    if (res.status === 401) {
+      // Saat farkında eşleşme sağlam: kodu yeniden okutmak işe yaramaz, saati düzeltmek gerekir
+      const why = await res.json().then((j: { error?: string }) => j.error ?? "").catch(() => "");
+      if (why.includes("saat")) throw new PcError(CLOCK_MSG, "clock");
+      throw new PcError("Eşleşme geçersiz: PC'de kodu yeniden okut.", "auth");
+    }
     if (!res.ok) {
       const msg = await res.json().then((j: { error?: string }) => j.error).catch(() => null);
       throw new PcError(msg ?? `PC hata verdi (${res.status})`, "server");
@@ -708,6 +716,10 @@ export interface ClaudeAskInfo {
   detail: string;
   questions: ClaudeQuestionInfo[] | null;
   canAlways: boolean;
+  /** "Her zaman"da eklenecek kural */
+  rule?: string;
+  /** Komutun tamamı */
+  code?: string;
   at: number;
 }
 
@@ -741,6 +753,10 @@ export const getClaude = (p: Pairing) =>
     : request(p, "GET", "/v1/claude")
         .then((r) => r.json() as Promise<ClaudeInfo | null>)
         .then((c) => (cache("claude", c), c));
+
+/** Oturuma telefondan istek: PC'de terminaline yazılır ve gönderilir */
+export const claudeSend = (p: Pairing, session: string, text: string) =>
+  import.meta.env.DEV && p.key === "demo" ? Promise.resolve() : request(p, "POST", "/v1/claude/send", { session, text }).then(() => undefined);
 
 /** Onay isteğine cevap: izin ver, her zaman izin ver, reddet ya da sorulara cevaplar */
 export const claudeDecide = (p: Pairing, askId: number, decision: "allow" | "always" | "deny" | { answers: Record<string, string | string[]> }) =>

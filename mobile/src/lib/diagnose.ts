@@ -35,7 +35,7 @@ export function diagnose(p: Pairing): Diagnosis {
   if (!hasTs(p))
     return {
       title: "Evden uzaktasın",
-      detail: "Dışarıdan bağlanmak için PC'de Tailscale gerekli: PC açıkken Nook › Ayarlar › Telefon › Evden uzaktayken bağlanma'dan kur. O zamana kadar yalnızca evden bağlanabilirsin.",
+      detail: "Dışarıdan bağlanmak için PC'de Tailscale gerekli: PC açıkken Nook Studio › Ayarlar › Telefon › Evden uzaktayken bağlanma'dan kur. O zamana kadar yalnızca evden bağlanabilirsin.",
       action: p.wan ? "wake" : "none",
       canWake: !!p.wan,
     };

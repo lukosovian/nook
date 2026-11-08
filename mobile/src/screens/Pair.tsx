@@ -26,7 +26,7 @@ export function PairScreen({ onPaired }: { onPaired: (p: Pairing) => void }) {
     } catch (e) {
       setError(
         e instanceof PcError && e.kind === "offline"
-          ? "PC'ye ulaşamadım. Aynı Wi-Fi'de misin, ya da iki cihazda da Tailscale açık mı?"
+          ? "PC'ye ulaşamadım. Aynı Wi-Fi'de misin, ya da iki cihazda da Tailscale açık mı? Öyleyse PC'de Studio › Ayarlar › Telefon'daki güvenlik duvarı “İzin ver”e bas ve yeniden dene."
           : e instanceof Error
             ? e.message
             : String(e),
@@ -58,9 +58,9 @@ export function PairScreen({ onPaired }: { onPaired: (p: Pairing) => void }) {
         <div>
           <h1 className="font-round text-[28px] font-extrabold tracking-tight">Merhaba!</h1>
           <p className="mt-2 text-[14px] leading-relaxed text-label-2">
-            Bilgisayarındaki Nook'ta <b className="text-label">Ayarlar › Telefon</b>'u aç,
+            Bilgisayarındaki Nook'ta <b className="text-label">Studio › Ayarlar › Telefon</b>'u aç,
             <br />
-            köprüyü aç ve <b className="text-label">Kodu göster</b>'e bas.
+            köprüyü aç ve <b className="text-label">Eşleştirme kodu</b>'na bas.
           </p>
         </div>
       </div>

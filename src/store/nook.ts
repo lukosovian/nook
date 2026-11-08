@@ -144,6 +144,7 @@ export type Tab =
   | "whatsapp"
   | "hum"
   | "habits"
+  | "news"
   | "settings";
 
 /** Pomodoro: çalışma → kısa mola (her 4 turda bir uzun mola) */
@@ -338,6 +339,8 @@ export interface Settings extends NativeSettings {
   nookName: string;
   /** Gövde, gözler, gözlük, aksesuarlar (lib/look) */
   look: Look;
+  /** Görünüm › Kayıtlılar: kullanıcının kaydettiği görünümler */
+  savedLooks: { look: Look; color: string; name?: string }[];
   /** "Hey Nook" diye seslenince dinlesin (mikrofon sürekli, yalnızca bu bilgisayarda dinlenir) */
   wakeWord: boolean;
   /** 0 az tetiklenir … 1 kolay tetiklenir */
@@ -407,6 +410,10 @@ export interface Settings extends NativeSettings {
   lang: import("../lib/i18n").Lang;
   /** Renk körlüğü paleti */
   colorVision: import("../lib/palette").ColorVision;
+  /** Net yazı: soluk gri yazılar daha açık (zayıf gören için) */
+  clearText: boolean;
+  /** Daha az hareket: kayan, büyüyen animasyonlar ve hava efektleri durur */
+  calmMotion: boolean;
   /** Nook ara sıra dışarı çıksın: pencere üstüne tüner, iple sarkar, boştayken balık tutar */
   outings: boolean;
   /** Kapalı adada boştayken saat ve hava */
@@ -488,6 +495,8 @@ export interface Settings extends NativeSettings {
   weatherLevel: import("../components/atmosphere/IslandAtmosphere").AtmosphereLevel;
   /** WhatsApp mesajlarında adada bildirim kartı fırlasın mı */
   whatsappNotify: boolean;
+  /** Bildirim kartı adada kaç saniye kalsın; 0 = otomatik (yanıtlanabilenler biraz daha uzun) */
+  notifySecs?: number;
   /** Ana sayfa profilleri ("Hepsi" hariç); yoksa varsayılanlar (lib/profiles) */
   profiles?: import("../lib/profiles").ProfileDef[];
 }
@@ -509,6 +518,32 @@ export interface CalEvent {
   alarmId?: string;
   /** Hatırlatıcı modülünden kurulan tek başına hatırlatma (takvimde etkinlik olarak görünmez) */
   reminder?: boolean;
+  /** Tekrar: her hafta aynı gün, her ay aynı tarih, her yıl aynı gün. `day` hep sıradaki tekrarın günüdür. */
+  repeat?: EventRepeat;
+}
+export type EventRepeat = "week" | "month" | "year";
+
+const ymd = (day: string) => day.split("-").map(Number) as [number, number, number];
+
+/** Etkinlik o gün var mı (tekrarlıysa `day`den sonraki tekrarları da sayar) */
+export function occursOn(e: Pick<CalEvent, "day" | "repeat">, day: string): boolean {
+  if (day === e.day) return true;
+  if (!e.repeat || day < e.day) return false;
+  const [y, m, d] = ymd(e.day);
+  const [Y, M, D] = ymd(day);
+  if (e.repeat === "week") return new Date(y, m - 1, d).getDay() === new Date(Y, M - 1, D).getDay();
+  if (e.repeat === "month") return d === D;
+  return m === M && d === D;
+}
+
+/** Tekrarlı etkinliğin `day`den sonraki ilk tekrarı (31'i olmayan ay, 29 Şubat'sız yıl atlanır) */
+export function nextRepeat(e: Pick<CalEvent, "day" | "repeat">): string {
+  const [y, m, d] = ymd(e.day);
+  for (let i = 1; i < 60; i++) {
+    const t = e.repeat === "week" ? new Date(y, m - 1, d + 7 * i) : e.repeat === "month" ? new Date(y, m - 1 + i, d) : new Date(y + i, m - 1, d);
+    if (e.repeat === "week" || t.getDate() === d) return dayKey(t);
+  }
+  return e.day;
 }
 
 /** Kapalı adanın kapsül ayarları (Studio › Modüller › Kapalı ada) */
@@ -559,7 +594,8 @@ export const DEFAULT_SETTINGS: Settings = {
   aiModel: "",
   userName: "",
   memories: [],
-  translate: true,
+  // Yeni kurulumda kapalı: kopyalanan metin sorulmadan dışarı gitmesin
+  translate: false,
   freeTranslate: null,
   quietUntil: 0,
   notifications: true,
@@ -567,8 +603,9 @@ export const DEFAULT_SETTINGS: Settings = {
   focusWork: 25,
   focusBreak: 5,
   focusLong: 15,
-  eyeBreak: true,
-  stretchBreak: true,
+  // Yeni kurulumda yalnızca su açık; göz ve esneme Alışkanlıklar'dan açılır
+  eyeBreak: false,
+  stretchBreak: false,
   waterEvery: 60,
   dailySummary: true,
   diary: true,
@@ -578,6 +615,7 @@ export const DEFAULT_SETTINGS: Settings = {
   logDays: 14,
   wallpaperCycle: null,
   wallCycles: [],
+  savedLooks: [],
   wallCycleOn: null,
   playOffers: true,
   welcomeBack: 10,
@@ -611,6 +649,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   uiScale: 1,
   colorVision: "normal",
+  clearText: false,
+  calmMotion: false,
   // Eski kurulumlarda Türkçe, yeni kurulumda sistemin dili (bkz. lib/i18n)
   lang: initialLang,
   homeOrder: [],
@@ -733,6 +773,8 @@ interface NookState {
   privacy: PrivacyPayload;
   downloads: DownloadItem[];
   weather: Weather | null;
+  /** Son hava durumu denemesi başarısızsa nedeni (bağlantı yok, şehir bulunamadı); pencereler arasında paylaşılır */
+  weatherError: string | null;
   /** 0–100: Nook'un sana olan sevgisi — ilgilendikçe artar, ihmal edince azalır */
   affection: number;
   /** Son ilgi zamanı (ms) — sevginin azalması buradan hesaplanır */
@@ -889,6 +931,7 @@ interface NookState {
   setPrivacy: (privacy: PrivacyPayload) => void;
   setDownloads: (downloads: DownloadItem[]) => void;
   setWeather: (weather: Weather | null) => void;
+  setWeatherError: (weatherError: string | null) => void;
   /** Sevgi ekle (etkileşim) ya da çıkar (ihmal) */
   care: (delta: number) => void;
   setGrabbed: (grabbed: boolean) => void;
@@ -904,7 +947,7 @@ interface NookState {
   addAlarm: (a: Omit<Alarm, "id" | "next" | "enabled"> & { at?: number }) => void;
   toggleAlarm: (id: string, enabled: boolean) => void;
   /** Kurulu alarmı düzenle: saat/isim/tekrar/ses değişir, alarm açılıp yeniden kurulur */
-  updateAlarm: (id: string, a: Pick<Alarm, "hour" | "minute" | "label" | "repeat" | "silent">) => void;
+  updateAlarm: (id: string, a: Pick<Alarm, "hour" | "minute" | "label" | "repeat" | "days" | "silent">) => void;
   setAlarmSilent: (id: string, silent: boolean) => void;
   removeAlarm: (id: string) => void;
   /** Çalma anı geldi: tekrar eden alarm bir sonrakine kurulur, tek seferlik kapanır/silinir */
@@ -996,6 +1039,7 @@ export const useNook = create<NookState>()(
       privacy: { mic: [], camera: [] },
       downloads: [],
       weather: null,
+      weatherError: null,
       affection: 60,
       lastCare: Date.now(),
       grabbed: false,
@@ -1206,7 +1250,8 @@ export const useNook = create<NookState>()(
       setFullscreen: (fullscreen) => set({ fullscreen }),
       setPrivacy: (privacy) => set({ privacy }),
       setDownloads: (downloads) => set({ downloads }),
-      setWeather: (weather) => set({ weather }),
+      setWeather: (weather) => set({ weather, weatherError: null }),
+      setWeatherError: (weatherError) => set({ weatherError }),
       care: (delta) =>
         set((s) => {
           // Karne: bugünkü etkileşim sayısı
@@ -1437,6 +1482,7 @@ export const useNook = create<NookState>()(
         yearShown: s.yearShown,
         // Kalkan ekranı (ayrı pencere) son hava durumunu gösterebilsin
         weather: s.weather,
+        weatherError: s.weatherError,
       }),
       // Yeni eklenen ayar alanları eski kayıtlarda da varsayılanla gelsin.
       merge: (persisted, current) => {
@@ -1444,6 +1490,9 @@ export const useNook = create<NookState>()(
         const settings = { ...DEFAULT_SETTINGS, ...p.settings };
         settings.look = { ...DEFAULT_SETTINGS.look, ...p.settings?.look };
         settings.capsule = { ...DEFAULT_SETTINGS.capsule, ...p.settings?.capsule };
+        // Göz ve esneme molası eskiden varsayılan açıktı: kayıtta yoksa mevcut kullanıcıda açık kalsın
+        if (p.settings && p.settings.eyeBreak === undefined) settings.eyeBreak = true;
+        if (p.settings && p.settings.stretchBreak === undefined) settings.stretchBreak = true;
         // Yerel (Ollama) dönemden kalan model adı Gemini'de yok
         if (!settings.aiModel.startsWith("gemini")) settings.aiModel = "";
         // İlk sürümün varsayılanı birçok bilgisayarda başka programlarca tutuluyordu
@@ -1475,6 +1524,32 @@ function trimClips(list: ClipItem[]): ClipItem[] {
 }
 
 /** Etkinliğin hatırlatma anı (ms); hatırlatma yoksa null. Gün boyu etkinlik sabah 09:00 sayılır. */
+/**
+ * Tekrarlı etkinliğin vakti geçtiyse (saatliyse 10 dk sonra, gün boyuysa ertesi gün) sıradaki tekrara taşı;
+ * hatırlatması da yeniden kurulur. Nook günlerce kapalı kaldıysa geçenler atlanır.
+ */
+export function rollRepeats(now = Date.now()) {
+  const st = useNook.getState();
+  for (const e of st.events) {
+    if (!e.repeat) continue;
+    const over = (day: string) => {
+      const [y, m, d] = day.split("-").map(Number);
+      const [hh, mm] = e.time ? e.time.split(":").map(Number) : [24, 0];
+      return new Date(y, m - 1, d, hh, mm).getTime() + (e.time ? 10 * 60_000 : 0) <= now;
+    };
+    if (!over(e.day)) continue;
+    let day = e.day;
+    while (over(day)) {
+      const next = nextRepeat({ day, repeat: e.repeat });
+      if (next === day) break;
+      day = next;
+    }
+    const { id: _id, alarmId: _a, ...rest } = e;
+    st.removeEvent(e.id);
+    useNook.getState().addEvent({ ...rest, day });
+  }
+}
+
 export function remindAt(e: Pick<CalEvent, "day" | "time" | "remind">): number | null {
   if (e.remind < 0) return null;
   const [y, m, d] = e.day.split("-").map(Number);

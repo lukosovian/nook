@@ -8,7 +8,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { claudeConnect, claudeDecide, claudeDisconnect, claudeSetup, EVENTS, isPrimary, subscribe, type ClaudeSetup } from "./bridge";
+import { claudeConnect, claudeDecide, claudeDisconnect, claudeSetup, claudeStatusWrap, EVENTS, isPrimary, subscribe, type ClaudeSetup } from "./bridge";
 import { useNook } from "../store/nook";
 import { playAntic } from "../hooks/useAntics";
 import { tt, locale } from "./i18n";
@@ -59,6 +59,12 @@ export interface ClaudeAsk {
   questions: ClaudeQuestion[] | null;
   /** "Her zaman izin ver" önerisi var mı */
   canAlways: boolean;
+  /** "Her zaman"da eklenecek kural(lar), okunur biçimde: "Bash(npm test:*)" */
+  rule?: string;
+  /** Komutun tamamı (çok satırlı olabilir) */
+  code?: string;
+  /** Komut tek satıra sığmıyor ya da Nook'a kesik geldi: önce tamamı görülmeli */
+  long?: boolean;
   at: number;
   /** Kart küçük adada çözülemiyor (çok sorulu): büyük adada açıldı */
   opened?: boolean;
@@ -209,6 +215,30 @@ function askText(tool: string, input: Input): { title: string; detail: string } 
   }
 }
 
+/** Komut araçlarında komutun tamamı; birden çok satırsa ya da Nook'a kesik geldiyse (sonunda …) uzun sayılır */
+function codeOf(tool: string, input: Input): { code?: string; long?: boolean } {
+  if (tool !== "Bash" && tool !== "PowerShell") return {};
+  const code = str(input.command).trim();
+  if (!code) return {};
+  const lines = code.split("\n").filter((l) => l.trim()).length;
+  return { code, long: lines > 1 || code.length > 200 || code.endsWith("…") };
+}
+
+/** Claude Code'un "her zaman" önerisini okunur yaz: eklenecek kurallar, mod değişikliği, klasörler */
+function ruleText(list: unknown[] | undefined): string | undefined {
+  if (!list?.length) return undefined;
+  const parts = list.flatMap((raw) => {
+    const s = (raw ?? {}) as Input;
+    if (Array.isArray(s.rules)) {
+      return (s.rules as Input[]).map((r) => (str(r.ruleContent) ? `${str(r.toolName)}(${str(r.ruleContent)})` : str(r.toolName)));
+    }
+    if (str(s.mode)) return [tt("mod: {0}", str(s.mode))];
+    if (Array.isArray(s.directories)) return [tt("klasör: {0}", (s.directories as unknown[]).map(String).join(", "))];
+    return [];
+  });
+  return parts.filter(Boolean).join(", ") || undefined;
+}
+
 function parseQuestions(input: Input): ClaudeQuestion[] | null {
   const list = Array.isArray(input.questions) ? input.questions : null;
   if (!list?.length) return null;
@@ -307,6 +337,8 @@ function handle(ev: HookEvent) {
         ...askText(tool, input),
         questions: tool === "AskUserQuestion" ? parseQuestions(input) : null,
         canAlways: !!ev.permission_suggestions?.length,
+        rule: ruleText(ev.permission_suggestions),
+        ...codeOf(tool, input),
         at: ev.at,
       };
       useClaude.setState((st) => ({ asks: [...st.asks.filter((a) => a.askId !== ask.askId), ask] }));
@@ -447,6 +479,18 @@ export async function connect() {
   try {
     const backup = await claudeConnect();
     useClaude.setState({ backup });
+  } catch (e) {
+    useClaude.setState({ error: String(e) });
+  }
+  await refreshSetup();
+  useClaude.setState({ busy: false });
+}
+
+/** Kendi durum satırı olan kullanıcıda plan göstergesi: satırı Nook'la sar ya da eski hâline döndür */
+export async function wrapStatus(on: boolean) {
+  useClaude.setState({ busy: true, error: null });
+  try {
+    await claudeStatusWrap(on);
   } catch (e) {
     useClaude.setState({ error: String(e) });
   }

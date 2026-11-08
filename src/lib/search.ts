@@ -6,6 +6,9 @@ import { ek, nookName } from "./look";
 import { searchEmoji } from "./emoji";
 import { convertCurrency, parseCurrency, translate } from "./online";
 import { tt } from "./i18n";
+import { useNook } from "../store/nook";
+
+const hasKey = () => !!useNook.getState().settings.geminiKey.trim();
 
 export type ResultKind = "calc" | "convert" | "currency" | "translate" | "emoji" | "app" | "web" | "note" | "ask" | "argus";
 
@@ -87,7 +90,7 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
   }
 
   // Yerel yapay zekâya sor
-  out.push({ id: "ask", kind: "ask", title: q, subtitle: tt("{0} sor", ek(nookName(), "a")), payload: q });
+  out.push({ id: "ask", kind: "ask", title: q, subtitle: hasKey() ? tt("{0} sor", ek(nookName(), "a")) : tt("{0} sor · önce Gemini anahtarı lazım", ek(nookName(), "a")), payload: q });
 
   const isUrl = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i.test(q) && !/\s/.test(q);
   out.push(

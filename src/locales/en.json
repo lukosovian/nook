@@ -41,7 +41,7 @@
  "{0}. sezon {1}. bölüm": "Season {0} episode {1}",
  "Ekle": "Add",
  "Kulaklık": "Headset",
- "Mouse": "Mouse",
+ "Fare": "Mouse",
  "Alarm": "Alarm",
  "Bugün yok": "None today",
  "Su": "Water",
@@ -2225,5 +2225,17 @@
  "Ayarlarda ara…": "Search settings…",
  "Nook'u tanı": "Meet Nook",
  "Küçült": "Minimize",
- "Büyüt": "Maximize"
+ "Büyüt": "Maximize",
+ "Oyun ve video, oyun özeti, mola": "Games and video, game recap, breaks",
+ "Klavye kısayolları": "Keyboard shortcuts",
+ "Her yerde çalışan tuşlar": "Keys that work everywhere",
+ "Uygulamalar": "Apps",
+ "Mini oyunlar": "Mini games",
+ "Oyun süresi": "Play time",
+ "Duvar kağıtları": "Wallpapers",
+ "Nook'lu arka planlar": "Backgrounds with Nook",
+ "Tuşlar ve otomasyonlar": "Keys and automations",
+ "Ne kadar oynadın": "How much you played",
+ "Kayıtlılar": "Saved",
+ "{0} okunmamış": "{0} unread"
 }

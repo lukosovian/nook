@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { NookFigure } from "../components/mascot/Figure";
-import { CHIP_NOOKS, COLLECTION, DEFAULT_LOOK, EYE_STYLES, FACES, GLASSES, HALLOWEEN, HEADS, SHAPES, TEXTURES, type Look } from "../lib/look";
+import { CHIP_NOOKS, COLLECTION, DEFAULT_LOOK, EYE_STYLES, FACES, GLASSES, HEADS, NECKS, SHAPES, TEXTURES, type Look } from "../lib/look";
 import { __bake, __programOf } from "../lib/nook3d";
 import { figureRes } from "../components/mascot/Figure";
 
@@ -26,6 +26,7 @@ function items(set: string | null): { look: Look; color: string; label: string }
     return [
       ...GLASSES.slice(7).map((o) => ({ look: { ...DEFAULT_LOOK, glasses: o.id }, color: "#FFE3A8", label: o.label })),
       ...FACES.slice(1).map((o) => ({ look: { ...DEFAULT_LOOK, face: o.id }, color: "#FFE3A8", label: o.label })),
+      ...NECKS.slice(1).map((o) => ({ look: { ...DEFAULT_LOOK, neck: o.id }, color: "#FFE3A8", label: o.label })),
       ...EYE_STYLES.slice(5).map((o) => ({ look: { ...DEFAULT_LOOK, eyes: o.id }, color: "#2B8CFF", label: o.label })),
     ];
   return after(SHAPES).map((o, i) => ({ look: { ...DEFAULT_LOOK, shape: o.id }, color: PALETTE[i % PALETTE.length], label: o.label }));
@@ -57,7 +58,7 @@ function measureCompile() {
     ["kendi Nook'u (küre)", [DEFAULT_LOOK]],
     ["çipler (eski parçalar)", Object.values(CHIP_NOOKS).map((c) => c.look)],
     ["Görünüm seçenekleri", [...SHAPES.map((o) => ({ ...DEFAULT_LOOK, shape: o.id })), ...TEXTURES.map((o) => ({ ...DEFAULT_LOOK, texture: o.id })), ...GLASSES.map((o) => ({ ...DEFAULT_LOOK, glasses: o.id })), ...HEADS.map((o) => ({ ...DEFAULT_LOOK, head: o.id })), ...FACES.map((o) => ({ ...DEFAULT_LOOK, face: o.id }))]],
-    ["Koleksiyon + Cadılar", [...COLLECTION, ...HALLOWEEN].map((o) => o.look)],
+    ["Koleksiyon", COLLECTION.map((o) => o.look)],
   ];
   const seen = new Set<string>();
   return sets.map(([name, looks]) => {
@@ -79,13 +80,13 @@ function CompileTimes() {
   );
 }
 
-/** set=bake: Koleksiyon ve Cadılar Nook'larının hazır resimleri (scripts/bake-looks.py okur) */
+/** set=bake: Koleksiyon Nook'larının hazır resimleri (scripts/bake-looks.py okur) */
 function Bake() {
   const [out] = useState(() => {
     const res = figureRes(31);
     const seen = new Set<string>();
     const list: { key: string; url: string; tag: string }[] = [];
-    for (const o of [...COLLECTION, ...HALLOWEEN]) {
+    for (const o of COLLECTION) {
       const r = __bake!(o.look, o.color, res);
       if (r && !seen.has(r.key)) {
         seen.add(r.key);

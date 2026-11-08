@@ -35,7 +35,7 @@ pub async fn quick_state() -> QuickState {
         bluetooth: imp::radio(imp::Kind::Bluetooth),
         dark: imp::dark_mode(),
         muted: imp::endpoint_muted(false),
-        mic_muted: imp::endpoint_muted(true),
+        mic_muted: if crate::shield::quick_mic_zeroed() { Some(true) } else { imp::endpoint_muted(true) },
         volume: imp::volume(),
         outputs: imp::outputs(),
         inputs: imp::inputs(),
@@ -49,6 +49,11 @@ pub fn volume_state() -> (Option<f32>, bool) {
 
 pub fn set_muted(on: bool) -> Result<(), String> {
     imp::set_endpoint_muted(false, on)
+}
+
+/// Varsayılan mikrofonu sustur / aç (mikrofon tuşu, görüşme yokken)
+pub fn set_mic_muted(on: bool) -> Result<(), String> {
+    imp::set_endpoint_muted(true, on)
 }
 
 pub fn set_volume(value: f32) -> Result<(), String> {
@@ -103,7 +108,7 @@ pub async fn quick_set(key: String, on: bool) -> Result<(), String> {
         "bluetooth" => imp::set_radio(imp::Kind::Bluetooth, on),
         "dark" => imp::set_dark_mode(on),
         "mute" => imp::set_endpoint_muted(false, on),
-        "mic" => imp::set_endpoint_muted(true, on),
+        "mic" => crate::shield::quick_mic(on),
         _ => Err("bilinmeyen ayar".into()),
     }
 }

@@ -77,9 +77,11 @@ export function IslandAtmosphere({ width: _width = 240, height: _height = 36, ov
   const settings = useNook((s) => s.settings);
   // "Pilde yavaşla" açıkken yalnızca gerçekten pildeyken / Windows tasarrufundayken susar
   const saving = useNook((s) => !!s.stats?.saver && s.settings.powerSaver);
+  // Daha az hareket (Ayarlar ya da Windows'ta animasyonlar kapalı)
+  const calm = settings.calmMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Ayarlardan kapatıldıysa veya tasarruf modundaysa çizme
-  if (!override && (!settings.weatherAtmosphere || saving)) {
+  // Ayarlardan kapatıldıysa, tasarruf modundaysa ya da daha az hareket isteniyorsa çizme
+  if (!override && (!settings.weatherAtmosphere || saving || calm)) {
     return null;
   }
 

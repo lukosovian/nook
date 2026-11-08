@@ -6,6 +6,7 @@
  * - Yorumları ve geliştirici yanıtlarını doğrudan Nook içinden okumayı sağlar.
  */
 import { create } from "zustand";
+import { getVersion } from "@tauri-apps/api/app";
 import { openPath, recentLogs } from "./bridge";
 import { REPO_URL } from "./supporters";
 import { useNook } from "../store/nook";
@@ -259,11 +260,24 @@ export async function fetchComments(issueNumber: number) {
   }
 }
 
+/**
+ * Herkese açık Issue'ya giden günlük satırı: kullanıcı adı (dosya yollarında), e-posta, IP adresleri,
+ * uzun anahtar/jeton benzeri dizgiler ve tırnak içindeki metinler (şarkı adları, duyulan sözler) gizlenir.
+ */
+export function maskLog(line: string): string {
+  return line
+    .replace(/([A-Za-z]:[\\/]+Users[\\/]+)[^\\/\s"']+/gi, "$1***")
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "***@***")
+    .replace(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g, "*.*.*.*")
+    .replace(/\b[A-Za-z0-9_\-]{32,}\b/g, "***")
+    .replace(/"[^"]{2,}"/g, '"…"')
+    .replace(/(hum(?: \([^)]*\))?): .+/i, "$1: …");
+}
+
 /** Sistem ve hata günlüğü tanılama bloğunu üretir */
 export async function buildDiagnostics(includeLogs: boolean): Promise<string> {
   const s = useNook.getState().settings;
-  const note = latestNote();
-  const v = note?.version ?? "0.3.2";
+  const v = (await getVersion().catch(() => null)) ?? latestNote()?.version ?? "?";
   const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "Bilinmiyor";
 
   let lines: string[] = [
@@ -286,7 +300,7 @@ export async function buildDiagnostics(includeLogs: boolean): Promise<string> {
           `<summary><b>Son Hata ve Olay Kayıtları (${logs.length} satır)</b></summary>`,
           "",
           "```log",
-          ...logs,
+          ...logs.map(maskLog),
           "```",
           "</details>",
         );

@@ -129,6 +129,8 @@ pub struct Settings {
     pub log_days: u32,
     /// Açık duvar kağıdı döngüsü (yoksa döngü kapalı)
     pub wallpaper_cycle: Option<WallCycle>,
+    /// Tailscale kapanırsa Nook yeniden bağlasın ve girişsiz çalışma (unattended) açılsın
+    pub tailscale_keep: bool,
 }
 
 /// Duvar kağıdı döngüsü: `ids` sırayla, `every_min` dakikada bir; `since` (ms) döngünün açıldığı an, ilk resim o an
@@ -203,6 +205,7 @@ impl Default for Settings {
             deck_hotkeys: Vec::new(),
             log_days: 14,
             wallpaper_cycle: None,
+            tailscale_keep: false,
         }
     }
 }
@@ -236,6 +239,8 @@ pub struct Shared {
     /// Öndeki tam ekran oyunun monitörü (sol, üst, sağ, alt — fiziksel px). İmleç oradayken
     /// ada açılmaz: pencere etkileşimli olunca tam ekran oyun odağı kaybedip alta düşer.
     pub game_screen: Mutex<Option<(i32, i32, i32, i32)>>,
+    /// Oyun şu an önde mi (Alt-Tab ile çıkılınca arkada ekranı kaplasa da ada tıklanabilir olsun)
+    pub game_front: AtomicBool,
     /// Ada bu tam ekran yüzünden (oyun ya da video) 2. ekrana geçti: imleç oraya gitse de Nook dönmez
     pub full_screen: Mutex<Option<(i32, i32, i32, i32)>>,
     /// Parolalı kalkan açık: adalar ve yan kartlar etkileşime kapalı

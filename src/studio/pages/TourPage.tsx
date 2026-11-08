@@ -24,7 +24,7 @@ const ART = { w: 582, h: 408 };
 let lastStep = 0;
 
 export function TourPage({ arg }: { arg: string | null }) {
-  const steps = useTourSteps();
+  const steps = useTourSteps(true);
   const hasArgus = useArgus((s) => !!s.snap);
   const settings = useNook((s) => s.settings);
   const look = normalizeLook(settings.look);

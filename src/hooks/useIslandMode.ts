@@ -27,7 +27,8 @@ export function islandModeOf(s: State): IslandMode {
   // Otomasyon "çalışsın mı?" diye soruyor (aynı kart)
   if (s.reminder || (s.autoAsk && isPrimary)) return "reminder";
   // Claude Code izin istiyor: cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
-  if (s.claudeCard && isPrimary) return "claude";
+  // Bildirim kartı onay kartını beklemez: süresince önde durur, sonra onay kartı geri gelir
+  if (s.claudeCard && isPrimary && s.toasts[0]?.kind !== "notify") return "claude";
   // Bildirim kartı (Windows/telefon bildirimi, yanıtlanabilir kart): üstüne gelince ada açılmaz, kart büyüyüp
   // tam metni gösterir. Diğer kartlar ("Üstüme gel" teklifleri, sistem olayları) eskisi gibi adayı açar.
   if (s.toasts.length && holdsOnHover(s.toasts[0]) && !s.pinned && !s.grabbed && !s.holds.length) {

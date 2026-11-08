@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { FileCode2, Link2, SquareTerminal, Unlink } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { ago, answer, CLAUDE_COLOR, connect, disconnect, effectivePct, planColor, refreshSetup, resetLabel, useClaude, type ClaudeAsk, type ClaudeSession, type PlanWindow } from "../../lib/claude";
+import { ago, answer, CLAUDE_COLOR, connect, disconnect, wrapStatus, effectivePct, planColor, refreshSetup, resetLabel, useClaude, type ClaudeAsk, type ClaudeSession, type PlanWindow } from "../../lib/claude";
 import { useNook } from "../../store/nook";
 import { ACCENT, Bar, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { pct as fmtPct, tt } from "../../lib/i18n";
@@ -36,9 +36,7 @@ export function ClaudePanel() {
   return (
     <div ref={scroller} className="-mr-1.5 flex h-full min-h-0 flex-col gap-1.5 overflow-y-auto pr-1.5">
       <Plan now={now} />
-      {opened.map((a) => (
-        <Questions key={a.askId} ask={a} />
-      ))}
+      {opened.map((a) => (a.questions ? <Questions key={a.askId} ask={a} /> : <Permission key={a.askId} ask={a} />))}
       {list.length ? (
         list.map((s) => <SessionRow key={s.id} s={s} now={now} />)
       ) : (
@@ -56,12 +54,26 @@ export function ClaudePanel() {
 function Plan({ now }: { now: number }) {
   const plan = useClaude((s) => s.plan);
   const statusline = useClaude((s) => s.setup?.statusline);
+  const busy = useClaude((s) => s.busy);
   if (!plan) {
+    if (statusline === "other") {
+      return (
+        <div className="flex items-center gap-2 rounded-[12px] bg-well py-1 pl-2.5 pr-1">
+          <p className="min-w-0 flex-1 text-[10.5px] leading-snug text-label-3">{tt("Kendi durum satırın var. İstersen o da yerinde kalır, plan göstergesi de açılır.")}</p>
+          <button
+            disabled={busy}
+            onClick={() => void wrapStatus(true)}
+            className="h-6 shrink-0 rounded-full border px-2.5 text-[10.5px] font-semibold disabled:opacity-40"
+            style={{ background: tintBg(CLAUDE_COLOR, 18), borderColor: tintBg(CLAUDE_COLOR, 45), color: tintText(CLAUDE_COLOR) }}
+          >
+            {tt("Plan göstergesini aç")}
+          </button>
+        </div>
+      );
+    }
     return (
       <p className="rounded-[12px] bg-well px-2.5 py-1.5 text-[10.5px] text-label-3">
-        {statusline === "other"
-          ? tt("Kendi durum satırın olduğu için plan göstergesi kapalı.")
-          : tt("Plan kullanımı Claude Code'un ilk cevabından sonra görünür (Pro ve Max planlarında).")}
+        {tt("Plan kullanımı Claude Code'un ilk cevabından sonra görünür (Pro ve Max planlarında).")}
       </p>
     );
   }
@@ -73,9 +85,16 @@ function Plan({ now }: { now: number }) {
         <Gauge label={tt("5 saat")} w={plan.fiveHour} weekly={false} now={now} />
         <Gauge label={tt("Hafta")} w={plan.sevenDay} weekly now={now} />
       </div>
-      <p className="mt-1 truncate px-1 text-[9.5px] text-label-3" title={stale ? tt("Claude uygulamasında harcadığın kullanım, Claude Code bir sonraki cevabı verene kadar burada görünmez.") : undefined}>
-        {stale ? tt("{0} güncellendi · Claude Code'da bir mesajla tazelenir", ago(plan.updatedAt, now)) : tt("{0} güncellendi", ago(plan.updatedAt, now))}
-      </p>
+      <div className="mt-1 flex items-center gap-2 px-1">
+        <p className="min-w-0 flex-1 truncate text-[9.5px] text-label-3" title={stale ? tt("Claude uygulamasında harcadığın kullanım, Claude Code bir sonraki cevabı verene kadar burada görünmez.") : undefined}>
+          {stale ? tt("{0} güncellendi · Claude Code'da bir mesajla tazelenir", ago(plan.updatedAt, now)) : tt("{0} güncellendi", ago(plan.updatedAt, now))}
+        </p>
+        {statusline === "wrapped" && (
+          <button disabled={busy} onClick={() => void wrapStatus(false)} className="shrink-0 text-[9.5px] text-label-3 hover:text-label disabled:opacity-40" title={tt("Durum satırın eski hâline döner, plan göstergesi kapanır")}>
+            {tt("Göstergeyi kapat")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -207,6 +226,45 @@ function Questions({ ask }: { ask: ClaudeAsk }) {
   );
 }
 
+/** Uzun komut onayı: komutun tamamı (kaydırılabilir), "her zaman"da eklenecek kural ve düğmeler */
+function Permission({ ask }: { ask: ClaudeAsk }) {
+  const send = (decision: Parameters<typeof answer>[1]) => {
+    answer(ask, decision);
+    useNook.getState().setPinned(false);
+  };
+  const cut = ask.code?.endsWith("…");
+  const btn = "rounded-full border px-3 py-1 text-[11px] font-medium";
+  return (
+    <div className="shrink-0 rounded-[14px] border px-2.5 py-2" style={{ background: tintBg(CLAUDE_COLOR, 10), borderColor: tintBg(CLAUDE_COLOR, 40) }}>
+      <p className="text-[10px] font-medium" style={{ color: tintText(CLAUDE_COLOR) }}>
+        Claude · {ask.project}
+      </p>
+      <p className="mt-1 text-[12px] font-medium leading-tight text-label">{ask.title}</p>
+      <pre className="mt-1.5 max-h-[150px] overflow-auto whitespace-pre-wrap break-all rounded-[8px] bg-black/30 px-2 py-1.5 font-mono text-[10.5px] leading-snug text-label-2">{ask.code ?? ask.detail}</pre>
+      {cut && <p className="mt-1 text-[10px] text-orange">{tt("Komut çok uzun, sonu Nook'a gelmedi. Tamamını görmek için terminalde cevapla.")}</p>}
+      {ask.canAlways && ask.rule && <p className="mt-1 text-[10px] text-label-3">{tt("“Her zaman” şu kuralı ekler: {0}", ask.rule)}</p>}
+      <div className="mt-2 flex items-center justify-end gap-1.5">
+        <button onClick={() => send("")} className="rounded-full px-2.5 py-1 text-[11px] text-label-3 hover:bg-white/[0.08] hover:text-label">
+          {tt("Terminalde cevapla")}
+        </button>
+        <button onClick={() => send("deny")} className={btn} style={{ background: tintBg(ACCENT.red, 12), borderColor: tintBg(ACCENT.red, 32), color: tintText(ACCENT.red) }}>
+          {tt("Reddet")}
+        </button>
+        {ask.canAlways && !cut && (
+          <button onClick={() => send("always")} className={btn} style={{ background: tintBg(ACCENT.green, 12), borderColor: tintBg(ACCENT.green, 32), color: tintText(ACCENT.green) }}>
+            {tt("Her zaman")}
+          </button>
+        )}
+        {!cut && (
+          <button onClick={() => send("allow")} className={btn} style={{ background: tintBg(ACCENT.green, 26), borderColor: tintBg(ACCENT.green, 60), color: tintText(ACCENT.green) }}>
+            {tt("İzin ver")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Altta: bağlantı durumu; kaldırma iki adımlı */
 function Footer() {
   const setup = useClaude((s) => s.setup);
@@ -256,7 +314,7 @@ function Connect() {
       </div>
       <ul className="space-y-0.5 px-1 text-[10.5px] leading-snug text-label-3">
         <Li>{tt("~/.claude/settings.json'a Nook'un hook'ları eklenir, önce yedeği alınır; seninkilere dokunulmaz.")}</Li>
-        <Li>{statusline === "other" ? tt("Kendi durum satırın korunur; plan göstergesi bu yüzden kapalı kalır.") : tt("Plan göstergesi için durum satırı Nook'a bağlanır (terminale bir şey yazmaz).")}</Li>
+        <Li>{statusline === "other" ? tt("Kendi durum satırın korunur; plan göstergesini bağladıktan sonra istersen açarsın.") : tt("Plan göstergesi için durum satırı Nook'a bağlanır (terminale bir şey yazmaz).")}</Li>
         <Li>{tt("Terminal öndeyken izin orada sorulur, başka yerdeysen adaya gelir. Nook kapalıysa Claude Code hiç beklemez.")}</Li>
       </ul>
       <div className="mt-auto flex items-center gap-2">

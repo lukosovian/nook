@@ -373,11 +373,6 @@ pub fn wa_send(app: AppHandle, title: String, text: String, reply_key: Option<St
     Err("Yanıt göndermek için Nook Mobil bildirimi ya da bağlı bir WhatsApp Web oturumu gerekli".into())
 }
 
-#[tauri::command]
-pub fn wa_push(app: AppHandle, data: Value) {
-    apply_push(&app, data);
-}
-
 const WA_BRIDGE_JS: &str = r###"
 (function () {
   if (window.__nookWaInit) return;
@@ -581,12 +576,6 @@ const WA_BRIDGE_JS: &str = r###"
 
     try {
       document.title = "NOOK_WA:" + jsonStr;
-    } catch (_) {}
-
-    try {
-      if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === "function") {
-        window.__TAURI_INTERNALS__.invoke("wa_push", { data: payload }).catch(() => {});
-      }
     } catch (_) {}
   }
 

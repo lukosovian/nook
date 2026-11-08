@@ -29,6 +29,7 @@ import { openBrief } from "../lib/brief";
 import { notesDue, openNotes } from "../lib/notes";
 import { nextPhase, remaining } from "../lib/focus";
 import { dayKey, isQuiet, isSleeping, useNook } from "../store/nook";
+import { islandModeOf } from "./useIslandMode";
 import { playAntic } from "./useAntics";
 import { tt } from "../lib/i18n";
 import { logDiaryMinute } from "../lib/diary";
@@ -215,7 +216,7 @@ export function useDayTracker() {
 
       // Su Hatırlatması (telefona waterInfo() ile gider; Nook Mobil kendi bildirimini çıkarır)
       if (s.settings.waterEvery > 0) {
-        if (waterMinutes >= s.settings.waterEvery && !s.reminder && !isQuiet(s)) {
+        if (waterMinutes >= s.settings.waterEvery && !s.reminder && !s.fullscreen && !s.ringing && !isQuiet(s)) {
           waterMinutes = 0;
           s.setReminder({ kind: "water", phase: "due" });
           playAntic("surprised");
@@ -273,6 +274,11 @@ export function useNotificationFeed() {
       s.track({ notifs: 1 });
       const focusing = s.settings.focusMute && s.focus?.phase === "work" && s.focus.endsAt !== null;
       if (n.call) note(`arama kartı: ${s.fullscreen ? "tam ekran yüzünden gösterilmedi" : focusing ? "odak yüzünden gösterilmedi" : n.quiet ? "eski, gösterilmedi" : "gösterildi"}`);
+      // Kart görünmedi şikâyetinde sebebi günlükten okuyabilmek için: kartın akıbeti ve o anki ada durumu
+      else
+        note(
+          `bildirim kartı (${n.app}): ${s.fullscreen ? "tam ekran, gösterilmedi" : focusing ? "odak, gösterilmedi" : n.quiet ? "eski, gösterilmedi" : isQuiet(s) ? "sessiz kip, gösterilmedi" : "kuyruğa girdi"} · ada=${islandModeOf(s)} · sırada=${s.toasts.length}`,
+        );
       if (s.fullscreen || focusing || n.quiet) return;
 
       // Kullanıcının kendi gönderdiği mesajlar ("Sen: ...") bildirim kartı oluşturmasın
@@ -300,7 +306,7 @@ export function useNotificationFeed() {
         replyKey,
         whatsappChat: wa ? n.title : null,
         phoneKey: n.phoneKey ?? null,
-        ms: replyKey || wa ? 6500 : 4500,
+        ms: s.settings.notifySecs ? s.settings.notifySecs * 1000 : replyKey || wa ? 6500 : 4500,
       });
       playAntic("surprised");
     });
@@ -477,9 +483,9 @@ export function useGameFeed() {
       if (!settings.gameIntro) return;
       const parts = [
         stats && tt("İşlemci %{0}", Math.round(stats.cpu)),
-        stats && stats.memTotal > 0 && `Bellek %${Math.round((stats.memUsed / stats.memTotal) * 100)}`,
+        stats && stats.memTotal > 0 && tt("Bellek %{0}", Math.round((stats.memUsed / stats.memTotal) * 100)),
         devices?.headset && tt("Kulaklık %{0}", devices.headset.percent),
-        devices?.mouse && `Mouse %${devices.mouse.percent}`,
+        devices?.mouse && tt("Fare %{0}", devices.mouse.percent),
       ].filter(Boolean);
       pushToast({ kind: "game", title: tt("{0} başlıyor · iyi oyunlar!", g.app), detail: parts.join(" · ") || tt("Ben burada bekliyorum"), ms: 4800 });
       playAntic("wink");

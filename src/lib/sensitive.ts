@@ -48,12 +48,17 @@ const KEY_PATTERNS = [
   /\bAKIA[0-9A-Z]{16}\b/, // AWS
   /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/,
   /\b(?:sk|rk)_live_[A-Za-z0-9]{20,}\b/, // Stripe
+  /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{10,}/, // JWT
+  /\bnpm_[A-Za-z0-9]{36}\b/, // npm
+  /\bglpat-[A-Za-z0-9_-]{20,}\b/, // GitLab
 ];
 
 /** Metin hassas mi? Uzun metinlerde (bir paragrafın içinde geçen numara) de arar. */
 export function detectSensitive(text: string): SensitiveKind | null {
   const t = text.trim();
-  if (!t || t.length > 4000) return null;
+  if (!t) return null;
+  // Çok uzun metinde (günlük, kod dosyası) yalnızca anahtarlara bakılır
+  if (t.length > 4000) return KEY_PATTERNS.some((r) => r.test(t)) ? "key" : null;
 
   if (KEY_PATTERNS.some((r) => r.test(t))) return "key";
 

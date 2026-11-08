@@ -76,7 +76,7 @@ export function PcScreen({ pairing, status, conn, onBack, onOffline }: { pairing
     setAsk(null);
     if (a.id === "remote") {
       if (status?.control === undefined) say("Önce PC'deki Nook'u güncelle");
-      else if (!status.control) say("PC'de Nook › Ayarlar › Telefon › “Telefondan uzaktan kontrol”ü aç");
+      else if (!status.control) say("PC'de Nook Studio › Ayarlar › Telefon › “Telefondan uzaktan kontrol”ü aç");
       else setRemote(true);
       return;
     }

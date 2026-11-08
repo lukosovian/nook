@@ -1,20 +1,15 @@
 /**
- * Yalnızca geliştirme (?preview=karakter): karakter denemesi Lokum. Büyük hâli, ruh hâlleri,
- * renk seçenekleri, kulaklık ve adadaki küçük boyu bir arada.
- * Ekran görüntüsü için: &mood=happy&color=1&phones=0&still=2.4&aim=0.8,0.3
+ * Yalnızca geliştirme (?preview=karakter): karakter denemeleri. Büyük canlı hâli, ruh hâlleri,
+ * renk seçenekleri, kendi aksesuarı ve adadaki küçük boyu bir arada. Seçicideki küçükler tek kare
+ * (resim gibi) çizilir; yalnızca büyük olan canlıdır.
+ * Ekran görüntüsü için: &char=pamuk&mood=happy&color=1&acc=0&still=2.4&aim=0.8,0.3
+ * Hepsi yan yana: &grid (&still=…&mood=…&color=…)
  */
 import { useState } from "react";
-import { Character3D, type Mood } from "../lib/character3d";
-
-const COLORS = [
-  { id: "gül", label: "Gül", hex: "#FF9CC0" },
-  { id: "fıstık", label: "Fıstık", hex: "#A6DB7E" },
-  { id: "limon", label: "Limon", hex: "#FFD873" },
-  { id: "nar", label: "Nar", hex: "#FF6676" },
-];
+import { CHARACTERS, Character3D, type CharId, type Mood } from "../lib/character3d";
 
 const MOODS: { id: Mood; label: string; hint: string }[] = [
-  { id: "idle", label: "Boşta", hint: "Etrafa bakar, imleci izler" },
+  { id: "idle", label: "Boşta", hint: "Kendi hâlinde takılır, imleci izler" },
   { id: "happy", label: "Mutlu", hint: "Hoplayıp sallanır" },
   { id: "music", label: "Müzik", hint: "Ritme göre sallanır" },
   { id: "sleepy", label: "Uykulu", hint: "Gözleri kapanır, başı düşer" },
@@ -24,22 +19,55 @@ const MOODS: { id: Mood; label: string; hint: string }[] = [
 export function CharacterLab() {
   const q = new URLSearchParams(location.search);
   const still = q.has("still") && q.get("still") !== "" ? Number(q.get("still")) : undefined;
+  const [charId, setCharId] = useState<CharId>((q.get("char") as CharId) ?? "nook");
   const [mood, setMood] = useState<Mood>((q.get("mood") as Mood) ?? "idle");
-  const [color, setColor] = useState(COLORS[Number(q.get("color") ?? 0)] ?? COLORS[0]);
-  const [phones, setPhones] = useState(q.get("phones") !== "0");
+  const [colorIx, setColorIx] = useState(Number(q.get("color") ?? 0));
+  const [acc, setAcc] = useState(q.get("acc") !== "0");
   const aim = q.get("aim")?.split(",").map(Number) as [number, number] | undefined;
+  const ch = CHARACTERS.find((c) => c.id === charId) ?? CHARACTERS[0];
+  const color = ch.colors[colorIx] ?? ch.colors[0];
+
+  if (q.has("grid"))
+    return (
+      <div className="grid h-full w-full grid-cols-4 place-items-center gap-4 bg-[#0e0e10] p-6 text-label">
+        {CHARACTERS.filter((c) => !q.get("only") || q.get("only")!.split(",").includes(c.id)).map((c) => (
+          <div key={c.id} className="flex flex-col items-center rounded-[28px] border border-white/[0.06] px-4 pb-4" style={{ background: `radial-gradient(circle at 50% 38%, color-mix(in srgb, ${c.colors[colorIx]?.hex ?? c.colors[0].hex} 24%, #1a1a1f), #111114 72%)` }}>
+            <Character3D char={c.id} size={Number(q.get("size") ?? 300)} color={c.colors[colorIx]?.hex ?? c.colors[0].hex} acc={acc} mood={mood} res={Number(q.get("res") ?? 1.5)} still={still ?? 0.5} aim={aim} />
+            <p className="text-[18px] font-extrabold">{c.name}</p>
+          </div>
+        ))}
+      </div>
+    );
 
   return (
     <div className="flex h-full w-full items-center justify-center gap-10 bg-[#0e0e10] p-10 text-label">
-      {/* Sahne */}
-      <div
-        className="relative flex h-[560px] w-[560px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-[36px] border border-white/[0.06]"
-        style={{ background: `radial-gradient(circle at 50% 38%, color-mix(in srgb, ${color.hex} 26%, #1a1a1f), #111114 72%)` }}
-      >
-        <Character3D size={430} color={color.hex} phones={phones} mood={mood} res={2} still={still} aim={aim} />
-        <div className="absolute bottom-6 text-center">
-          <p className="text-[26px] font-extrabold tracking-[-0.02em]">Lokum</p>
-          <p className="text-[12.5px] text-label-3">Yumuşacık, biraz uykucu, müziksiz yapamaz</p>
+      <div className="flex flex-col gap-4">
+        {/* Sahne */}
+        <div
+          className="relative flex h-[560px] w-[560px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-[36px] border border-white/[0.06]"
+          style={{ background: `radial-gradient(circle at 50% 38%, color-mix(in srgb, ${color.hex} 26%, #1a1a1f), #111114 72%)` }}
+        >
+          <Character3D char={ch.id} size={430} color={color.hex} acc={acc} mood={mood} res={2} still={still} aim={aim} />
+          <div className="absolute bottom-6 text-center">
+            <p className="text-[26px] font-extrabold tracking-[-0.02em]">{ch.name}</p>
+            <p className="text-[12.5px] text-label-3">{ch.tagline}</p>
+          </div>
+        </div>
+        {/* Karakter seçici: tek karelik küçükler */}
+        <div className="flex justify-between">
+          {CHARACTERS.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => {
+                setCharId(c.id);
+                setColorIx(0);
+              }}
+              className={`flex flex-col items-center rounded-[18px] border pb-1.5 transition-colors ${c.id === ch.id ? "border-white/20 bg-white/[0.09]" : "border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.05]"}`}
+            >
+              <Character3D char={c.id} size={80} color={c.colors[0].hex} acc mood="idle" res={2} still={0.5} />
+              <span className={`text-[11.5px] font-semibold ${c.id === ch.id ? "text-label" : "text-label-3"}`}>{c.name}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -62,34 +90,34 @@ export function CharacterLab() {
 
         <Group title="Renk">
           <div className="flex gap-2.5">
-            {COLORS.map((c) => (
-              <button key={c.id} onClick={() => setColor(c)} className="flex flex-col items-center gap-1.5">
-                <span className="h-10 w-10 rounded-full transition-transform" style={{ background: c.hex, boxShadow: color.id === c.id ? `0 0 0 2px #0e0e10, 0 0 0 4px ${c.hex}` : undefined, transform: color.id === c.id ? "scale(1.05)" : undefined }} />
-                <span className={`text-[11px] ${color.id === c.id ? "text-label" : "text-label-3"}`}>{c.label}</span>
+            {ch.colors.map((c, i) => (
+              <button key={c.label} onClick={() => setColorIx(i)} className="flex flex-col items-center gap-1.5">
+                <span className="h-10 w-10 rounded-full transition-transform" style={{ background: c.hex, boxShadow: colorIx === i ? `0 0 0 2px #0e0e10, 0 0 0 4px ${c.hex}` : undefined, transform: colorIx === i ? "scale(1.05)" : undefined }} />
+                <span className={`text-[11px] ${colorIx === i ? "text-label" : "text-label-3"}`}>{c.label}</span>
               </button>
             ))}
           </div>
         </Group>
 
-        <Group title="Aksesuar">
+        {ch.accessory && <Group title="Aksesuar">
           <button
-            onClick={() => setPhones((v) => !v)}
-            className={`flex w-full items-center justify-between rounded-[14px] border px-3.5 py-2.5 ${phones ? "border-white/20 bg-white/[0.09]" : "border-white/[0.05] bg-white/[0.02]"}`}
+            onClick={() => setAcc((v) => !v)}
+            className={`flex w-full items-center justify-between rounded-[14px] border px-3.5 py-2.5 ${acc ? "border-white/20 bg-white/[0.09]" : "border-white/[0.05] bg-white/[0.02]"}`}
           >
-            <span className="text-[13px] font-semibold">Kulaklık</span>
-            <span className="text-[11.5px] text-label-3">{phones ? "Takılı" : "Çıkarılmış"}</span>
+            <span className="text-[13px] font-semibold">{ch.accessory}</span>
+            <span className="text-[11.5px] text-label-3">{acc ? "Takılı" : "Çıkarılmış"}</span>
           </button>
-        </Group>
+        </Group>}
 
         <Group title="Adada">
           <div className="flex items-center gap-3">
             <div className="flex h-[38px] w-[200px] items-center justify-end rounded-b-[18px] rounded-t-[6px] bg-black pr-3">
-              <Character3D size={32} color={color.hex} phones={phones} mood={mood} res={3} still={still} />
+              <Character3D char={ch.id} size={32} color={color.hex} acc={acc} mood={mood} res={3} still={still} />
             </div>
-            <Character3D size={64} color={color.hex} phones={phones} mood={mood} res={2.5} still={still} />
+            <Character3D char={ch.id} size={64} color={color.hex} acc={acc} mood={mood} res={2.5} still={still} />
           </div>
         </Group>
-        <p className="text-[11px] leading-relaxed text-label-3">Lokum'a tıklayınca basılıp geri yaylanır. İmleci oynatınca gözleriyle izler.</p>
+        <p className="text-[11px] leading-relaxed text-label-3">Karaktere tıklayınca tepki verir. İmleci oynatınca gözleriyle izler. Boştayken her biri kendine özgü şeyler yapar.</p>
       </div>
     </div>
   );

@@ -50,6 +50,8 @@ use tauri::{Manager, RunEvent, WindowEvent};
 pub fn run() {
     log::install_panic_hook();
     tauri::Builder::default()
+        // Windows'taki bölge (ör. "TR"): ilk açılışta dil seçimi için; İngilizce Windows + Türkiye bölgesi → Türkçe
+        .append_invoke_initialization_script(format!("window.__NOOK_REGION__={:?};", system_region()))
         // İkinci kez açılırsa (örn. başlangıçta + elle) yeni bir kopya başlatma.
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -187,11 +189,13 @@ pub fn run() {
             claude::claude_decide,
             claude::claude_setup,
             claude::claude_connect,
+            claude::claude_status_wrap,
             claude::claude_disconnect,
             remote::remote_info,
             remote::remote_set,
             remote::remote_reset,
             remote::remote_control_set,
+            remote::remote_test_notification,
             remote::remote_profile,
             remote::remote_notes,
             remote::remote_mirror,
@@ -202,7 +206,6 @@ pub fn run() {
             whatsapp::wa_disconnect,
             whatsapp::wa_select_chat,
             whatsapp::wa_send,
-            whatsapp::wa_push,
             wol::wol_status,
             wol::wol_fix,
             outside::outside_status,
@@ -258,6 +261,7 @@ pub fn run() {
             notify::spawn(handle.clone());
             net::spawn(handle.clone());
             share::spawn(handle.clone());
+            shield::recover();
             remote::spawn(handle.clone());
             whatsapp::spawn(handle.clone());
             powertimer::spawn(handle.clone());
@@ -294,7 +298,22 @@ pub fn run() {
         // Günlükte "kapandı" yoksa Nook çökmüş ya da zorla kapatılmış demektir
         .run(|_, event| {
             if let RunEvent::Exit = event {
+                shield::restore_on_exit();
                 log::write("info", "Nook kapandı");
             }
         });
+}
+
+/// Windows Ayarlar › Saat ve dil › Bölge'deki ülke kodu ("TR"); okunamazsa boş
+fn system_region() -> String {
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        winreg::RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"Control Panel\International\Geo")
+            .and_then(|k| k.get_value::<String, _>("Name"))
+            .unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    String::new()
 }

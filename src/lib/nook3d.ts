@@ -8,6 +8,8 @@ import { useEffect, useMemo, useReducer } from "react";
 import shader from "./nook3d.glsl?raw";
 import { capColor, type Look } from "./look";
 import { BAKED, BAKED_TAG } from "./bakedLooks";
+import { emitTo } from "@tauri-apps/api/event";
+import { inTauri, isPrimary } from "./bridge";
 
 /** Resmin kapsadığı alan, yüz çapının (2 birim) kaç katı: şapka, kulaklık, papyon sığsın */
 export const SPAN = 3.2;
@@ -18,9 +20,10 @@ const SHAPE_ID: Record<Look["shape"], number> = { sphere: 0, cloud: 1, heart: 2,
   stump: 43, sun: 44, moon: 45 };
 const TEX_ID: Record<Look["texture"], number> = { smooth: 0, plush: 1, matte: 2, jelly: 3, metal: 4, spots: 5, galaxy: 6, knit: 7, lava: 8, camo: 9, marble: 10, glass: 11, glow: 12, plaid: 13, stripes: 14, denim: 15, pixel: 16, fluffy: 17, gold: 18, chrome: 19 };
 const HAT_ID: Record<Look["head"], number> = { none: 0, beret: 1, headphones: 2, bowler: 3, antenna: 4, bow: 5, ears: 6, cap: 7, sprout: 8, flower: 9, star: 10, stalks: 11, witch: 12, horns: 13, bat: 14, cowboy: 15, pirate: 16, straw: 17, conductor: 18, helmet: 19, hardhat: 20, crown: 21, party: 22, beanie: 23, chef: 24, santa: 25, halo: 26, toadstool: 27, astronaut: 28, elf: 29, wizard: 30,
-  police: 31, nurse: 32, viking: 33, knight: 34, pilot: 35, safari: 36, detective: 37, miner: 38, nightcap: 39, clownwig: 40, bandana: 41, earflap: 42, earmuffs: 43, robot: 44 };
-const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4, eyepatch: 5, goggles: 6, hero: 7, masquerade: 8, neon: 9, snorkel: 10 };
-const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1, scarf: 2 };
+  police: 31, nurse: 32, viking: 33, knight: 34, pilot: 35, safari: 36, detective: 37, miner: 38, nightcap: 39, clownwig: 40, bandana: 41, earflap: 42, earmuffs: 43, robot: 44,
+  trapper: 45, rainhat: 46, headband: 47, bucket: 48, rainbowbucket: 49, rainbowbeanie: 50, newsboy: 51, moonwizard: 52, hood: 53, sitehat: 54 };
+const GLASSES_ID: Record<Look["glasses"], number> = { none: 0, round: 1, shades: 2, monocle: 3, bold: 4, eyepatch: 5, goggles: 6, hero: 7, masquerade: 8, neon: 9, snorkel: 10, magnifier: 11, rainbow: 12, visor: 13 };
+const NECK_ID: Record<Look["neck"], number> = { none: 0, bowtie: 1, scarf: 2, stripescarf: 3, greenscarf: 4 };
 const FACE_ID: Record<Look["face"], number> = { none: 0, mustache: 1, beard: 2, nose: 3, note: 4, sparkle: 5, bubbles: 6 };
 
 /** Gözlerin yeri (birim; yüz yarıçapı 1): y yukarı +, gap merkezden yana, z yüzün önü (gözlük için) */
@@ -36,7 +39,7 @@ const HAT_Y: Partial<Record<Look["shape"], number>> = {
   acorn: -0.26, orange: -0.12, cherry: -0.16, crystal: -0.06, rock: -0.3, stump: -0.32, sun: -0.24, moon: -0.12,
 };
 /** Başı saran ya da yanlara takılan başlıklar kaymaz (kulaklık, astronot kaskı, kulaklar, salyangoz gözü, kar kulaklığı, robot) */
-const HAT_FIXED = new Set<Look["head"]>(["none", "headphones", "astronaut", "ears", "stalks", "earmuffs", "robot"]);
+const HAT_FIXED = new Set<Look["head"]>(["none", "headphones", "astronaut", "ears", "stalks", "earmuffs", "robot", "hood"]);
 const hatY = (look: Look) => (HAT_FIXED.has(look.head) ? 0 : (HAT_Y[look.shape] ?? 0));
 
 export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number }> = {
@@ -91,7 +94,7 @@ export const ANCHORS: Record<Look["shape"], { y: number; gap: number; z: number 
 /** Gözler camın ardında mı (küçülür, az oynar); göz bandı cam değil — tek göz kapanır */
 export const lensOn = (look: Look) => !["none", "eyepatch", "hero", "masquerade"].includes(look.glasses);
 /** Gözleri tümden örten gözlükler (güneş, neon panjur): gözler çizilmez */
-export const hidesEyes = (look: Look) => look.glasses === "shades" || look.glasses === "neon";
+export const hidesEyes = (look: Look) => look.glasses === "shades" || look.glasses === "neon" || look.glasses === "rainbow" || look.glasses === "visor";
 /** Gözlük takılınca iki cam arasında köprüye yer kalsın diye gözler biraz açılır */
 export const eyeGap = (look: Look) => (!lensOn(look) ? ANCHORS[look.shape].gap : Math.max(ANCHORS[look.shape].gap, 0.38));
 /** Gözlük camının ardında gözler küçülür */
@@ -110,8 +113,8 @@ type Slot = "uShape" | "uHat" | "uGlasses" | "uFace" | "uTex";
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const GROUPS: Record<Slot, number[][]> = {
   uShape: [[0], range(1, 13), range(14, 21), range(22, 29), range(30, 37), range(38, 45)],
-  uHat: [[0], range(1, 20), range(21, 28), range(29, 36), range(37, 44)],
-  uGlasses: [[0], range(1, 6), range(7, 10)],
+  uHat: [[0], range(1, 20), range(21, 28), range(29, 36), range(37, 44), range(45, 49), range(50, 54)],
+  uGlasses: [[0], range(1, 6), range(7, 10), range(11, 13)],
   uFace: [[0], range(1, 6)],
   uTex: [[0, 1], range(2, 5), range(6, 12), range(13, 19)],
 };
@@ -190,6 +193,20 @@ function setup(): Ctx | null {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const out = document.createElement("canvas");
     ctx = { gl, gl2: !!gl2, canvas, vs, ext: gl.getExtension("KHR_parallel_shader_compile"), out, out2d: out.getContext("2d")! };
+    // Zayıf ekran kartında sürücü bağlamı düşürebilir: o zaman WebGL yokmuş gibi CSS Nook'a geçilir,
+    // derlenmeyi bekleyen her şey de beklemeyi bırakır (boş kalmasın)
+    canvas.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      console.warn("[nook] 3B çizici bağlamı düştü; düz çizime geçiliyor");
+      ctx = null;
+      for (const [key, p] of progs) {
+        if (p.state !== "pending") continue;
+        p.state = "failed";
+        const fns = readyListeners.get(key);
+        readyListeners.delete(key);
+        fns?.forEach((fn) => fn());
+      }
+    });
   } catch (e) {
     console.warn("[nook] 3B çizici", e);
     ctx = null;
@@ -396,6 +413,9 @@ function readiness(look: Look): "wait" | "ok" | "none" {
   return p.state === "pending" ? "wait" : p.state === "ready" ? "ok" : "none";
 }
 
+/** Bu bilgisayarda 3B çizim var mı (yoksa küçük Nook'lar düz CSS küresiyle çizilir) */
+export const hasWebGL = () => setup() !== null;
+
 /** Görünüm çizilebilir mi: "wait" derleniyor, "ok" hazır, "none" WebGL yok ya da derlenemedi */
 export const lookState = (look: Look) => readiness(look);
 
@@ -415,7 +435,32 @@ export function bodyImage(look: Look, color: string, size: number): string | nul
   if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
   cache.set(key, url);
   if (url) save(key, url);
+  // Studio'nun büyük Nook'u adadakiyle aynı resim: ada kendi çizicisini derlemeyi beklemesin
+  if (url && size >= 512) shareImage(key, url);
   return url;
+}
+
+/** Büyük resmi adaya bir kez gönder (Studio'dan; adanın kendisi göndermez) */
+const shared = new Set<string>();
+function shareImage(key: string, url: string) {
+  if (!inTauri || isPrimary || shared.has(key)) return;
+  shared.add(key);
+  void emitTo("island", IMAGE_EVENT, { key, url }).catch(() => {});
+}
+
+/** Başka pencerenin çizdiği resim (Studio → ada) */
+export const IMAGE_EVENT = "nook://body-image";
+const arrivals = new Map<string, Set<() => void>>();
+
+/** Gelen resmi önbelleğe al; onu bekleyen Nook hemen yenilensin */
+export function acceptImage(key: string, url: string) {
+  if (cache.get(key)) return;
+  if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
+  cache.set(key, url);
+  save(key, url);
+  const fns = arrivals.get(key);
+  arrivals.delete(key);
+  fns?.forEach((fn) => fn());
 }
 
 /** Önbellekteki resmi al ve "son kullanılan" yap */
@@ -438,8 +483,17 @@ function useProgramReady(look: Look, have: boolean) {
 }
 
 export function useBodyImage(look: Look, color: string, size: number) {
-  const ready = useProgramReady(look, hasImage(keyOf(look, color, size)));
-  return useMemo(() => bodyImage(look, color, size), [look.shape, look.texture, look.glasses, look.head, look.neck, look.face, color, size, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = keyOf(look, color, size);
+  const ready = useProgramReady(look, hasImage(key));
+  // Resim başka pencereden (Studio) gelirse programın derlenmesini beklemeden göster
+  const [got, bump] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (hasImage(key)) return;
+    if (!arrivals.has(key)) arrivals.set(key, new Set());
+    arrivals.get(key)!.add(bump);
+    return () => void arrivals.get(key)?.delete(bump);
+  }, [key]);
+  return useMemo(() => bodyImage(look, color, size), [look.shape, look.texture, look.glasses, look.head, look.neck, look.face, color, size, ready, got]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 // ------------------------------------------------------------------ sıralı çizim
@@ -524,6 +578,8 @@ function request(look: Look, color: string, size: number, done?: () => void) {
     waiting.get(key)!.add(done);
   }
   // Ekrandaki (bekleyeni olan) iş öne: sekme değişince yeni sekmenin Nook'ları eskilerin arkasında beklemesin
+  // Büyük önizleme (Görünüm'deki sahne) derleme sırası beklemesin: programı hemen derlenmeye başlar
+  if (done && size >= 512) readiness(look);
   const at = queue.findIndex((j) => j.key === key);
   if (at >= 0 && done) queue.unshift(...queue.splice(at, 1));
   else if (at < 0) (done ? queue.unshift : queue.push).call(queue, { key, look, color, size });
@@ -553,6 +609,11 @@ export function useBodyImageQueued(look: Look, color: string, size: number): str
   // Geliştirme önizlemesinin ekran görüntüsü beklemez: orada hemen çiz
   if (STILL && !hasImage(key)) bodyImage(look, color, size);
   const has = hasImage(key);
+  // Resim önbellekten/diskten geldiyse de ada alsın (onun disk listesi açılışta okunmuştu, yenileri görmez)
+  useEffect(() => {
+    const url = has && size >= 512 ? cache.get(key) : null;
+    if (url) shareImage(key, url);
+  }, [key, has]); // eslint-disable-line react-hooks/exhaustive-deps
   // Önbellekten düşmüşse (çok görünüm gezildi) yeniden sıraya girer — boş kalmaz
   useEffect(() => {
     if (hasImage(key)) return;

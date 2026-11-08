@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { create } from "zustand";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
@@ -12,7 +13,7 @@ import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, Keys
 import { ModulesArt, StudioArt } from "./TourArt3";
 import { ClaudeArt, DayArt, HumArt, OutingsArt, ShieldArt } from "./TourArt2";
 import { useClaude } from "../../lib/claude";
-import { isTurkish, tt } from "../../lib/i18n";
+import { tt } from "../../lib/i18n";
 import { prettyKeys, type ShortcutKey } from "../../lib/shortcuts";
 import { LangChips } from "../ui/LangPicker";
 
@@ -31,9 +32,14 @@ export interface Step {
   /** Metindeki {0}: bu kısayolun kullanıcının seçtiği tuşları; kısayol kaldırılmışsa `noKeys` metni */
   keys?: ShortcutKey;
   noKeys?: string;
-  /** Argus adımı: Türkçe dışında, Argus kurulu değilse gösterilmez (Argus yalnızca Türkçe) */
+  /** Argus adımı: Argus kurulu değilse gösterilmez */
   argus?: boolean;
+  /** Kısa turda yok: son adımda "Daha fazlasını gör" denirse gösterilir */
+  extra?: boolean;
 }
+
+/** Tanıtım kısa başlar (temel adımlar); son adımda istenirse öbür özellikler de anlatılır */
+export const useTourMore = create<{ more: boolean }>(() => ({ more: false }));
 
 export const STEPS: Step[] = [
   {
@@ -73,38 +79,21 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Klavyeden çağır"),
-    text: tt("Fareye uzanmana gerek yok. Bu kısayollar her yerde çalışır; istersen Studio › Ayarlar › Kısayollar'dan değiştirirsin."),
+    text: tt("Fareye uzanmana gerek yok. Bu kısayollar her yerde çalışır; istersen Studio › Ayarlar › Klavye kısayolları'ndan değiştirirsin."),
     color: ACCENT.yellow,
     antic: "suspicious",
     Art: KeysArt,
   },
   {
     title: tt("Benimle konuş"),
-    text: tt("Sohbet, ekrana sor ve sesli komut için Google'ın ücretsiz Gemini anahtarı lazım. Bir kere yapıştırman yeter; alarm kurar, not alır, müziği yönetir, aklımda tutarım."),
+    text: tt("Sohbet, ekrana sor ve sesli komut için Google'ın ücretsiz verdiği bir şifre, Gemini anahtarı lazım; nasıl alınacağı Studio › Ayarlar › Asistan'da adım adım yazar. Bir kere yapıştırman yeter; alarm kurar, not alır, müziği yönetir, aklımda tutarım. İstemezsen geç, gerisi anahtarsız da çalışır."),
     color: ACCENT.purple,
     antic: "love",
     Art: AiArt,
   },
   {
-    title: tt("Ekranını korurum"),
-    text: tt("Biri yanına gelince {0} tuşlarına bas: ekranını uyuyan Nook'ların bir sahnesi kaplar (kamp ateşi, deniz altı, uzay ve 19 tane daha). Çalan müzik durur, mikrofonun kapanır; istersen parolayla kilitlerim. Kart numarası, IBAN ya da şifre kopyalarsan panoda tutmam."),
-    keys: "shieldShortcut",
-    color: ACCENT.purple,
-    antic: "yawn",
-    Art: ShieldArt,
-  },
-  {
-    title: tt("Çalan şarkıyı bulurum"),
-    text: tt("Videoda, dizide çalan şarkıyı merak ettin mi? {0} tuşlarına bas, DJ kulaklığımı takıp dinlerim; adını, sanatçısını ve kapağını getiririm. Mikrofonu değil, bilgisayarın kendi sesini dinlerim."),
-    keys: "humShortcut",
-    noKeys: tt("Videoda, dizide çalan şarkıyı merak ettin mi? Adadaki Hum çipine dokun, DJ kulaklığımı takıp dinlerim; adını, sanatçısını ve kapağını getiririm. Mikrofonu değil, bilgisayarın kendi sesini dinlerim."),
-    color: ACCENT.pink,
-    antic: "hum",
-    Art: HumArt,
-  },
-  {
     title: tt("Sağlığına göz kulak olurum"),
-    text: tt("Uzun süre ekrana bakınca göz molası, aralıklarla su hatırlatırım. Bunlar her zaman çalışır, odak modu açık olmasa da. Oyundayken ve tam ekranda susarım."),
+    text: tt("Aralıklarla su hatırlatırım; istersen uzun süre ekrana bakınca göz molası da veririm, aşağıdan aç. Odak modu açık olmasa da çalışırlar. Oyundayken ve tam ekranda susarım."),
     color: ACCENT.teal,
     antic: "stretch",
     Art: CareArt,
@@ -117,11 +106,31 @@ export const STEPS: Step[] = [
     Art: DayArt,
   },
   {
+    title: tt("Ekranını korurum"),
+    text: tt("Biri yanına gelince {0} tuşlarına bas: ekranını uyuyan Nook'ların bir sahnesi kaplar (kamp ateşi, deniz altı, uzay ve 19 tane daha). Çalan müzik durur, mikrofonun kapanır; istersen parolayla kilitlerim. Kart numarası, IBAN ya da şifre kopyalarsan panoda tutmam."),
+    keys: "shieldShortcut",
+    color: ACCENT.purple,
+    antic: "yawn",
+    Art: ShieldArt,
+    extra: true,
+  },
+  {
+    title: tt("Çalan şarkıyı bulurum"),
+    text: tt("Videoda, dizide çalan şarkıyı merak ettin mi? {0} tuşlarına bas, DJ kulaklığımı takıp dinlerim; adını, sanatçısını ve kapağını getiririm. Mikrofonu değil, bilgisayarın kendi sesini dinlerim."),
+    keys: "humShortcut",
+    noKeys: tt("Videoda, dizide çalan şarkıyı merak ettin mi? Adadaki Hum çipine dokun, DJ kulaklığımı takıp dinlerim; adını, sanatçısını ve kapağını getiririm. Mikrofonu değil, bilgisayarın kendi sesini dinlerim."),
+    color: ACCENT.pink,
+    antic: "hum",
+    Art: HumArt,
+    extra: true,
+  },
+  {
     title: tt("Benim de bir keyfim var"),
     text: tt("İlgilendikçe mutlu olurum, uzun süre unutursan küserim. Beni tutup fırlatabilir, dürtebilirsin. Şimdi dene: soldaki beni tut ve fırlat!"),
     color: ACCENT.orange,
     antic: "shy",
     Art: MoodArt,
+    extra: true,
   },
   {
     title: tt("Ekranında dolaşırım"),
@@ -129,6 +138,7 @@ export const STEPS: Step[] = [
     color: ACCENT.teal,
     antic: "wander",
     Art: OutingsArt,
+    extra: true,
   },
   {
     title: tt("Beni kendine göre giydir"),
@@ -136,6 +146,7 @@ export const STEPS: Step[] = [
     color: ACCENT.pink,
     antic: "spin",
     Art: LookArt,
+    extra: true,
   },
   {
     title: tt("Argus'la birlikte çalışırım"),
@@ -148,6 +159,7 @@ export const STEPS: Step[] = [
     antic: "wink",
     Art: ArgusArt,
     argus: true,
+    extra: true,
   },
   {
     title: tt("Claude Code adada"),
@@ -156,6 +168,7 @@ export const STEPS: Step[] = [
     antic: "wink",
     Art: ClaudeArt,
     claude: true,
+    extra: true,
   },
   {
     title: tt("Hazırız!"),
@@ -167,13 +180,20 @@ export const STEPS: Step[] = [
 ];
 
 /**
- * Bu bilgisayarda gösterilecek adımlar: Claude Code yoksa onun adımı atlanır; Argus yalnızca Türkçe
- * olduğundan başka dilde, kurulu da değilse Argus adımı da.
+ * Bu bilgisayarda gösterilecek adımlar: Claude Code ya da Argus kurulu değilse onların adımı atlanır
+ * (Argus'u olmayana yalnızca Modüller'deki Argus kartı tanıtır).
  */
-export function useTourSteps() {
+export function useTourSteps(all = false) {
   const hasClaude = useClaude((s) => !!s.setup?.present);
   const hasArgus = useArgus((s) => !!s.snap);
-  return STEPS.filter((s) => (!s.claude || hasClaude) && (!s.argus || hasArgus || isTurkish));
+  const more = useTourMore((s) => s.more) || all;
+  return STEPS.filter((s) => (!s.claude || hasClaude) && (!s.argus || hasArgus) && (!s.extra || more));
+}
+
+/** Kısa turda gösterilmeyen (ve bu bilgisayarda olan) adım sayısı */
+function useExtraCount() {
+  const all = useTourSteps(true);
+  return all.filter((s) => s.extra).length;
 }
 
 /** Adım metni: {0} yerine kullanıcının o anki kısayolu */
@@ -194,10 +214,14 @@ export function Tour() {
   const merged = base.alt && !hasArgus ? { ...base, ...base.alt } : base;
   const cur = { ...merged, text: stepText(merged, settings) };
   const last = step === steps.length - 1;
+  const more = useTourMore((s) => s.more);
+  const extras = useExtraCount();
 
   useEffect(() => {
     playAntic(base.antic);
   }, [base]);
+  // Tanıtım kapanınca bir dahaki yine kısa başlasın
+  useEffect(() => () => useTourMore.setState({ more: false }), []);
 
   const next = () => (last ? endTour() : setStep(step + 1));
   const back = () => step > 0 && setStep(step - 1);
@@ -263,6 +287,16 @@ export function Tour() {
               </div>
             )}
             <div className="mt-5">{last ? <DoneTips /> : <HelloChips />}</div>
+            {last && !more && extras > 0 && (
+              <button
+                onClick={() => useTourMore.setState({ more: true })}
+                className="mt-4 flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] font-medium transition-colors"
+                style={{ background: tintBg(ACCENT.purple, 14), borderColor: tintBg(ACCENT.purple, 40), color: tintText(ACCENT.purple) }}
+              >
+                {tt("Başka neler yapabildiğimi gör ({0} adım)", extras)}
+                <ArrowRight size={13} strokeWidth={2.4} />
+              </button>
+            )}
           </motion.div>
         ) : (
           <motion.div
@@ -286,7 +320,7 @@ export function Tour() {
                   style={{ background: `radial-gradient(70% 90% at 50% 0%, ${tintBg(cur.color, 22)} 0%, transparent 70%)` }}
                 />
                 <span
-                  className="relative mb-2 w-fit rounded-full border px-2 py-[2px] text-[10.5px] font-medium tabular-nums"
+                  className="relative mb-2 w-fit rounded-full border px-2 py-[2px] text-[11.5px] font-medium tabular-nums"
                   style={{ background: tintBg(cur.color, 14), borderColor: tintBg(cur.color, 36), color: tintText(cur.color) }}
                 >
                   {step} / {steps.length - 2}

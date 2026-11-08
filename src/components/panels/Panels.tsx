@@ -34,6 +34,7 @@ import { StatsPanel } from "./StatsPanel";
 import { ClaudePanel } from "./ClaudePanel";
 import { WhatsAppPanel } from "./WhatsAppPanel";
 import { HabitsPanel } from "./HabitsPanel";
+import { NewsPanel } from "./NewsPanel";
 
 const PANEL: Record<Module, () => React.JSX.Element> = {
   chat: () => <ChatPanel />,
@@ -63,6 +64,7 @@ const PANEL: Record<Module, () => React.JSX.Element> = {
   claude: ClaudePanel,
   whatsapp: WhatsAppPanel,
   hum: HumPanel,
+  news: NewsPanel,
 };
 
 const TITLE = {

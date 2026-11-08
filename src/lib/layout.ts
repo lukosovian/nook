@@ -130,6 +130,7 @@ export const MODULE_SIZE: Partial<Record<string, IslandSize>> = {
   calendar: { width: 724, height: 330 },
   remind: { width: 700, height: 316 },
   habits: { width: 724, height: 330 },
+  news: { width: 724, height: 330 },
   apps: { width: 690, height: 300 },
   notify: { width: 690, height: 320 },
   control: { width: 680, height: 320 },

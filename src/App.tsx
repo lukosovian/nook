@@ -2,7 +2,10 @@ import { usePowerTimerFeed } from "./lib/powerTimer";
 import { useSupportersFeed } from "./lib/supporters";
 import { useEffect } from "react";
 import { CHIP_NOOKS } from "./lib/look";
-import { prefetchBodies } from "./lib/nook3d";
+import { acceptImage, IMAGE_EVENT, prefetchBodies, warmLook } from "./lib/nook3d";
+import { WARM_EVENT } from "./components/panels/LookPanel";
+import { subscribe } from "./lib/bridge";
+import type { Look } from "./lib/look";
 import { figureRes } from "./components/mascot/Figure";
 import { Island } from "./components/Island";
 import { useUpdateCheck } from "./lib/update";
@@ -129,6 +132,14 @@ export default function App() {
 function useChipPrefetch() {
   useEffect(() => {
     const t = window.setTimeout(() => prefetchBodies(Object.values(CHIP_NOOKS).map((c) => ({ look: c.look, color: c.color, size: figureRes(22) }))), 4000);
-    return () => window.clearTimeout(t);
+    // Studio › Görünüm'de üstüne gelinen seçenek: adanın çizicisi de şimdiden derlesin, tıklayınca beklemesin
+    const off = subscribe<Look>(WARM_EVENT, (look) => warmLook(look));
+    // Studio'nun çizdiği büyük Nook: ada kendi derlemesini beklemeden onu gösterir
+    const offImg = subscribe<{ key: string; url: string }>(IMAGE_EVENT, (m) => acceptImage(m.key, m.url));
+    return () => {
+      window.clearTimeout(t);
+      off();
+      offImg();
+    };
   }, []);
 }

@@ -241,7 +241,7 @@ function NotReady({ state }: { state: ReturnType<typeof useGemini> }) {
           ? tt("Gemini'ye bağlanıyorum…")
           : state.status === "error"
             ? tt("Gemini'ye bağlanamadım: {0}", state.error)
-            : tt("Konuşabilmem için Ayarlar'a Gemini API anahtarını yapıştırman lazım.")}
+            : tt("Konuşabilmem için ücretsiz bir Gemini anahtarı lazım: Google hesabınla bir dakikada alınır, Ayarlar › Asistan'a yapıştırırsın. Anahtar olmadan Nook'un geri kalanı aynen çalışır.")}
       </p>
       {state.status !== "checking" && (
         <button

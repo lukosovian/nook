@@ -48,7 +48,7 @@ const GRID = [
   { label: tt("Alarm"), color: ACCENT.yellow },
   { label: tt("Hatırlatıcı"), color: ACCENT.orange },
   { label: tt("Takvim"), color: ACCENT.blue },
-  { label: tt("Kısayollar"), color: ACCENT.blue },
+  { label: tt("Uygulamalar"), color: ACCENT.blue },
   { label: tt("Kontrol"), color: ACCENT.green },
   { label: tt("Sistem"), color: ACCENT.red },
 ];

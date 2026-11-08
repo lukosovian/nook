@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronRight, Droplet, MoreHorizontal } from "lucide-react";
-import { cached, getMedia, wakePc, drinkWater, type Pairing, type NowPlaying, type PcNote, type Status } from "../lib/pc";
+import { cached, CLOCK_MSG, getMedia, wakePc, drinkWater, type Pairing, type NowPlaying, type PcNote, type Status } from "../lib/pc";
 import { ChipNook, errText, Sheet, tintBg, tintText, useToast } from "../ui";
 import { LiveNook } from "../LiveNook";
 import { installUpdate, useInstallProgress, useMobileUpdate } from "../lib/update";
@@ -127,7 +127,9 @@ export function HomeScreen({
                 ? "Bağlanıyor…"
                 : conn === "auth"
                   ? "Eşleşme geçersiz"
-                  : "Ulaşılamıyor"}
+                  : conn === "clock"
+                    ? "Saat farkı"
+                    : "Ulaşılamıyor"}
           </span>
         </span>
         <button onClick={() => setMenu(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-label-2">
@@ -141,6 +143,7 @@ export function HomeScreen({
       {/* Su Takibi ve Hızlı Bardak Ekleme */}
       <WaterCard pairing={pairing} status={status} />
 
+      {conn === "clock" && <div className="rounded-3xl bg-red/10 p-4 text-[13.5px] text-red">{CLOCK_MSG}</div>}
       {conn === "auth" && (
         <div className="rounded-3xl bg-red/10 p-4 text-[13.5px] text-red">PC'de eşleşme sıfırlanmış. Menüden “Eşleşmeyi kaldır”a bas ve kodu yeniden okut.</div>
       )}
@@ -510,7 +513,7 @@ function OutsideTip({ pairing }: { pairing: Pairing }) {
         </button>
       </div>
       <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[13px] leading-snug text-label-2">
-        <li>PC'de Nook › Ayarlar › Telefon › “Evden uzaktayken bağlanma” adımlarını tamamla (Tailscale'i oradan kurabilirsin).</li>
+        <li>PC'de Nook Studio › Ayarlar › Telefon › “Evden uzaktayken bağlanma” adımlarını tamamla (Tailscale'i oradan kurabilirsin).</li>
         <li>Bu telefona Tailscale'i kur ve PC'deki hesapla giriş yap.</li>
         <li>Hepsi bu: Nook Mobil yeni adresi kendisi öğrenir, kodu yeniden okutman gerekmez.</li>
       </ol>

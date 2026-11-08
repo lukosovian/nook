@@ -22,13 +22,51 @@ const WHEN: When[] = [
   { id: "30", label: tt("30 dk"), at: () => Date.now() + 30 * 60_000 },
   { id: "60", label: tt("1 saat"), at: () => Date.now() + 60 * 60_000 },
   { id: "180", label: tt("3 saat"), at: () => Date.now() + 180 * 60_000 },
-  // Akşam 20:00 geçtiyse seçenek kaybolur
+  // 19:00'dan sonra seçenek kaybolur (akşam 20:00'ye bir saatten az kalınca)
   { id: "eve", label: tt("Bu akşam"), at: () => (new Date().getHours() < 19 ? at(0, 20) : null) },
-  { id: "tom", label: tt("Yarın sabah"), at: () => at(1, 9) },
+  // Gece 05:00'ten önce "yarın sabah" uyanınca gelen sabahtır (aynı takvim günü)
+  { id: "tom", label: tt("Yarın sabah"), at: () => at(new Date().getHours() < 5 ? 0 : 1, 9) },
 ];
 
-/** "çamaşır 20 dk", "20 dakika sonra ilaç", "toplantı 14:30" → metin ve an; saat yoksa null */
+/** Pazar = 0 (Date.getDay); "cumartesi" "cuma"dan, "pazartesi" "pazar"dan önce denenir */
+const WEEKDAYS: [RegExp, number][] = [
+  [/pazartesi/, 1],
+  [/sal[ıi]/, 2],
+  [/[çc]ar[şs]amba/, 3],
+  [/per[şs]embe/, 4],
+  [/cumartesi/, 6],
+  [/cuma/, 5],
+  [/pazar/, 0],
+];
+
+/** "salı 10:00 ders", "cuma günü fatura" → o günün (bugünse ve saat geçmediyse bugün) o saati; saat yoksa 09:00 */
+function parseWeekday(text: string): { title: string; at: number } | null {
+  for (const [re, wd] of WEEKDAYS) {
+    const m = new RegExp(`(?:^|\\s)${re.source}(?:\\s+g[üu]n[üu])?(?=\\s|$)`, "iu").exec(text);
+    if (!m) continue;
+    const abs = /(?:^|\s)(?:saat\s+)?(\d{1,2})[:.](\d{2})(?=\s|$)/iu.exec(text);
+    const h = abs ? Number(abs[1]) : 9;
+    const min = abs ? Number(abs[2]) : 0;
+    if (h > 23 || min > 59) return null;
+    let days = (wd - new Date().getDay() + 7) % 7;
+    if (days === 0 && at(0, h, min) <= Date.now()) days = 7;
+    let title = text.replace(m[0], " ");
+    if (abs) title = title.replace(abs[0], " ");
+    return { title: title.replace(/\s+/g, " ").trim(), at: at(days, h, min) };
+  }
+  return null;
+}
+
+/** "çamaşır 20 dk", "20 dakika sonra ilaç", "toplantı 14:30", "yarın 21:00 sunum", "salı 10:00 ders" → metin ve an; saat yoksa null */
 function parse(text: string): { title: string; at: number } | null {
+  const wd = parseWeekday(text);
+  if (wd) return wd;
+  // "yarın" + saat: ertesi takvim gününün o saati (gece 02:00'de de)
+  const tom = /(?:^|\s)yar[ıi]n(?=\s|$)/iu.exec(text);
+  const tomAbs = tom && /(?:^|\s)(?:saat\s+)?(\d{1,2})[:.](\d{2})(?=\s|$)/iu.exec(text);
+  if (tom && tomAbs && Number(tomAbs[1]) < 24 && Number(tomAbs[2]) < 60) {
+    return { title: text.replace(tom[0], " ").replace(tomAbs[0], " ").trim(), at: at(1, Number(tomAbs[1]), Number(tomAbs[2])) };
+  }
   const rel = /(?:^|\s)(\d{1,3})\s*(dk|dakika|sa|saat)(?:\s+sonra)?(?=\s|$)/iu.exec(text);
   if (rel) {
     const n = Number(rel[1]) * (/^s/i.test(rel[2]) ? 60 : 1);

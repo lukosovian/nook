@@ -19,7 +19,7 @@ Windows 10 / 11 · Free · English, Türkçe, Español, Português, Deutsch, Fra
 
 ## What it does
 
-Move the mouse to the black notch at the top center of your screen and the island opens. Move away and it closes. Every module opens the island at its own size, and while it's closed the island can show small live pills (music, timer, next alarm…). It never covers your windows and hides itself in games and full-screen video.
+Move the mouse to the black notch at the top center of your screen and the island opens. Move away and it closes. Every module opens the island at its own size, and while it's closed the island can show small live pills (music, timer, next alarm…). It never covers your windows, and in games and full-screen video it steps aside — or moves to your other screen if you have one.
 
 <img src="docs/home.png" alt="Home page with chips" width="680">
 
@@ -35,12 +35,14 @@ Move the mouse to the black notch at the top center of your screen and the islan
 | 🍅 **Pomodoro** | Focus timer with a **focus guard**: open YouTube or X while working and Nook knocks on the glass |
 | 🔎 **Quick search** | `Ctrl+Shift+Space` — open apps, calculate, convert units and currencies, find emoji, search the web |
 | 🎛️ **Controls** | Wi-Fi, Bluetooth, dark mode, mic, per-app volume, brightness, and a scheduled shutdown |
-| ⌨️ **Shortcuts** | A Stream Deck–style grid of buttons: open apps, sites and folders with one click |
+| ⌨️ **Shortcuts** | A Stream Deck–style grid of buttons: open apps, sites and folders with one click, each with its own hotkey. **Automations** run steps on their own — at a time, when an app opens, when your phone gets home… |
 | 📊 **System · Report card** | CPU, memory, network, disk — and a weekly report card of your focus, music and breaks |
-| 🔔 **Notifications** | Windows notifications shown on the island (muted while you focus) |
+| 🔔 **Notifications** | Windows and phone notifications on the island: hover to read the full text, swipe or × to dismiss, and an incoming phone call gets its own card (Decline / Silence). Muted while you focus |
+| 💬 **WhatsApp** | Unread chats at a glance, reply right from the notification, mute chats you don't want to hear from |
+| 💧 **Habits** | One-tap water tracking and small healthy habits, with gentle reminders (synced with Nook Mobile) |
 | 🗂️ **Profiles** | Arrange modules on one grid, hide the ones you don't use, and keep separate home pages for Work, Games, Fun… Move the island anywhere on screen by its handle |
-| 🎮 **Games** | Five mini games to play with Nook |
-| ☀️ **Daily brief** | The first time you open it each day: weather, alarms, water, new episodes |
+| 🎮 **Games** | Six mini games to play with Nook |
+| ☀️ **Daily brief · Weather** | The first time you open it each day: weather, alarms, water, new episodes. The island also shows live weather — rain, snow, a night sky |
 | 🔊 **Sounds** | Soft little sounds when the island opens, a notification arrives or Nook is happy (Studio › Settings › Sound) |
 | 📔 **Nook's diary** | Nook writes a short diary entry about your day |
 
@@ -48,9 +50,9 @@ Move the mouse to the black notch at the top center of your screen and the islan
 
 Nook is a little 3D character with moods. Care for it and it's happy; ignore it and it sulks. Grab it and fling it, poke it, feed it files. It reacts to your music, the weather and the time of day.
 
-<img src="docs/look.png" alt="Dress up Nook" width="680">
+<img src="docs/look.png" alt="Dress up Nook in Nook Studio" width="680">
 
-Dress it up your way: **14 bodies** (sphere, cloud, heart, star, cat, teddy…), **6 textures** (vinyl, plush, matte clay, jelly, metallic, spotted), **20 colors**, glasses, hats, bows and Halloween costumes.
+Dress it up your way in Studio › Look: pick one of **78 ready-made looks** (astronaut, king, mushroom, strawberry…) or build your own from **46 bodies**, **20 textures**, **20 colors**, eyes, glasses, hats and more — and save your favorites. Your Nook looks the same on the island, your phone and the privacy shield.
 
 #### Nook goes outside
 
@@ -67,7 +69,9 @@ Dress it up your way: **14 bodies** (sphere, cloud, heart, star, cat, teddy…),
 
 ### Nook Studio
 
-A separate window for everything that doesn't fit on the island: all settings (with search), the **look** of your Nook, the weekly **report card**, your **year in review**, **patch notes**, shows and movies from Argus, and a chat with Nook. Open it from the tray icon or the island. Updates install right on the island — pick one of ten update animations.
+A separate window for everything that doesn't fit on the island: all settings (with search), the **look** of your Nook, **wallpapers** with Nook in them (they can change on their own), shortcuts and automations, modules and profiles, the weekly **report card**, your **year in review**, play time, **patch notes**, shows and movies from Argus, and a chat with Nook. Open it from the tray icon or the island. Updates install right on the island — pick one of ten update animations.
+
+<img src="docs/studio.png" alt="Nook Studio" width="680">
 
 ### Nook Mobile (Android)
 
@@ -97,15 +101,13 @@ With a free **Google Gemini** key, Nook can chat, set alarms and timers, take no
 - **Interface size** from 80% to 150% for 4K displays and small laptops.
 - **Color-blind palettes** for protanopia, deuteranopia and tritanopia.
 
-<img src="docs/settings.png" alt="Settings" width="680">
-
 ---
 
 ## Install
 
 1. Download [**Nook-setup.exe**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe) (always the latest version) and run it.
 2. Nook isn't code-signed yet, so Windows may show **"Windows protected your PC"**. Click **More info → Run anyway**.
-3. Nook starts at the top of your screen and introduces itself. It starts with Windows and **updates itself** (Studio › Settings › About).
+3. Nook starts at the top of your screen and introduces itself. It starts with Windows, **finds updates itself** and installs them with one click (Studio › Settings › About).
 
 **Requirements:** Windows 10 or 11 (64-bit) with Microsoft Edge WebView2 (already included in Windows 11).
 
@@ -131,8 +133,8 @@ Go to [aistudio.google.com](https://aistudio.google.com), sign in with your Goog
 
 ### FAQ
 
-- **Does it slow down games?** No. When a game or video goes full screen, the island disappears completely and stops drawing.
-- **Where is my data?** In Nook's own folder on your computer (`%LOCALAPPDATA%\app.nook.island`). Your notes, clipboard, alarms and settings are never uploaded.
+- **Does it slow down games?** No. When a game or video goes full screen, the island disappears and stops drawing (or moves to your other screen).
+- **Where is my data?** On your computer, in two folders: notes, clipboard, alarms and settings in `%LOCALAPPDATA%\app.nook.island`; logs, the phone pairing key and window sizes in `%LOCALAPPDATA%\Nook`. None of it is uploaded.
 - **What's Argus?** Nook's sibling app for tracking shows and movies. If it's installed, Nook shows your next episodes and can mark what you watched. Nook works fine without it.
 
 ---
@@ -162,13 +164,13 @@ Thanks to everyone who starred Nook on GitHub — you show up in Studio › Sett
 
 ## Türkçe
 
-**Nook**, Windows ekranının üst ortasındaki çentikte yaşayan, 3B maskotlu bir "Dynamic Island". Fareyi çentiğe götür, ada açılsın: müzik ve şarkı sözleri, dosya rafı, pano geçmişi, not, alarm, takvim, Pomodoro ve odak bekçisi, hızlı arama, kontrol merkezi, sistem bilgisi, bildirimler, mini oyunlar ve günün özeti hepsi bir arada. Her modül adayı kendi boyutunda açar, kapalı adada küçük canlı kapsüller durur; modülleri tek ızgarada dizer, İş / Oyun / Eğlence gibi profiller kurarsın. Ayarlar, Görünüm, Karne, Yıl özeti ve Yama notları **Nook Studio** penceresinde.
+**Nook**, Windows ekranının üst ortasındaki çentikte yaşayan, 3B maskotlu bir "Dynamic Island". Fareyi çentiğe götür, ada açılsın: müzik ve şarkı sözleri, dosya rafı, pano geçmişi, not, alarm, takvim, Pomodoro ve odak bekçisi, hızlı arama, kontrol merkezi, sistem bilgisi, bildirimler ve telefon araması kartı, WhatsApp, su ve alışkanlık takibi, canlı hava durumu, mini oyunlar ve günün özeti hepsi bir arada. Her modül adayı kendi boyutunda açar, kapalı adada küçük canlı kapsüller durur; modülleri tek ızgarada dizer, İş / Oyun / Eğlence gibi profiller kurarsın. Kısayol tuşları ve otomasyonlar ("bu olunca şunu yap") da var. Ayarlar, Görünüm, Nook'lu duvar kağıtları, Karne, Yıl özeti ve Yama notları **Nook Studio** penceresinde.
 
 **Hum** (`Ctrl+Alt+M`) videoda ya da dizide çalan şarkıyı bulur. **Claude Code** kullanıyorsan oturumlarını adada izler, izin isteklerini ve sorularını terminale dönmeden adadan cevaplarsın; plan limitinin ne kadar dolduğunu da görürsün.
 
 Nook'un keyfi vardır; ilgilenirsen sevinir, unutursan küser. Ara sıra dışarı da çıkar: pencerelerin üstüne tüner, adadan iple sarkar, sen yokken masaüstünde balık tutar. Gemini anahtarınla sohbet eder, ekranına bakar; sesli komutları ("Hey Nook") bilgisayarda internetsiz yazıya döker. Gizlilik kalkanı (`Ctrl+Alt+H`) ekranını 22 canlı Nook sahnesinden biriyle örter, mikrofonunu kapatır, istersen parolayla kilitlenir; hassas veri koruyucusu kopyaladığın şifreyi ve kart numarasını panoda tutmaz. Her şey bilgisayarında kalır. 9 dil, arayüz boyutu ve renk körü paletleri var.
 
-**Kurulum:** [**Nook-setup.exe**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe)'yi indirip çalıştır (her zaman en yeni sürüm). Windows "bilgisayarınız korundu" derse **Ek bilgi → Yine de çalıştır**. Nook kendini tanıtır, Windows'la açılır ve kendiliğinden güncellenir.
+**Kurulum:** [**Nook-setup.exe**](https://github.com/lukosovian/nook/releases/latest/download/Nook-setup.exe)'yi indirip çalıştır (her zaman en yeni sürüm). Windows "bilgisayarınız korundu" derse **Ek bilgi → Yine de çalıştır**. Nook kendini tanıtır, Windows'la açılır; yeni sürümü kendisi bulur, tek tıkla kurarsın (Studio › Ayarlar › Hakkında).
 
 **Nook Mobil:** Android telefondan bilgisayarın müziğini yönet, ekranını gör ve kontrol et, rafa dosya at, bilgisayarı aç kapat. [NookMobil.apk](https://github.com/lukosovian/nook/releases/latest/download/NookMobil.apk).
 

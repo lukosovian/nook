@@ -31,6 +31,9 @@ class MainActivity : TauriActivity() {
     val b = NookBridge(this, webView)
     bridge = b
     webView.addJavascriptInterface(b, "NookNative")
+    // Telefonda yazı büyütülmüşse uygulamadaki yazı da büyüsün (düzen bozulmasın diye en fazla %130)
+    val scale = resources.configuration.fontScale
+    if (scale > 1.01f) webView.settings.textZoom = (scale * 100).toInt().coerceAtMost(130)
   }
 
   override fun onNewIntent(intent: Intent) {

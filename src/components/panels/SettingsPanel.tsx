@@ -12,7 +12,7 @@ import { checkPassword, hashPassword } from "../../lib/lock";
 import { startTour } from "../../lib/tour";
 import { openStudio, isStudio, studioGo } from "../../lib/studio";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
-import { chooseArgusDir, installArgus, openArgus, useArgus } from "../../lib/argus";
+import { chooseArgusDir, openArgus, useArgus } from "../../lib/argus";
 import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
 import { latestNote, NOTES } from "../../lib/notes";
 import { normalizeColor, normalizeLook } from "../../lib/look";
@@ -22,8 +22,9 @@ import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle, Dropdown, tintBg,
 import { INTRO_KINDS } from "../overlays/Intro";
 import { MOVE_KINDS } from "../../lib/moveFx";
 import { IntroPreview, MovePreview, UpdateAnimGallery } from "./EffectPreview";
+import { UpdateBody } from "../overlays/UpdateAnims";
 import { LangDropdown } from "../ui/LangPicker";
-import { isTurkish, tt } from "../../lib/i18n";
+import { tt } from "../../lib/i18n";
 import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 import { conflictOf, duplicateOf, isFailed, prettyKeys, SHORTCUTS, spareShortcut, useInstalledApps, useShortcutFailures } from "../../lib/shortcuts";
@@ -86,6 +87,14 @@ const WEATHER_LEVEL: { id: "low" | "mid" | "high"; label: string }[] = [
   { id: "high", label: tt("Çok") },
 ];
 
+const NOTIFY_SECS: { id: number; label: string }[] = [
+  { id: 0, label: tt("Otomatik") },
+  { id: 3, label: tt("3 sn") },
+  { id: 6, label: tt("6 sn") },
+  { id: 10, label: tt("10 sn") },
+  { id: 20, label: tt("20 sn") },
+];
+
 const WATER: { id: number; label: string }[] = [
   { id: 0, label: tt("Yok") },
   { id: 45, label: tt("45 dk") },
@@ -101,11 +110,11 @@ export const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; c
   { id: "island", title: tt("Ada ve Nook"), hint: tt("Uyku, gezinti, animasyonlar"), icon: Sparkles, color: ACCENT.pink, sections: [tt("Ada"), tt("Animasyonlar")] },
   { id: "notify", title: tt("Bildirimler"), hint: tt("Bildirim kartları, uyarılar"), icon: Bell, color: ACCENT.purple, sections: [tt("Bildirimler")] },
   { id: "health", title: tt("Sağlık"), hint: tt("Su, göz molası, odak bekçisi"), icon: HeartPulse, color: ACCENT.teal, sections: [tt("Mola hatırlatıcıları"), tt("Odak bekçisi")] },
-  { id: "game", title: tt("Oyun"), hint: tt("Tam ekran, oyun özeti, mola"), icon: Gamepad2, color: ACCENT.orange, sections: [tt("Oyun")] },
+  { id: "game", title: tt("Tam ekran"), hint: tt("Oyun ve video, oyun özeti, mola"), icon: Gamepad2, color: ACCENT.orange, sections: [tt("Tam ekran")] },
   { id: "privacy", title: tt("Gizlilik"), hint: tt("Kalkan, parola, yayın, hassas veri"), icon: ShieldCheck, color: ACCENT.red, sections: [tt("Yayın ve hassas veri"), tt("Gizlilik kalkanı"), tt("Parola kilidi")] },
   { id: "voice", title: tt("Asistan"), hint: tt("Gemini, Hey Nook, sesler"), icon: AudioLines, color: ACCENT.yellow, sections: [tt("Yapay zekâ"), "Hey Nook", tt("Ses")] },
   { id: "modules", title: tt("Modüller"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
-  { id: "shortcuts", title: tt("Kısayollar"), hint: tt("Klavye kısayolları"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Kısayollar")] },
+  { id: "shortcuts", title: tt("Klavye kısayolları"), hint: tt("Her yerde çalışan tuşlar"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Klavye kısayolları")] },
   { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.teal, sections: [tt("Telefon")] },
   { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, geribildirim, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Günlük kayıtları"), tt("Geribildirim"), tt("Destekçiler")] },
 ];
@@ -165,6 +174,7 @@ export const SettingsLook = createContext<"island" | "studio">("island");
 export function CategoryBody({ id }: { id: CatId }) {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
+  const weatherHint = useWeatherHint(!s.weatherCity.trim());
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   useEffect(() => {
     if (id === "general") void listMonitors().then(setMonitors);
@@ -214,6 +224,12 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Section title={tt("Erişilebilirlik")}>
             <Row label={tt("Arayüz boyutu")}>
               <Segmented id="scale" options={SCALES} value={s.uiScale} onChange={(v) => update({ uiScale: v })} />
+            </Row>
+            <Row label={tt("Net yazı")} hint={tt("Soluk gri yazılar açılır, koyu kartta daha kolay okunur")}>
+              <Toggle on={s.clearText} onChange={(v) => update({ clearText: v })} color={ACCENT.yellow} />
+            </Row>
+            <Row label={tt("Daha az hareket")} hint={tt("Kayan, büyüyen animasyonlar ve hava efektleri durur. Windows'ta animasyonlar kapalıysa kendiliğinden azalır")}>
+              <Toggle on={s.calmMotion} onChange={(v) => update({ calmMotion: v })} color={ACCENT.teal} />
             </Row>
             <Row label={tt("Renk körlüğü paleti")}>
               <Dropdown options={VISION} value={s.colorVision} onChange={(v) => update({ colorVision: v })} />
@@ -295,6 +311,9 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Row label={tt("Windows bildirimleri")} hint={tt("Gelen bildirimler adada kart olarak görünür")}>
             <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} />
           </Row>
+          <Row label={tt("Kart ekranda kalma süresi")} hint={tt("Windows, telefon ve WhatsApp bildirim kartları; üstüne gelince süre durur")}>
+            <Segmented id="settings-notify-secs" options={NOTIFY_SECS} value={s.notifySecs ?? 0} onChange={(v) => update({ notifySecs: v })} />
+          </Row>
           <Row label={tt("WhatsApp bildirim kartları")} hint={tt("Mesaj gelince adada hızlı yanıt kartı çıkar; kapatırsan yalnızca modülde birikir")}>
             <Toggle on={s.whatsappNotify} onChange={(v) => update({ whatsappNotify: v })} color={ACCENT.green} />
           </Row>
@@ -307,7 +326,7 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Row label={tt("Sistem uyarıları")} hint={tt("Uzun süre yüksek işlemci / bellek, dolan disk")}>
             <Toggle on={s.sysAlerts} onChange={(v) => update({ sysAlerts: v })} color={ACCENT.orange} />
           </Row>
-          <Row label={tt("Kopyalanan yabancı metni çevir")}>
+          <Row label={tt("Kopyalanan yabancı metni çevir")} hint={tt("Açıksa yabancı dilde görünen kopyalar çevrilmek için Gemini'ye gönderilir")}>
             <Toggle on={s.translate} onChange={(v) => update({ translate: v })} />
           </Row>
           {s.translate && !s.geminiKey.trim() && (
@@ -349,7 +368,7 @@ export function CategoryBody({ id }: { id: CatId }) {
       );
     case "game":
       return (
-        <Section title={tt("Oyun")}>
+        <Section title={tt("Tam ekran")}>
           <Row label={tt("Oyunda / tam ekranda gizlen")}>
             <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
           </Row>
@@ -401,7 +420,7 @@ export function CategoryBody({ id }: { id: CatId }) {
               <Toggle on={s.weather} onChange={(v) => update({ weather: v })} />
             </Row>
             {s.weather && (
-              <Row label={tt("Şehir")}>
+              <Row label={tt("Şehir")} hint={weatherHint}>
                 <TextInput value={s.weatherCity} placeholder={tt("Otomatik")} onChange={(v) => update({ weatherCity: v })} />
               </Row>
             )}
@@ -466,7 +485,7 @@ export function CategoryBody({ id }: { id: CatId }) {
  * sürüm numarası, büyük sürümse rozeti; altında güncelleme durumu ve düğmesi.
  */
 function AboutHero() {
-  const { current, available, progress, status } = useUpdate();
+  const { current, available, progress, status, restarting, anim } = useUpdate();
   const look = normalizeLook(useNook((s) => s.settings.look));
   const color = normalizeColor(useNook((s) => s.settings.faceColor));
   const version = current || latestNote().version;
@@ -495,14 +514,25 @@ function AboutHero() {
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {progress !== null ? (
+          {progress !== null && anim ? (
+            // Adadaki güncelleme kapsülünün aynısı: aynı animasyon, aynı ilerleme
+            <div className="relative h-10 w-[300px] overflow-hidden rounded-[18px] bg-black shadow-[0_10px_26px_-8px_rgba(0,0,0,0.95)]">
+              <div className="absolute left-[13px] top-1/2 -translate-y-1/2">
+                <NookFigure look={look} color={color} size={26} expression={restarting ? "happy" : "downloading"} />
+              </div>
+              <UpdateBody anim={anim} p={progress} done={restarting} version={available} />
+            </div>
+          ) : progress !== null ? (
             <span className="text-[12.5px] font-bold tabular-nums" style={{ color: tintText(ACCENT.green) }}>
               {tt("İndiriliyor %{0}", progress)}
             </span>
           ) : available ? (
-            <motion.button whileTap={{ scale: 0.96 }} onClick={() => void installUpdate()} className="rounded-[13px] px-4 py-2 text-[13px] font-bold text-black" style={{ background: ACCENT.green }}>
-              {tt("{0} sürümüne güncelle", available)}
-            </motion.button>
+            <>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => void installUpdate()} className="rounded-[13px] px-4 py-2 text-[13px] font-bold text-black" style={{ background: ACCENT.green }}>
+                {status ? tt("Yeniden dene") : tt("{0} sürümüne güncelle", available)}
+              </motion.button>
+              {status && <span className="max-w-[280px] text-right text-[11.5px] leading-snug" style={{ color: tintText(ACCENT.red) }}>{status}</span>}
+            </>
           ) : (
             <>
               <span className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: tintText(ACCENT.green) }}>
@@ -523,20 +553,8 @@ export function ArgusSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const snap = useArgus((st) => st.snap);
-  // Argus yalnızca Türkçe: başka dilde, kurulu değilse önerilmez
-  if (!snap && !isTurkish) return null;
-  if (!snap)
-    return (
-      <Section title="Argus">
-        <Row label={tt("Dizi/film arşivi: Argus")}>
-          <TextButton onClick={() => void installArgus()}>{tt("Kur")}</TextButton>
-        </Row>
-        <Row label={tt("Argus kurulu ama bulamadım")}>
-          <TextButton onClick={() => void chooseArgusDir()}>{tt("Klasörünü seç")}</TextButton>
-        </Row>
-        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Nook'un kardeşi. Kurarsan yeni bölümleri haber veririm, ne izleyeceğini seçerim.")}</p>
-      </Section>
-    );
+  // Kurulu değilse burada görünmez; tanıtımı Modüller'deki Argus kartında
+  if (!snap) return null;
   return (
     <Section title="Argus">
       <Row label={tt("Profil")}>
@@ -587,14 +605,24 @@ function PhoneSection() {
   const [appQr, setAppQr] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
-  useEffect(() => void remoteInfo().then(setInfo), []);
+  const [fw, setFw] = useState<"idle" | "busy" | "ok" | string>("idle");
+  useEffect(() => {
+    void remoteInfo().then(setInfo);
+    // Telefon bağlanınca durum kendiliğinden "Bağlı"ya dönsün
+    const t = window.setInterval(() => void remoteInfo().then(setInfo), 4000);
+    return () => window.clearInterval(t);
+  }, []);
+  const [shownAt, setShownAt] = useState(0);
   useEffect(() => {
     if (!showQr) return;
     // Adresler değişebilir (Tailscale sonradan açıldı): kod gösterilirken tazele
     void remoteInfo().then(setInfo);
-    const t = window.setTimeout(() => setShowQr(false), 60_000);
-    return () => window.clearTimeout(t);
+    setShownAt(Date.now());
   }, [showQr]);
+  // Kod acele ettirmez: telefon bağlanana ya da "Gizle"ye basılana kadar görünür
+  useEffect(() => {
+    if (showQr && shownAt && info?.lastSeen && info.lastSeen > shownAt) setShowQr(false);
+  }, [showQr, shownAt, info?.lastSeen]);
   if (!info) return null;
   const toggle = async (on: boolean) => {
     setBusy(true);
@@ -623,8 +651,8 @@ function PhoneSection() {
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
-                    background: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "#3ccf6e" : "#ffd23f",
-                    boxShadow: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "0 0 8px #3ccf6e" : "none",
+                    background: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "var(--color-sys-green)" : "var(--color-sys-yellow)",
+                    boxShadow: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "0 0 8px var(--color-sys-green)" : "none",
                   }}
                 />
                 <div className="min-w-0">
@@ -636,7 +664,7 @@ function PhoneSection() {
                         : tt("Telefon bekleniyor")}
                   </span>
                   <span className="block truncate text-[9.5px] text-label-3">
-                    {info.lastIp ? `${info.lastIp} · Port ${info.port}` : tt("Henüz bağlantı isteği gelmedi")}
+                    {info.lastIp ? tt("{0} · bağlantı noktası {1}", info.lastIp, info.port) : tt("Henüz bağlantı isteği gelmedi")}
                   </span>
                 </div>
               </div>
@@ -654,8 +682,8 @@ function PhoneSection() {
             </div>
           </div>
 
-          <Row label={tt("Telefona Nook Mobil'i kur (Android)")}>
-            <TextButton onClick={() => setAppQr((v) => !v)}>{appQr ? tt("Gizle") : tt("Kodu göster")}</TextButton>
+          <Row label={tt("1. Nook Mobil'i telefona indir (Android)")}>
+            <TextButton onClick={() => setAppQr((v) => !v)}>{appQr ? tt("Gizle") : tt("İndirme kodu")}</TextButton>
           </Row>
           {appQr && info.appQr && (
             <div className="flex items-center gap-3 py-2">
@@ -665,16 +693,41 @@ function PhoneSection() {
               </p>
             </div>
           )}
-          <Row label={tt("Telefonu eşleştir")}>
-            <TextButton onClick={() => setShowQr((v) => !v)}>{showQr ? tt("Gizle") : tt("Kodu göster")}</TextButton>
+          <Row label={tt("2. Nook Mobil'i açıp bu PC'yle eşleştir")}>
+            <TextButton onClick={() => setShowQr((v) => !v)}>{showQr ? tt("Gizle") : tt("Eşleştirme kodu")}</TextButton>
           </Row>
           {showQr && info.qr && (
             <div className="flex items-center gap-3 py-2">
               <div className="h-[118px] w-[118px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: info.qr }} />
               <p className="text-[10.5px] leading-snug text-label-2">
-                {tt("Telefonda Nook'u aç, “PC ekle”ye bas ve bu kodu okut. Kodu kimseyle paylaşma: bu PC'yi yönetmenin anahtarı.")}
+                {tt("Telefonun kamerasıyla değil, Nook Mobil'in içinden okut: uygulamayı aç, “PC ekle”ye bas. Telefon bağlanınca kod kendiliğinden gizlenir. Kimseyle paylaşma: bu PC'yi yönetmenin anahtarı.")}
               </p>
             </div>
+          )}
+          {!info.lastSeen && (
+            <Row label={tt("Telefon bu PC'yi bulamıyor mu? Güvenlik duvarı engelliyor olabilir")}>
+              {fw === "ok" ? (
+                <span className="text-[11px] text-label-2">{tt("İzin verildi")}</span>
+              ) : (
+                <TextButton
+                  onClick={() => {
+                    setFw("busy");
+                    outsideFixFirewall().then(
+                      () => setFw("ok"),
+                      (e) => setFw(String(e) === "cancelled" ? "idle" : String(e)),
+                    );
+                  }}
+                >
+                  {fw === "busy" ? tt("Bekle…") : tt("İzin ver")}
+                </TextButton>
+              )}
+            </Row>
+          )}
+          {fw !== "idle" && fw !== "busy" && fw !== "ok" && <p className="pb-1 text-[10px] text-red/90">{fw}</p>}
+          {!info.lastSeen && (
+            <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+              {tt("Ev ağın Windows'ta Genel ağ olarak işaretliyse telefon bağlanamaz: Windows Ayarlar › Ağ ve İnternet › Wi-Fi'den ağı Özel yap.")}
+            </p>
           )}
           <Row label={tt("Telefondan uzaktan kontrol")}>
             <Toggle on={!!info.control} onChange={(v) => void remoteControlSet(v).then(setInfo)} color={ACCENT.blue} />
@@ -682,7 +735,7 @@ function PhoneSection() {
           <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
             {info.control
               ? tt("Telefondan bu PC'nin ekranını görüp fare ve klavyeyle kullanabilirsin. Kontrol başlayınca adada görünür.")
-              : tt("Açınca eşleştirdiğin telefondan bu PC'nin ekranını görüp fareyi ve klavyeyi kullanabilirsin.")}
+              : tt("Kapalıyken telefon bu PC'nin ekranını göremez, ekran görüntüsü de alamaz. Açınca eşleştirdiğin telefondan ekranı görüp fareyi ve klavyeyi kullanabilirsin.")}
           </p>
           <OutsideSetup />
           <WakeSetup />
@@ -863,6 +916,8 @@ function OutsideSetup() {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [qr, setQr] = useState(false);
+  const keep = useNook((x) => x.settings.tailscaleKeep ?? false);
+  const update = useNook((x) => x.updateSettings);
   useEffect(() => {
     const load = () => void outsideStatus().then(setSt);
     load();
@@ -904,14 +959,26 @@ function OutsideSetup() {
             ok={st.tailscaleUp}
             text={
               st.tailscaleUp
-                ? tt("Tailscale açık (Nook kapanırsa yeniden açar)")
+                ? tt("Tailscale açık")
                 : st.tailscaleState === "needs-login"
                   ? tt("Tailscale'e giriş yapılmadı")
-                  : tt("Tailscale kapalı: Nook açıyor…")
+                  : keep
+                    ? tt("Tailscale kapalı: Nook açıyor…")
+                    : tt("Tailscale kapalı")
             }
           >
             {!st.tailscaleUp && <SmallAction onClick={() => void act("open", outsideOpenTailscale)}>{tt("Aç")}</SmallAction>}
           </CheckRow>
+        )}
+        {st.tailscaleInstalled && (
+          <>
+            <Row label={tt("Tailscale'i açık tut")}>
+              <Toggle on={keep} onChange={(v) => update({ tailscaleKeep: v })} color={ACCENT.blue} />
+            </Row>
+            <p className="-mt-1 pb-0.5 text-[10px] text-label-3">
+              {tt("Açıksa Tailscale kapanınca Nook birkaç dakika içinde yeniden bağlar ve Tailscale'i Windows'a giriş yapılmadan da çalışacak şekilde ayarlar. Kapalıyken Nook Tailscale'e dokunmaz.")}
+            </p>
+          </>
         )}
         <CheckRow ok={st.firewall} text={st.firewall ? tt("Güvenlik duvarı izin veriyor") : tt("Güvenlik duvarı izni yok")}>
           {!st.firewall && (
@@ -938,7 +1005,7 @@ function OutsideSetup() {
           ? tt("Tailscale ücretsiz; PC ile telefon arasında her yerden çalışan özel, şifreli bir bağlantı kurar. Kur'a basınca resmi kurucu açılır, Google hesabınla giriş yapman yeter.")
           : ready
             ? tt("Telefon evdeyken ev ağından, dışarıdayken Tailscale'den bağlanır.")
-            : tt("“İzin ver” Windows yönetici izni ister; yalnızca ev ağından ve Tailscale'den gelen bağlantılara izin verilir.")}
+            : tt("“İzin ver” Windows yönetici izni ister; yalnızca Özel olarak işaretli ev ağından ve Tailscale'den gelen bağlantılara izin verilir. Kafe gibi Genel ağlarda port kapalı kalır.")}
       </p>
     </div>
   );
@@ -980,9 +1047,12 @@ function UpdateRow() {
         <span className="text-[11px] font-medium tabular-nums" style={{ color: ACCENT.green }}>{tt("İndiriliyor %{0}", progress)}
         </span>
       ) : available ? (
-        <TextButton onClick={() => void installUpdate()}>
-          <span style={{ color: ACCENT.green }}>{tt("{0} sürümüne güncelle", available)}</span>
-        </TextButton>
+        <div className="flex items-center gap-1">
+          {status && <span className="max-w-[220px] text-[10.5px] leading-snug" style={{ color: tintText(ACCENT.red) }}>{status}</span>}
+          <TextButton onClick={() => void installUpdate()}>
+            <span style={{ color: ACCENT.green }}>{status ? tt("Yeniden dene") : tt("{0} sürümüne güncelle", available)}</span>
+          </TextButton>
+        </div>
       ) : (
         <div className="flex items-center gap-1">
           {status && <span className="text-[10.5px] text-label-3">{status}</span>}
@@ -1218,7 +1288,7 @@ function ShortcutsSection() {
   const apps = useInstalledApps();
   const failed = useShortcutFailures();
   return (
-    <Section title={tt("Kısayollar")}>
+    <Section title={tt("Klavye kısayolları")}>
       {SHORTCUTS.map((k) => {
         const combo = s[k.key];
         const dup = duplicateOf(s, k.key);
@@ -1496,7 +1566,7 @@ function AiSection() {
             ? gemini.error
             : gemini.status === "checking"
               ? tt("Kontrol ediliyor…")
-              : tt("aistudio.google.com → Get API key. Anahtar yalnızca bu bilgisayarda saklanır.")}
+              : tt("Anahtar, Google'ın ücretsiz verdiği bir şifre; sohbet, sesli komut ve ekrana sor bununla çalışır, Nook'un geri kalanı anahtarsız da çalışır. Almak için aistudio.google.com'a Google hesabınla gir, “Get API key” (API anahtarı al) düğmesine bas, çıkan yazıyı kopyalayıp buraya yapıştır. Yalnızca bu bilgisayarda saklanır.")}
       </p>
       {gemini.status === "ok" && (
         <Row label={tt("Model")}>
@@ -1994,4 +2064,13 @@ function PasswordInput({ placeholder, action, verify, onOk }: { placeholder: str
       <TextButton onClick={() => void go()}>{action}</TextButton>
     </div>
   );
+}
+
+/** Şehir satırının altı: bulunan şehir, ya da neden alınamadığı */
+function useWeatherHint(auto: boolean): string {
+  const city = useNook((s) => s.weather?.city);
+  const error = useNook((s) => s.weatherError);
+  if (error) return error;
+  if (!city) return tt("Hava durumu alınıyor…");
+  return auto ? tt("İnternet bağlantından tahmin edildi: {0}. Yanlışsa şehrini yaz", city) : tt("Bulunan: {0}", city);
 }

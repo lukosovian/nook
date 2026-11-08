@@ -291,9 +291,9 @@ export function KeysArt() {
       {clash.length ? (
         <button
           onClick={() => {
-            if (isStudio) return studioGo("settings", tt("Kısayollar"));
+            if (isStudio) return studioGo("settings", tt("Klavye kısayolları"));
             endTour();
-            openStudio(`settings:${tt("Kısayollar")}`);
+            openStudio(`settings:${tt("Klavye kısayolları")}`);
           }}
           className="mx-0.5 flex items-center gap-1.5 rounded-[10px] px-2 py-1 text-left text-[10.5px] leading-snug transition-colors hover:bg-white/[0.04]"
           style={{ color: tintText(ACCENT.orange) }}

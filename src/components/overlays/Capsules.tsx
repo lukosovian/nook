@@ -252,7 +252,7 @@ export function UpdateCapsule() {
   const demo = useUpdate((u) => u.demo);
   const version = useUpdate((u) => (u.demo ? u.current || null : u.available));
   // Bu güncelleme boyunca aynı animasyon (sırayla seçilen bir kez ilerlesin)
-  const [anim] = useState(() => demo ?? resolveUpdateAnim(useNook.getState().settings.updateAnim));
+  const [anim] = useState(() => demo ?? useUpdate.getState().anim ?? resolveUpdateAnim(useNook.getState().settings.updateAnim));
   return (
     <motion.div className="pointer-events-none absolute inset-0" {...appear}>
       <UpdateBody anim={anim} p={progress} done={restarting} version={version} />

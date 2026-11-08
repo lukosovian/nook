@@ -77,7 +77,9 @@ async function apiError(r: Response): Promise<GeminiError> {
   if (r.status === 503 || status === "UNAVAILABLE") return new GeminiError(tt("Gemini şu an çok yoğun"), true);
   if (r.status === 429 || status === "RESOURCE_EXHAUSTED") return new GeminiError(tt("Gemini kotası doldu"), true, true);
   if (r.status >= 500) return new GeminiError(tt("Gemini geçici bir hata verdi ({0})", r.status), true);
-  return new GeminiError(tt("Gemini hatası ({0})", message ? `${status}: ${message}` : status));
+  // Google'ın ham (İngilizce) iletisi kullanıcıya değil günlüğe
+  console.warn("[nook] gemini", r.status, status, message);
+  return new GeminiError(tt("Gemini bir hata verdi ({0}). Biraz sonra yeniden dene", status || r.status));
 }
 
 /**

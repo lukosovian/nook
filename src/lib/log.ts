@@ -45,6 +45,8 @@ export function installLogging() {
  */
 function watchFreezes() {
   let last = performance.now();
+  // Gizliyken kısılan sayacın boşluğu, sayfa yeniden görününce donma sayılmasın
+  document.addEventListener("visibilitychange", () => (last = performance.now()));
   window.setInterval(() => {
     const now = performance.now();
     const gap = (now - last) / 1000;

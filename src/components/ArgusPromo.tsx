@@ -64,7 +64,7 @@ export function ArgusPromo({ big = false }: { big?: boolean }) {
             <button onClick={hide} className="rounded-full px-2 py-0.5 text-[10.5px] text-label-3 hover:bg-well-hi hover:text-label-2">{tt("Gösterme")}</button>
           )}
         </div>
-        <p className={`text-label-3 ${big ? "mt-2 text-[11px]" : "mt-1 text-[9.5px]"}`}>{tt("Ücretsiz. Gerekenleri kurulum kendisi kurar; bittiğinde Nook Argus'u kendiliğinden bulur.")}</p>
+        <p className={`text-label-3 ${big ? "mt-2 text-[11px]" : "mt-1 text-[9.5px]"}`}>{tt("Ücretsiz. Kurulum siyah bir komut penceresinde adım adım ilerler; Git gerekirse kurmak için izin ister, \"E\" yazıp Enter'a basman yeter. Bittiğinde Nook Argus'u kendiliğinden bulur.")}</p>
       </div>
     </div>
   );

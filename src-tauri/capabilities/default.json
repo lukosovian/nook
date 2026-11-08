@@ -2,10 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for Nook island window",
-  "windows": ["island*", "perch", "shield*", "argus", "sound", "studio", "whatsapp"],
-  "remote": {
-    "urls": ["https://web.whatsapp.com/*", "https://*.whatsapp.com/*"]
-  },
+  "windows": ["island*", "perch", "shield*", "argus", "sound", "studio"],
   "permissions": [
     "core:default",
     "core:window:allow-set-ignore-cursor-events",

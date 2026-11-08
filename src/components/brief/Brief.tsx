@@ -358,7 +358,7 @@ function useTiles(): TileData[] {
   const water = getTodayWater();
   const night = s.notifications.filter((n) => n.at > Date.now() - 12 * 3600_000).length;
   const wd = now.getDay();
-  const devs = [s.devices?.headset && { name: tt("Kulaklık"), pct: s.devices.headset.percent }, s.devices?.mouse && { name: tt("Mouse"), pct: s.devices.mouse.percent }].filter(
+  const devs = [s.devices?.headset && { name: tt("Kulaklık"), pct: s.devices.headset.percent }, s.devices?.mouse && { name: tt("Fare"), pct: s.devices.mouse.percent }].filter(
     (d): d is { name: string; pct: number } => !!d,
   );
   const lowest = Math.min(s.devices?.headset?.percent ?? 100, s.devices?.mouse?.percent ?? 100);

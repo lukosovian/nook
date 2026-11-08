@@ -46,14 +46,25 @@ const BROWSERS = /chrome|edge|brave|opera|vivaldi|firefox/i;
 const OFFICE = /^(microsoft )?(word|excel|powerpoint|outlook|onenote)\b/i;
 const VSCODE = /visual studio code|^cursor$/i;
 const JETBRAINS = /intellij|pycharm|webstorm|rider|clion|goland|phpstorm|rubymine|datagrip|android studio/i;
+const TEAMS = /^microsoft teams|^teams\b/i;
 
 /**
  * Sık kullanılan programların aynı tuşlara bağlı işleri (küçük harf, boşluksuz). `apps`: yalnızca bu
  * programlardan biri kuruluysa uyar (Başlat menüsündeki adlara bakılır); yoksa her bilgisayarda geçerli.
  */
-const KNOWN: Record<string, { what: string; apps?: RegExp }> = {
-  "ctrl+shift+a": { what: tt("tarayıcıda sekme arama"), apps: BROWSERS },
-  "ctrl+shift+d": { what: tt("tarayıcıda bütün sekmeleri yer imine ekleme"), apps: BROWSERS },
+type Known = { what: string; apps?: RegExp };
+const KNOWN: Record<string, Known | Known[]> = {
+  "ctrl+shift+a": [
+    { what: tt("Teams'te gelen aramayı kabul etme"), apps: TEAMS },
+    { what: tt("JetBrains IDE'lerinde Find Action"), apps: JETBRAINS },
+    { what: tt("tarayıcıda sekme arama"), apps: BROWSERS },
+  ],
+  "ctrl+shift+d": [
+    { what: tt("Teams'te gelen aramayı reddetme"), apps: TEAMS },
+    { what: tt("tarayıcıda bütün sekmeleri yer imine ekleme"), apps: BROWSERS },
+  ],
+  "ctrl+shift+m": { what: tt("Teams'te mikrofonu açıp kapatma"), apps: TEAMS },
+  "ctrl+shift+o": { what: tt("Teams'te kamerayı açıp kapatma"), apps: TEAMS },
   "ctrl+shift+n": { what: tt("tarayıcıda gizli pencere"), apps: BROWSERS },
   "ctrl+shift+t": { what: tt("tarayıcıda kapanan sekmeyi geri açma"), apps: BROWSERS },
   "ctrl+shift+space": { what: tt("VS Code'da parametre ipuçları"), apps: VSCODE },
@@ -113,7 +124,8 @@ export function spareShortcut(settings: Settings, failed: string[]): string | nu
 export function conflictOf(combo: string, apps: string[]): string | null {
   const k = combo ? KNOWN[norm(combo)] : undefined;
   if (!k) return null;
-  return !k.apps || apps.some((a) => k.apps!.test(a)) ? k.what : null;
+  const hits = (Array.isArray(k) ? k : [k]).filter((x) => !x.apps || apps.some((a) => x.apps!.test(a)));
+  return hits.length ? hits.map((x) => x.what).join(", ") : null;
 }
 
 /** Rust'ın kısayolları kaydettiği sıra (src-tauri/src/shortcut.rs): aynı tuşlar iki işe verildiyse önce gelen kazanır */

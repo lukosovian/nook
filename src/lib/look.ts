@@ -13,10 +13,11 @@ export type ShapeId = "sphere" | "cloud" | "heart" | "triangle" | "flower" | "be
   | "raincloud" | "storm" | "crystal" | "leaf" | "cactus" | "rock" | "stump" | "sun" | "moon";
 export type Texture = "smooth" | "plush" | "matte" | "jelly" | "metal" | "spots" | "galaxy" | "knit" | "lava" | "camo" | "marble" | "glass" | "glow" | "plaid" | "stripes" | "denim" | "pixel" | "fluffy" | "gold" | "chrome";
 export type EyeStyle = "pill" | "bead" | "diamond" | "sparkle" | "calm" | "happy" | "squint" | "wink" | "led";
-export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle" | "eyepatch" | "goggles" | "hero" | "masquerade" | "neon" | "snorkel";
+export type GlassesId = "none" | "round" | "bold" | "shades" | "monocle" | "eyepatch" | "goggles" | "hero" | "masquerade" | "neon" | "snorkel" | "magnifier" | "rainbow" | "visor";
 export type HeadId = "none" | "beret" | "headphones" | "bowler" | "antenna" | "bow" | "ears" | "cap" | "sprout" | "flower" | "star" | "stalks" | "witch" | "horns" | "bat" | "cowboy" | "pirate" | "straw" | "conductor" | "helmet" | "hardhat" | "crown" | "party" | "beanie" | "chef" | "santa" | "halo" | "toadstool" | "astronaut" | "elf" | "wizard"
-  | "police" | "nurse" | "viking" | "knight" | "pilot" | "safari" | "detective" | "miner" | "nightcap" | "clownwig" | "bandana" | "earflap" | "earmuffs" | "robot";
-export type NeckId = "none" | "bowtie" | "scarf";
+  | "police" | "nurse" | "viking" | "knight" | "pilot" | "safari" | "detective" | "miner" | "nightcap" | "clownwig" | "bandana" | "earflap" | "earmuffs" | "robot"
+  | "trapper" | "rainhat" | "headband" | "bucket" | "rainbowbucket" | "rainbowbeanie" | "newsboy" | "moonwizard" | "hood" | "sitehat";
+export type NeckId = "none" | "bowtie" | "scarf" | "stripescarf" | "greenscarf";
 export type FaceId = "none" | "mustache" | "beard" | "nose" | "note" | "sparkle" | "bubbles";
 
 export interface Look {
@@ -142,6 +143,9 @@ export const GLASSES: { id: GlassesId; label: string }[] = [
   { id: "masquerade", label: tt("Balo") },
   { id: "neon", label: tt("Neon") },
   { id: "snorkel", label: tt("Şnorkel") },
+  { id: "magnifier", label: tt("Büyüteç") },
+  { id: "rainbow", label: tt("Gökkuşağı") },
+  { id: "visor", label: tt("Teknoloji") },
 ];
 
 export const HEADS: { id: HeadId; label: string }[] = [
@@ -190,6 +194,16 @@ export const HEADS: { id: HeadId; label: string }[] = [
   { id: "earflap", label: tt("Kulaklı bere") },
   { id: "earmuffs", label: tt("Kar kulaklığı") },
   { id: "robot", label: tt("Robot") },
+  { id: "trapper", label: tt("Kürk şapka") },
+  { id: "rainhat", label: tt("Yağmur şapkası") },
+  { id: "headband", label: tt("Ter bandı") },
+  { id: "bucket", label: tt("Balıkçı şapkası") },
+  { id: "rainbowbucket", label: tt("Gökkuşağı balıkçı") },
+  { id: "rainbowbeanie", label: tt("Gökkuşağı bere") },
+  { id: "newsboy", label: tt("Tüylü kasket") },
+  { id: "moonwizard", label: tt("Ay büyücüsü") },
+  { id: "hood", label: tt("Kapüşon") },
+  { id: "sitehat", label: tt("Kulaklıklı baret") },
 ];
 
 /** Kepin rengi: gövdeyle karışmasın diye mavi gövdede mercan, öbürlerinde koyu mavi (Dots'taki gibi) */
@@ -199,6 +213,8 @@ export const NECKS: { id: NeckId; label: string }[] = [
   { id: "none", label: tt("Yok") },
   { id: "bowtie", label: tt("Papyon") },
   { id: "scarf", label: tt("Atkı") },
+  { id: "stripescarf", label: tt("Çizgili atkı") },
+  { id: "greenscarf", label: tt("Yeşil atkı") },
 ];
 
 export const FACES: { id: FaceId; label: string }[] = [
@@ -377,6 +393,21 @@ const WEAR_WORDS: Partial<Record<GlassesId | HeadId | NeckId | FaceId, string>> 
   earflap: tt("kulaklı örgü bere"),
   earmuffs: tt("kar kulaklığı"),
   robot: tt("robot anteni"),
+  trapper: tt("kürklü avcı şapkası"),
+  rainhat: tt("sarı yağmur şapkası"),
+  headband: tt("neon ter bandı"),
+  bucket: tt("balıkçı şapkası"),
+  rainbowbucket: tt("gökkuşağı balıkçı şapkası"),
+  rainbowbeanie: tt("gökkuşağı örgü bere"),
+  newsboy: tt("tüylü kasket"),
+  moonwizard: tt("aylı büyücü şapkası"),
+  hood: tt("zümrüt kapüşon"),
+  sitehat: tt("kulaklıklı baret"),
+  magnifier: tt("büyüteç"),
+  rainbow: tt("gökkuşağı gözlük"),
+  visor: tt("ışıklı teknoloji gözlüğü"),
+  stripescarf: tt("kırmızı beyaz çizgili atkı"),
+  greenscarf: tt("yeşil örgü atkı"),
   hero: tt("kahraman maskesi"),
   masquerade: tt("balo maskesi"),
   neon: tt("neon gözlük"),
@@ -514,18 +545,11 @@ export const COLLECTION_GROUPS = COLLECTION.reduce<{ title: string; items: typeo
   return gs;
 }, []);
 
-/** Cadılar Bayramı parçaları Görünüm'de yalnızca kendi bölümünde (hazır kostümlerde) görünür */
+/** Cadılar Bayramı parçaları Görünüm'de seçilemez (giyen kullanıcıda kalır) */
 export const HALLOWEEN_PARTS = new Set<string>(["pumpkin", "ghost", "witch", "horns", "bat"]);
 
-/** Cadılar Bayramı: Görünüm'de tek dokunuşla giyilen hazır Nook'lar */
-export const HALLOWEEN: { name: string; color: string; look: Look }[] = [
-  { name: tt("Bal Kabak"), color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", eyes: "diamond" } },
-  { name: tt("Hayalet"), color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "ghost", eyes: "bead" } },
-  { name: tt("Cadı"), color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "witch" } },
-  { name: tt("Şeytancık"), color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", head: "horns" } },
-  { name: tt("Yarasa"), color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "bat" } },
-  { name: tt("Kabak Cadı"), color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", texture: "plush", head: "witch" } },
-];
+/** Nook'un ilk hâli (Görünüm › Varsayılan) */
+export const DEFAULT_COLOR = "#F4F4F6";
 
 /**
  * Ana sayfadaki çiplerin Nook'ları: her biri bölümün işine göre giyinmiş (Medya'da kulaklık,
@@ -550,11 +574,12 @@ export const CHIP_NOOKS: Record<string, { color: string; look: Look }> = {
   stats: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "blob", glasses: "shades" } },
   play: { color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "cloud", eyes: "sparkle", head: "star" } },
   report: { color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", glasses: "monocle" } },
-  notes: { color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", head: "witch" } },
+  notes: { color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "cloud", eyes: "sparkle", head: "party" } },
   look: { color: "#FF5C8A", look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "bow" } },
   year: { color: "#FFD21F", look: { ...DEFAULT_LOOK, shape: "star", eyes: "sparkle", head: "bow" } },
   claude: { color: "#D97757", look: { ...DEFAULT_LOOK, shape: "cube", texture: "matte", eyes: "bead", head: "hardhat" } },
   hum: { color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "blob", eyes: "calm", head: "headphones", glasses: "shades" } },
+  news: { color: "#FF3B4A", look: { ...DEFAULT_LOOK, shape: "bean", eyes: "bead", glasses: "round", head: "beret" } },
   habits: { color: "#2FD4C0", look: { ...DEFAULT_LOOK, shape: "flower", texture: "smooth", eyes: "sparkle", head: "sprout" } },
 };
 

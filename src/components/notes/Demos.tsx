@@ -5,7 +5,16 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AlarmClock, Bell, Check, CloudSun, FileArchive, FileText, Folder, LockKeyhole, Maximize2, MousePointer2, Move, RotateCw, Music, ScrollText, Sparkles } from "lucide-react";
-import { CHIP_NOOKS, DEFAULT_LOOK, HALLOWEEN, normalizeColor, normalizeLook, SHOWCASE, type Look } from "../../lib/look";
+import { CHIP_NOOKS, DEFAULT_LOOK, normalizeColor, normalizeLook, SHOWCASE, type Look } from "../../lib/look";
+
+/** Eski Cadılar Bayramı notunun Nook'ları (Görünüm'den kalktı, eski notta kalsın) */
+const HALLOWEEN: { name: string; color: string; look: Look }[] = [
+  { name: "pumpkin", color: "#FF8A1F", look: { ...DEFAULT_LOOK, shape: "pumpkin", eyes: "diamond" } },
+  { name: "ghost", color: "#F4F4F6", look: { ...DEFAULT_LOOK, shape: "ghost", eyes: "bead" } },
+  { name: "witch", color: "#8FE03A", look: { ...DEFAULT_LOOK, shape: "blob", texture: "plush", head: "witch" } },
+  { name: "devil", color: "#E23BD6", look: { ...DEFAULT_LOOK, shape: "sphere", eyes: "calm", head: "horns" } },
+  { name: "bat", color: "#9B7BFF", look: { ...DEFAULT_LOOK, shape: "bean", texture: "plush", head: "bat" } },
+];
 import type { DemoId } from "../../lib/notes";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
@@ -36,6 +45,12 @@ import { DEMOS20 } from "./Demos20";
 import { DEMOS21 } from "./Demos21";
 import { DEMOS22 } from "./Demos22";
 import { DEMOS23 } from "./Demos23";
+import { DEMOS24 } from "./Demos24";
+import { DEMOS25 } from "./Demos25";
+import { DEMOS26 } from "./Demos26";
+import { DEMOS27 } from "./Demos27";
+import { DEMOS28 } from "./Demos28";
+import { DEMOS29 } from "./Demos29";
 
 /** Her `ms`'de bir artan sayaç (sahneler kendini tekrarlasın) */
 function useTick(ms: number) {
@@ -852,6 +867,12 @@ export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
   ...DEMOS21,
   ...DEMOS22,
   ...DEMOS23,
+  ...DEMOS24,
+  ...DEMOS25,
+  ...DEMOS26,
+  ...DEMOS27,
+  ...DEMOS28,
+  ...DEMOS29,
   lang: LangDemo,
   scale: ScaleDemo,
   cvd: CvdDemo,

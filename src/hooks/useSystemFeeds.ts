@@ -592,6 +592,7 @@ const native = (s: Settings, deck: DeckKey[] | null) => ({
   humAuto: s.humAuto ?? false,
   logDays: s.logDays ?? 14,
   wallpaperCycle: s.wallpaperCycle ?? null,
+  tailscaleKeep: s.tailscaleKeep ?? false,
   // Klavye kısayolu atanmış kısayol tuşları
   deckHotkeys: (deck ?? []).filter((k) => k.hotkey).map((k) => ({ id: k.id, accel: k.hotkey! })),
 });
@@ -659,8 +660,11 @@ export function useDownloadsFeed() {
 }
 
 const WEATHER_EVERY = 30 * 60_000;
+/** Başarısız olunca daha sık dene (sabah internet geç bağlanıyor) */
+const WEATHER_RETRY = 2 * 60_000;
 
-/** Hava durumu: açılışta ve 30 dakikada bir (ya da şehir değişince). */
+/** Hava durumu: açılışta ve 30 dakikada bir (ya da şehir değişince). Başarısızsa 2 dakikada bir ve
+ *  bağlantı gelir gelmez yeniden dener; nedeni (bağlantı yok, şehir bulunamadı) ekranda yazar. */
 export function useWeatherFeed() {
   const enabled = useNook((s) => s.settings.weather);
   const city = useNook((s) => s.settings.weatherCity);
@@ -670,17 +674,33 @@ export function useWeatherFeed() {
       return;
     }
     let alive = true;
+    let next = 0;
+    const plan = (ms: number) => {
+      window.clearTimeout(next);
+      next = window.setTimeout(load, ms);
+    };
     const load = () =>
       fetchWeather(city)
-        .then((w) => alive && useNook.getState().setWeather(w))
-        .catch((e) => console.warn("[nook] hava durumu", e));
+        .then((w) => {
+          if (!alive) return;
+          useNook.getState().setWeather(w);
+          plan(WEATHER_EVERY);
+        })
+        .catch((e) => {
+          if (!alive) return;
+          console.warn("[nook] hava durumu", e);
+          const notFound = e instanceof Error && e.message === tt("şehir bulunamadı");
+          useNook.getState().setWeatherError(notFound ? tt("Şehir bulunamadı, adını kontrol et") : !navigator.onLine ? tt("İnternet bağlantısı yok") : tt("Hava durumu alınamadı"));
+          plan(WEATHER_RETRY);
+        });
+    const online = () => plan(1500);
+    window.addEventListener("online", online);
     // Şehir yazılırken her tuşta istek atma
-    const first = window.setTimeout(load, 800);
-    const t = window.setInterval(load, WEATHER_EVERY);
+    plan(800);
     return () => {
       alive = false;
-      window.clearTimeout(first);
-      window.clearInterval(t);
+      window.clearTimeout(next);
+      window.removeEventListener("online", online);
     };
   }, [enabled, city]);
 }
@@ -723,8 +743,17 @@ export function useSettingsSync() {
     void applySettings(native(useNook.getState().settings, useNook.getState().deck)).catch((e) => {
       console.warn("[nook] ayarlar", e);
       // Kısayolu başka bir program tutuyorsa sessizce çalışmamak yerine söyle
-      const m = /Kısayol kaydedilemedi \(([^:]+):/.exec(String(e));
-      if (m) useNook.getState().pushToast({ kind: "chat", title: tt("{0} kullanılamıyor", m[1]), detail: tt("Başka bir program tutuyor — Studio › Ayarlar › Kısayollar'dan değiştir"), ms: 9000 });
+      const m = /Kısayol kaydedilemedi \(([^:]+):\s*([^)]*)/.exec(String(e));
+      if (m) {
+        // Aynı kısayol Nook'ta iki işe verildiyse "başka program" demesin
+        const dup = m[2].includes("başka bir işte");
+        useNook.getState().pushToast({
+          kind: "chat",
+          title: tt("{0} kullanılamıyor", m[1]),
+          detail: dup ? tt("Nook'ta başka bir işe de verilmiş — Studio › Ayarlar › Klavye kısayolları'ndan değiştir") : tt("Başka bir program tutuyor — Studio › Ayarlar › Klavye kısayolları'ndan değiştir"),
+          ms: 9000,
+        });
+      }
     });
   }, [key]);
   useEffect(() => {

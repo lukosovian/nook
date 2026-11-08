@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, FileCode2, Terminal, X } from "lucide-react";
-import { cached, claudeDecide, getClaude, type ClaudeAskInfo, type ClaudeInfo, type ClaudeQuestionInfo, type ClaudeSessionInfo, type ClaudeWindow, type Pairing } from "../lib/pc";
+import { ArrowUp, Check, FileCode2, Terminal, X } from "lucide-react";
+import { cached, claudeDecide, claudeSend, getClaude, type ClaudeAskInfo, type ClaudeInfo, type ClaudeQuestionInfo, type ClaudeSessionInfo, type ClaudeWindow, type Pairing } from "../lib/pc";
 import { errText, tintBg, tintText, TopBar, useBackButton, useToast } from "../ui";
 import type { Conn } from "../App";
 
@@ -70,6 +70,17 @@ export function ClaudeScreen({ pairing, conn, onBack }: { pairing: Pairing; conn
     }
   };
 
+  const send = async (s: ClaudeSessionInfo, text: string) => {
+    try {
+      await claudeSend(pairing, s.id, text);
+      say(s.state === "working" ? "Sıraya alındı; Claude bitince işler" : "Gönderildi");
+      return true;
+    } catch (e) {
+      say(errText(e));
+      return false;
+    }
+  };
+
   const asks = (info?.asks ?? []).filter((a) => !answered.current.has(a.askId));
   const sessions = info?.sessions ?? [];
 
@@ -103,7 +114,7 @@ export function ClaudeScreen({ pairing, conn, onBack }: { pairing: Pairing; conn
         <>
           <h2 className="-mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-label-3">Oturumlar</h2>
           {sessions.map((s) => (
-            <SessionCard key={s.id} s={s} />
+            <SessionCard key={s.id} s={s} disabled={!online} onSend={(t) => send(s, t)} />
           ))}
         </>
       )}
@@ -157,7 +168,8 @@ function AskCard({ ask, disabled, onDecide }: { ask: ClaudeAskInfo; disabled: bo
         {ask.project} · {ago(ask.at)}
       </p>
       <p className="mt-0.5 text-[16px] font-bold">{ask.title}</p>
-      {ask.detail && <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-2xl bg-black/35 p-3 font-mono text-[12px] leading-snug text-label-2">{ask.detail}</pre>}
+      {(ask.code || ask.detail) && <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-2xl bg-black/35 p-3 font-mono text-[12px] leading-snug text-label-2">{ask.code || ask.detail}</pre>}
+      {ask.canAlways && ask.rule && <p className="mt-2 text-[12px] text-label-3">“Her zaman” şu kuralı ekler: {ask.rule}</p>}
 
       {qs.length > 0 ? (
         <div className="mt-3 space-y-3">
@@ -221,8 +233,16 @@ function Btn({ label, icon, primary, danger, disabled, onClick }: { label: strin
   );
 }
 
-function SessionCard({ s }: { s: ClaudeSessionInfo }) {
+function SessionCard({ s, disabled, onSend }: { s: ClaudeSessionInfo; disabled: boolean; onSend: (text: string) => Promise<boolean> }) {
   const st = STATE[s.state];
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const submit = async () => {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    if (await onSend(text.trim())) setText("");
+    setSending(false);
+  };
   return (
     <section className="rounded-3xl bg-card p-4">
       <div className="flex items-center gap-2">
@@ -250,6 +270,27 @@ function SessionCard({ s }: { s: ClaudeSessionInfo }) {
           {s.files.length > 0 && <span className="truncate">{s.files.slice(0, 3).join(", ")}</span>}
         </div>
       )}
+      {/* Terminale yazılmış gibi gider; Claude çalışıyorsa sıraya girer */}
+      <div className="mt-3 flex items-end gap-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={1}
+          disabled={disabled}
+          placeholder="Claude'a yaz…"
+          className="max-h-28 min-h-[40px] flex-1 resize-none rounded-2xl bg-well px-3.5 py-2.5 text-[14px] leading-snug text-label outline-none placeholder:text-label-3 disabled:opacity-40"
+        />
+        <motion.button
+          whileTap={{ scale: 0.92 }}
+          disabled={disabled || sending || !text.trim()}
+          onClick={() => void submit()}
+          aria-label="Gönder"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-black disabled:opacity-35"
+          style={{ background: CLAUDE }}
+        >
+          <ArrowUp size={19} strokeWidth={2.8} />
+        </motion.button>
+      </div>
     </section>
   );
 }

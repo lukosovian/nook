@@ -26,9 +26,21 @@ static CUR_W: AtomicU64 = AtomicU64::new(WIN_W.to_bits());
 static CUR_H: AtomicU64 = AtomicU64::new(WIN_H.to_bits());
 /// Arayüz ölçeği (Ayarlar › Erişilebilirlik): sayfa bu kadar büyütülür, pencere de onunla birlikte
 static ZOOM: AtomicU64 = AtomicU64::new(1f64.to_bits());
+/// Ana ada ekrana sığmayınca (büyük tanıtım penceresi + büyük arayüz boyutu, küçük ekran) sayfa bu oranla
+/// küçültülür: düzen bozulmaz, kesilmez, yalnızca ekrana sığacak kadar küçülür (1 = küçültme yok)
+static FIT: AtomicU64 = AtomicU64::new(1f64.to_bits());
 
 pub fn zoom() -> f64 {
     f64::from_bits(ZOOM.load(Ordering::Relaxed))
+}
+
+/// Pencerenin sayfaya uygulanan ölçeği: arayüz ölçeği, ana adada ekrana sığdırma oranıyla birlikte
+pub fn zoom_of(label: &str) -> f64 {
+    if label == ISLAND {
+        zoom() * f64::from_bits(FIT.load(Ordering::Relaxed))
+    } else {
+        zoom()
+    }
 }
 
 /// Pencerenin sayfa içi (CSS) genişliği — yalnızca ana ada büyüyebilir.
@@ -42,7 +54,7 @@ pub fn css_width_of(label: &str) -> f64 {
 
 /// Pencerenin geçerli mantıksal genişliği (CSS genişliği × arayüz ölçeği)
 pub fn width_of(label: &str) -> f64 {
-    css_width_of(label) * zoom()
+    css_width_of(label) * zoom_of(label)
 }
 
 /// Arayüz ölçeği değişti: bütün adalar yeni ölçekle çizilir, pencereleri de büyür/küçülür
@@ -56,9 +68,12 @@ pub fn set_zoom(app: &AppHandle, z: f64) {
     let _ = app.run_on_main_thread(move || {
         for (label, win) in app2.webview_windows() {
             if label == ISLAND {
-                let _ = win.set_zoom(z);
                 let (w, h) = (f64::from_bits(CUR_W.load(Ordering::Relaxed)), f64::from_bits(CUR_H.load(Ordering::Relaxed)));
                 let _ = resize_island(&win, w, h);
+                let _ = win.set_zoom(zoom_of(ISLAND));
+            } else if label == crate::studio::STUDIO {
+                let _ = win.set_zoom(z);
+                crate::studio::fit(&win);
             } else if label.starts_with(EXTRA_PREFIX) {
                 let _ = win.set_zoom(z);
                 let _ = win.set_size(tauri::LogicalSize::new(WIN_W * z, WIN_H * z));
@@ -78,7 +93,7 @@ pub fn set_zoom(app: &AppHandle, z: f64) {
 
 /// Pencere yeni oluştu: arayüz ölçeğini uygula
 pub fn apply_zoom(win: &WebviewWindow) {
-    let z = zoom();
+    let z = zoom_of(win.label());
     if (z - 1.0).abs() > 0.001 {
         let _ = win.set_zoom(z);
     }
@@ -92,10 +107,13 @@ const RELOCATE_OUT: Duration = Duration::from_millis(470);
 pub fn place_on(win: &WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
     let scale = monitor.scale_factor();
     let width = (width_of(win.label()) * scale).round() as i32;
-    let height = win.outer_size().map(|s| s.height as i32).unwrap_or((WIN_H * zoom() * scale).round() as i32);
+    // Pencerenin şimdiki yüksekliği bulunduğu ekranın ölçeğinde: yeni ekranın ölçeğine çevir (farklı DPI)
+    let now_scale = win.scale_factor().unwrap_or(scale);
+    let height = win.outer_size().map(|s| (s.height as f64 / now_scale * scale).round() as i32).unwrap_or((WIN_H * zoom() * scale).round() as i32);
     let origin = monitor.position();
     let (mw, mh) = (monitor.size().width as i32, monitor.size().height as i32);
-    let pos = win.app_handle().state::<Arc<Shared>>().settings().island_pos;
+    let settings = win.app_handle().state::<Arc<Shared>>().settings();
+    let pos = settings.island_pos;
     let (x, y) = match pos {
         Some(p) => {
             let cx = origin.x + (p.fx * mw as f64).round() as i32;
@@ -233,21 +251,27 @@ pub fn apply_monitor_mode(app: &AppHandle, settings: &Settings) {
 }
 
 /// Ana adanın penceresini büyütür/küçültür (tanıtım ekranı için) ve aynı ekranın üst ortasına yeniden yapıştırır.
-/// Ekrandan büyük istenirse ekrana sığdırılır.
+/// Ekrandan büyük istenirse sayfa kesilmez, ekranın çalışma alanına sığacak kadar küçültülür.
 /// `width`, `height` sayfanın istediği (CSS) boyut; pencere arayüz ölçeğiyle çarpılır.
 pub fn resize_island(win: &WebviewWindow, width: f64, height: f64) -> tauri::Result<()> {
     let monitor = win.current_monitor()?.or_else(|| primary_monitor(win.app_handle()));
     let z = zoom();
-    let (w, h) = match &monitor {
+    let fit = match &monitor {
         Some(m) => {
             let s = m.scale_factor();
-            ((width * z).min(m.size().width as f64 / s), (height * z).min(m.size().height as f64 / s))
+            let area = m.work_area().size;
+            let (aw, ah) = (area.width as f64 / s, area.height as f64 / s);
+            (aw / (width * z)).min(ah / (height * z)).min(1.0)
         }
-        None => (width * z, height * z),
+        None => 1.0,
     };
-    CUR_W.store((w / z).to_bits(), Ordering::Relaxed);
-    CUR_H.store((h / z).to_bits(), Ordering::Relaxed);
-    win.set_size(tauri::LogicalSize::new(w, h))?;
+    let was = f64::from_bits(FIT.swap(fit.to_bits(), Ordering::Relaxed));
+    CUR_W.store(width.to_bits(), Ordering::Relaxed);
+    CUR_H.store(height.to_bits(), Ordering::Relaxed);
+    if (was - fit).abs() > 0.001 {
+        let _ = win.set_zoom(z * fit);
+    }
+    win.set_size(tauri::LogicalSize::new(width * z * fit, height * z * fit))?;
     if let Some(m) = monitor {
         place_on(win, &m)?;
     }
@@ -420,8 +444,8 @@ pub fn finish_drag(app: &AppHandle, label: &str) {
     let monitors = app.available_monitors().unwrap_or_default();
     let Some(m) = monitor_at(&monitors, cx, pos.y as f64 + 1.0).or_else(|| primary_monitor(app)) else { return };
     let (o, ms, scale) = (m.position(), m.size(), m.scale_factor());
-    let top = (pos.y - o.y).max(0) as f64;
     let fx = ((cx - o.x as f64) / ms.width as f64).clamp(0.0, 1.0);
+    let top = (pos.y - o.y).max(0) as f64;
     let fy = if top < SNAP_TOP * scale { 0.0 } else { (top / ms.height as f64).clamp(0.0, 1.0) };
     // Ortaya çok yakın ve üste yapışıksa: tam orta (eski yerine) dönsün
     let centered = fy == 0.0 && (fx - 0.5).abs() * ms.width as f64 / scale < 24.0;

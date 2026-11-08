@@ -118,7 +118,7 @@ function claudeMirror() {
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 12)
       .map(({ id, project, state, action, prompt, reply, updatedAt, turnAt, edits, commands, files }) => ({ id, project, state, action, prompt, reply, updatedAt, turnAt, edits, commands, files })),
-    asks: asks.map(({ askId, session, project, tool, title, detail, questions, canAlways, at }) => ({ askId, session, project, tool, title, detail, questions, canAlways, at })),
+    asks: asks.map(({ askId, session, project, tool, title, detail, questions, canAlways, rule, code, at }) => ({ askId, session, project, tool, title, detail, questions, canAlways, rule, code, at })),
     plan,
   };
 }

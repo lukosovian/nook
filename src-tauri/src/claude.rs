@@ -25,6 +25,9 @@ const PLAN: &str = "nook://claude-plan";
 /// Köprünün `args`'ı; Nook'un hook'u bununla tanınır
 const HOOK_ARG: &str = "claude-hook";
 const STATUS_ARG: &str = "claude-status";
+/// Kullanıcının kendi durum satırı sarıldıysa: `nook.exe claude-status --tee | <kendi komutu>`.
+/// Nook gelen JSON'u aynen geçirir; kullanıcının komutunu yine Claude Code'un kabuğu çalıştırır.
+pub const TEE_ARG: &str = "--tee";
 /// Hook'u kurulan olaylar
 const EVENTS: &[&str] = &["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Notification", "Stop", "SessionEnd"];
 /// Araç olayları matcher ister
@@ -158,8 +161,17 @@ mod server {
                 return;
             }
         }
-        let Ok(Value::Object(map)) = serde_json::from_slice::<Value>(&line) else { return };
+        let Ok(Value::Object(mut map)) = serde_json::from_slice::<Value>(&line) else { return };
         let event = map.get("hook_event_name").and_then(Value::as_str).unwrap_or_default().to_string();
+        let pid = map.remove("claude_pid").and_then(|p| p.as_u64());
+        if let (Some(session), Some(pid)) = (map.get("session_id").and_then(Value::as_str), pid) {
+            let mut pids = session_pids().lock().unwrap();
+            if event == "SessionEnd" {
+                pids.remove(session);
+            } else {
+                pids.insert(session.to_owned(), pid as u32);
+            }
+        }
 
         if event == "StatusLine" {
             if let Some(limits) = map.get("rate_limits") {
@@ -172,7 +184,15 @@ mod server {
         let idle = crate::tracker::system_idle().is_some_and(|d| d > Duration::from_secs(90));
         let away = !terminal_in_front() || idle;
         let mut ui = Value::Object(map);
+        // Onay kartında komutun tamamı görünsün: komut daha uzun sınırla kısalır
+        let command = ui.pointer("/tool_input/command").cloned();
         cap_strings_to(&mut ui, 600);
+        if let Some(mut c) = command {
+            cap_strings_to(&mut c, 8000);
+            if let Some(slot) = ui.pointer_mut("/tool_input/command") {
+                *slot = c;
+            }
+        }
         if let Value::Object(m) = &mut ui {
             m.insert("at".into(), json!(now_ms()));
             m.insert("away".into(), json!(away));
@@ -213,6 +233,138 @@ mod server {
 }
 
 // ---------------------------------------------------------------------------
+// Telefondan istek yazma: oturumun terminaline klavyeden yazılmış gibi
+// ---------------------------------------------------------------------------
+
+/// Oturum → Claude Code süreci (köprü her olayda kendi atasını bildirir)
+fn session_pids() -> &'static Mutex<HashMap<String, u32>> {
+    static P: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
+    P.get_or_init(Default::default)
+}
+
+/// Telefondan gelen metni oturumun terminaline yazar ve Enter'a basar. Claude çalışıyorsa
+/// Claude Code bunu kendi sırasına alır, bitince işler.
+pub fn send_prompt(session: &str, text: &str) -> Result<(), String> {
+    let text: String = text.replace(['\r', '\n'], " ").trim().to_string();
+    if text.is_empty() {
+        return Err("boş istek".into());
+    }
+    let pid = session_pids().lock().unwrap().get(session).copied().ok_or("Bu oturumun terminali bulunamadı; Claude'da bir şey olunca yeniden dene")?;
+    #[cfg(windows)]
+    {
+        term::type_into(pid, &text)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+        Err("yalnızca Windows'ta".into())
+    }
+}
+
+#[cfg(windows)]
+pub mod term {
+    use std::collections::HashMap;
+    use std::os::windows::io::AsRawHandle;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Console::{AttachConsole, FreeConsole, GetConsoleWindow, WriteConsoleInputW, ATTACH_PARENT_PROCESS, INPUT_RECORD, KEY_EVENT};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
+
+    const CLAUDE_EXES: &[&str] = &["claude.exe", "node.exe", "bun.exe"];
+
+    /// pid → (ebeveyn, küçük harf exe adı)
+    fn processes() -> HashMap<u32, (u32, String)> {
+        let mut out = HashMap::new();
+        unsafe {
+            let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if snap == INVALID_HANDLE_VALUE {
+                return out;
+            }
+            let mut e: PROCESSENTRY32W = std::mem::zeroed();
+            e.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+            let mut ok = Process32FirstW(snap, &mut e) != 0;
+            while ok {
+                let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
+                out.insert(e.th32ProcessID, (e.th32ParentProcessID, String::from_utf16_lossy(&e.szExeFile[..len]).to_lowercase()));
+                ok = Process32NextW(snap, &mut e) != 0;
+            }
+            CloseHandle(snap);
+        }
+        out
+    }
+
+    /// Köprüyü çalıştıran Claude Code süreci: atalar arasında art arda gelen Claude süreçlerinin en dıştaki
+    pub fn claude_ancestor() -> Option<u32> {
+        let procs = processes();
+        let mut cur = std::process::id();
+        let mut found = None;
+        for _ in 0..16 {
+            let Some((parent, _)) = procs.get(&cur) else { break };
+            let parent = *parent;
+            match procs.get(&parent) {
+                Some((_, name)) if CLAUDE_EXES.contains(&name.as_str()) => found = Some(parent),
+                _ if found.is_some() => break,
+                _ => {}
+            }
+            cur = parent;
+        }
+        found
+    }
+
+    fn key(c: u16, vk: u16, down: bool) -> INPUT_RECORD {
+        let mut r: INPUT_RECORD = unsafe { std::mem::zeroed() };
+        r.EventType = KEY_EVENT as u16;
+        r.Event.KeyEvent.bKeyDown = down as i32;
+        r.Event.KeyEvent.wRepeatCount = 1;
+        r.Event.KeyEvent.wVirtualKeyCode = vk;
+        r.Event.KeyEvent.uChar.UnicodeChar = c;
+        r
+    }
+
+    fn write(con: &std::fs::File, recs: &[INPUT_RECORD]) -> bool {
+        let mut n = 0u32;
+        unsafe { WriteConsoleInputW(con.as_raw_handle() as _, recs.as_ptr(), recs.len() as u32, &mut n) != 0 && n as usize == recs.len() }
+    }
+
+    /// Sürecin konsoluna bağlanıp metni ve Enter'ı yazar. Konsol süreç genelinde tek olduğu için sırayla.
+    pub fn type_into(pid: u32, text: &str) -> Result<(), String> {
+        static LOCK: Mutex<()> = Mutex::new(());
+        let _g = LOCK.lock().unwrap();
+        // Kimlik başka bir sürece verilmiş olmasın
+        if !processes().get(&pid).is_some_and(|(_, n)| CLAUDE_EXES.contains(&n.as_str())) {
+            return Err("Bu Claude oturumu kapanmış".into());
+        }
+        let had_console = unsafe { !GetConsoleWindow().is_null() };
+        unsafe { FreeConsole() };
+        let result = (|| {
+            if unsafe { AttachConsole(pid) } == 0 {
+                return Err("Bu oturum bir terminalde çalışmıyor".to_string());
+            }
+            let con = std::fs::OpenOptions::new().read(true).write(true).open("CONIN$").map_err(|e| format!("terminale ulaşılamadı: {e}"))?;
+            let recs: Vec<INPUT_RECORD> = text.encode_utf16().flat_map(|c| [key(c, 0, true), key(c, 0, false)]).collect();
+            if !write(&con, &recs) {
+                return Err("terminale yazılamadı".into());
+            }
+            // Enter ayrı gelsin: metinle birlikte gelirse yapıştırma sayılıp alt satıra geçebilir
+            std::thread::sleep(Duration::from_millis(150));
+            if !write(&con, &[key(13, 0x0D, true), key(13, 0x0D, false)]) {
+                return Err("terminale yazılamadı".into());
+            }
+            Ok(())
+        })();
+        unsafe {
+            FreeConsole();
+            if had_console {
+                AttachConsole(ATTACH_PARENT_PROCESS);
+            }
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Kurulum: ~/.claude/settings.json
 // ---------------------------------------------------------------------------
 
@@ -246,6 +398,14 @@ fn is_our_handler(h: &Value) -> bool {
     let first_arg = h.get("args").and_then(Value::as_array).and_then(|a| a.first()).and_then(Value::as_str);
     let file = cmd.rsplit(['\\', '/']).next().unwrap_or_default();
     file.contains("nook") && file.ends_with(".exe") && first_arg == Some(HOOK_ARG)
+}
+
+/// Sarılmış durum satırından kullanıcının kendi komutu
+fn unwrap_status(v: &Value) -> Option<String> {
+    let cmd = v.get("command").and_then(Value::as_str)?;
+    let marker = format!("{STATUS_ARG} {TEE_ARG} | ");
+    let at = cmd.find(&marker)?;
+    Some(cmd[at + marker.len()..].to_string())
 }
 
 fn is_our_status(v: &Value) -> bool {
@@ -321,7 +481,7 @@ pub struct ClaudeSetup {
     hooked: bool,
     /// Hook'lar başka bir nook.exe'yi gösteriyor (taşınmış/geliştirme kopyası)
     stale: bool,
-    /// "nook" | "other" | "none"
+    /// "nook" | "wrapped" (kendi satırı Nook'la birlikte) | "other" | "none"
     statusline: &'static str,
 }
 
@@ -345,6 +505,7 @@ pub fn claude_setup() -> ClaudeSetup {
         .filter_map(|h| h.get("command").and_then(Value::as_str).map(str::to_ascii_lowercase))
         .collect();
     let statusline = match map.get("statusLine") {
+        Some(v) if unwrap_status(v).is_some() => "wrapped",
         Some(v) if is_our_status(v) => "nook",
         Some(_) => "other",
         None => "none",
@@ -369,9 +530,9 @@ pub fn claude_connect() -> Result<Option<String>, String> {
         let list = hooks.entry(*ev).or_insert_with(|| json!([]));
         list.as_array_mut().ok_or(format!("settings.json'daki \"{ev}\" bir liste değil"))?.push(group);
     }
-    // Kullanıcının kendi durum satırına dokunma
+    // Kullanıcının kendi durum satırına dokunma (sarılmışsa da öyle kalsın)
     match map.get("statusLine") {
-        Some(v) if !is_our_status(v) => {}
+        Some(v) if !is_our_status(v) || unwrap_status(v).is_some() => {}
         _ => {
             map.insert("statusLine".into(), json!({ "type": "command", "command": status_command(&exe), "padding": 0 }));
         }
@@ -383,13 +544,38 @@ pub fn claude_connect() -> Result<Option<String>, String> {
 pub fn claude_disconnect() -> Result<Option<String>, String> {
     let (path, mut map) = read_settings()?;
     let mut changed = strip_ours(&mut map);
-    if map.get("statusLine").is_some_and(is_our_status) {
+    if let Some(own) = map.get("statusLine").and_then(unwrap_status) {
+        // Sarılmışsa kullanıcının kendi komutu geri gelir
+        map["statusLine"]["command"] = Value::String(own);
+        changed = true;
+    } else if map.get("statusLine").is_some_and(is_our_status) {
         map.remove("statusLine");
         changed = true;
     }
     if !changed {
         return Ok(None);
     }
+    write_settings(&path, map)
+}
+
+/// Kendi durum satırı olan kullanıcıda plan göstergesini aç/kapat: satırı Nook'la sarar ya da eski hâline döndürür.
+#[tauri::command]
+pub fn claude_status_wrap(on: bool) -> Result<Option<String>, String> {
+    let exe = exe()?;
+    let (path, mut map) = read_settings()?;
+    let Some(line) = map.get_mut("statusLine").and_then(Value::as_object_mut) else {
+        return Err("Claude Code'da durum satırı yok".into());
+    };
+    let current = Value::Object(line.clone());
+    let command = match (on, unwrap_status(&current)) {
+        (true, None) if !is_our_status(&current) => {
+            let own = current.get("command").and_then(Value::as_str).filter(|c| !c.trim().is_empty()).ok_or("Durum satırının komutu okunamadı")?;
+            format!("{} {TEE_ARG} | {own}", status_command(&exe))
+        }
+        (false, Some(own)) => own,
+        _ => return Ok(None),
+    };
+    line.insert("command".into(), Value::String(command));
     write_settings(&path, map)
 }
 
@@ -464,6 +650,15 @@ mod tests {
         assert_eq!(after, original);
         std::env::remove_var("CLAUDE_CONFIG_DIR");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn wrapped_status_keeps_users_command() {
+        let own = "bash ~/.claude/statusline.sh && echo ok";
+        let v = json!({ "type": "command", "command": format!("{} {TEE_ARG} | {own}", status_command(r"C:\Users\A B\nook.exe")), "padding": 1 });
+        assert!(is_our_status(&v));
+        assert_eq!(unwrap_status(&v).as_deref(), Some(own));
+        assert_eq!(unwrap_status(&json!({ "command": "C:/x/nook.exe claude-status" })), None);
     }
 
     #[test]

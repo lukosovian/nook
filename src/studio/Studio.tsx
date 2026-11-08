@@ -16,7 +16,7 @@ import { useStorageSync } from "../hooks/useSystemFeeds";
 import { ContextMenu } from "../components/overlays/ContextMenu";
 import { NookFigure } from "../components/mascot/Figure";
 import { ACCENT, tintBg, tintText } from "../components/ui/primitives";
-import { isTurkish, tt } from "../lib/i18n";
+import { tt } from "../lib/i18n";
 import { HomePage } from "./pages/HomePage";
 import { LookPage } from "./pages/LookPage";
 import { KeysPage } from "./pages/KeysPage";
@@ -148,8 +148,8 @@ function Sidebar({ page, go }: { page: StudioPage; go: (p: StudioPage) => void }
   const look = normalizeLook(useNook((s) => s.settings.look));
   const color = normalizeColor(useNook((s) => s.settings.faceColor));
   const affection = useNook((s) => s.affection);
-  // Argus bu bilgisayarda yoksa yalnızca Türkçede (tanıtımı için) görünür
-  const argus = useArgus((s) => !!s.snap) || isTurkish;
+  // Argus yalnızca bu bilgisayarda kuruluysa (tanıtımı Modüller'deki Argus kartında)
+  const argus = useArgus((s) => !!s.snap);
   return (
     <nav className="flex w-[232px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/[0.05] bg-white/[0.015] px-3 py-4">
       {NAV.filter((n) => (n.id !== "argus" || argus) && (n.id !== "aquarium" || page === "aquarium")).map((n) => {

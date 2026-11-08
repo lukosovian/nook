@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { playAntic } from "../../../hooks/useAntics";
-import { DEFAULT_LOOK, HALLOWEEN, normalizeColor, normalizeLook, type Look } from "../../../lib/look";
+import { COLLECTION, DEFAULT_LOOK, normalizeColor, normalizeLook, type Look } from "../../../lib/look";
 import { spring } from "../../../lib/motion";
 import { useNook } from "../../../store/nook";
 import { NookFigure } from "../../mascot/Figure";
@@ -150,7 +150,7 @@ export function Whack({ onBack }: { onBack: () => void }) {
 // ------------------------------------------------------------------ Eşleştir
 
 const PAIR_LOOKS: { look: Look; color: string }[] = [
-  ...HALLOWEEN.slice(0, 4).map((h) => ({ look: h.look, color: h.color })),
+  ...COLLECTION.slice(0, 4).map((h) => ({ look: h.look, color: h.color })),
   { look: { ...DEFAULT_LOOK, shape: "cloud", texture: "plush", head: "beret" }, color: "#2B8CFF" },
   { look: { ...DEFAULT_LOOK, shape: "heart", glasses: "shades" }, color: "#FF5C8A" },
 ];

@@ -6,7 +6,9 @@ import { windowLabel } from "./lib/bridge";
 import { isStudio } from "./lib/studio";
 import { installLogging } from "./lib/log";
 import "./styles.css";
-import { useColorVision } from "./lib/palette";
+import { useClearText, useColorVision } from "./lib/palette";
+import { MotionConfig } from "motion/react";
+import { useNook } from "./store/nook";
 
 async function boot() {
   installLogging();
@@ -83,15 +85,22 @@ async function boot() {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ColorVision />
-      {view}
+      <Motion>{view}</Motion>
     </StrictMode>,
   );
 }
 
 void boot();
 
-/** Renk körlüğü paletini her pencerede uygular */
+/** Renk körlüğü paletini ve net yazıyı her pencerede uygular */
 function ColorVision() {
   useColorVision();
+  useClearText();
   return null;
+}
+
+/** "Daha az hareket" açıksa ya da Windows'ta animasyonlar kapalıysa kayan, büyüyen animasyonlar durur */
+function Motion({ children }: { children: ReactNode }) {
+  const calm = useNook((s) => s.settings.calmMotion);
+  return <MotionConfig reducedMotion={calm ? "always" : "user"}>{children}</MotionConfig>;
 }

@@ -156,7 +156,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     let shield_locked = shared.locked.load(Ordering::Relaxed);
                     let gated = shared.gated.load(Ordering::Relaxed);
                     // Tam ekran oyunun ekranında ada açılmaz (alarm çalarken hariç)
-                    let in_game = shared
+                    let in_game = shared.game_front.load(Ordering::Relaxed)
+                        && shared
                         .game_screen
                         .lock()
                         .unwrap()
@@ -167,7 +168,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     for (label, ws) in &windows {
                         let locked = shield_locked || (gated && label != window::ISLAND);
                         let g = ws.geom;
-                        let k = g.scale * window::zoom();
+                        let k = g.scale * window::zoom_of(label);
                         let (x, y) = ((px - g.x) / k, (py - g.y) / k);
                         let over = !in_game && !locked && (ws.hit.contains(x, y) || ws.extra.contains(x, y));
                         let prev_drag = prev.get(label).is_some_and(|p| p.drag);
@@ -189,7 +190,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let locked = shield_locked || (gated && label != window::ISLAND);
                         let g = ws.geom;
                         // Sayfanın gördüğü (CSS) px: ekran ölçeği × arayüz ölçeği
-                        let k = g.scale * window::zoom();
+                        let k = g.scale * window::zoom_of(&label);
                         let (x, y) = ((px - g.x) / k, (py - g.y) / k);
                         // Ada içinde basılıp (metin seçerken, kaydırıcı çekerken) imleç dışarı kayarsa
                         // tuş bırakılana kadar ada kapanmaz.

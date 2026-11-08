@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { AlarmClock, Bell, BellOff, Check, ChevronDown, ChevronUp, Pencil, Repeat2, X } from "lucide-react";
-import { clock, pad, REPEAT_LABEL, until, type Alarm, type Repeat } from "../../lib/alarm";
+import { AlarmClock, Bell, BellOff, Check, ChevronDown, ChevronUp, Pencil, Pill, X } from "lucide-react";
+import { clock, DAY_SHORT, daysOf, pad, repeatOf, repeatText, until, WEEK, type Alarm } from "../../lib/alarm";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText, Toggle } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
 const QUICK = [5, 10, 25, 60];
-const REPEATS = Object.keys(REPEAT_LABEL) as Repeat[];
 
 /** Alarm kur: saat seçici + isim + tekrar; hızlı "+N dk"; kurulu alarmlar listesi (satıra tıklayınca düzenlenir). */
 export function AlarmPanel() {
@@ -29,7 +28,7 @@ export function AlarmPanel() {
   const [hour, setHour] = useState(() => (new Date().getHours() + 1) % 24);
   const [minute, setMinute] = useState(0);
   const [label, setLabel] = useState("");
-  const [repeat, setRepeat] = useState<Repeat>("once");
+  const [days, setDays] = useState<number[]>([]);
   // Ayarlarda ses "Sessiz" ise yeni alarmlar da sessiz başlar
   const [silent, setSilent] = useState(() => useNook.getState().settings.alarmSound === 0);
   // Düzenlenen alarm: üstteki seçici onun değerleriyle dolar, "Kur" → "Kaydet"
@@ -46,7 +45,7 @@ export function AlarmPanel() {
     setHour(a.hour);
     setMinute(a.minute);
     setLabel(a.label);
-    setRepeat(a.repeat);
+    setDays(daysOf(a));
     setSilent(!!a.silent);
   };
   const cancel = () => {
@@ -55,9 +54,9 @@ export function AlarmPanel() {
   };
   const add = () => {
     if (editing) {
-      useNook.getState().updateAlarm(editing, { hour, minute, label: label.trim(), repeat, silent });
+      useNook.getState().updateAlarm(editing, { hour, minute, label: label.trim(), ...repeatOf(days), silent });
       setEditing(null);
-    } else addAlarm({ hour, minute, label: label.trim(), repeat, silent });
+    } else addAlarm({ hour, minute, label: label.trim(), ...repeatOf(days), silent });
     setLabel("");
   };
   const quick = (min: number) => {
@@ -89,20 +88,26 @@ export function AlarmPanel() {
           className="h-7 w-full rounded-[10px] bg-black/30 px-2.5 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-black/45"
         />
         <div className="flex gap-1">
-          {/* Tekrar: tıkladıkça sıradaki seçenek */}
-          <button
-            onClick={() => setRepeat(REPEATS[(REPEATS.indexOf(repeat) + 1) % REPEATS.length])}
-            title={tt("Değiştirmek için tıkla")}
-            className="flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-2 text-[11px] font-semibold"
-            style={{ background: tintBg(ACCENT.yellow, 10), borderColor: tintBg(ACCENT.yellow, 30), color: tintText(ACCENT.yellow) }}
-          >
-            <Repeat2 size={12} strokeWidth={2.4} className="shrink-0" />
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span key={repeat} className="truncate" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.12 }}>
-                {REPEAT_LABEL[repeat]}
-              </motion.span>
-            </AnimatePresence>
-          </button>
+          {/* Tekrar: çalacağı günler; hiçbiri seçili değilse bir kez */}
+          <div className="flex min-w-0 flex-1 gap-0.5" title={days.length ? repeatText(repeatOf(days)) : tt("Bir kez · gün seçersen her hafta o günlerde çalar")}>
+            {WEEK.map((d) => {
+              const on = days.includes(d);
+              return (
+                <button
+                  key={d}
+                  onClick={() => setDays(on ? days.filter((x) => x !== d) : [...days, d])}
+                  className="flex h-7 min-w-0 flex-1 items-center justify-center rounded-[8px] border text-[9px] font-bold"
+                  style={{
+                    background: on ? tintBg(ACCENT.yellow, 30) : "rgb(0 0 0 / 0.3)",
+                    borderColor: on ? tintBg(ACCENT.yellow, 60) : "transparent",
+                    color: on ? tintText(ACCENT.yellow) : "var(--color-label-3)",
+                  }}
+                >
+                  {DAY_SHORT[d]}
+                </button>
+              );
+            })}
+          </div>
           <BellToggle silent={silent} onChange={setSilent} />
         </div>
         <motion.button
@@ -145,7 +150,7 @@ export function AlarmPanel() {
                   {clock(next)}
                 </p>
                 <p className="truncate text-[10.5px] text-label-2">
-                  {next.label || REPEAT_LABEL[next.repeat]} · {until(next.next!, now)}
+                  {next.label || repeatText(next)} · {until(next.next!, now)}
                 </p>
               </>
             ) : (
@@ -163,6 +168,23 @@ export function AlarmPanel() {
                 +{m >= 60 ? tt("{0} sa", m / 60) : tt("{0} dk", m)}
               </button>
             ))}
+            {/* İlaç: her gün 09:00 "İlaç" hazır gelir; saati ve günleri soldan değiştirip Kur'a basılır */}
+            <button
+              onClick={() => {
+                if (!editing) {
+                  setHour(9);
+                  setMinute(0);
+                }
+                setLabel(tt("İlaç"));
+                setDays([...WEEK]);
+              }}
+              title={tt("Her gün aynı saatte çalan ilaç alarmı: saati soldan ayarla, Kur'a bas. Çalınca \"Aldım\" dersin")}
+              className="col-span-2 flex items-center justify-center gap-1 rounded-[9px] px-2 py-[3px] text-[10.5px] font-semibold transition-colors"
+              style={{ background: tintBg(ACCENT.green, 14), color: tintText(ACCENT.green) }}
+            >
+              <Pill size={11} strokeWidth={2.5} />
+              {tt("İlaç")}
+            </button>
           </div>
         </div>
 
@@ -189,7 +211,7 @@ export function AlarmPanel() {
                     {clock(a)}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-label-3">
-                    <span className="text-label-2">{a.label || REPEAT_LABEL[a.repeat]}</span>
+                    <span className="text-label-2">{a.label || repeatText(a)}</span>
                     {a.enabled && a.next ? ` · ${until(a.next, now)}` : ""}
                   </span>
                   <Pencil size={10} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-opacity ${editing === a.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />

@@ -48,3 +48,17 @@ export function useColorVision() {
   if (cvd !== current) apply(cvd);
   useEffect(() => apply(cvd), [cvd]);
 }
+
+/** Net yazı açıkken soluk gri yazılar açılır (koyu kartta okunaklı karşıtlık) */
+const CLEAR_TEXT: Record<string, string> = { "--color-label-2": "#c9c9cf", "--color-label-3": "#a4a4ac" };
+
+export function useClearText() {
+  const on = useNook((s) => s.settings.clearText);
+  useEffect(() => {
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(CLEAR_TEXT)) {
+      if (on) root.style.setProperty(k, v);
+      else root.style.removeProperty(k);
+    }
+  }, [on]);
+}

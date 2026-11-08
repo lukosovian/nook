@@ -180,10 +180,12 @@ export function looksForeign(raw: string): boolean {
   const other = Math.max(...Object.entries(STOP).filter(([l]) => l !== "tr").map(([, re]) => hits(re!, t))) + (FOREIGN_CHARS.test(t) ? 2 : 0);
   if (tr || other) return other > tr;
   if (TURKISH_CHARS.test(t)) return false;
-  // Hiç ipucu yok: birkaç kelimelik Latin metin Gemini'ye gider (Türkçeyse "-" der, kart çıkmaz);
-  // tek kelime yalnızca büyük harfle başlıyorsa ya da İngilizce gibi görünüyorsa
+  // Hiç ipucu yok: en az dört kelimelik Latin metin Gemini'ye gider (Türkçeyse "-" der, kart çıkmaz);
+  // "git status" gibi iki üç kelimelik komutlar ve adlar gönderilmez. Tek kelime yalnızca büyük harfle
+  // başlıyorsa ya da İngilizce gibi görünüyorsa
   const words = t.split(/\s+/).filter((w) => /\p{L}{2,}/u.test(w)).length;
-  if (words >= 2) return true;
+  if (words >= 4) return true;
+  if (words > 1) return false;
   return /^[A-Za-z][a-z]{3,}$/.test(t) && (/^[A-Z]/.test(t) || /(ing|tion|ness|ment|able|ful|less|ly|ed|er|est|ous|ive|ght|th|sh|w|y)$/.test(t));
 }
 

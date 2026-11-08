@@ -3,7 +3,7 @@ import { isPrimary } from "../lib/bridge";
 import { syncFeeds } from "../lib/ics";
 import { note } from "../lib/log";
 import { tt } from "../lib/i18n";
-import { useNook } from "../store/nook";
+import { rollRepeats, useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 
 const SYNC_EVERY = 30 * 60_000;
@@ -47,7 +47,10 @@ export function useExtReminders() {
     if (!isPrimary) return;
     const told = new Set<string>();
     let last = Date.now();
+    // Tekrarlı etkinlikler: geçen tekrar sıradakine taşınır (açılışta da, Nook kapalıyken geçenler için)
+    rollRepeats();
     const t = window.setInterval(() => {
+      rollRepeats();
       const st = useNook.getState();
       const lead = st.settings.calRemindExt;
       const now = Date.now();

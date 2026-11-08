@@ -14,6 +14,16 @@ const RULE: &str = "Nook Mobil";
 /// Dışarıdan açmayı sınarken uyandırma paketinin PC'ye ulaşıp ulaşmadığını görmek için (UDP 9)
 #[cfg(windows)]
 const RULE_WAKE: &str = "Nook Mobil uyandırma testi";
+/// Tailscale'den gelen bağlantı (her ağ profilinde; ev ağı kuralı Genel ağlarda kapalı)
+#[cfg(windows)]
+const RULE_TS: &str = "Nook Mobil (Tailscale)";
+
+/// Ayarlar › Telefon: "Tailscale'i açık tut" (kapalıyken Nook Tailscale'e kendiliğinden dokunmaz)
+static TS_KEEP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_tailscale_keep(on: bool) {
+    TS_KEEP.store(on, std::sync::atomic::Ordering::Relaxed);
+}
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -121,6 +131,28 @@ mod fw {
         .unwrap_or(false)
     }
 
+    /// Nook'un kurallarından biri var mı (kaldırırken yönetici izni yalnızca gerekirse istensin)
+    pub fn any_rule() -> bool {
+        std::thread::spawn(|| unsafe {
+            policy().and_then(|p| p.Rules()).is_ok_and(|r| [super::RULE, super::RULE_WAKE, super::RULE_TS].iter().any(|n| r.Item(&BSTR::from(*n)).is_ok()))
+        })
+        .join()
+        .unwrap_or(false)
+    }
+
+    /// Kaldırırken (yönetici): Nook'un güvenlik duvarı kurallarını sil
+    pub fn remove_rules() {
+        std::thread::spawn(|| unsafe {
+            if let Ok(rules) = policy().and_then(|p| p.Rules()) {
+                for n in [super::RULE, super::RULE_WAKE, super::RULE_TS] {
+                    let _ = rules.Remove(&BSTR::from(n));
+                }
+            }
+        })
+        .join()
+        .ok();
+    }
+
     /// Yönetici olarak açılmış Nook'ta: köprünün portuna yalnızca ev ağı ve Tailscale'den gelen bağlantıya izin
     pub fn add_rule() -> windows::core::Result<()> {
         unsafe {
@@ -134,7 +166,23 @@ mod fw {
             }
             rule.SetProtocol(NET_FW_IP_PROTOCOL_TCP.0)?;
             rule.SetLocalPorts(&BSTR::from(crate::remote::PORT.to_string()))?;
-            rule.SetRemoteAddresses(&BSTR::from("LocalSubnet,100.64.0.0/255.192.0.0"))?;
+            rule.SetRemoteAddresses(&BSTR::from("LocalSubnet"))?;
+            rule.SetDirection(NET_FW_RULE_DIR_IN)?;
+            rule.SetAction(NET_FW_ACTION_ALLOW)?;
+            // Kafe gibi Genel ağlarda port kapalı kalsın: yalnızca Özel ve Etki alanı ağları
+            rule.SetProfiles(NET_FW_PROFILE2_PRIVATE.0 | NET_FW_PROFILE2_DOMAIN.0)?;
+            rule.SetEnabled(VARIANT_TRUE)?;
+            rules.Add(&rule)?;
+            let _ = rules.Remove(&BSTR::from(super::RULE_TS));
+            let rule: INetFwRule = CoCreateInstance(&NetFwRule, None, CLSCTX_INPROC_SERVER)?;
+            rule.SetName(&BSTR::from(super::RULE_TS))?;
+            rule.SetDescription(&BSTR::from("Nook Mobil: telefonun Tailscale üzerinden bu PC'ye bağlanması"))?;
+            if let Ok(exe) = std::env::current_exe() {
+                rule.SetApplicationName(&BSTR::from(exe.to_string_lossy().as_ref()))?;
+            }
+            rule.SetProtocol(NET_FW_IP_PROTOCOL_TCP.0)?;
+            rule.SetLocalPorts(&BSTR::from(crate::remote::PORT.to_string()))?;
+            rule.SetRemoteAddresses(&BSTR::from("100.64.0.0/255.192.0.0"))?;
             rule.SetDirection(NET_FW_RULE_DIR_IN)?;
             rule.SetAction(NET_FW_ACTION_ALLOW)?;
             rule.SetProfiles(NET_FW_PROFILE2_ALL.0)?;
@@ -199,6 +247,11 @@ mod ts {
         if !prefs.contains("\"ForceDaemon\": true") {
             let ok = ts_cli(&["set", "--unattended=true"]).is_some_and(|o| o.status.success());
             crate::log::write("info", &format!("tailscale unattended: {}", if ok { "açıldı" } else { "açılamadı" }));
+            if ok {
+                if let Some(flag) = super::ts_flag() {
+                    let _ = std::fs::write(flag, "");
+                }
+            }
         }
     }
 
@@ -219,17 +272,20 @@ mod ts {
         *STATE.lock().unwrap()
     }
 
-    /// Kapalıysa bağlar; durumu döner. Bağlıyken süreç başlatmaz (yalnızca ağ kartlarına bakar).
-    pub fn keep() -> TsState {
+    /// Durumu döner. `reconnect` (Ayarlar'da "Tailscale'i açık tut" ya da kullanıcı düğmeye bastı):
+    /// kapalıysa bağlar ve unattended'ı açar; yoksa yalnızca bakar. Bağlıyken süreç başlatmaz.
+    pub fn keep(reconnect: bool) -> TsState {
         let st = if !installed() {
             TsState::Missing
         } else if connected() {
-            ensure_unattended();
+            if reconnect {
+                ensure_unattended();
+            }
             TsState::Running
         } else {
             match backend().as_deref() {
                 Some("Stopped") => {
-                    let due = LAST_UP.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(5 * 60));
+                    let due = reconnect && LAST_UP.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(5 * 60));
                     if due {
                         *LAST_UP.lock().unwrap() = Some(Instant::now());
                         let ok = ts_up();
@@ -260,6 +316,48 @@ pub fn fix_elevated() -> i32 {
     match fw::add_rule() {
         Ok(()) => 0,
         Err(_) => 1,
+    }
+}
+
+/// main.rs `fw-remove` (yönetici, kaldırırken)
+#[cfg(windows)]
+pub fn remove_elevated() -> i32 {
+    fw::remove_rules();
+    0
+}
+
+/// Nook'un Tailscale'de açtığı unattended ayarının işareti (kaldırırken geri alınır)
+fn ts_flag() -> Option<std::path::PathBuf> {
+    Some(std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Nook").join("tailscale_unattended.flag"))
+}
+
+/// Kaldırıcı çağırır (main.rs `claude-uninstall`): Nook'un sistemde bıraktıklarını geri al. Modemdeki
+/// yönlendirme silinir, Tailscale'in girişsiz çalışma ayarı Nook açtıysa kapanır, güvenlik duvarı kuralları
+/// (yönetici izniyle) silinir; eşleştirme anahtarı, günlükler ve indirilen ses modeli silinir.
+pub fn uninstall_cleanup() {
+    #[cfg(windows)]
+    {
+        if let Some(lan) = crate::remote::lan_ip() {
+            if let Some(gw) = upnp::discover(lan) {
+                for (port, _) in ROUTES {
+                    gw.remove(port);
+                }
+            }
+        }
+        if let Some(flag) = ts_flag().filter(|p| p.exists()) {
+            let _ = ts_cli(&["set", "--unattended=false"]);
+            let _ = std::fs::remove_file(flag);
+        }
+        if fw::any_rule() {
+            let _ = crate::wol::run_elevated("fw-remove");
+        }
+    }
+    let Some(root) = std::env::var_os("LOCALAPPDATA").map(|p| std::path::PathBuf::from(p).join("Nook")) else { return };
+    for f in ["remote.json", "outside.json", "wake.json", "whatsapp.json", "studio_size.json", "mic_restore.json"] {
+        let _ = std::fs::remove_file(root.join(f));
+    }
+    for d in ["logs", "whisper"] {
+        let _ = std::fs::remove_dir_all(root.join(d));
     }
 }
 
@@ -308,7 +406,7 @@ pub async fn outside_install_tailscale() -> Result<(), String> {
 pub async fn outside_open_tailscale() -> Result<(), String> {
     #[cfg(windows)]
     {
-        let st = tauri::async_runtime::spawn_blocking(ts::keep).await.map_err(|e| e.to_string())?;
+        let st = tauri::async_runtime::spawn_blocking(|| ts::keep(true)).await.map_err(|e| e.to_string())?;
         if st == TsState::Running {
             return Ok(());
         }
@@ -669,7 +767,7 @@ pub fn spawn() {
             loop {
                 #[cfg(windows)]
                 if crate::remote::enabled() {
-                    ts::keep();
+                    ts::keep(TS_KEEP.load(std::sync::atomic::Ordering::Relaxed));
                 }
                 if tick % 15 == 0 && wake_on() {
                     refresh_wake();
@@ -691,7 +789,7 @@ pub fn setup_report() -> serde_json::Value {
     out.phone_qr = None;
     #[cfg(windows)]
     if !out.tailscale_up && out.tailscale_installed {
-        out.tailscale_state = ts::keep();
+        out.tailscale_state = ts::keep(TS_KEEP.load(std::sync::atomic::Ordering::Relaxed));
     }
     serde_json::json!({
         "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),

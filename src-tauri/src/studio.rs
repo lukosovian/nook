@@ -44,8 +44,24 @@ fn load() -> StudioSize {
     sz
 }
 
+/// Diske yazma bekliyor: sürüklerken her olayda değil, yarım saniyede en fazla bir kez yazılır
+static SAVING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn save(sz: StudioSize) {
     *LAST.lock().unwrap() = Some(sz);
+    if SAVING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        SAVING.store(false, std::sync::atomic::Ordering::SeqCst);
+        if let Some(sz) = *LAST.lock().unwrap() {
+            write(sz);
+        }
+    });
+}
+
+fn write(sz: StudioSize) {
     let Some(p) = config_path() else { return };
     if let Some(dir) = p.parent() {
         let _ = std::fs::create_dir_all(dir);
@@ -138,11 +154,48 @@ pub fn open(app: &AppHandle, section: Option<String>) -> tauri::Result<()> {
     if let (true, Some(x), Some(y)) = (placed, sz.x, sz.y) {
         let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
     }
+    // Arayüz boyutu (Ayarlar › Erişilebilirlik) Studio'yu da büyütür
+    crate::window::apply_zoom(&win);
     if sz.maximized {
         let _ = win.maximize();
+    } else {
+        fit(&win);
     }
     bring_front(&win);
     Ok(())
+}
+
+/// Studio'yu bulunduğu ekranın çalışma alanına (görev çubuğu hariç) sığdırır: 1366x768 gibi küçük
+/// ekranlarda alt kenar görev çubuğunun arkasında kalmaz. En küçük boyut arayüz ölçeğiyle büyür
+/// (sayfa sıkışmasın), ama hiçbir zaman ekrandan büyük olmaz.
+pub fn fit(win: &tauri::WebviewWindow) {
+    let Some(m) = win.current_monitor().ok().flatten().or_else(|| crate::window::primary_monitor(win.app_handle())) else { return };
+    let s = m.scale_factor();
+    let area = *m.work_area();
+    let (aw, ah) = (area.size.width as f64 / s, area.size.height as f64 / s);
+    let z = crate::window::zoom();
+    let (min_w, min_h) = ((940.0 * z).min(aw), (620.0 * z).min(ah));
+    let _ = win.set_min_size(Some(tauri::LogicalSize::new(min_w, min_h)));
+    if win.is_maximized().unwrap_or(false) {
+        return;
+    }
+    let Ok(size) = win.outer_size() else { return };
+    let (w, h) = (size.width as f64 / s, size.height as f64 / s);
+    let (nw, nh) = (w.max(min_w).min(aw), h.max(min_h).min(ah));
+    if (nw - w).abs() > 0.5 || (nh - h).abs() > 0.5 {
+        let _ = win.set_size(tauri::LogicalSize::new(nw, nh));
+    }
+    // Pencere çalışma alanından taşıyorsa içeri çek
+    if let Ok(pos) = win.outer_position() {
+        let (pw, ph) = ((nw * s).round() as i32, (nh * s).round() as i32);
+        let (ax, ay) = (area.position.x, area.position.y);
+        let (ar, ab) = (ax + area.size.width as i32, ay + area.size.height as i32);
+        let x = pos.x.min(ar - pw).max(ax);
+        let y = pos.y.min(ab - ph).max(ay);
+        if x != pos.x || y != pos.y {
+            let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+        }
+    }
 }
 
 /// Öne getir: ada odak almayan bir pencere olduğundan Windows, ondan açılan pencerenin öne gelmesine

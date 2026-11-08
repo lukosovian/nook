@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { motion } from "motion/react";
 import { normalizeColor, normalizeLook, type Look } from "../../lib/look";
-import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, hidesEyes, lensOn, SPAN, useBodyImageQueued } from "../../lib/nook3d";
+import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, hasWebGL, hidesEyes, lensOn, SPAN, useBodyImageQueued } from "../../lib/nook3d";
 import { useNook, type Expression } from "../../store/nook";
 import { eyesFor } from "./Eye";
 
@@ -104,7 +104,37 @@ export function NookFigure({
             />
           )}
         </span>
+      ) : !hasWebGL() ? (
+        <FlatNook size={size} color={color} />
       ) : null}
+    </span>
+  );
+}
+
+/** WebGL yoksa (eski ekran kartı, sürücü sorunu) küçük Nook boş kalmasın: düz bir küre ve iki göz */
+function FlatNook({ size, color }: { size: number; color: string }) {
+  const d = size * 0.86;
+  const shade = `color-mix(in srgb, ${color} 62%, #5d5d6b)`;
+  const eye = { width: d * 0.1, height: d * 0.2 };
+  return (
+    <span
+      className="absolute rounded-full"
+      style={{
+        width: d,
+        height: d,
+        left: (size - d) / 2,
+        top: (size - d) / 2,
+        background: `radial-gradient(circle at 36% 30%, #ffffff 0%, ${color} 34%, ${shade} 100%)`,
+        filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))",
+      }}
+    >
+      {[-1, 1].map((side) => (
+        <span
+          key={side}
+          className="absolute rounded-full bg-black"
+          style={{ ...eye, left: d / 2 + side * d * 0.14 - eye.width / 2, top: d * 0.36 }}
+        />
+      ))}
     </span>
   );
 }

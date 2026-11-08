@@ -20,8 +20,119 @@ static MICS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static LEVELS: Mutex<Vec<(String, f32)>> = Mutex::new(Vec::new());
 /// Görüşmedeki (mikrofonu kullanan) uygulamaların kalkanın kapattığı sesleri — kalkınca açılır
 static CALL_MUTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// Görüşmedeyken mikrofon tuşunun (Kontrol merkezi, telefon, tuş takımı) 0'a indirdiği mikrofonlar
+static QUICK: Mutex<Vec<(String, f32)>> = Mutex::new(Vec::new());
 /// Kalkan açılıyor (ses işleri arka planda, pencereler henüz yok): ikinci kez açılmasın
 static OPENING: AtomicBool = AtomicBool::new(false);
+
+/// Kapatılan mikrofonlar ve eski seviyeleri diske de yazılır: Nook kalkan açıkken çöker, kapanır ya da
+/// güncellenirse bir sonraki açılışta mikrofon geri gelir (%0'da kalmaz)
+fn saved_path() -> Option<std::path::PathBuf> {
+    Some(std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Nook").join("mic_restore.json"))
+}
+
+fn persist() {
+    let Some(p) = saved_path() else { return };
+    let mut levels = LEVELS.lock().unwrap().clone();
+    levels.extend(QUICK.lock().unwrap().iter().cloned());
+    let mics = MICS.lock().unwrap().clone();
+    let calls = CALL_MUTED.lock().unwrap().clone();
+    if levels.is_empty() && mics.is_empty() && calls.is_empty() {
+        let _ = std::fs::remove_file(p);
+        return;
+    }
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(p, serde_json::json!({ "levels": levels, "mics": mics, "calls": calls }).to_string());
+}
+
+/// Açılışta: önceki oturumdan kapalı kalan mikrofon ve görüşme sesleri varsa geri aç
+pub fn recover() {
+    let Some(p) = saved_path() else { return };
+    let Some(v) = std::fs::read_to_string(&p).ok().and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()) else { return };
+    let _ = std::fs::remove_file(&p);
+    std::thread::spawn(move || {
+        let levels: Vec<(String, f32)> = serde_json::from_value(v["levels"].clone()).unwrap_or_default();
+        let mics: Vec<String> = serde_json::from_value(v["mics"].clone()).unwrap_or_default();
+        let calls: Vec<String> = serde_json::from_value(v["calls"].clone()).unwrap_or_default();
+        crate::log::write("info", &format!("önceki oturumdan kapalı kalan mikrofonlar geri açılıyor ({} seviye, {} cihaz)", levels.len(), mics.len()));
+        if !levels.is_empty() {
+            crate::quick::restore_levels(&levels);
+        }
+        if !mics.is_empty() {
+            crate::quick::unmute_mics(&mics);
+        }
+        for k in calls {
+            crate::mixer::set_muted(&k, false);
+        }
+    });
+}
+
+/// Nook kapanırken: kalkanın ya da mikrofon tuşunun kapattığı mikrofonları aç
+pub fn restore_on_exit() {
+    unmute_calls();
+    unmute_mic();
+    let quick = std::mem::take(&mut *QUICK.lock().unwrap());
+    if !quick.is_empty() {
+        crate::quick::restore_levels(&quick);
+    }
+    persist();
+}
+
+/// Görüşme uygulaması seviyeyi kendisi yükseltirse yeniden indir (liste boşalınca döngü biter)
+fn keep_zero_loop(list: &'static Mutex<Vec<(String, f32)>>) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let ids: Vec<String> = list.lock().unwrap().iter().map(|(i, _)| i.clone()).collect();
+        if ids.is_empty() {
+            break;
+        }
+        if crate::quick::keep_zero(&ids) {
+            crate::log::write("info", "mikrofon seviyesi yükselmişti, yeniden 0");
+        }
+    });
+}
+
+/// Mikrofon tuşu. Görüşmedeyken cihaz susturulmaz, kalkandaki gibi seviyesi 0'a iner (Teams cihaz
+/// susunca kendi düğmesini de kapatıp geri açmıyor); görüşme yoksa varsayılan mikrofon susar.
+pub fn quick_mic(muted: bool) -> Result<(), String> {
+    if !muted {
+        let quick = std::mem::take(&mut *QUICK.lock().unwrap());
+        persist();
+        if !quick.is_empty() {
+            crate::quick::restore_levels(&quick);
+        }
+        return crate::quick::set_mic_muted(false);
+    }
+    if mic_users().is_empty() {
+        return crate::quick::set_mic_muted(true);
+    }
+    let zeroed = crate::quick::zero_mics();
+    if zeroed.is_empty() {
+        return crate::quick::set_mic_muted(true);
+    }
+    let start = {
+        let mut q = QUICK.lock().unwrap();
+        let first = q.is_empty();
+        for (id, l) in zeroed {
+            if !q.iter().any(|(i, _)| *i == id) {
+                q.push((id, l));
+            }
+        }
+        first
+    };
+    persist();
+    if start {
+        keep_zero_loop(&QUICK);
+    }
+    Ok(())
+}
+
+/// Mikrofon tuşu görüşmede seviyeyi 0'a indirdi mi (Kontrol merkezi "kapalı" göstersin)
+pub fn quick_mic_zeroed() -> bool {
+    !QUICK.lock().unwrap().is_empty()
+}
 
 /// Mikrofonu kullanan uygulamalar (küçük harf adlar)
 fn mic_users() -> Vec<String> {
@@ -50,6 +161,8 @@ fn mute_mic() {
                 mics.push(id);
             }
         }
+        drop(mics);
+        persist();
         return;
     }
     let zeroed = crate::quick::zero_mics();
@@ -66,18 +179,9 @@ fn mute_mic() {
         }
         first
     };
-    // Görüşme uygulaması seviyeyi kendisi yükseltirse yeniden indir (kalkan kalkınca liste boşalır, döngü biter)
+    persist();
     if start {
-        std::thread::spawn(|| loop {
-            std::thread::sleep(std::time::Duration::from_millis(400));
-            let ids: Vec<String> = LEVELS.lock().unwrap().iter().map(|(i, _)| i.clone()).collect();
-            if ids.is_empty() {
-                break;
-            }
-            if crate::quick::keep_zero(&ids) {
-                crate::log::write("info", "kalkan: mikrofon seviyesi yükselmişti, yeniden 0");
-            }
-        });
+        keep_zero_loop(&LEVELS);
     }
 }
 
@@ -85,6 +189,7 @@ fn mute_mic() {
 fn unmute_mic() -> bool {
     let levels = std::mem::take(&mut *LEVELS.lock().unwrap());
     let ids = std::mem::take(&mut *MICS.lock().unwrap());
+    persist();
     let mut opened = false;
     if !levels.is_empty() && crate::quick::restore_levels(&levels) {
         opened = true;
@@ -113,10 +218,13 @@ fn mute_calls() {
             muted.push(app.key.clone());
         }
     }
+    drop(muted);
+    persist();
 }
 
 fn unmute_calls() {
     let keys = std::mem::take(&mut *CALL_MUTED.lock().unwrap());
+    persist();
     for k in keys {
         crate::mixer::set_muted(&k, false);
         crate::log::write("info", &format!("kalkan: görüşme sesi geri açıldı ({k})"));
@@ -302,6 +410,11 @@ pub fn on_window_event(win: &tauri::Window, event: &tauri::WindowEvent) {
         }
         _ => {}
     }
+}
+
+/// Kalkan parolayla kilitli mi (telefondan parolasız kalkmasın)
+pub fn is_locked(app: &AppHandle) -> bool {
+    is_on(app) && (app.state::<Arc<Shared>>().locked.load(Ordering::Relaxed) || lock_on(app))
 }
 
 /// Kalkanın kendisinden kapatma: Esc, çift tık ya da (kilitliyse) doğru parola

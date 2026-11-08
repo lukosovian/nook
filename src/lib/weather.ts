@@ -1,4 +1,4 @@
-import { lang, tt } from "./i18n";
+import { lang, locale, tt } from "./i18n";
 /**
  * Hava durumu — Open-Meteo (ücretsiz, anahtar gerektirmez).
  * Konum: ayarlardaki şehir (Open-Meteo geocoding) ya da boşsa IP'den yaklaşık konum (ipwho.is).
@@ -81,4 +81,14 @@ export async function fetchWeather(city: string): Promise<Weather> {
     rainChance: w.daily.precipitation_probability_max[0] ?? 0,
     at: Date.now(),
   };
+}
+
+/** Bilgi bir saatten eskiyse (internet yoktu) alındığı saat, "08:10" gibi; tazeyse null */
+export function staleTime(w: Weather, now = Date.now()): string | null {
+  if (now - w.at < 60 * 60_000) return null;
+  const d = new Date(w.at);
+  const same = d.toDateString() === new Date(now).toDateString();
+  return same
+    ? d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }

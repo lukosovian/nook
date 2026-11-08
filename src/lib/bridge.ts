@@ -256,11 +256,12 @@ export interface ClaudeSetup {
   hooked: boolean;
   /** Hook'lar başka bir nook.exe'yi gösteriyor */
   stale: boolean;
-  statusline: "nook" | "other" | "none";
+  statusline: "nook" | "wrapped" | "other" | "none";
 }
 const WEB_CLAUDE: ClaudeSetup = { present: true, hooked: typeof location === "undefined" || !location.search.includes("unhooked"), stale: false, statusline: "nook" };
 export const claudeSetup = () => (inTauri ? invoke<ClaudeSetup>("claude_setup") : Promise.resolve(WEB_CLAUDE));
 /** Yedeğin yolunu döner (settings.json yoksa null) */
+export const claudeStatusWrap = (on: boolean) => (inTauri ? invoke<string | null>("claude_status_wrap", { on }) : Promise.resolve(null));
 export const claudeConnect = () => (inTauri ? invoke<string | null>("claude_connect") : Promise.resolve(null));
 export const claudeDisconnect = () => (inTauri ? invoke<string | null>("claude_disconnect") : Promise.resolve(null));
 export const claudeDecide = (id: number, decision: string) => (inTauri ? invoke<void>("claude_decide", { id, decision }) : Promise.resolve());
@@ -496,6 +497,8 @@ export interface NativeSettings {
   wallpaperCycle: { ids: string[]; everyMin: number; since: number } | null;
   /** Kısayol tuşlarının klavye kısayolları */
   deckHotkeys?: { id: string; accel: string }[];
+  /** Tailscale kapanırsa Nook yeniden bağlasın, girişsiz çalışma açılsın */
+  tailscaleKeep?: boolean;
 }
 
 /** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */
@@ -801,6 +804,7 @@ export function mediaControl(action: MediaAction): Promise<void> {
 }
 
 /** Webview hazır olunca son durumu (kapak dahil) yeniden iste. */
+
 export function mediaResync(): Promise<void> {
   return inTauri ? invoke("media_resync") : Promise.resolve();
 }

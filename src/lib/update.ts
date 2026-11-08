@@ -14,12 +14,14 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { inTauri, isPrimary, subscribe } from "./bridge";
 import { useNook } from "../store/nook";
 import { tt } from "./i18n";
-import type { UpdateAnimId } from "../components/overlays/UpdateAnims";
+import { resolveUpdateAnim, type UpdateAnimId } from "../components/overlays/UpdateAnims";
 
 const FIRST_CHECK_MS = 30_000;
 const CHECK_EVERY_MS = 6 * 3600_000;
 /** İndirme bitince veda animasyonu bu kadar görünür, sonra kurulum başlar */
 const FAREWELL_MS = 2600;
+/** İndirme hızlı bitse de animasyon en az bu kadar oynar (indirmeyi yavaşlatmaz, yalnızca gösterilen ilerleme) */
+const MIN_SHOW_MS = 5000;
 const INSTALL_EVENT = "nook://update-install";
 const PROGRESS_EVENT = "nook://update-progress";
 const DEMO_EVENT = "nook://update-demo";
@@ -38,9 +40,11 @@ interface UpdateState {
   status: string;
   /** Ayarlardan "Adada dene": gerçek indirme yok, bu animasyon oynar */
   demo: UpdateAnimId | null;
+  /** Bu güncellemede oynayan animasyon: ada ile Studio aynısını gösterir */
+  anim: UpdateAnimId | null;
 }
 
-export const useUpdate = create<UpdateState>(() => ({ current: "", available: null, progress: null, restarting: false, status: "", demo: null }));
+export const useUpdate = create<UpdateState>(() => ({ current: "", available: null, progress: null, restarting: false, status: "", demo: null, anim: null }));
 
 /** İlerleme bütün pencerelere yansır (Studio'daki Ayarlar da görsün) */
 function share(patch: Partial<UpdateState>) {
@@ -56,12 +60,12 @@ export async function checkUpdate(manual = false) {
   if (!inTauri) return;
   if (manual) useUpdate.setState({ status: tt("Denetleniyor…") });
   try {
-    const u = await check();
+    const u = await check({ timeout: 30_000 });
     pending = u;
     useUpdate.setState({ available: u?.version ?? null, status: u ? "" : tt("Güncel") });
     if (u && announced !== u.version) {
       announced = u.version;
-      useNook.getState().pushToast({ kind: "update", title: tt("Yeni sürüm: {0}", u.version), detail: tt("Ayarlar › Güncelle"), ms: 7000 });
+      useNook.getState().pushToast({ kind: "update", title: tt("Yeni sürüm: {0}", u.version), detail: tt("Studio › Ayarlar › Hakkında'dan güncelle"), ms: 7000 });
     }
   } catch (e) {
     // Henüz yayın yoksa ya da internet yoksa sessizce geç; elle denetlendiyse söyle
@@ -80,30 +84,69 @@ export async function installUpdate() {
   // Deneme sürüyorsa gerçek kurulum onun yerine geçer
   window.clearInterval(demoTimer);
   useUpdate.setState({ demo: null });
-  if (!pending) pending = await check().catch(() => null);
+  if (!pending) pending = await check({ timeout: 30_000 }).catch(() => null);
+  if (!pending && !navigator.onLine) return void share({ progress: null, status: tt("İnternet bağlantısı yok; bağlanınca yeniden dene") });
   if (!pending) return void share({ progress: null, status: tt("Güncel") });
   let total = 0;
   let got = 0;
   useNook.getState().setBrief(false);
-  share({ progress: 0, restarting: false, available: pending.version, status: "" });
+  share({ progress: 0, restarting: false, available: pending.version, status: "", anim: resolveUpdateAnim(useNook.getState().settings.updateAnim) });
+  // Gösterilen ilerleme hem gerçek indirmeyi hem MIN_SHOW_MS'lik süreyi bekler: hızlı internette de animasyon görünür
+  const started = Date.now();
+  let real = 0;
+  const show = window.setInterval(() => {
+    const p = Math.min(real, Math.round(((Date.now() - started) / MIN_SHOW_MS) * 99));
+    if (p !== useUpdate.getState().progress) share({ progress: p });
+  }, 100);
+  // Yavaş internette indirme sürebilir; ama bir dakika hiç ilerlemezse bağlantı kopmuş demektir
+  let stall = 0;
+  let lastByte = Date.now();
+  const stalled = new Promise<never>((_, reject) => {
+    stall = window.setInterval(() => Date.now() - lastByte > STALL_MS && reject(new Error("stalled")), 5000);
+  });
   try {
-    await pending.download((ev) => {
-      if (ev.event === "Started") total = ev.data.contentLength ?? 0;
-      else if (ev.event === "Progress") {
-        got += ev.data.chunkLength;
-        const p = total ? Math.min(99, Math.round((got / total) * 100)) : 0;
-        if (p !== useUpdate.getState().progress) share({ progress: p });
-      }
-    });
+    await Promise.race([
+      pending.download((ev) => {
+        lastByte = Date.now();
+        if (ev.event === "Started") total = ev.data.contentLength ?? 0;
+        else if (ev.event === "Progress") {
+          got += ev.data.chunkLength;
+          real = total ? Math.min(99, Math.round((got / total) * 100)) : 0;
+        }
+      }),
+      stalled,
+    ]);
+    window.clearInterval(stall);
+    real = 99;
+    const left = MIN_SHOW_MS - (Date.now() - started);
+    if (left > 0) await new Promise((r) => window.setTimeout(r, left + 150));
+    window.clearInterval(show);
     share({ progress: 100, restarting: true });
     await new Promise((r) => window.setTimeout(r, FAREWELL_MS));
     // Sessiz kurulum: Windows'ta uygulama burada kapanır, kurulum bitince yeni sürüm açılır
     await pending.install();
     await relaunch();
   } catch (e) {
-    share({ progress: null, restarting: false, status: tt("Kurulamadı") });
+    window.clearInterval(stall);
+    window.clearInterval(show);
+    // Yarım kalan indirme yeniden denenince baştan, temiz bir denetimle başlasın
+    pending = null;
+    share({ progress: null, restarting: false, status: whyFailed(e) });
     console.warn("[nook] güncelleme kurulumu", e);
   }
+}
+
+/** İndirme bir dakika hiç ilerlemezse durmuş sayılır */
+const STALL_MS = 60_000;
+
+/** Kurulamadıysa nedeni, herkesin anlayacağı dille */
+function whyFailed(e: unknown): string {
+  const msg = String(e).toLowerCase();
+  if (!navigator.onLine) return tt("Kurulamadı: internet bağlantısı koptu. Bağlanınca yeniden dene");
+  if (msg.includes("stalled") || msg.includes("timed out") || msg.includes("timeout")) return tt("Kurulamadı: indirme durdu, bağlantı çok yavaş ya da koptu. Yeniden dene");
+  if (msg.includes("signature")) return tt("Kurulamadı: indirilen dosya doğrulanamadı. Yeniden dene");
+  if (msg.includes("dns") || msg.includes("connect") || msg.includes("network") || msg.includes("request")) return tt("Kurulamadı: güncelleme sunucusuna ulaşılamadı. Biraz sonra yeniden dene");
+  return tt("Kurulamadı. Yeniden dene; olmazsa Nook-setup.exe'yi indirip kur");
 }
 
 let demoTimer = 0;

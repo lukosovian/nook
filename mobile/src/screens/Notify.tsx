@@ -93,6 +93,9 @@ export function NotifyScreen({ onBack }: { onBack: () => void }) {
               Bildirim erişimini aç
             </motion.button>
             <p className="mt-2 text-[12px] leading-snug text-label-3">Açılan listede Nook'u bul, izin ver ve geri dön. Nook bildirimleri yalnızca senin PC'ne gönderir.</p>
+            <p className="mt-1.5 text-[12px] leading-snug text-label-3">
+              Nook listede gri ve açılmıyorsa (Android 13 ve üstü, “kısıtlanmış ayar”): telefonun Ayarlar › Uygulamalar › Nook Mobil sayfasında sağ üstteki ⋮ menüden “Kısıtlanmış ayarlara izin ver”e bas, sonra buraya dönüp yeniden dene.
+            </p>
           </>
         )}
       </section>

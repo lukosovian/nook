@@ -270,6 +270,10 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
     let mut last_level = Instant::now();
 
     let mut warned = false;
+    // Görüşmedeyken (başka bir uygulama mikrofonu kullanıyor) ya da kalkan açıkken dinleme durur:
+    // toplantıdaki konuşma Whisper'a gitmesin. İki saniyede bir bakılır.
+    let mut paused = false;
+    let mut paused_at: Option<Instant> = None;
     loop {
         let result = imp::capture(&stop, |frame| {
             // Örnekler yeniden kaydedildiyse yükle
@@ -277,8 +281,16 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
                 store = load();
                 loaded = Instant::now();
             }
+            if paused_at.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
+                let now = crate::shield::is_on(&app) || !crate::privacy::mic_apps().is_empty();
+                if now != paused {
+                    crate::log::write("info", if now { "hey nook: görüşme ya da kalkan, dinleme durdu" } else { "hey nook: dinleme sürüyor" });
+                }
+                paused = now;
+                paused_at = Some(Instant::now());
+            }
             let speech = vad.speech(frame);
-            let busy = ENROLLING.load(Ordering::Relaxed) || crate::voice::active();
+            let busy = ENROLLING.load(Ordering::Relaxed) || crate::voice::active() || paused;
             phase = match std::mem::replace(&mut phase, Phase::Idle) {
                 Phase::Idle => {
                     if speech && !busy && Instant::now() >= cooldown && !store.templates.is_empty() {

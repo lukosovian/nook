@@ -45,14 +45,14 @@ if errorlevel 1 goto :winget_failed
 
 echo.
 if defined ARGUS_EN (echo Git is installed. For this change to take effect, close this window, then) else (echo Git kuruldu. Bu degisikligin etkili olmasi icin bu pencereyi kapat, sonra)
-if defined ARGUS_EN (echo press the "Install" button in Nook's Settings ^> Argus ONE MORE TIME - just this once.) else (echo Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine BIR KEZ DAHA bas - sadece bu seferlik.)
+if defined ARGUS_EN (echo press the "Install Argus" button on the Argus card in Nook's Modules ONE MORE TIME - just this once.) else (echo Nook'ta Moduller ^> Argus kartindaki "Argus'u kur" dugmesine BIR KEZ DAHA bas - sadece bu seferlik.)
 pause
 exit /b 0
 
 :winget_failed
 echo.
 if defined ARGUS_EN (echo Automatic install failed. Continue from the page that just opened to install it by hand;) else (echo Otomatik kurulum basarisiz oldu. Elle kurmak icin simdi acilan sayfadan devam et,)
-if defined ARGUS_EN (echo when it's done, press the "Install" button in Nook's Settings ^> Argus again.) else (echo kurulum bitince Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas.)
+if defined ARGUS_EN (echo when it's done, press the "Install Argus" button on the Argus card in Nook's Modules again.) else (echo kurulum bitince Nook'ta Moduller ^> Argus kartindaki "Argus'u kur" dugmesine tekrar bas.)
 start "" "https://git-scm.com/download/win"
 pause
 exit /b 1
@@ -60,7 +60,7 @@ exit /b 1
 :install_declined
 echo.
 if defined ARGUS_EN (echo OK, nothing was installed. After installing Git from https://git-scm.com/download/win,) else (echo Tamam, bir sey kurulmadi. Git'i https://git-scm.com/download/win adresinden kurduktan)
-if defined ARGUS_EN (echo press the "Install" button in Nook's Settings ^> Argus again.) else (echo sonra Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas.)
+if defined ARGUS_EN (echo press the "Install Argus" button on the Argus card in Nook's Modules again.) else (echo sonra Nook'ta Moduller ^> Argus kartindaki "Argus'u kur" dugmesine tekrar bas.)
 pause
 exit /b 1
 
@@ -68,7 +68,7 @@ exit /b 1
 if defined ARGUS_EN (echo This computer has no automatic install tool either, so install it by hand - it's easy.) else (echo Bu bilgisayarda otomatik kurulum araci da yok, elle kurman lazim - cok kolay.)
 if defined ARGUS_EN (echo   1. On the page that just opened, click the "64-bit Git for Windows Setup" link) else (echo   1. Simdi acilan sayfada "64-bit Git for Windows Setup" yazan linke tikla)
 if defined ARGUS_EN (echo   2. Run the downloaded file and click "Next" through all the steps ^(don't change the settings^)) else (echo   2. Inen dosyayi calistir, hepsine "Next"/"Ileri" diyerek gec ^(ayarlari degistirme^))
-echo   3. Kurulum bitince bu pencereyi kapat, Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas
+echo   3. Kurulum bitince bu pencereyi kapat, Nook'ta Moduller ^> Argus kartindaki "Argus'u kur" dugmesine tekrar bas
 start "" "https://git-scm.com/download/win"
 echo.
 pause
@@ -96,7 +96,7 @@ exit /b 0
 :clone_failed
 echo.
 if defined ARGUS_EN (echo Something went wrong while downloading, check the message above - it's usually an internet) else (echo Indirme sirasinda bir sorun oldu, yukaridaki mesaji kontrol et - genelde internet)
-if defined ARGUS_EN (echo connection problem. Once it's fixed, press the "Install" button in Nook's Settings ^> Argus again.) else (echo baglantisi sorunudur. Duzelince Nook'ta Ayarlar ^> Argus ^> "Kur" dugmesine tekrar bas.)
+if defined ARGUS_EN (echo connection problem. Once it's fixed, press the "Install Argus" button on the Argus card in Nook's Modules again.) else (echo baglantisi sorunudur. Duzelince Nook'ta Moduller ^> Argus kartindaki "Argus'u kur" dugmesine tekrar bas.)
 pause
 exit /b 1
 
