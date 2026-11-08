@@ -45,6 +45,10 @@ export function installLogging() {
  */
 function watchFreezes() {
   let last = performance.now();
+  // Gizliyken (tam ekran oyunda ada gizlenince) sayaç kısılır; görünür olunca o boşluk donma sayılmasın
+  document.addEventListener("visibilitychange", () => {
+    last = performance.now();
+  });
   window.setInterval(() => {
     const now = performance.now();
     const gap = (now - last) / 1000;

@@ -236,6 +236,9 @@ pub struct Shared {
     /// Öndeki tam ekran oyunun monitörü (sol, üst, sağ, alt — fiziksel px). İmleç oradayken
     /// ada açılmaz: pencere etkileşimli olunca tam ekran oyun odağı kaybedip alta düşer.
     pub game_screen: Mutex<Option<(i32, i32, i32, i32)>>,
+    /// Oyun şu an öndeki pencere mi. Alt-Tab ile çıkıldıysa oyun arkada ekranı kaplasa da
+    /// false: o zaman ada tıklanabilir olmalı (yoksa tek ekranda oyun açık kaldıkça ada hiç açılmıyordu).
+    pub game_front: AtomicBool,
     /// Ada bu tam ekran yüzünden (oyun ya da video) 2. ekrana geçti: imleç oraya gitse de Nook dönmez
     pub full_screen: Mutex<Option<(i32, i32, i32, i32)>>,
     /// Parolalı kalkan açık: adalar ve yan kartlar etkileşime kapalı
