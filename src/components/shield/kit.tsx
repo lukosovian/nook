@@ -8,12 +8,16 @@
  *  - Karakterler kendiliğinden değişmez: sahnenin bir olayı (iksir dökülür, deney patlar…) olunca
  *    o olayın Nook'u başka bir gövdeye/renge dönüşür (Actor `morph`, useBeat `n`).
  */
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
 import type { Look } from "../../lib/look";
 import { BODY_COLORS, DEFAULT_LOOK, EYE_STYLES, SHAPES, TEXTURES } from "../../lib/look";
 import type { Expression } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Medium, StyleDefs, StyleFilters } from "./styles";
+import { ClockStyle } from "./clocks";
+import { LookMarkup, type Look as ArtLook } from "./looks";
 
 export const W = 1600;
 export const H = 900;
@@ -51,8 +55,100 @@ function useCastBody(morph: number | undefined, delay: number) {
 /** Sahne pencere yerine bir kutuya sığsın (tanıtımdaki küçük ekran): kutunun ölçüleri */
 export const StageBox = createContext<{ w: number; h: number } | null>(null);
 
-/** Ekranı (ya da StageBox'ı) kaplayan sahne */
-export function Stage({ children, sky }: { children: ReactNode; sky: string }) {
+/** Ortak SVG tanımları (el, parıltı, bulanıklık…) */
+function KitDefs() {
+  return (
+    <defs>
+      <radialGradient id="nk-hand" cx="35%" cy="30%" r="70%">
+        <stop offset="0" stopColor="#ffffff" />
+        <stop offset="0.55" stopColor="#e4e4ea" />
+        <stop offset="1" stopColor="#a9a9b4" />
+      </radialGradient>
+      <radialGradient id="nk-glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stopColor="#ffd27a" stopOpacity="0.9" />
+        <stop offset="0.4" stopColor="#ff8a3d" stopOpacity="0.35" />
+        <stop offset="1" stopColor="#ff6a3d" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient id="nk-soft" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stopColor="#ffffff" stopOpacity="0.8" />
+        <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+      </radialGradient>
+      {/* Yumuşak kenar (uzak dağlar, sis, ışık hüzmesi) ve parıltı (kristal, alev) */}
+      <filter id="nk-blur" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="14" />
+      </filter>
+      <filter id="nk-blur-s" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="4" />
+      </filter>
+      <filter id="nk-bloom" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="6" result="b" />
+        <feMerge>
+          <feMergeNode in="b" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+  );
+}
+
+/**
+ * Sahnedeki bir ışık kaynağı (ateş, mum, kristal…): karakterlerin ve eşyaların da üstüne vuran yumuşak
+ * bir parıltı. Sahne biriminde (1600×900) merkez ve yarıçap; `flicker` titreşim şiddeti (0 = sabit).
+ */
+export type Light = { x: number; y: number; r: number; color: string; opacity?: number; flicker?: number; blend?: "screen" | "soft-light" | "overlay" };
+
+/** Film greni: bir kez üretilen küçük gürültü dokusu (tüm sahnelerde aynı) */
+const GRAIN = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>`,
+)}")`;
+
+/** Işıkları sahnenin en üstüne, karakterlerin de üzerine çizer */
+function Lights({ lights }: { lights: Light[] }) {
+  return (
+    <>
+      {lights.map((l, i) => (
+        <motion.div
+          key={i}
+          className="pointer-events-none absolute rounded-full"
+          style={{
+            left: l.x - l.r,
+            top: l.y - l.r,
+            width: l.r * 2,
+            height: l.r * 2,
+            background: `radial-gradient(circle, ${l.color} 0%, transparent 68%)`,
+            mixBlendMode: l.blend ?? "screen",
+          }}
+          initial={{ opacity: l.opacity ?? 0.5 }}
+          animate={l.flicker ? { opacity: [(l.opacity ?? 0.5), (l.opacity ?? 0.5) * (1 - l.flicker), (l.opacity ?? 0.5) * (1 - l.flicker * 0.3), (l.opacity ?? 0.5)], scale: [1, 1 - l.flicker * 0.08, 1 + l.flicker * 0.05, 1] } : undefined}
+          transition={l.flicker ? { duration: 1.6 + (i % 3) * 0.37, repeat: Infinity, ease: "easeInOut" } : undefined}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * Ekranı (ya da StageBox'ı) kaplayan sahne. `lights`: karakterlere de vuran ışıklar; `vignette`: kenar kararması (0–1);
+ * `medium`: sahnenin malzemesi (suluboya kâğıdı, eskiz kâğıdı, CRT tarama) en üste serilir; `grain`: film greni.
+ */
+export function Stage({
+  children,
+  sky,
+  lights,
+  vignette = 0.42,
+  medium,
+  grain = true,
+  clock,
+}: {
+  children: ReactNode;
+  sky: string;
+  lights?: Light[];
+  vignette?: number;
+  medium?: "watercolor" | "sketch" | "crt" | "canvas";
+  grain?: boolean;
+  /** Saat panelinin tarz süzgeci (sahneyle aynı malzeme) */
+  clock?: string;
+}) {
   const box = useContext(StageBox);
   const [win, setK] = useState(1);
   useEffect(() => {
@@ -66,37 +162,100 @@ export function Stage({ children, sky }: { children: ReactNode; sky: string }) {
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: sky }}>
       <svg width="0" height="0" className="absolute">
-        <defs>
-          <radialGradient id="nk-hand" cx="35%" cy="30%" r="70%">
-            <stop offset="0" stopColor="#ffffff" />
-            <stop offset="0.55" stopColor="#e4e4ea" />
-            <stop offset="1" stopColor="#a9a9b4" />
-          </radialGradient>
-          <radialGradient id="nk-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stopColor="#ffd27a" stopOpacity="0.9" />
-            <stop offset="0.4" stopColor="#ff8a3d" stopOpacity="0.35" />
-            <stop offset="1" stopColor="#ff6a3d" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="nk-soft" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stopColor="#ffffff" stopOpacity="0.8" />
-            <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-          </radialGradient>
-        </defs>
+        <KitDefs />
       </svg>
       <div className="absolute bottom-0 left-1/2" style={{ width: W, height: H, transform: `translateX(-50%) scale(${k})`, transformOrigin: "50% 100%" }}>
-        {children}
+        <ClockStyle.Provider value={clock}>{children}</ClockStyle.Provider>
+        {lights && <Lights lights={lights} />}
       </div>
+      <StyleDefs />
+      {medium && <Medium kind={medium} />}
+      {/* Kenar kararması ve çok hafif gren: düz renkler "ekran resmi" gibi değil, bir sahne gibi dursun */}
+      {vignette > 0 && <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(0,0,0,${vignette}) 100%)` }} />}
+      {grain && <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: GRAIN, opacity: 0.07, mixBlendMode: "overlay" }} />}
     </div>
   );
 }
 
 /** Tüm sahneyi kaplayan SVG katmanı (arka plan, ön plan) */
-export function Layer({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Layer({ children, className = "", style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className={`absolute inset-0 overflow-visible ${className}`}>
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className={`absolute inset-0 overflow-visible ${className}`} style={style}>
       {children}
     </svg>
   );
+}
+
+/** Resme çevrilmekte olan katman sayısı: sahne hepsi bitince açılır (bkz. Shield) */
+let baking = 0;
+export const bakesBusy = () => baking > 0;
+
+/**
+ * Durağan, ağır süzgeçli katman: sahne açılırken BİR KEZ bit eşlem resme çevrilir (SVG → canvas → PNG) ve
+ * sonra yalnızca o resim gösterilir. Suluboya, hamur gibi süzgeçler her karede yeniden hesaplanmaz; açılıştaki
+ * yakınlaşma ya da üstteki animasyonlar tarayıcıyı yormaz. İçine hareketli parça konmaz; kullandığı her
+ * tanım (degrade, desen) kendi içinde olmalı — ortak süzgeçler ve nk-* tanımları otomatik eklenir.
+ * `filter` verilirse tüm katmana uygulanır; verilmezse parçalar kendi süzgeçlerini taşır.
+ */
+export function Painted({ children, filter, pixel, look, seed }: { children: ReactNode; filter?: string; pixel?: number; look?: ArtLook; seed?: number }) {
+  const box = useContext(StageBox);
+  const [url, setUrl] = useState<string | null>(null);
+  // Çocuklar durağan: işaretleme bir kez üretilir
+  // <svg> kökü içinde üretilir ki React SVG etiketlerini doğru tanısın; dış etiket sonra atılır
+  const [markup] = useState(() =>
+    renderToStaticMarkup(
+      <svg>
+        <StyleFilters />
+        <KitDefs />
+        {look ? (
+          <LookMarkup look={look} seed={seed}>
+            {children}
+          </LookMarkup>
+        ) : filter ? (
+          <g filter={`url(#${filter})`}>{children}</g>
+        ) : (
+          children
+        )}
+      </svg>,
+    ).replace(/^<svg>/, "").replace(/<\/svg>$/, ""),
+  );
+  useEffect(() => {
+    let alive = true;
+    let out: string | null = null;
+    const fit = box ? Math.max(box.w / W, box.h / H) : Math.max(window.innerWidth / W, window.innerHeight / H);
+    // Ekrandaki boyuta göre net, ama aşırı büyük olmayan çözünürlük
+    // Piksel sanat: düşük çözünürlükte çizilip keskin büyütülür
+    const scale = pixel ? 1 / pixel : Math.min(2.5, Math.max(0.5, fit * (window.devicePixelRatio || 1)));
+    const w = Math.round(W * scale);
+    const h = Math.round(H * scale);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${W} ${H}">${markup}</svg>`;
+    const src = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    baking++;
+    const done = () => {
+      baking = Math.max(0, baking - 1);
+      URL.revokeObjectURL(src);
+    };
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d")?.drawImage(img, 0, 0, w, h);
+      c.toBlob((b) => {
+        done();
+        if (!alive || !b) return;
+        out = URL.createObjectURL(b);
+        setUrl(out);
+      });
+    };
+    img.onerror = done;
+    img.src = src;
+    return () => {
+      alive = false;
+      if (out) URL.revokeObjectURL(out);
+    };
+  }, [markup, box, pixel]);
+  return url ? <img src={url} alt="" draggable={false} className="pointer-events-none absolute left-0 top-0 select-none" style={{ width: W, height: H, imageRendering: pixel ? "pixelated" : undefined }} /> : null;
 }
 
 /** Beyaz yüzen el (yüz biriminde) */
@@ -124,6 +283,7 @@ export function Actor({
   opacity,
   morph,
   morphDelay = 700,
+  shadow = true,
 }: {
   x: number;
   y: number;
@@ -144,6 +304,8 @@ export function Actor({
   morph?: number;
   /** Dönüşüm olayın başından kaç ms sonra */
   morphDelay?: number;
+  /** Ayağının altında yumuşak yer gölgesi (havada duranlar, içeride oturanlar için kapatılır) */
+  shadow?: boolean;
 }) {
   // Rol aynı, oyuncu değişir: gövde/doku/göz/renk rastgele, aksesuarlar sahnenin
   const body = useCastBody(morph, morphDelay);
@@ -157,6 +319,13 @@ export function Actor({
   );
   return (
     <div className="absolute" style={{ left: x - size / 2, top: y - size, width: size, height: size, zIndex: z, opacity }}>
+      {/* Yere bassın: ayağın altında yumuşak, hafif yayvan bir gölge */}
+      {shadow && (
+        <span
+          className="pointer-events-none absolute left-1/2"
+          style={{ bottom: -size * 0.07, width: size * 1.05, height: size * 0.2, transform: "translateX(-50%)", background: "radial-gradient(closest-side, rgba(0,0,0,0.5), rgba(0,0,0,0.22) 55%, transparent)" }}
+        />
+      )}
       <motion.div className="absolute inset-0" style={{ originY: 1 }} animate={move?.animate} transition={move?.transition}>
         <motion.div key={actKey} className="absolute inset-0" style={{ originY: 1 }} animate={act?.animate} transition={act?.transition}>
           <motion.div className="absolute inset-0" animate={{ scaleX: flip ? -1 : 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }}>

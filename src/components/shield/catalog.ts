@@ -27,6 +27,18 @@ export const SCENE_LIST: { id: string; label: string }[] = [
   { id: "bunker", label: tt("Sığınak") },
   { id: "ferris", label: tt("Dönme dolap") },
   { id: "sketch", label: tt("Eskiz defteri") },
+  { id: "lighthouse", label: tt("Deniz feneri") },
+  { id: "moonbase", label: tt("Ay kampı") },
+  { id: "ramen", label: tt("Ramen tezgâhı") },
+  { id: "popup", label: tt("Masal kitabı") },
+  { id: "aquarium", label: tt("Akvaryum") },
+  { id: "autumn", label: tt("Sonbahar ormanı") },
+  { id: "lanterns", label: tt("Fener festivali") },
+  { id: "cabin", label: tt("Dağ evi") },
+  { id: "waterfall", label: tt("Şelale") },
+  { id: "metro", label: tt("Retro metro") },
+  { id: "bakery", label: tt("Kek mutfağı") },
+  { id: "rooftop", label: tt("Çatı katı") },
 ];
 
 export type SceneMode = "random" | "order" | "fixed";

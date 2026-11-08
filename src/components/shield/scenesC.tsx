@@ -4,7 +4,7 @@
  */
 import { motion } from "motion/react";
 import { ArcadeClock, CinemaClock, GreenhouseClock, OceanClock, TrainClock, WesternClock } from "./clocks2";
-import { Actor, breathe, Drift, Hand, hop, Layer, look, on, Stage, Stars, sway, useBeat, W } from "./kit";
+import { Actor, breathe, Drift, Hand, hop, Layer, look, on, Painted, Stage, Stars, sway, useBeat, W, H } from "./kit";
 
 // ------------------------------------------------------------------ 11. Retro atari salonu
 
@@ -18,43 +18,107 @@ export function Arcade() {
   const beat = useBeat(4);
   const k = beat.k;
   return (
-    <Stage sky="linear-gradient(180deg, #120822 0%, #1d0d36 60%, #2a1040 100%)">
-      <Layer>
-        {/* Duvardaki neon şeritler */}
-        {[["#ff3ea5", 300], ["#00e0ff", 318]].map(([c, y]) => (
-          <rect key={c} x="0" y={y} width={W} height="4" fill={c as string} opacity="0.55" style={{ filter: `drop-shadow(0 0 8px ${c})` }} />
+    <Stage
+      sky="linear-gradient(180deg, #07021a 0%, #1a0838 35%, #4a1258 58%, #a0306e 72%, #ff7a7a 86%)"
+      medium="crt"
+      grain={false}
+      vignette={0.35}
+      lights={[
+        ...CABINETS.map((m) => ({ x: m.x + 115, y: 470, r: 320, color: `${m.glow}88`, opacity: 0.55, flicker: 0.15 })),
+        { x: 915, y: 470, r: 520, color: "rgba(255,90,170,0.35)", opacity: 0.5 },
+      ]}
+    >
+      {/* Gökyüzü, çizgili retro güneş, tel kafes dağlar, parlayan ufuk */}
+      <Painted filter="st-chroma">
+        <defs>
+          <linearGradient id="sw-sun" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#fff36a" />
+            <stop offset="0.45" stopColor="#ff9a3c" />
+            <stop offset="1" stopColor="#ff2e9a" />
+          </linearGradient>
+          <mask id="sw-sun-cut">
+            <rect x="0" y="0" width={W} height={H} fill="#fff" />
+            {Array.from({ length: 8 }, (_, i) => (
+              <rect key={i} x="600" y={482 + i * 15} width="640" height={3 + i * 1.6} fill="#000" />
+            ))}
+          </mask>
+          <linearGradient id="sw-mtn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#2a0a4a" />
+            <stop offset="1" stopColor="#12042a" />
+          </linearGradient>
+        </defs>
+        {Array.from({ length: 60 }, (_, i) => (
+          <circle key={i} cx={(i * 263 + 41) % W} cy={20 + ((i * 113) % 360)} r={0.8 + (i % 3) * 0.6} fill="#fff" opacity={0.4 + (i % 4) * 0.15} />
         ))}
-        <path d="M1260 120 l40 -50 l40 50 l-40 50 Z" fill="none" stroke="#00e0ff" strokeWidth="5" opacity="0.7" style={{ filter: "drop-shadow(0 0 10px #00e0ff)" }} />
-        <circle cx="1450" cy="140" r="46" fill="none" stroke="#ff3ea5" strokeWidth="5" opacity="0.7" style={{ filter: "drop-shadow(0 0 10px #ff3ea5)" }} />
-        {/* Mor ışıklı, damalı zemin */}
-        <rect x="0" y="740" width={W} height="160" fill="#1a0a2a" />
-        {Array.from({ length: 20 }, (_, i) => (
-          <line key={i} x1={i * 84 - 200} y1="900" x2={800 + (i - 10) * 30} y2="740" stroke="#b14dff" strokeWidth="2" opacity="0.35" />
+        <circle cx="915" cy="470" r="300" fill="#ff3ea5" opacity="0.22" filter="url(#nk-blur)" />
+        <circle cx="915" cy="470" r="185" fill="url(#sw-sun)" mask="url(#sw-sun-cut)" />
+        {/* Tel kafes dağlar */}
+        <path d="M0 640 L120 560 L210 600 L330 520 L470 610 L560 580 L640 640 Z M1160 640 L1260 560 L1340 600 L1460 520 L1600 590 L1600 640 Z" fill="url(#sw-mtn)" stroke="#00e0ff" strokeWidth="2.5" />
+        {[[120, 560], [330, 520], [1260, 560], [1460, 520]].map(([x, y], i) => (
+          <path key={i} d={`M${x} ${y} L${x - 60} 640 M${x} ${y} L${x + 70} 640 M${x} ${y} L${x} 640`} stroke="#00e0ff" strokeWidth="1.2" opacity="0.6" />
         ))}
-        {[760, 790, 830, 880].map((y) => (
-          <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="#b14dff" strokeWidth="2" opacity="0.3" />
+        <rect x="0" y="640" width={W} height="270" fill="#0c0320" />
+        <rect x="0" y="640" width={W} height="60" fill="#ff3ea5" opacity="0.18" filter="url(#nk-blur)" />
+      </Painted>
+      {/* Neon ızgara zemin (perspektifli) ve ufuk çizgisi */}
+      <Painted filter="st-neon">
+        <rect x="0" y="639" width={W} height="3" fill="#ff7ad0" />
+        {Array.from({ length: 31 }, (_, i) => (
+          <line key={i} x1={915 + (i - 15) * 18} y1="640" x2={915 + (i - 15) * 150} y2="900" stroke="#ff3ea5" strokeWidth="2" opacity="0.85" />
         ))}
-        <ellipse cx="800" cy="820" rx="700" ry="80" fill="#b14dff" opacity="0.12" />
-        {/* Atari makineleri */}
+        {[648, 660, 676, 698, 728, 768, 820, 886].map((y) => (
+          <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="#ff3ea5" strokeWidth="2" opacity="0.8" />
+        ))}
+      </Painted>
+      {/* Atari makineleri: parlak siyah lake gövde, krom kenar, neon şerit, ışıklı tabela */}
+      <Painted>
+        <defs>
+          <linearGradient id="ar-lacq" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#05030c" />
+            <stop offset="0.18" stopColor="#1a1030" />
+            <stop offset="0.5" stopColor="#0c0818" />
+            <stop offset="0.82" stopColor="#24183e" />
+            <stop offset="1" stopColor="#05030c" />
+          </linearGradient>
+          <linearGradient id="ar-chrome" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="0.45" stopColor="#8a94b8" />
+            <stop offset="0.55" stopColor="#2a2448" />
+            <stop offset="1" stopColor="#c8d0f0" />
+          </linearGradient>
+        </defs>
         {CABINETS.map((m, i) => (
           <g key={i} transform={`translate(${m.x} 330)`}>
-            <path d="M0 0 h230 v60 l-20 60 l20 70 v230 h-230 v-230 l20 -70 l-20 -60 Z" fill={m.body} />
-            <rect x="8" y="8" width="214" height="44" rx="6" fill={m.glow} opacity="0.85" />
-            <rect x="8" y="8" width="214" height="44" rx="6" fill="url(#nk-soft)" opacity="0.4" />
+            <ellipse cx="115" cy="420" rx="150" ry="16" fill={m.glow} opacity="0.25" filter="url(#nk-blur)" />
+            <path d="M0 0 h230 v60 l-20 60 l20 70 v230 h-230 v-230 l20 -70 l-20 -60 Z" fill="url(#ar-lacq)" />
+            <path d="M0 0 h230 v60 l-20 60 l20 70 v230 h-230 v-230 l20 -70 l-20 -60 Z" fill={m.body} opacity="0.35" />
+            <path d="M0 0 v60 l20 60 l-20 70 v230 M230 0 v60 l-20 60 l20 70 v230" stroke={m.glow} strokeWidth="4" fill="none" filter="url(#st-neon)" />
+            <rect x="6" y="6" width="218" height="48" rx="8" fill="url(#ar-chrome)" />
+            <rect x="10" y="10" width="210" height="40" rx="6" fill={m.glow} filter="url(#st-neon)" />
+            <rect x="10" y="10" width="210" height="14" rx="6" fill="#fff" opacity="0.35" />
+            <rect x="26" y="62" width="178" height="136" rx="14" fill="url(#ar-chrome)" />
             <rect x="34" y="70" width="162" height="120" rx="10" fill="#05030a" />
-            <path d="M10 190 h210 l20 50 h-250 Z" fill="#3a2a6a" />
-            <rect x="80" y="300" width="70" height="40" rx="6" fill="#120a20" />
-            <rect x="104" y="314" width="22" height="6" rx="3" fill={m.glow} opacity="0.8" />
+            <rect x="34" y="70" width="162" height="120" rx="10" fill={m.glow} opacity="0.14" />
+            <path d="M10 190 h210 l20 50 h-250 Z" fill="#1a1030" stroke={m.glow} strokeWidth="2" strokeOpacity="0.6" />
+            {[50, 90, 140, 180].map((x, j) => (
+              <circle key={j} cx={x} cy="216" r="7" fill={["#ff3ea5", "#00e0ff", "#ffe04a", "#8aff6a"][j]} filter="url(#st-neon)" />
+            ))}
+            <rect x="80" y="300" width="70" height="40" rx="6" fill="#0a0614" stroke={m.glow} strokeOpacity="0.5" strokeWidth="2" />
+            <rect x="104" y="314" width="22" height="6" rx="3" fill={m.glow} filter="url(#st-neon)" />
             <rect x="96" y="356" width="38" height="22" rx="4" fill="#0a0612" />
           </g>
         ))}
-        {/* Joystick'e yetişmek için üst üste iki kasa */}
+        {/* Joystick'e yetişmek için üst üste iki kasa: neon kenarlı */}
         {[640, 715].map((y) => (
           <g key={y}>
-            <rect x="235" y={y} width="110" height="75" rx="4" fill="#7a4a2a" stroke="#5a3a22" strokeWidth="4" />
-            <path d={`M240 ${y + 6} L340 ${y + 69} M340 ${y + 6} L240 ${y + 69}`} stroke="#5a3a22" strokeWidth="4" />
+            <rect x="235" y={y} width="110" height="75" rx="4" fill="#160a2a" stroke="#00e0ff" strokeWidth="3" filter="url(#st-neon)" />
+            <path d={`M240 ${y + 6} L340 ${y + 69} M340 ${y + 6} L240 ${y + 69}`} stroke="#00e0ff" strokeOpacity="0.5" strokeWidth="2" />
           </g>
         ))}
+      </Painted>
+      {/* Izgarada akan parlak çizgi (ufuktan izleyiciye) */}
+      <Layer>
+        <motion.rect x="0" width={W} height="3" fill="#ffb0e6" style={{ filter: "drop-shadow(0 0 6px #ff3ea5)" }} initial={{ y: 640, opacity: 0 }} animate={{ y: [640, 900], opacity: [0, 1, 0], height: [1, 5] }} transition={{ duration: 2.6, repeat: Infinity, ease: "easeIn" }} />
       </Layer>
       {/* Ekranlardaki oyunlar: uzaylılar, top, yılan */}
       {CABINETS.map((m, i) => (
@@ -121,23 +185,172 @@ export function Ocean() {
   const k = beat.k;
   const coral = ["#ff6a8a", "#ff9a4a", "#c86aff", "#ffd24a"];
   return (
-    <Stage sky="linear-gradient(180deg, #0f7a96 0%, #0a4d6e 40%, #062a46 100%)">
+    <Stage medium="canvas" clock="st-c-gouache"
+      sky="linear-gradient(180deg, #1aa0b8 0%, #0d6688 30%, #08405e 65%, #04223a 100%)"
+      lights={[
+        { x: 800, y: 0, r: 900, color: "rgba(190,250,255,0.35)", opacity: 0.45, flicker: 0.08 },
+        { x: 400, y: 790, r: 220, color: "rgba(255,120,160,0.35)", opacity: 0.35 },
+        { x: 1350, y: 790, r: 220, color: "rgba(200,120,255,0.35)", opacity: 0.35 },
+      ]}
+    >
       <Layer>
-        {/* Yüzeyden süzülen ışık */}
+        <defs>
+          <linearGradient id="oc-rock" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#14566e" />
+            <stop offset="1" stopColor="#082e44" />
+          </linearGradient>
+          <linearGradient id="oc-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e2cc96" />
+            <stop offset="1" stopColor="#b8995e" />
+          </linearGradient>
+          <linearGradient id="oc-ray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dffaff" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#dffaff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Yüzeyden süzülen ışık: aşağı indikçe solan hüzmeler */}
         {[200, 520, 900, 1250].map((x, i) => (
-          <motion.polygon key={x} points={`${x},0 ${x + 120},0 ${x + 300},900 ${x - 60},900`} fill="#bff4ff" animate={{ opacity: [0.04, 0.1, 0.04] }} transition={{ duration: 5 + i, repeat: Infinity, ease: "easeInOut" }} />
+          <motion.polygon key={x} points={`${x},0 ${x + 120},0 ${x + 300},900 ${x - 60},900`} fill="url(#oc-ray)" animate={{ opacity: [0.25, 0.6, 0.25] }} transition={{ duration: 5 + i, repeat: Infinity, ease: "easeInOut" }} />
         ))}
+      </Layer>
+      <Painted look="gouache" seed={486}>
+        <defs>
+          <linearGradient id="oc-rock" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#14566e" />
+            <stop offset="1" stopColor="#082e44" />
+          </linearGradient>
+          <linearGradient id="oc-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e2cc96" />
+            <stop offset="1" stopColor="#b8995e" />
+          </linearGradient>
+          <linearGradient id="oc-ray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dffaff" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#dffaff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
         <path d="M0 40 Q 100 30 200 40 T 400 40 T 600 40 T 800 40 T 1000 40 T 1200 40 T 1400 40 T 1600 40 L1600 0 L0 0 Z" fill="#9ee8f5" opacity="0.35" />
+        {/* Çok uzak siluetler: suyun içinde kaybolan kayalar */}
+        <path d="M0 560 Q 300 470 520 540 Q 760 450 1000 540 Q 1260 460 1600 530 L1600 700 L0 700 Z" fill="#0a4a66" opacity="0.6" />
+        {/* Guaj: uzakta opak yosun ormanı ve kat kat resif rafları */}
+        {Array.from({ length: 14 }, (_, i) => {
+          const x = 40 + i * 118;
+          const h = 260 + (i % 4) * 60;
+          return <path key={`kp${i}`} d={`M${x} 760 C ${x - 30} ${760 - h * 0.35}, ${x + 30} ${760 - h * 0.65}, ${x + (i % 2 ? 14 : -14)} ${760 - h} C ${x + 26} ${760 - h * 0.6}, ${x + 6} ${760 - h * 0.3}, ${x + 20} 760 Z`} fill={i % 2 ? "#1a6a6a" : "#145a62"} opacity="0.85" />;
+        })}
+        <path d="M0 700 Q 180 660 360 690 Q 560 640 760 690 L760 760 L0 760 Z" fill="#1c5a72" />
+        <path d="M840 690 Q 1040 640 1240 680 Q 1420 650 1600 680 L1600 760 L840 760 Z" fill="#1c5a72" />
         {/* Uzak kayalar */}
-        <path d="M0 640 Q 200 540 380 620 Q 560 520 760 640 L760 900 L0 900 Z" fill="#0a3a52" />
-        <path d="M900 650 Q 1100 520 1300 610 Q 1460 540 1600 600 L1600 900 L900 900 Z" fill="#0a3a52" />
-        {/* Kum */}
-        <path d="M0 780 Q 400 750 800 775 T 1600 770 L1600 900 L0 900 Z" fill="#d9c08a" />
+        <path d="M0 640 Q 200 540 380 620 Q 560 520 760 640 L760 900 L0 900 Z" fill="url(#oc-rock)" />
+        <path d="M900 650 Q 1100 520 1300 610 Q 1460 540 1600 600 L1600 900 L900 900 Z" fill="url(#oc-rock)" />
+      </Painted>
+      <Layer>
+        <defs>
+          <linearGradient id="oc-rock" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#14566e" />
+            <stop offset="1" stopColor="#082e44" />
+          </linearGradient>
+          <linearGradient id="oc-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e2cc96" />
+            <stop offset="1" stopColor="#b8995e" />
+          </linearGradient>
+          <linearGradient id="oc-ray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dffaff" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#dffaff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Batık bir sandık */}
+        <g transform="translate(600 776)">
+          <rect x="0" y="-40" width="110" height="56" rx="6" fill="#6a4226" />
+          <path d="M0 -40 Q55 -80 110 -40 Z" fill="#7a5232" />
+          <rect x="0" y="-44" width="110" height="8" fill="#c9a24a" />
+          <rect x="48" y="-34" width="14" height="20" rx="3" fill="#c9a24a" />
+          <motion.ellipse cx="55" cy="-46" rx="40" ry="10" fill="#ffd27a" opacity="0.4" filter="url(#nk-blur-s)" animate={{ opacity: [0.2, 0.55, 0.2] }} transition={{ duration: 3, repeat: Infinity }} />
+        </g>
+      </Layer>
+      <Painted look="gouache" seed={486}>
+        <defs>
+          <linearGradient id="oc-rock" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#14566e" />
+            <stop offset="1" stopColor="#082e44" />
+          </linearGradient>
+          <linearGradient id="oc-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e2cc96" />
+            <stop offset="1" stopColor="#b8995e" />
+          </linearGradient>
+          <linearGradient id="oc-ray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dffaff" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#dffaff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Guaj: uzakta opak balık sürüsü, yuvarlak resif kayaları, sudan süzülen ışık lekeleri */}
+        {Array.from({ length: 26 }, (_, i) => {
+          const x = 980 + (i % 9) * 34 + (Math.floor(i / 9) % 2) * 16;
+          const y = 330 + Math.floor(i / 9) * 26 + (i % 3) * 4;
+          return (
+            <g key={`fs${i}`}>
+              <ellipse cx={x} cy={y} rx="13" ry="6" fill="#0e4a5e" />
+              <path d={`M${x + 11} ${y} l 9 -6 l 0 12 Z`} fill="#0e4a5e" />
+            </g>
+          );
+        })}
+        {[[160, 760, 70, "#2a6a6a"], [470, 770, 54, "#346e64"], [1180, 765, 66, "#2a6a6a"], [1460, 772, 50, "#3a7466"]].map(([x, y, r, c], i) => (
+          <g key={`rk${i}`}>
+            <ellipse cx={x as number} cy={y as number} rx={(r as number) * 1.4} ry={r as number} fill={c as string} />
+            <ellipse cx={(x as number) - (r as number) * 0.4} cy={(y as number) - (r as number) * 0.45} rx={(r as number) * 0.6} ry={(r as number) * 0.25} fill="#7ab8a8" opacity="0.7" />
+          </g>
+        ))}
+        {Array.from({ length: 40 }, (_, i) => {
+          const x = (i * 211) % W;
+          const y = 120 + ((i * 97) % 420);
+          return <ellipse key={`lt${i}`} cx={x} cy={y} rx={22 + (i % 3) * 8} ry="7" fill="#bff4ff" opacity="0.18" transform={`rotate(${(i % 5) * 8 - 16} ${x} ${y})`} />;
+        })}
+        {/* Kum: dalgalı izler */}
+        <path d="M0 780 Q 400 750 800 775 T 1600 770 L1600 900 L0 900 Z" fill="url(#oc-sand)" />
         <path d="M0 820 Q 500 800 900 820 T 1600 815 L1600 900 L0 900 Z" fill="#c9ad74" />
-        {/* Mercanlar */}
+        {[800, 840, 870].map((y, i) => (
+          <path key={y} d={`M0 ${y} q 60 -8 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0`} stroke="#a88a54" strokeWidth="2" fill="none" opacity={0.5 - i * 0.1} />
+        ))}
+      </Painted>
+      <Layer>
+        <defs>
+          <linearGradient id="oc-rock" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#14566e" />
+            <stop offset="1" stopColor="#082e44" />
+          </linearGradient>
+          <linearGradient id="oc-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e2cc96" />
+            <stop offset="1" stopColor="#b8995e" />
+          </linearGradient>
+          <linearGradient id="oc-ray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dffaff" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#dffaff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Su altı ışık desenleri (kostik) kumun üstünde */}
+        {Array.from({ length: 14 }, (_, i) => (
+          <motion.ellipse key={`cs${i}`} cx={60 + i * 115} cy={800 + (i % 3) * 22} rx={30 + (i % 3) * 10} ry="6" fill="#fffbe0" opacity="0.18" style={{ transformOrigin: `${60 + i * 115}px ${800 + (i % 3) * 22}px` }} animate={{ opacity: [0.05, 0.25, 0.05], scaleX: [1, 1.5, 1] }} transition={{ duration: 3 + (i % 4), repeat: Infinity, delay: i * 0.3 }} />
+        ))}
+      </Layer>
+      <Painted look="gouache" seed={486}>
+        <defs>
+          <linearGradient id="oc-rock" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#14566e" />
+            <stop offset="1" stopColor="#082e44" />
+          </linearGradient>
+          <linearGradient id="oc-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e2cc96" />
+            <stop offset="1" stopColor="#b8995e" />
+          </linearGradient>
+          <linearGradient id="oc-ray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dffaff" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#dffaff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Mercanlar: koyu iç gövde + açık dış kontur */}
         {[[120, 790, 0], [260, 800, 1], [1180, 790, 2], [1500, 800, 3], [760, 810, 1]].map(([x, y, c], i) => (
-          <g key={i} stroke={coral[c]} strokeWidth="16" strokeLinecap="round" fill="none">
-            <path d={`M${x} ${y} L${x} ${y - 80} M${x} ${y - 40} L${x - 34} ${y - 90} M${x} ${y - 56} L${x + 30} ${y - 110}`} />
+          <g key={i} strokeLinecap="round" fill="none">
+            <path d={`M${x} ${y} L${x} ${y - 80} M${x} ${y - 40} L${x - 34} ${y - 90} M${x} ${y - 56} L${x + 30} ${y - 110}`} stroke={coral[c]} strokeWidth="18" />
+            <path d={`M${x - 3} ${y} L${x - 3} ${y - 80} M${x - 3} ${y - 42} L${x - 36} ${y - 90} M${x - 2} ${y - 58} L${x + 27} ${y - 110}`} stroke="#fff" strokeWidth="4" opacity="0.3" />
           </g>
         ))}
         {[[400, 800], [1350, 795]].map(([x, y], i) => (
@@ -147,7 +360,7 @@ export function Ocean() {
             ))}
           </g>
         ))}
-      </Layer>
+      </Painted>
       {/* Salınan yosunlar */}
       {[60, 330, 590, 1100, 1420, 1560].map((x, i) => (
         <motion.svg key={x} className="absolute overflow-visible" style={{ left: x, top: 520, originX: 0.5, originY: 1 }} width="40" height="280" animate={{ rotate: [-6, 6, -6] }} transition={{ duration: 4 + (i % 3), repeat: Infinity, ease: "easeInOut" }}>
@@ -169,7 +382,7 @@ export function Ocean() {
       <OceanClock />
       {/* Şnorkelle yukarıdan bakan */}
       <motion.div key={`sn${beat.i === 1 ? k : 0}`} className="absolute inset-0" animate={beat.i === 1 ? { y: [0, 120, 120, 0] } : { y: [0, 6, 0] }} transition={beat.i === 1 ? { duration: 4, times: [0, 0.35, 0.65, 1] } : { duration: 3, repeat: Infinity }}>
-        <Actor x={800} y={190} size={88} look={look({ shape: "sphere" })} color="#FF8A1F" expression={beat.i === 1 ? "surprised" : "happy"} move={{ animate: { rotate: [-12, -6, -12] }, transition: { duration: 3, repeat: Infinity } }} front={<Snorkel />} />
+        <Actor shadow={false} x={800} y={190} size={88} look={look({ shape: "sphere" })} color="#FF8A1F" expression={beat.i === 1 ? "surprised" : "happy"} move={{ animate: { rotate: [-12, -6, -12] }, transition: { duration: 3, repeat: Infinity } }} front={<Snorkel />} />
       </motion.div>
       {/* Bakır dalgıç başlığıyla dipte yavaş yürüyen */}
       <motion.div className="absolute inset-0" animate={{ x: [0, 260, 260, 0, 0] }} transition={{ duration: 40, times: [0, 0.4, 0.5, 0.9, 1], repeat: Infinity, ease: "easeInOut" }}>
@@ -180,7 +393,7 @@ export function Ocean() {
       <Actor morph={beat.n[2]} morphDelay={800} x={1010} y={810} size={92} look={look({ shape: "flower" })} color="#FF5C8A" flip expression={beat.i === 2 ? "love" : "happy"} move={breathe(3)} act={on(beat, 2, hop(14))} actKey={k} front={<Pearl />} />
       {/* Kartondan köpekbalığı yüzgeciyle korkutmaya çalışan yaramaz */}
       <motion.div key={`sh${beat.i === 3 ? k : 0}`} className="absolute inset-0" animate={beat.i === 3 ? { x: [0, -380, -380, 0] } : { x: 0 }} transition={{ duration: 4, times: [0, 0.3, 0.6, 1], ease: "easeInOut" }}>
-        <Actor x={1300} y={700} size={86} look={look({ shape: "blob" })} color="#8A8F99" flip expression={beat.i === 3 ? "giggle" : "suspicious"} move={{ animate: { y: [0, -10, 0] }, transition: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }} back={<SharkFin />} front={<Hand x={-3} y={14} />} />
+        <Actor shadow={false} x={1300} y={700} size={86} look={look({ shape: "blob" })} color="#8A8F99" flip expression={beat.i === 3 ? "giggle" : "suspicious"} move={{ animate: { y: [0, -10, 0] }, transition: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }} back={<SharkFin />} front={<Hand x={-3} y={14} />} />
       </motion.div>
     </Stage>
   );
@@ -249,64 +462,114 @@ export function Greenhouse() {
   const beat = useBeat(4);
   const k = beat.k;
   return (
-    <Stage sky="linear-gradient(180deg, #e2f2e6 0%, #b9dcc4 55%, #9cc9a8 100%)">
-      <Layer>
-        {/* Cam tavan ve kemerler */}
-        {[0, 1, 2, 3].map((i) => (
-          <path key={i} d={`M${i * 400} 300 Q ${i * 400 + 200} 0 ${i * 400 + 400} 300`} stroke="#ffffff" strokeWidth="10" fill="none" opacity="0.85" />
+    <Stage medium="watercolor" clock="st-c-wc"
+      sky="linear-gradient(180deg, #f7f2e6 0%, #f1eedf 60%, #ebe4d2 100%)"
+      grain={false}
+      vignette={0.12}
+      lights={[{ x: 1150, y: 200, r: 700, color: "rgba(255,248,215,0.5)", opacity: 0.45 }]}
+    >
+      {/* Arka yıkama: ıslak üstüne ıslak yeşiller, camdan süzülen ışık */}
+      <Painted filter="st-wc-soft">
+        <ellipse cx="300" cy="420" rx="420" ry="260" fill="#b8dcb4" opacity="0.6" />
+        <ellipse cx="1250" cy="380" rx="460" ry="280" fill="#a8d4b8" opacity="0.6" />
+        <ellipse cx="800" cy="200" rx="520" ry="200" fill="#d8ecd0" opacity="0.7" />
+        <polygon points="1060,0 1320,0 1220,740 880,740" fill="#fff6c8" opacity="0.7" />
+        <ellipse cx="800" cy="820" rx="900" ry="120" fill="#e8b48e" opacity="0.6" />
+      </Painted>
+      {/* Botanik çizim: sepya mürekkep çizgiler + her parçada suluboya (look="wc") */}
+      <Painted look="wc" seed={1045}>
+        {/* Uzak bitki kümeleri (camın arkasında) */}
+        {[[100, 560, 120, "#7fb88a"], [320, 520, 150, "#6aa87a"], [620, 590, 120, "#8cc496"], [980, 550, 160, "#78b486"], [1280, 570, 130, "#6aa87a"], [1520, 530, 120, "#86bc8e"]].map(([x, y, r, c], i) => (
+          <circle key={i} cx={x as number} cy={y as number} r={r as number} fill={c as string} opacity="0.55" />
         ))}
-        {Array.from({ length: 17 }, (_, i) => (
-          <line key={i} x1={i * 100} y1="0" x2={i * 100} y2="740" stroke="#ffffff" strokeWidth="5" opacity="0.6" />
+        {/* Terakota zemin: karolar */}
+        <rect x="0" y="740" width={W} height="160" fill="#d99a70" opacity="0.9" />
+        {Array.from({ length: 15 }, (_, i) => (
+          <rect key={`tl${i}`} x={i * 110 + 4} y="744" width="102" height="62" fill={i % 2 ? "#cf8a5e" : "#dfa47a"} opacity="0.75" />
         ))}
-        <line x1="0" y1="300" x2={W} y2="300" stroke="#ffffff" strokeWidth="8" opacity="0.8" />
-        {/* Güneş ışığı */}
-        <polygon points="1100,0 1300,0 1180,760 900,760" fill="#fffbe0" opacity="0.35" />
-        {/* Ahşap raflar ve saksılar */}
+        {Array.from({ length: 15 }, (_, i) => (
+          <rect key={`tm${i}`} x={i * 110 - 51} y="812" width="102" height="86" fill={i % 2 ? "#dfa47a" : "#c98458"} opacity="0.75" />
+        ))}
+        {/* Raflar, saksılar ve botanik bitkiler */}
         {[0, 1].map((side) => (
           <g key={side} transform={side ? "translate(1360 0)" : undefined}>
             {[430, 600].map((y) => (
-              <rect key={y} x="0" y={y} width="240" height="14" fill="#a8744a" />
+              <rect key={y} x="0" y={y} width="240" height="14" fill="#b88a5e" />
             ))}
+            <rect x={side ? 226 : 0} y="420" width="14" height="320" fill="#8a5a36" />
             {[0, 1, 2].map((i) =>
               [430, 600].map((y) => (
                 <g key={`${i}${y}`} transform={`translate(${30 + i * 76} ${y})`}>
-                  <path d="M0 -40 h44 l-6 40 h-32 Z" fill="#c8693a" />
-                  <rect x="-3" y="-44" width="50" height="8" rx="2" fill="#d97a48" />
-                  {[0, 1, 2, 3].map((j) => (
-                    <ellipse key={j} cx={10 + j * 8} cy={-52 - (j % 2) * 6} rx="6" ry="12" fill={["#5aa86a", "#7ac47a", "#4a8a5a"][(i + j) % 3]} transform={`rotate(${(j - 1.5) * 20} ${10 + j * 8} -44)`} />
-                  ))}
+                  <path d="M0 -40 h44 l-6 40 h-32 Z" fill="#d4784a" />
+                  <rect x="-3" y="-44" width="50" height="8" rx="2" fill="#e08a5a" />
+                  {/* Eğrelti yaprağı: orta damar + yaprakçıklar */}
+                  <g transform={`rotate(${(i - 1) * 14} 22 -44)`}>
+                    {Array.from({ length: 6 }, (_, j) => (
+                      <g key={j}>
+                        <ellipse cx={22 - 9} cy={-50 - j * 9} rx="8" ry="3.4" fill={["#5aa86a", "#6fb878", "#4e9a60"][(i + j) % 3]} transform={`rotate(-30 ${22 - 9} ${-50 - j * 9})`} />
+                        <ellipse cx={22 + 9} cy={-50 - j * 9} rx="8" ry="3.4" fill={["#6fb878", "#4e9a60", "#5aa86a"][(i + j) % 3]} transform={`rotate(30 ${22 + 9} ${-50 - j * 9})`} />
+                      </g>
+                    ))}
+                  </g>
                 </g>
               )),
             )}
           </g>
         ))}
-        {/* Terakota zemin */}
-        <rect x="0" y="740" width={W} height="160" fill="#c98a5a" />
-        {Array.from({ length: 16 }, (_, i) => (
-          <line key={i} x1={i * 110} y1="740" x2={i * 110 - 60} y2="900" stroke="#a8693a" strokeWidth="3" />
-        ))}
-        <line x1="0" y1="810" x2={W} y2="810" stroke="#a8693a" strokeWidth="3" />
-        {/* Toprak yığını */}
-        <ellipse cx="1380" cy="810" rx="120" ry="34" fill="#5a3a22" />
-        <ellipse cx="1350" cy="796" rx="70" ry="22" fill="#6b4a2e" />
-        {/* Sukulentler */}
+        {/* Toprak yığını ve sukulentler */}
+        <ellipse cx="1380" cy="810" rx="120" ry="34" fill="#7a5236" />
+        <ellipse cx="1350" cy="796" rx="70" ry="22" fill="#8a6244" />
         {[300, 380, 440].map((x, i) => (
           <g key={x} transform={`translate(${x} 800)`}>
-            <path d="M-20 -26 h40 l-5 26 h-30 Z" fill="#e0a07a" />
-            {Array.from({ length: 7 }, (_, j) => (
-              <ellipse key={j} cx="0" cy="-34" rx="5" ry="13" fill={i === 1 ? "#8ac4a8" : "#6aa88a"} transform={`rotate(${j * 51} 0 -30)`} />
+            <path d="M-20 -26 h40 l-5 26 h-30 Z" fill="#e6a882" />
+            {Array.from({ length: 8 }, (_, j) => (
+              <ellipse key={j} cx="0" cy="-36" rx="6" ry="14" fill={i === 1 ? "#9ccab0" : "#7ab494"} transform={`rotate(${j * 45} 0 -30)`} />
             ))}
           </g>
         ))}
-      </Layer>
+        {/* Sepya mürekkep: cam kemerler, kayıtlar, raf ve saksı konturları, damarlar */}
+        <g stroke="#6a4a3a" fill="none" strokeLinecap="round" opacity="0.85">
+          {[0, 1, 2, 3].map((i) => (
+            <path key={`a${i}`} d={`M${i * 400} 300 Q ${i * 400 + 200} 0 ${i * 400 + 400} 300`} strokeWidth="3" />
+          ))}
+          {[0, 1, 2, 3].map((i) => (
+            <path key={`a2${i}`} d={`M${i * 400 + 20} 300 Q ${i * 400 + 200} 30 ${i * 400 + 380} 300`} strokeWidth="1.4" />
+          ))}
+          {Array.from({ length: 17 }, (_, i) => (
+            <line key={`m${i}`} x1={i * 100} y1={i % 4 === 0 ? 300 : 120 + Math.abs(((i % 4) - 2)) * 60} x2={i * 100} y2="740" strokeWidth="2" />
+          ))}
+          <line x1="0" y1="300" x2={W} y2="300" strokeWidth="3" />
+          <line x1="0" y1="740" x2={W} y2="740" strokeWidth="2.4" />
+          {[0, 1].map((side) =>
+            [430, 600].map((y) => <rect key={`s${side}${y}`} x={side ? 1360 : 0} y={y} width="240" height="14" strokeWidth="1.6" />),
+          )}
+          {[0, 1].map((side) =>
+            [0, 1, 2].map((i) =>
+              [430, 600].map((y) => <path key={`p${side}${i}${y}`} d={`M${(side ? 1360 : 0) + 30 + i * 76} ${y - 40} h44 l-6 40 h-32 Z`} strokeWidth="1.6" />),
+            ),
+          )}
+          {[0, 1].map((side) =>
+            [0, 1, 2].map((i) =>
+              [430, 600].map((y) => (
+                <path key={`v${side}${i}${y}`} d={`M${(side ? 1360 : 0) + 30 + i * 76 + 22} ${y - 44} q ${(i - 1) * 6} -30 ${(i - 1) * 14} -56`} strokeWidth="1.2" />
+              )),
+            ),
+          )}
+          {[300, 380, 440].map((x) => (
+            <path key={`sk${x}`} d={`M${x - 20} 774 h40 l-5 26 h-30 Z`} strokeWidth="1.4" />
+          ))}
+        </g>
+      </Painted>
       {/* Tavandan taşan monstera yaprakları */}
       {[[60, -20, 30], [380, -40, -20], [1160, -30, 15], [1460, -10, -35]].map(([x, y, a], i) => (
         <motion.svg key={i} className="absolute overflow-visible" style={{ left: x, top: y, originX: 0.5, originY: 0 }} width="180" height="220" animate={{ rotate: [a - 3, a + 3, a - 3] }} transition={{ duration: 5 + i, repeat: Infinity, ease: "easeInOut" }}>
           <line x1="90" y1="0" x2="90" y2="70" stroke="#3a7a4a" strokeWidth="5" />
-          <path d="M90 70 C 0 80, 10 210, 90 210 C 170 210, 180 80, 90 70 Z" fill="#3f9a5a" />
-          <path d="M90 76 L90 205" stroke="#2f7a46" strokeWidth="3" />
+          <path d="M90 70 C 0 80, 10 210, 90 210 C 170 210, 180 80, 90 70 Z" fill="#4f9e64" opacity="0.92" />
+          <path d="M90 70 C 30 84, 34 200, 90 210 C 60 180, 56 110, 90 70 Z" fill="#7cc08a" opacity="0.55" />
+          <path d="M90 70 C 0 80, 10 210, 90 210 C 170 210, 180 80, 90 70 Z" fill="none" stroke="#3e5a3a" strokeWidth="1.6" />
+          <path d="M90 76 L90 205" stroke="#3e5a3a" strokeWidth="1.8" />
           {[100, 130, 160, 185].map((y) => (
-            <path key={y} d={`M30 ${y} L70 ${y + 4} M150 ${y} L110 ${y + 4}`} stroke="#c9ead2" strokeWidth="7" strokeLinecap="round" />
+            <path key={y} d={`M30 ${y} L70 ${y + 4} M150 ${y} L110 ${y + 4}`} stroke="#f4f1e4" strokeWidth="7" strokeLinecap="round" />
           ))}
         </motion.svg>
       ))}
@@ -401,7 +664,14 @@ export function Train() {
   const beat = useBeat(4);
   const k = beat.k;
   return (
-    <Stage sky="#2a1414">
+    <Stage medium="sketch" clock="st-riso"
+      sky="#2a1414"
+      lights={[
+        { x: 790, y: 520, r: 420, color: "rgba(255,190,110,0.6)", opacity: 0.6, flicker: 0.1 },
+        { x: 780, y: 300, r: 500, color: "rgba(140,160,255,0.25)", opacity: 0.45 },
+        { x: 1240, y: 260, r: 160, color: "rgba(255,200,120,0.45)", opacity: 0.4 },
+      ]}
+    >
       {/* Pencereden akan gece */}
       <div className="absolute overflow-hidden rounded-[30px]" style={{ left: 380, top: 110, width: 800, height: 400, background: "linear-gradient(180deg, #0a0f2a 0%, #1a2050 70%, #2a2a5a 100%)" }}>
         <Stars count={40} maxY={300} />
@@ -424,15 +694,75 @@ export function Train() {
       </div>
       {/* Tren ritmiyle hafif sallanan kompartıman */}
       <motion.div className="absolute inset-0" animate={{ y: [0, 2, 0, 1, 0] }} transition={{ duration: 0.9, repeat: Infinity }}>
-        <Layer>
+        <Painted look="riso" seed={510}>
           {/* Ahşap duvar, pencere çerçevesi */}
-          <path d={`M0 0 H${W} V900 H0 Z M410 110 h740 q30 0 30 30 v340 q0 30 -30 30 h-740 q-30 0 -30 -30 v-340 q0 -30 30 -30 Z`} fill="#5a2a22" fillRule="evenodd" />
+          <defs>
+            <linearGradient id="tr-wall" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#4a2018" />
+              <stop offset="0.5" stopColor="#6a3226" />
+              <stop offset="1" stopColor="#3a1810" />
+            </linearGradient>
+            <linearGradient id="tr-velvet" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#a8303c" />
+              <stop offset="1" stopColor="#5a1520" />
+            </linearGradient>
+            <linearGradient id="tr-brass" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor="#8a6a2a" />
+              <stop offset="0.5" stopColor="#f0d48a" />
+              <stop offset="1" stopColor="#8a6a2a" />
+            </linearGradient>
+          </defs>
+          <path d={`M0 0 H${W} V900 H0 Z M410 110 h740 q30 0 30 30 v340 q0 30 -30 30 h-740 q-30 0 -30 -30 v-340 q0 -30 30 -30 Z`} fill="url(#tr-wall)" fillRule="evenodd" />
+          {/* Pirinç bagaj rafı ve duvar aplikleri */}
+          {[[80, 470], [1010, 230]].map(([x, w], i) => (
+            <g key={`rk${i}`}>
+              <rect x={x} y="60" width={w} height="8" rx="4" fill="url(#tr-brass)" />
+              <rect x={x} y="84" width={w} height="6" rx="3" fill="url(#tr-brass)" />
+              {Array.from({ length: Math.floor(w / 40) }, (_, j) => (
+                <line key={j} x1={x + 20 + j * 40} y1="64" x2={x + 20 + j * 40} y2="88" stroke="#c9a24a" strokeWidth="2" />
+              ))}
+            </g>
+          ))}
+          <g>
+            <rect x="140" y="20" width="120" height="44" rx="8" fill="#6a4a2a" />
+            <rect x="160" y="28" width="40" height="30" rx="4" fill="#3a5a8a" />
+          </g>
+          {[[1240, 230]].map(([x, y], i) => (
+            <g key={`sc${i}`}>
+              <rect x={x - 6} y={y + 10} width="12" height="30" fill="url(#tr-brass)" />
+              <path d={`M${x - 22} ${y + 10} h44 l-8 -34 h-28 Z`} fill="#ffe6b0" />
+              <circle cx={x} cy={y - 6} r="30" fill="#ffd27a" opacity="0.3" filter="url(#nk-blur-s)" />
+            </g>
+          ))}
           {Array.from({ length: 9 }, (_, i) => {
             const y = 60 + i * 100;
             const win = y > 100 && y < 520;
             return <path key={i} d={win ? `M0 ${y} H370 M1190 ${y} H${W}` : `M0 ${y} H${W}`} stroke="#4a2018" strokeWidth="3" opacity="0.6" />;
           })}
           <rect x="370" y="100" width="820" height="420" rx="36" fill="none" stroke="#c99a5a" strokeWidth="12" />
+          {/* Art Deco: pencerenin çevresinde basamaklı altın çerçeve, köşelerde yelpazeler, altta şerit friz */}
+          <rect x="356" y="86" width="848" height="448" rx="44" fill="none" stroke="#d4a43a" strokeWidth="4" />
+          <rect x="344" y="74" width="872" height="472" rx="52" fill="none" stroke="#8a6418" strokeWidth="3" />
+          {[[376, 106, 1], [1184, 106, -1]].map(([x, y, d], i) => (
+            <g key={`fan${i}`}>
+              {Array.from({ length: 7 }, (_, j) => {
+                const a = (j / 6) * (Math.PI / 2);
+                return <line key={j} x1={x} y1={y} x2={x + d * Math.cos(a) * 70} y2={y + Math.sin(a) * 70} stroke="#f0d48a" strokeWidth="3" />;
+              })}
+              <path d={`M${x} ${y} m ${d * 70} 0 a70 70 0 0 ${d > 0 ? 1 : 0} ${-d * 70} 70`} fill="none" stroke="#f0d48a" strokeWidth="3" />
+            </g>
+          ))}
+          {Array.from({ length: 28 }, (_, i) => (
+            <path key={`chev${i}`} d={`M${372 + i * 29} 548 l 14 -12 l 14 12`} fill="none" stroke="#d4a43a" strokeWidth="3" />
+          ))}
+          {[[60, 300], [1210, 300]].map(([x, y], i) => (
+            <g key={`dp${i}`}>
+              <rect x={x} y={y} width={i ? 70 : 280} height="140" fill="#4a1a14" stroke="#d4a43a" strokeWidth="3" />
+              {Array.from({ length: i ? 3 : 9 }, (_, j) => (
+                <path key={j} d={`M${x + 16 + j * 30} ${y + 130} L${x + 16 + j * 30} ${y + 50} L${x + 30 + j * 30} ${y + 24} L${x + 44 + j * 30} ${y + 50} L${x + 44 + j * 30} ${y + 130}`} fill="none" stroke="#b8862a" strokeWidth="2" />
+              ))}
+            </g>
+          ))}
           {/* Perde */}
           <path d="M360 90 q40 200 10 440 h60 q-20 -240 -10 -440 Z" fill="#7a2030" />
           <path d="M1200 90 q-40 200 -10 440 h-60 q20 -240 10 -440 Z" fill="#7a2030" />
@@ -440,13 +770,21 @@ export function Train() {
           <rect x="650" y="560" width="280" height="22" rx="6" fill="#8a5a34" />
           <rect x="780" y="580" width="20" height="160" fill="#6b4226" />
           {/* Kadife koltuklar */}
-          <rect x="90" y="470" width="420" height="300" rx="40" fill="#7a1f2a" />
+          <rect x="90" y="470" width="420" height="300" rx="40" fill="url(#tr-velvet)" />
           <rect x="80" y="700" width="460" height="100" rx="30" fill="#8a2a34" />
-          <rect x="1010" y="470" width="240" height="300" rx="40" fill="#7a1f2a" />
+          <rect x="80" y="700" width="460" height="14" rx="7" fill="#c04050" opacity="0.6" />
+          <rect x="1010" y="470" width="240" height="300" rx="40" fill="url(#tr-velvet)" />
           <rect x="980" y="700" width="290" height="100" rx="30" fill="#8a2a34" />
+          <rect x="980" y="700" width="290" height="14" rx="7" fill="#c04050" opacity="0.6" />
+          {/* Kapitone düğmeler ve dikiş çizgileri */}
           {[150, 250, 350, 450, 1070, 1180].map((x) => (
-            <circle key={x} cx={x} cy="560" r="5" fill="#5a1520" />
+            <g key={x}>
+              <circle cx={x} cy="560" r="5" fill="#5a1520" />
+              <circle cx={x} cy="640" r="5" fill="#5a1520" />
+              <path d={`M${x} 565 L${x} 635`} stroke="#5a1520" strokeWidth="2" opacity="0.5" />
+            </g>
           ))}
+          <rect x="650" y="582" width="280" height="8" fill="#000" opacity="0.3" />
           {/* Kompartıman kapısı ve koridor */}
           <rect x="1290" y="120" width="300" height="780" fill="#3a1a14" />
           <rect x="1300" y="140" width="280" height="760" fill="#c9a77a" />
@@ -455,7 +793,7 @@ export function Train() {
           <rect x="1280" y="120" width="14" height="780" fill="#c99a5a" />
           {/* Zemin */}
           <rect x="0" y="790" width="1290" height="110" fill="#3a1a14" />
-        </Layer>
+        </Painted>
         {/* Masadaki abajur, ritimle sallanır */}
         <motion.svg className="absolute overflow-visible" style={{ left: 880, top: 470, originX: 0.5, originY: 1 }} width="60" height="92" animate={{ rotate: [-3, 3, -3] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}>
           <rect x="27" y="40" width="6" height="48" fill="#c99a5a" />
@@ -523,34 +861,133 @@ function TicketPunch({ k }: { k: number }) {
 export function Cinema() {
   const beat = useBeat(4);
   const k = beat.k;
+  // Kadife koltuk: yumuşak ışıklı sırt, kapitone dikişler, altın başlıklı kolçaklar (3B film görünümü)
   const seat = (x: number, y: number, s = 1) => (
     <g key={`${x}-${y}`} transform={`translate(${x} ${y}) scale(${s})`}>
-      <rect x="-80" y="-150" width="160" height="170" rx="40" fill="#8a1a24" />
-      <rect x="-70" y="-140" width="140" height="150" rx="34" fill="#a8222e" />
-      <rect x="-70" y="-140" width="140" height="40" rx="20" fill="#c03040" opacity="0.5" />
+      <defs>
+        <radialGradient id="cn-back" cx="40%" cy="22%" r="85%">
+          <stop offset="0" stopColor="#f0606e" />
+          <stop offset="0.45" stopColor="#b82634" />
+          <stop offset="1" stopColor="#5a0e18" />
+        </radialGradient>
+        <linearGradient id="cn-arm" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2a0e14" />
+          <stop offset="0.5" stopColor="#5a1a24" />
+          <stop offset="1" stopColor="#2a0e14" />
+        </linearGradient>
+        <linearGradient id="cn-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff0b0" />
+          <stop offset="0.5" stopColor="#d4a43a" />
+          <stop offset="1" stopColor="#8a6418" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="0" cy="24" rx="100" ry="14" fill="#000" opacity="0.5" />
+      <rect x="-80" y="-150" width="160" height="172" rx="44" fill="url(#cn-back)" />
+      {[-40, 0, 40].map((dx) => (
+        <path key={dx} d={`M${dx} -130 v120`} stroke="#6a1420" strokeWidth="3" opacity="0.55" />
+      ))}
+      {[-20, 20].map((dx) => [-90, -50].map((dy) => <circle key={`${dx}${dy}`} cx={dx} cy={dy} r="4" fill="#6a1420" />))}
+      <ellipse cx="-20" cy="-128" rx="44" ry="12" fill="#fff" opacity="0.28" />
+      <rect x="-98" y="-40" width="24" height="66" rx="10" fill="url(#cn-arm)" />
+      <rect x="74" y="-40" width="24" height="66" rx="10" fill="url(#cn-arm)" />
+      <rect x="-100" y="-46" width="28" height="12" rx="6" fill="url(#cn-gold)" />
+      <rect x="72" y="-46" width="28" height="12" rx="6" fill="url(#cn-gold)" />
     </g>
   );
   return (
-    <Stage sky="radial-gradient(120% 90% at 50% 0%, #2a1630 0%, #120a18 55%, #07050a 100%)">
+    <Stage clock="st-soft3d"
+      sky="radial-gradient(120% 90% at 50% 0%, #2a1630 0%, #120a18 55%, #07050a 100%)"
+      lights={[
+        { x: 800, y: 900, r: 800, color: "rgba(140,190,255,0.35)", opacity: 0.5, flicker: 0.3 },
+        { x: 800, y: 65, r: 160, color: "rgba(255,240,200,0.6)", opacity: 0.6 },
+        { x: 1280, y: 70, r: 120, color: "rgba(80,255,140,0.5)", opacity: 0.5 },
+      ]}
+    >
       {/* Perdeden yüzlere vuran titrek ışık */}
       <motion.div className="absolute inset-0" style={{ background: "radial-gradient(80% 60% at 50% 100%, rgba(140,190,255,0.22), rgba(140,190,255,0))" }} animate={{ opacity: beat.i === 2 ? [0.6, 1.4, 0.4, 1.2, 0.8] : [0.6, 0.9, 0.7, 1, 0.6] }} transition={{ duration: beat.i === 2 ? 1.4 : 3, repeat: Infinity }} />
-      <Layer>
-        {/* Arka duvar, makine dairesi penceresi ve ışık hüzmesi */}
-        <rect x="0" y="0" width={W} height="340" fill="#1a0e1e" />
-        {Array.from({ length: 12 }, (_, i) => (
-          <rect key={i} x={i * 140 + 20} y="0" width="60" height="340" fill="#22122a" />
-        ))}
-        <rect x="760" y="40" width="80" height="50" rx="6" fill="#ffe6c0" />
-        <motion.polygon points="770,70 830,70 1250,900 350,900" fill="url(#beam)" animate={{ opacity: [0.5, 0.75, 0.55, 0.8, 0.5] }} transition={{ duration: 2.4, repeat: Infinity }} />
+      <Painted look="puff" seed={589}>
         <defs>
           <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#dfe9ff" stopOpacity="0.45" />
             <stop offset="1" stopColor="#dfe9ff" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {/* Arka sıralar */}
-        {[240, 400, 560, 720, 880, 1040, 1200, 1360].map((x) => seat(x, 420, 0.7))}
+          <defs>
+            <linearGradient id="cn-wall" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#2a1432" />
+              <stop offset="1" stopColor="#14081a" />
+            </linearGradient>
+            <linearGradient id="cn-drape" x1="0" y1="0" x2="54" y2="0" spreadMethod="repeat" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stopColor="#5a0e1a" />
+              <stop offset="0.35" stopColor="#c02a3a" />
+              <stop offset="0.55" stopColor="#e0485a" />
+              <stop offset="1" stopColor="#5a0e1a" />
+            </linearGradient>
+            <linearGradient id="cn-trim" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#fff2b8" />
+              <stop offset="0.5" stopColor="#d4a43a" />
+              <stop offset="1" stopColor="#7a5418" />
+            </linearGradient>
+            <radialGradient id="cn-sconce" cx="50%" cy="30%" r="70%">
+              <stop offset="0" stopColor="#fff6d0" />
+              <stop offset="0.5" stopColor="#ffc860" />
+              <stop offset="1" stopColor="#b8742a" />
+            </radialGradient>
+          </defs>
+          {/* Arka duvar: koyu kadife, altın çerçeveli kemer */}
+          <rect x="0" y="0" width={W} height="360" fill="url(#cn-wall)" />
+          {Array.from({ length: 12 }, (_, i) => (
+            <rect key={i} x={i * 140 + 20} y="0" width="60" height="360" rx="8" fill="#2c1636" />
+          ))}
+          <path d="M150 360 V120 Q 800 -40 1450 120 V360" fill="none" stroke="url(#cn-trim)" strokeWidth="14" />
+          {/* Yanlarda büzgülü kadife perdeler ve altın bağcıklar */}
+          <path d="M0 0 H260 Q 230 180 300 360 H0 Z" fill="url(#cn-drape)" />
+          <path d="M1600 0 H1340 Q 1370 180 1300 360 H1600 Z" fill="url(#cn-drape)" />
+          <path d="M0 0 H1600 V44 Q 1400 76 1200 44 Q 1000 76 800 44 Q 600 76 400 44 Q 200 76 0 44 Z" fill="url(#cn-drape)" />
+          <rect x="0" y="40" width={W} height="10" fill="url(#cn-trim)" />
+          <ellipse cx="252" cy="250" rx="20" ry="12" fill="url(#cn-trim)" />
+          <ellipse cx="1348" cy="250" rx="20" ry="12" fill="url(#cn-trim)" />
+          {/* Duvar aplikleri: altın kubbe, sıcak ışık */}
+          {[620, 980, 1180, 420].map((x) => (
+            <g key={`lm${x}`}>
+              <ellipse cx={x} cy="200" rx="46" ry="56" fill="#ffb84a" opacity="0.22" filter="url(#nk-blur-s)" />
+              <path d={`M${x - 20} 214 Q ${x} 170 ${x + 20} 214 Z`} fill="url(#cn-sconce)" />
+              <rect x={x - 22} y="212" width="44" height="8" rx="4" fill="url(#cn-trim)" />
+            </g>
+          ))}
+          {/* Basamak ışıkları */}
+          {[300, 1300].map((x) => (
+            <g key={`st${x}`}>
+              {[600, 680, 760, 840].map((y) => (
+                <rect key={y} x={x - 14} y={y} width="28" height="6" rx="3" fill="#ffd27a" opacity="0.85" />
+              ))}
+            </g>
+          ))}
+          {/* Çıkış levhası */}
+          <rect x="1240" y="56" width="80" height="28" rx="4" fill="#0a2a14" stroke="#3aff7a" strokeWidth="2" />
+          <text x="1280" y="76" textAnchor="middle" fontSize="16" fontWeight="800" fill="#5aff8a" fontFamily="system-ui">ÇIKIŞ</text>
+          <rect x="752" y="34" width="96" height="62" rx="8" fill="#1a0e1e" />
+          <rect x="760" y="40" width="80" height="50" rx="6" fill="#ffe6c0" filter="url(#nk-bloom)" />
+      </Painted>
+      <Layer>
+        <defs>
+          <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dfe9ff" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#dfe9ff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <motion.polygon points="770,70 830,70 1250,900 350,900" fill="url(#beam)" animate={{ opacity: [0.5, 0.75, 0.55, 0.8, 0.5] }} transition={{ duration: 2.4, repeat: Infinity }} />
       </Layer>
+      <Painted look="puff" seed={589}>
+        <defs>
+          <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dfe9ff" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#dfe9ff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+          {/* Arka sıralar */}
+          {[240, 400, 560, 720, 880, 1040, 1200, 1360].map((x) => seat(x, 420, 0.7))}
+      </Painted>
       {/* Hüzmede uçuşan toz */}
       <Drift count={22} from={120} to={700} dur={[10, 18]} xs={[640, 960]} sway={60} render={() => <span className="block h-1.5 w-1.5 rounded-full bg-white/60" />} />
 
@@ -565,15 +1002,15 @@ export function Cinema() {
       {/* Seans başlamadan uyuyakalan */}
       <Actor x={1320} y={720} size={96} look={look({ shape: "cloud", texture: "plush" })} color="#FF9EC4" expression="sleepy" move={{ animate: { rotate: [12, 16, 12] }, transition: { duration: 4, repeat: Infinity, ease: "easeInOut" } }} act={on(beat, 3, { animate: { rotate: [0, -16, 0] }, transition: { duration: 1.6 } })} actKey={k} />
       {/* Kol dayama ve koltuk önleri */}
-      <Layer>
-        {[240, 480, 720, 960, 1200, 1440].map((x) => (
-          <rect key={x} x={x - 14} y="660" width="28" height="80" rx="10" fill="#5a1018" />
-        ))}
-        <rect x="0" y="740" width={W} height="160" fill="#0a0608" />
-        {[360, 600, 840, 1080, 1320].map((x) => (
-          <rect key={x} x={x - 90} y="720" width="180" height="40" rx="16" fill="#6a121c" />
-        ))}
-      </Layer>
+      <Painted look="puff" seed={589}>
+          {[240, 480, 720, 960, 1200, 1440].map((x) => (
+            <rect key={x} x={x - 14} y="660" width="28" height="80" rx="10" fill="#5a1018" />
+          ))}
+          <rect x="0" y="740" width={W} height="160" fill="#0a0608" />
+          {[360, 600, 840, 1080, 1320].map((x) => (
+            <rect key={x} x={x - 90} y="720" width="180" height="40" rx="16" fill="#6a121c" />
+          ))}
+      </Painted>
     </Stage>
   );
 }
@@ -621,18 +1058,128 @@ export function Western() {
   const beat = useBeat(4);
   const k = beat.k;
   return (
-    <Stage sky="linear-gradient(180deg, #3b1d4a 0%, #a8384a 38%, #e86a3a 62%, #f7b45a 100%)">
-      <Layer>
-        {/* Batan dev kızıl güneş */}
-        <circle cx="900" cy="600" r="230" fill="#ff5a2a" opacity="0.9" />
-        <circle cx="900" cy="600" r="300" fill="#ffb05a" opacity="0.18" />
-        {/* Kayalık tepeler (mesa) */}
-        <path d="M700 640 v-90 h40 l20 -40 h170 l20 40 h30 v90 Z" fill="#6a2a3a" />
-        <path d="M1150 640 v-60 l30 -30 h160 l30 30 v60 Z" fill="#7a3040" />
-        <path d="M0 650 Q 400 620 800 645 T 1600 640 L1600 900 L0 900 Z" fill="#c9844a" />
+    <Stage medium="sketch" clock="st-riso"
+      sky="linear-gradient(180deg, #2e1640 0%, #8a2e4a 30%, #e05a3a 56%, #f7b45a 78%, #ffd88a 100%)"
+      lights={[{ x: 900, y: 600, r: 800, color: "rgba(255,150,80,0.5)", opacity: 0.55 }]}
+    >
+      <Painted look="riso" seed={744}>
+        <defs>
+          <radialGradient id="ws-sun" cx="50%" cy="45%" r="55%">
+            <stop offset="0" stopColor="#fff0b0" />
+            <stop offset="0.5" stopColor="#ff8a3a" />
+            <stop offset="1" stopColor="#ff4a2a" />
+          </radialGradient>
+          <linearGradient id="ws-mesa" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#5a2238" />
+            <stop offset="0.6" stopColor="#8a3a44" />
+            <stop offset="1" stopColor="#c45a44" />
+          </linearGradient>
+          <linearGradient id="ws-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#d8904e" />
+            <stop offset="1" stopColor="#b06a34" />
+          </linearGradient>
+          <linearGradient id="ws-plank" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#6a4022" />
+            <stop offset="0.7" stopColor="#9a6a3e" />
+            <stop offset="1" stopColor="#c48a52" />
+          </linearGradient>
+          <linearGradient id="ws-cactus" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#2a5a34" />
+            <stop offset="0.6" stopColor="#4a8a52" />
+            <stop offset="1" stopColor="#7aa85a" />
+          </linearGradient>
+        </defs>
+        {/* Uzun, ince bulut şeritleri */}
+        {[[200, 140, 420], [900, 220, 520], [1200, 110, 360]].map(([x, y, w], i) => (
+          <ellipse key={i} cx={x} cy={y} rx={w / 2} ry="10" fill="#ffb0a0" opacity="0.35" />
+        ))}
+        {/* Poster güneşi: arkadan açılan ışın dilimleri ve gökte kalın renk bantları */}
+        {Array.from({ length: 22 }, (_, i) => {
+          const a0 = Math.PI + (i / 22) * Math.PI;
+          const a1 = a0 + Math.PI / 44;
+          return i % 2 ? null : <polygon key={`ray${i}`} points={`900,600 ${900 + Math.cos(a0) * 1300},${600 + Math.sin(a0) * 1300} ${900 + Math.cos(a1) * 1300},${600 + Math.sin(a1) * 1300}`} fill="#ffd27a" opacity="0.22" />;
+        })}
+        {[[60, "#3a1a4a"], [150, "#6a2448"], [250, "#a8384a"], [360, "#d85a3a"]].map(([y, c], i) => (
+          <rect key={`band${i}`} x="0" y={y as number} width={W} height="14" fill={c as string} opacity="0.35" />
+        ))}
+        {/* Batan dev kızıl güneş: hale ve ısı titreşimi */}
+        <circle cx="900" cy="600" r="380" fill="#ffb05a" opacity="0.2" filter="url(#nk-blur)" />
+        <circle cx="900" cy="600" r="230" fill="url(#ws-sun)" />
+        {[560, 590, 615].map((y, i) => (
+          <rect key={y} x="660" y={y} width="480" height={6 - i} fill="#e86a3a" opacity="0.35" />
+        ))}
+        {/* Uzak mesalar: sisli */}
+        <path d="M1300 640 v-40 l20 -30 h120 l20 30 v40 Z M80 640 v-50 l30 -20 h100 l20 20 v50 Z" fill="#a84a50" opacity="0.6" />
+        {/* Kayalık tepeler (mesa): güneşe bakan yüz aydınlık */}
+        <path d="M700 640 v-90 h40 l20 -40 h170 l20 40 h30 v90 Z" fill="url(#ws-mesa)" />
+        <path d="M1150 640 v-60 l30 -30 h160 l30 30 v60 Z" fill="url(#ws-mesa)" />
+        <path d="M0 650 Q 400 620 800 645 T 1600 640 L1600 900 L0 900 Z" fill="url(#ws-sand)" />
         <path d="M0 720 Q 500 700 900 725 T 1600 715 L1600 900 L0 900 Z" fill="#d9965a" />
+        {Array.from({ length: 30 }, (_, i) => (
+          <ellipse key={`pb${i}`} cx={(i * 113) % W} cy={740 + ((i * 47) % 150)} rx={3 + (i % 3)} ry="2" fill="#8a5a2a" opacity="0.5" />
+        ))}
+      </Painted>
+      <Layer>
+        <defs>
+          <radialGradient id="ws-sun" cx="50%" cy="45%" r="55%">
+            <stop offset="0" stopColor="#fff0b0" />
+            <stop offset="0.5" stopColor="#ff8a3a" />
+            <stop offset="1" stopColor="#ff4a2a" />
+          </radialGradient>
+          <linearGradient id="ws-mesa" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#5a2238" />
+            <stop offset="0.6" stopColor="#8a3a44" />
+            <stop offset="1" stopColor="#c45a44" />
+          </linearGradient>
+          <linearGradient id="ws-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#d8904e" />
+            <stop offset="1" stopColor="#b06a34" />
+          </linearGradient>
+          <linearGradient id="ws-plank" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#6a4022" />
+            <stop offset="0.7" stopColor="#9a6a3e" />
+            <stop offset="1" stopColor="#c48a52" />
+          </linearGradient>
+          <linearGradient id="ws-cactus" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#2a5a34" />
+            <stop offset="0.6" stopColor="#4a8a52" />
+            <stop offset="1" stopColor="#7aa85a" />
+          </linearGradient>
+        </defs>
+        {/* Akbabalar */}
+        {[0, 1].map((i) => (
+          <motion.path key={`v${i}`} d="M0 0 q 12 -10 24 0 q 12 -10 24 0" stroke="#3a1a2a" strokeWidth="3" fill="none" initial={{ x: 1100 + i * 90, y: 240 + i * 30 }} animate={{ x: [1100 + i * 90, 1180 + i * 90, 1100 + i * 90], y: [240 + i * 30, 220 + i * 30, 240 + i * 30] }} transition={{ duration: 8 + i * 2, repeat: Infinity, ease: "easeInOut" }} />
+        ))}
+      </Layer>
+      <Painted look="riso" seed={744}>
+        <defs>
+          <radialGradient id="ws-sun" cx="50%" cy="45%" r="55%">
+            <stop offset="0" stopColor="#fff0b0" />
+            <stop offset="0.5" stopColor="#ff8a3a" />
+            <stop offset="1" stopColor="#ff4a2a" />
+          </radialGradient>
+          <linearGradient id="ws-mesa" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#5a2238" />
+            <stop offset="0.6" stopColor="#8a3a44" />
+            <stop offset="1" stopColor="#c45a44" />
+          </linearGradient>
+          <linearGradient id="ws-sand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#d8904e" />
+            <stop offset="1" stopColor="#b06a34" />
+          </linearGradient>
+          <linearGradient id="ws-plank" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#6a4022" />
+            <stop offset="0.7" stopColor="#9a6a3e" />
+            <stop offset="1" stopColor="#c48a52" />
+          </linearGradient>
+          <linearGradient id="ws-cactus" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#2a5a34" />
+            <stop offset="0.6" stopColor="#4a8a52" />
+            <stop offset="1" stopColor="#7aa85a" />
+          </linearGradient>
+        </defs>
         {/* Kaktüs */}
-        <g fill="#3f7a4a">
+        <g fill="url(#ws-cactus)">
           <rect x="1050" y="560" width="30" height="130" rx="15" />
           <rect x="1020" y="600" width="18" height="50" rx="9" />
           <rect x="1020" y="632" width="40" height="18" rx="9" />
@@ -640,21 +1187,35 @@ export function Western() {
           <rect x="1070" y="612" width="40" height="18" rx="9" />
         </g>
         {/* Saloon: ahşap cephe, sundurma */}
-        <rect x="0" y="230" width="640" height="560" fill="#8a5a34" />
+        <rect x="0" y="230" width="640" height="560" fill="url(#ws-plank)" />
         {Array.from({ length: 14 }, (_, i) => (
-          <line key={i} x1="0" y1={250 + i * 40} x2="640" y2={250 + i * 40} stroke="#6b4226" strokeWidth="3" />
+          <line key={i} x1="0" y1={250 + i * 40} x2="640" y2={250 + i * 40} stroke="#5a3a1e" strokeWidth="3" />
         ))}
-        <path d="M0 200 h660 v40 h-660 Z" fill="#6b4226" />
+        {/* Sıcak ışıklı pencere ve tabela */}
+        <rect x="430" y="300" width="130" height="110" fill="#3a1e10" />
+        <rect x="440" y="310" width="110" height="90" fill="#ffc46a" />
+        <line x1="495" y1="310" x2="495" y2="400" stroke="#3a1e10" strokeWidth="6" />
+        <line x1="440" y1="355" x2="550" y2="355" stroke="#3a1e10" strokeWidth="6" />
+        <rect x="370" y="440" width="250" height="60" rx="6" fill="#3a1e10" />
+        <text x="495" y="482" textAnchor="middle" fontSize="34" fontWeight="900" fill="#f0c86a" fontFamily="Georgia, serif" letterSpacing="4">SALOON</text>
+        <path d="M0 200 h660 v40 h-660 Z" fill="#5a3a1e" />
+        <path d="M0 200 h660 v8 h-660 Z" fill="#c48a52" opacity="0.6" />
         <path d="M-20 600 h680 l-10 -24 h-660 Z" fill="#5a3a22" />
         <rect x="380" y="600" width="12" height="190" fill="#5a3a22" />
         <rect x="620" y="580" width="16" height="210" fill="#5a3a22" />
         <rect x="400" y="560" width="200" height="230" fill="#1a0e08" />
+        <rect x="400" y="560" width="200" height="230" fill="#ffb84a" opacity="0.08" />
+        {/* Yaylı kapılar */}
+        <path d="M410 640 h86 v90 h-86 Z M504 640 h86 v90 h-86 Z" fill="#8a5a34" />
+        {[420, 440, 460, 480, 514, 534, 554, 574].map((x) => (
+          <line key={x} x1={x} y1="648" x2={x} y2="722" stroke="#5a3a1e" strokeWidth="4" />
+        ))}
         <rect x="0" y="770" width="660" height="30" fill="#6b4226" />
         {/* Çit */}
         {Array.from({ length: 9 }, (_, i) => (
           <rect key={i} x={1180 + i * 46} y="680" width="16" height="140" fill="#7a5030" />
         ))}
-      </Layer>
+      </Painted>
       {/* Yuvarlanan çalı */}
       <motion.svg className="absolute" style={{ left: 0, top: 760 }} width="70" height="70" viewBox="0 0 70 70" initial={{ x: W + 100 }} animate={{ x: [W + 100, -120], y: [0, -30, 0, -14, 0, -24, 0], rotate: [0, -1080] }} transition={{ duration: 11, repeat: Infinity, ease: "linear", repeatDelay: 3 }}>
         <g stroke="#9a6a3a" strokeWidth="3" fill="none">
@@ -675,10 +1236,10 @@ export function Western() {
       <Actor x={860} y={830} size={110} look={look({ shape: "egg", head: "cowboy" })} color="#FFE3A8" expression={beat.i === 0 ? "happy" : "focused"} move={{ animate: { x: [0, 2, 0] }, transition: { duration: 2, repeat: Infinity } }} act={on(beat, 0, { animate: { y: [0, -6, 0] }, transition: { duration: 0.6 } })} actKey={k} front={<><WaterPistol draw={beat.i === 0} k={k} /></>} />
       {/* Başında tüyle çitin üstünden sarkan yaramaz */}
       <Actor x={1340} y={beat.i === 3 ? 660 : 700} size={88} look={look({ shape: "star" })} color="#8FE03A" expression={beat.i === 3 ? "giggle" : "suspicious"} move={sway(2.4, 4)} act={on(beat, 3, hop(20))} actKey={k} back={<Feather />} front={<><Hand x={0} y={22} /><Hand x={24} y={22} /></>} />
-      <Layer>
+      <Painted look="riso" seed={744}>
         <rect x="1170" y="700" width="420" height="18" fill="#8a5a34" />
         <rect x="1170" y="760" width="420" height="18" fill="#8a5a34" />
-      </Layer>
+      </Painted>
     </Stage>
   );
 }

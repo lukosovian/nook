@@ -204,7 +204,7 @@ export function LavenderClock() {
 export function BunkerClock() {
   const c = useClock();
   return (
-    <At x={60} y={50} w={460} h={230}>
+    <At x={60} y={84} w={460} h={230}>
       <div className="absolute inset-0 rounded-[10px]" style={{ background: "repeating-linear-gradient(135deg,#d9b21f 0 22px,#1a1a1a 22px 44px)", boxShadow: "0 10px 24px -8px rgba(0,0,0,0.8)" }} />
       <div className="absolute inset-[12px] flex flex-col items-center justify-center gap-3 rounded-[6px] bg-[#1d211c]">
         <div className="flex gap-1.5">
@@ -221,11 +221,13 @@ export function BunkerClock() {
             ),
           )}
         </div>
-        <span className="flex items-center gap-2 capitalize" style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: 14, color: "#a8c79a" }}>
+        {/* Tarih ve hava: yeşil fosfor ekran yazısı, okunaklı boyda */}
+        <span className="flex items-center gap-2.5 font-bold capitalize" style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: 20, color: "#c8f0b4", textShadow: "0 0 6px rgba(140,255,140,0.35)" }}>
           {c.date}
           {c.wx && (
             <>
-              <c.wx.Icon size={14} strokeWidth={2.4} />
+              <span className="opacity-50">·</span>
+              <c.wx.Icon size={20} strokeWidth={2.4} />
               {c.wx.temp}
             </>
           )}
