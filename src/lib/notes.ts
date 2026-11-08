@@ -290,7 +290,7 @@ export const NOTES: PatchNote[] = [
   {
     version: "0.3.8",
     date: tt("5 Kasım 2026"),
-    headline: tt("Oyunda görünen alarm, alarmda gün seçimi ve ilaç alarmı, büyüyen Studio ve net yazı, kolay telefon eşleştirme, Claude onayında tam komut"),
+    headline: tt("Kalkanda 12 yeni sahne ve sanat tarzları, oyunda görünen alarm, alarmda gün seçimi ve ilaç alarmı, büyüyen Studio ve net yazı, kolay telefon eşleştirme, Claude onayında tam komut"),
     items: [
       {
         title: tt("Oyunda alarm görünür"),

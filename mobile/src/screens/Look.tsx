@@ -8,7 +8,6 @@ import {
   FACES,
   EYE_STYLES,
   GLASSES,
-  HALLOWEEN,
   HALLOWEEN_PARTS,
   HEADS,
   NECKS,
@@ -100,14 +99,6 @@ export function LookScreen({ pairing, status, conn, onBack }: { pairing: Pairing
           ))}
         </Group>
       ))}
-
-      <Group title="Cadılar Bayramı 🎃">
-        {HALLOWEEN.map((o) => (
-          <Option key={o.name} label={o.name} on={same(o)} onClick={() => apply(o.look, o.color)}>
-            <Fig look={o.look} color={o.color} />
-          </Option>
-        ))}
-      </Group>
 
       <Group title="Gövde">
         {SHAPES.filter((o) => !HALLOWEEN_PARTS.has(o.id)).map((o) => (
