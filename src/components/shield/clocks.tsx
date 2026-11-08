@@ -2,7 +2,7 @@
  * Her sahnenin kendi saati: sahnenin içinde bir eşya olarak (ahşap tabela, kara tahta, neon, ekran…),
  * boş bir yere yerleşir ve hiçbir şeyi örtmez. Konumlar sahne koordinatında (1600×900).
  */
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Moon, Sun, type LucideIcon } from "lucide-react";
 import { SKY_LABEL, type Sky } from "../../lib/weather";
@@ -59,9 +59,13 @@ export function Face({ c, time, sub, gap = 6, wxSize = 20 }: { c: Clock; time: C
   );
 }
 
+/** Sahnenin sanat tarzı: saat paneli de aynı malzemeden görünsün (SVG süzgeci, bkz. shield/styles) */
+export const ClockStyle = createContext<string | undefined>(undefined);
+
 export function At({ x, y, w, h, children, style }: { x: number; y: number; w: number; h: number; children: ReactNode; style?: CSSProperties }) {
+  const look = useContext(ClockStyle);
   return (
-    <div className="pointer-events-none absolute" style={{ left: x, top: y, width: w, height: h, ...style }}>
+    <div className="pointer-events-none absolute" style={{ left: x, top: y, width: w, height: h, ...style, filter: look ? `url(#${look})` : style?.filter }}>
       {children}
     </div>
   );

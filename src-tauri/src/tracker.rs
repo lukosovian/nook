@@ -155,8 +155,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     // Parolalı kalkan açıkken hiçbir pencere (ada, yan kart) açılmaz/tıklanmaz
                     let shield_locked = shared.locked.load(Ordering::Relaxed);
                     let gated = shared.gated.load(Ordering::Relaxed);
-                    // Tam ekran oyunun ekranında ada açılmaz (alarm çalarken hariç)
-                    let in_game = shared
+                    // Tam ekran oyunun ekranında ada açılmaz (alarm çalarken hariç). Yalnızca oyun öndeyken:
+                    // Alt-Tab ile çıkılınca oyun arkada ekranı kaplamaya devam eder, ama ada tıklanabilmeli.
+                    let in_game = shared.game_front.load(Ordering::Relaxed)
+                        && shared
                         .game_screen
                         .lock()
                         .unwrap()

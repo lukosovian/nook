@@ -206,6 +206,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         .map(|s| s.monitor)
                 };
                 *shared.game_screen.lock().unwrap() = game_mon;
+                shared.game_front.store(in_session_game, Ordering::Relaxed);
 
                 video = match (game_mon, detected.as_ref()) {
                     (Some(_), _) => None,
