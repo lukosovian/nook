@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for Nook island window",
-  "windows": ["island*", "perch", "shield*", "argus", "sound", "studio"],
+  "windows": ["island*", "perch", "shield*", "argus*", "sound*", "song-toast", "studio"],
   "permissions": [
     "core:default",
     "core:window:allow-set-ignore-cursor-events",

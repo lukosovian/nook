@@ -30,6 +30,7 @@ mod share;
 mod shell;
 mod shield;
 mod shortcut;
+mod song_toast;
 mod state;
 mod studio;
 mod system;
@@ -139,6 +140,11 @@ pub fn run() {
             argus::argus_tmdb_search,
             argus::argus_tmdb_add,
             argus::argus_card,
+            argus::argus_stingers,
+            argus::argus_unmark,
+            argus::argus_rate,
+            song_toast::song_toast,
+            song_toast::song_toast_take,
             argus::argus_open,
             argus::argus_install,
             argus::argus_check_dir,

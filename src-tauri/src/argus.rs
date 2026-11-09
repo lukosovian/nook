@@ -63,6 +63,8 @@ pub struct Item {
     release: Option<String>,
     runtime: Option<f64>,
     score: Option<f64>,
+    /// Kriter kimliği → puan (kriter yoksa "_genel")
+    scores: HashMap<String, f64>,
     /// Afişin dosya yolu (asset protokolüyle gösterilir)
     poster: Option<String>,
     /// Argus'un "son izlenenler" listesindeki zaman (ms)
@@ -90,6 +92,8 @@ pub struct Snapshot {
     episode_days: HashMap<String, u32>,
     /// Durum sütununun seçenekleri (Argus'taki sırayla) — izledikten sonra hangisi işaretlensin
     statuses: Vec<String>,
+    /// Puan sütununun kriterleri (kimlik, ad); boşsa tek genel puan. Puan sütunu yoksa None
+    rating: Option<Vec<(String, String)>>,
 }
 
 /// Yazmak için gereken sütun/seçenek kimlikleri
@@ -98,6 +102,7 @@ struct Meta {
     durum: Option<String>,
     izlendi: Option<String>,
     izleme: Option<String>,
+    puan: Option<String>,
     /// (seçenek kimliği, etiket)
     statuses: Vec<(String, String)>,
 }
@@ -532,7 +537,14 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
     let (durum_id, kat_id, tur_id) = (pid_of(durum), pid_of(kategori), pid_of(tur));
     let vizyon_id = pid_of(role("vizyon"));
     let sure_id = pid_of(role("sure"));
-    let puan_id = pid_of(role("puan"));
+    let puan_prop = role("puan");
+    let puan_id = pid_of(puan_prop);
+    let rating = puan_prop.map(|p| {
+        p.get("criteria")
+            .and_then(|c| c.as_array())
+            .map(|a| a.iter().filter_map(|c| Some((s(c.get("id")?)?, s(c.get("name")?)?))).collect())
+            .unwrap_or_default()
+    });
     let izleme_id = pid_of(role("izlemeTarihi"));
     let poster_id = pid_of(role("poster").or_else(|| by_name(&["poster", "afiş"]))).or_else(|| board.get("coverPropertyId").and_then(s));
     let izlendi = status_option(board, durum, "izlendi");
@@ -649,6 +661,10 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
             release: get(&vizyon_id).and_then(s),
             runtime: num(get(&sure_id)),
             score,
+            scores: match get(&puan_id) {
+                Some(Value::Object(m)) => m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_f64()?))).collect(),
+                _ => HashMap::new(),
+            },
             poster,
             recent: recent.get(&id).copied(),
             watch_dates,
@@ -668,8 +684,9 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
         items,
         episode_days,
         statuses: statuses.iter().map(|(_, l)| l.clone()).collect(),
+        rating,
     };
-    Some((snap, Meta { durum: durum_id, izlendi, izleme: izleme_id, statuses }))
+    Some((snap, Meta { durum: durum_id, izlendi, izleme: izleme_id, puan: puan_id, statuses }))
 }
 
 fn server_up() -> bool {
@@ -709,6 +726,7 @@ pub fn snapshot_blocking(app: &AppHandle, profile: Option<String>, today: String
         items: Vec::new(),
         episode_days: HashMap::new(),
         statuses: Vec::new(),
+        rating: None,
     };
     let Some((pid, pname)) = all.iter().find(|(_, n)| n.to_lowercase() == want).or_else(active).cloned() else {
         return Some(empty());
@@ -918,6 +936,85 @@ pub fn mark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, 
     Ok(MarkResult { completed, booted })
 }
 
+/// Puanı yazar (Argus'un Puan sütunu: kriter kimliği → 0–10, kriter yoksa "_genel"). Tek puan: tekrar izlemede üstüne yazılır.
+#[tauri::command]
+pub async fn argus_rate(row_id: String, scores: HashMap<String, f64>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = argus_dir().ok_or("Argus bulunamadı")?;
+        let (pid, board_id, puan) = {
+            let c = CACHE.lock().unwrap();
+            let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
+            (c.snap.profile_id.clone(), c.snap.board_id.clone(), c.meta.puan.clone())
+        };
+        let puan = puan.ok_or("Argus'ta Puan sütunu yok")?;
+        let server = Server::ensure(&dir)?;
+        let rows = get_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows"))?;
+        let row = rows.as_array().and_then(|a| a.iter().find(|r| r.get("id").and_then(|v| v.as_str()) == Some(&row_id))).ok_or("Kayıt bulunamadı")?;
+        let mut values = row.get("values").and_then(|v| v.as_object().cloned()).unwrap_or_default();
+        values.insert(puan.clone(), json!(scores));
+        put_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows/{row_id}"), json!({ "values": values, "_changed": [puan] }))?;
+        drop(server);
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Nook'un kendiliğinden yazdığını geri alır: bugünün tarihini siler, durumu önceki hâline döndürür
+/// (`status`: önceki durumun etiketi; yoksa durum değişmez).
+#[tauri::command]
+pub async fn argus_unmark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || unmark_blocking(row_id, season, episode, status, today))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn unmark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<(), String> {
+    let dir = argus_dir().ok_or("Argus bulunamadı")?;
+    let (pid, board_id, meta) = {
+        let c = CACHE.lock().unwrap();
+        let c = c.as_ref().ok_or("Argus henüz okunmadı")?;
+        (c.snap.profile_id.clone(), c.snap.board_id.clone(), c.meta.clone())
+    };
+    let status_id = status.as_deref().and_then(|l| meta.statuses.iter().find(|(_, x)| same_name(x, l)).map(|(id, _)| id.clone()));
+    let server = Server::ensure(&dir)?;
+    let drop_today = |dates: &mut Vec<Value>| dates.retain(|d| d.as_str() != Some(&today));
+    if let (Some(sn), Some(en)) = (season, episode) {
+        let all = get_json(&format!("/api/profiles/{pid}/watched"))?;
+        let mut row: Map<String, Value> = all.get(&row_id).and_then(|v| v.as_object().cloned()).unwrap_or_default();
+        let key = format!("{sn}-{en}");
+        let mut dates: Vec<Value> = row.get(&key).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        drop_today(&mut dates);
+        if dates.is_empty() {
+            row.remove(&key);
+        } else {
+            row.insert(key, Value::Array(dates));
+        }
+        put_json(&format!("/api/profiles/{pid}/watched/{row_id}"), Value::Object(row))?;
+    }
+    let rows = get_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows"))?;
+    let row = rows.as_array().and_then(|a| a.iter().find(|r| r.get("id").and_then(|v| v.as_str()) == Some(&row_id))).ok_or("Kayıt bulunamadı")?;
+    let mut values = row.get("values").and_then(|v| v.as_object().cloned()).unwrap_or_default();
+    let mut changed = Vec::new();
+    if let (Some(durum), Some(sid)) = (meta.durum.clone(), status_id) {
+        values.insert(durum.clone(), Value::String(sid));
+        changed.push(durum);
+    }
+    if season.is_none() {
+        if let Some(iz) = meta.izleme.clone() {
+            let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+            drop_today(&mut dates);
+            values.insert(iz.clone(), Value::Array(dates));
+            changed.push(iz);
+        }
+    }
+    if !changed.is_empty() {
+        put_json(&format!("/api/profiles/{pid}/boards/{board_id}/rows/{row_id}"), json!({ "values": values, "_changed": changed }))?;
+    }
+    drop(server);
+    Ok(())
+}
+
 /// TMDB'de bulunan içerik (Argus'ta olmayabilir)
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -992,6 +1089,41 @@ pub fn tmdb_search_blocking(query: String, lang: String) -> Result<Vec<TmdbHit>,
         }
     }
     Ok(hits)
+}
+
+/// Filmin jenerik arası / sonrası sahnesi var mı (TMDB anahtar kelimeleri). Film başına bir kez sorulur.
+#[derive(Serialize, Clone, Copy, Default)]
+pub struct Stingers {
+    during: bool,
+    after: bool,
+}
+
+static STINGERS: Mutex<Option<std::collections::HashMap<u64, Stingers>>> = Mutex::new(None);
+
+#[tauri::command]
+pub async fn argus_stingers(movie_id: u64) -> Option<Stingers> {
+    if let Some(s) = STINGERS.lock().unwrap().as_ref().and_then(|m| m.get(&movie_id).copied()) {
+        return Some(s);
+    }
+    let found = tauri::async_runtime::spawn_blocking(move || {
+        let dir = argus_dir()?;
+        let pid = CACHE.lock().unwrap().as_ref().map(|c| c.snap.profile_id.clone())?;
+        let key = tmdb_key(&dir, &pid)?;
+        let v = ureq::get(&format!("https://api.themoviedb.org/3/movie/{movie_id}/keywords"))
+            .query("api_key", &key)
+            .timeout(Duration::from_secs(8))
+            .call()
+            .ok()?
+            .into_json::<Value>()
+            .ok()?;
+        let names: Vec<&str> = v.get("keywords")?.as_array()?.iter().filter_map(|k| k.get("name")?.as_str()).collect();
+        Some(Stingers { during: names.contains(&"duringcreditsstinger"), after: names.contains(&"aftercreditsstinger") })
+    })
+    .await
+    .ok()
+    .flatten()?;
+    STINGERS.lock().unwrap().get_or_insert_with(Default::default).insert(movie_id, found);
+    Some(found)
 }
 
 /// TMDB'deki içeriği Argus'a ekler (Argus'un kendi "TMDB'den ekle"si — afiş, bölümler vb. Argus doldurur).

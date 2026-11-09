@@ -436,6 +436,10 @@ export interface Settings extends NativeSettings {
   argusDetect: boolean;
   /** İzlerken Hum: Argus'taki dizi/film çalarken içindeki şarkıları bulup Argus'a yaz */
   humWatch: boolean;
+  /** İzlerken Hum şarkı bulunca tam ekranda sol altta kısa bir bildirim */
+  humToast: boolean;
+  /** Filmde jenerik arası/sonrası sahne varsa jenerik gelince haber ver */
+  argusStinger: boolean;
   /** Parola kilidi: kalkan yalnızca parolayla kalkar */
   lockEnabled: boolean;
   /** Parolanın tuzlu SHA-256 özeti ("tuz:özet"); parolanın kendisi saklanmaz */
@@ -629,6 +633,8 @@ export const DEFAULT_SETTINGS: Settings = {
   argusNews: true,
   argusDetect: true,
   humWatch: false,
+  humToast: true,
+  argusStinger: true,
   outings: true,
   collapsedInfo: true,
   capsule: {

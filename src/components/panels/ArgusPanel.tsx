@@ -18,13 +18,15 @@ import {
   answerSuggestion,
   addFresh,
   skipFresh,
+  undoWritten,
+  saveRating,
 } from "../../lib/argus";
 import { sendChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
 import { dayKey, useNook } from "../../store/nook";
 import { ACCENT, EmptyState, Segmented, tintBg, tintText } from "../ui/primitives";
 import { ARGUS_CYAN, ARGUS_DEEP, ARGUS_GRADIENT, ArgusPromo } from "../ArgusPromo";
-import { tt } from "../../lib/i18n";
+import { dec, tt } from "../../lib/i18n";
 
 /** Argus'un kendi renkleri (uygulamadaki camgöbeği → mavi) */
 const COLOR = ARGUS_CYAN;
@@ -78,6 +80,8 @@ export function ArgusPanel() {
         </button>
       </div>
       <SuggestionBanner />
+      <WrittenBanner />
+      <RateBanner />
       <FreshBanner />
       <div ref={scroller} className={`min-h-0 flex-1 ${view === "watching" && !focused ? "" : "-mr-1.5 overflow-y-auto pr-1.5"}`}>
         <AnimatePresence mode="wait" initial={false}>
@@ -184,6 +188,101 @@ function SuggestionBanner() {
         </button>
       </div>
       <StatusChoice item={item} ep={ep} />
+    </motion.div>
+  );
+}
+
+/** "Demir Adam bugüne yazıldı · Geri al" — 15 dk izlenince Nook kendisi yazdı */
+function WrittenBanner() {
+  const w = useArgus((s) => s.written);
+  useArgus((s) => s.snap);
+  const item = w ? findItem(w.sug.itemId) : null;
+  if (!w || !item || w.day !== dayKey()) return null;
+  const ep = w.sug.season && w.sug.episode ? { season: w.sug.season, episode: w.sug.episode } : null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-2 rounded-[12px] border px-2 py-1.5"
+      style={{ background: tintBg(COLOR, 10), borderColor: tintBg(COLOR, 30) }}
+    >
+      <Poster item={item} w={18} h={26} />
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="truncate text-[11.5px] font-medium" style={{ color: tintText(COLOR) }}>
+          {item.title}
+          {ep ? ` ${epLabel(ep)}` : ""} {tt("bugüne yazıldı")}
+        </p>
+        <p className="truncate text-[10px] text-label-3">{w.status ? tt("{0} · 15 dk'yı geçtin", w.status) : tt("15 dk'yı geçtin")}</p>
+      </div>
+      <motion.button
+        whileTap={{ scale: 0.92 }}
+        transition={spring.pop}
+        onClick={() => void undoWritten()}
+        className="flex h-6 shrink-0 items-center rounded-full border px-2 text-[10.5px] font-medium"
+        style={{ background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }}
+      >
+        {tt("Geri al")}
+      </motion.button>
+      <button onClick={() => useArgus.setState({ written: null })} title={tt("Kapat")} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+        <X size={12} />
+      </button>
+    </motion.div>
+  );
+}
+
+/** Film bitti: Argus'taki puan kriterleriyle puan (varsa eski puan dolu gelir; tek puan, üstüne yazılır) */
+function RateBanner() {
+  const id = useArgus((s) => s.rate);
+  const crit = useArgus((s) => s.snap?.rating);
+  const item = id ? findItem(id) : null;
+  const rows: [string, string][] = crit?.length ? crit : [["_genel", tt("Puan")]];
+  const [vals, setVals] = useState<Record<string, number>>({});
+  useEffect(() => setVals(Object.fromEntries(rows.map(([k]) => [k, item?.scores?.[k] ?? 8]))), [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!id || !item || !crit) return null;
+  const avg = rows.reduce((a, [k]) => a + (vals[k] ?? 8), 0) / rows.length;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-[12px] border px-2 py-1.5"
+      style={{ background: tintBg(COLOR, 10), borderColor: tintBg(COLOR, 30) }}
+    >
+      <div className="flex items-center gap-2">
+        <Poster item={item} w={18} h={26} />
+        <p className="min-w-0 flex-1 truncate text-[11.5px] font-medium" style={{ color: tintText(COLOR) }}>
+          {tt("{0} nasıldı?", item.title)} <span className="text-label-3">★ {dec(avg)}</span>
+        </p>
+        <motion.button
+          whileTap={{ scale: 0.92 }}
+          transition={spring.pop}
+          onClick={() => void saveRating(item.id, vals)}
+          className="flex h-6 shrink-0 items-center rounded-full border px-2 text-[10.5px] font-medium"
+          style={{ background: tintBg(COLOR, 16), borderColor: tintBg(COLOR, 40), color: tintText(COLOR) }}
+        >
+          {tt("Kaydet")}
+        </motion.button>
+        <button onClick={() => useArgus.setState({ rate: null })} title={tt("Sonra")} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+          <X size={12} />
+        </button>
+      </div>
+      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
+        {rows.map(([k, name]) => (
+          <label key={k} className="flex items-center gap-1.5 text-[10px] text-label-2">
+            <span className="w-[74px] shrink-0 truncate">{name}</span>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              step={0.5}
+              value={vals[k] ?? 8}
+              onChange={(e) => setVals((v) => ({ ...v, [k]: Number(e.target.value) }))}
+              className="h-1 min-w-0 flex-1"
+              style={{ accentColor: COLOR }}
+            />
+            <span className="w-[22px] shrink-0 text-right tabular-nums text-label">{dec(vals[k] ?? 8)}</span>
+          </label>
+        ))}
+      </div>
     </motion.div>
   );
 }

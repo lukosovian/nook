@@ -573,12 +573,25 @@ export function ArgusSection() {
       </Row>
       {s.argusDetect && (
         <>
+          <Row label={tt("Jenerik sonrası sahne varsa haber ver")}>
+            <Toggle on={s.argusStinger} onChange={(v) => update({ argusStinger: v })} color={ACCENT.orange} />
+          </Row>
           <Row label={tt("İzlerken içindeki müzikleri bul (Hum)")}>
             <Toggle on={s.humWatch} onChange={(v) => update({ humWatch: v })} color={ACCENT.purple} />
           </Row>
           <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
             {tt("Argus'taki bir dizi ya da film çalarken Hum arkada dinler; çalan şarkıyı hangi dakikada çaldığıyla Argus'taki detay penceresinin Müzikler bölümüne yazar.")}
           </p>
+          {s.humWatch && (
+            <>
+              <Row label={tt("Bulunan şarkıyı sol altta göster")}>
+                <Toggle on={s.humToast} onChange={(v) => update({ humToast: v })} color={ACCENT.purple} />
+              </Row>
+              <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+                {tt("Film ya da dizi izlerken bulunan şarkı videonun ekranının sol altında birkaç saniye görünür; Argus'a hangi dakikayla eklendiği de yazar.")}
+              </p>
+            </>
+          )}
         </>
       )}
       <Row label={tt("Klasör")}>

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { argusAddSong, EVENTS, inTauri, isPrimary, subscribe } from "../lib/bridge";
-import { findItem, useArgus, EXTRA } from "../lib/argus";
+import { argusAddSong, EVENTS, inTauri, isPrimary, songToast, subscribe } from "../lib/bridge";
+import { epLabel, findItem, useArgus, EXTRA } from "../lib/argus";
 import { DJ_MOVES, humCancel, humListen, humWatching, type HumTrack } from "../lib/hum";
 import { tt } from "../lib/i18n";
 import { useNook } from "../store/nook";
@@ -50,7 +50,7 @@ export function useHum() {
     const offToggle = subscribe(EVENTS.humToggle, () => void toggleHum());
     const offFound = subscribe<{ track: HumTrack; auto: boolean; agoMs?: number | null; phone?: boolean }>(EVENTS.humFound, ({ track, auto, agoMs, phone }) => {
       useNook.getState().addHum({ ...track, auto, phone });
-      if (agoMs != null) void toArgus(track, agoMs);
+      if (agoMs != null) void toArgus(track, agoMs).then((at) => fullscreenToast(track, at));
     });
     return () => {
       offToggle();
@@ -83,27 +83,28 @@ let oldArgusWarned = false;
  * yazar. `agoMs`: tanınan sesin başı kaç ms önceydi. Oynatıcı konum vermiyorsa (bazı siteler) dakika,
  * Nook'un saydığı izleme süresinden tahmin edilir.
  */
-async function toArgus(track: HumTrack, agoMs: number) {
+async function toArgus(track: HumTrack, agoMs: number): Promise<{ show: string; atMs: number } | null> {
   const s = useNook.getState();
   const live = useArgus.getState().live;
   const item = findItem(live?.itemId);
-  if (!s.settings.humWatch || !live || !item) return;
+  if (!s.settings.humWatch || !live || !item) return null;
   const m = s.media;
   const mediaText = `${m?.title ?? ""} ${m?.artist ?? ""}`;
   // Başlıkta sahne, kesit, klip, derleme vb. varsa şarkıyı Argus bölümüne ekleme
-  if (EXTRA.test(mediaText)) return;
+  if (EXTRA.test(mediaText)) return null;
   const ep = live.season && live.episode ? { season: live.season, episode: live.episode } : null;
   // Dizilerde kesin sezon/bölüm numarası olmadan şarkı rastgele bölüme (1. bölüme) eklenmesin
-  if (item.series && !ep) return;
+  if (item.series && !ep) return null;
   const timeline = !!m && m.durationMs > 0 && m.positionMs > 0;
   const pos = timeline ? m.positionMs + (m.playing ? performance.now() - m.at : 0) : live.playedMs;
   const atMs = Math.max(0, Math.round(pos - agoMs));
   try {
     // İzlerken kart çıkmaz (bölüm boyunca art arda gelip rahatsız ediyordu); şarkı sessizce Müzikler'e yazılır
     await argusAddSong(item.id, ep?.season ?? null, ep?.episode ?? null, atMs, !timeline, track);
+    return { show: ep ? `${item.title} ${epLabel(ep)}` : item.title, atMs };
   } catch (e) {
     const old = String(e) === "old";
-    if (old && oldArgusWarned) return;
+    if (old && oldArgusWarned) return null;
     oldArgusWarned ||= old;
     s.pushToast({
       kind: "argus",
@@ -111,5 +112,21 @@ async function toArgus(track: HumTrack, agoMs: number) {
       detail: old ? tt("Argus'u güncelle: Müzikler listesi yeni sürümde") : String(e),
       ms: 6000,
     });
+    return null;
   }
+}
+
+/** İzlerken bulunan şarkı videonun ekranının sol altında kısa bir çubukla görünür */
+function fullscreenToast(track: HumTrack, at: { show: string; atMs: number } | null) {
+  const s = useNook.getState();
+  // Hangi ekranda çıkacağına Rust bakar (tam ekran video, yoksa öndeki pencere)
+  if (!s.settings.humToast) return;
+  void songToast({
+    id: Date.now(),
+    title: track.title,
+    artist: track.artist,
+    cover: track.cover ?? null,
+    show: at?.show ?? null,
+    minute: at ? Math.floor(at.atMs / 60_000) : null,
+  }).catch(() => {});
 }

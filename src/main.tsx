@@ -41,6 +41,12 @@ async function boot() {
   } else if (windowLabel === "argus-card") {
     const { ArgusCard } = await import("./components/ArgusCard");
     view = <ArgusCard />;
+  } else if (preview === "songtoast") {
+    const { SongToast } = await import("./components/SongToast");
+    view = <SongToast initial={{ id: 1, title: "Back In Black", artist: "AC/DC", cover: null, show: "Iron Man", minute: 34 }} />;
+  } else if (windowLabel === "song-toast") {
+    const { SongToast } = await import("./components/SongToast");
+    view = <SongToast />;
   } else if (preview === "soundcard") {
     const { SoundCard } = await import("./components/SoundCard");
     view = <SoundCard initial={{ visible: true, detached: false, right: new URLSearchParams(location.search).has("right") }} />;

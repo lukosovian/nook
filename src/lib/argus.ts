@@ -13,7 +13,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { playAntic } from "../hooks/useAntics";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import { emitTo, listen } from "@tauri-apps/api/event";
-import { argusCard, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, argusTmdbAdd, argusTmdbSearch, inTauri, isPrimary } from "./bridge";
+import { argusCard, argusRate, argusUnmark, argusStingers, songToast, argusCheckDir, argusInstall, argusMark, argusOpen, argusSnapshot, argusTmdbAdd, argusTmdbSearch, inTauri, isPrimary } from "./bridge";
 import type { IslandMode } from "./layout";
 import { ISLAND_TOP, SIDE_CARD_H, sizeFor } from "./layout";
 import { cardHit } from "./soundCard";
@@ -38,6 +38,8 @@ export interface ArgusItem {
   release: string | null;
   runtime: number | null;
   score: number | null;
+  /** Kriter kimliği → puan (kriter yoksa "_genel") */
+  scores?: Record<string, number>;
   poster: string | null;
   recent: number | null;
   watchDates: string[];
@@ -68,6 +70,8 @@ export interface ArgusSnapshot {
   episodeDays: Record<string, number>;
   /** Durum seçenekleri, Argus'taki sırayla */
   statuses: string[];
+  /** Puan kriterleri [kimlik, ad]; boşsa tek genel puan; Puan sütunu yoksa null */
+  rating?: [string, string][] | null;
 }
 
 export interface ArgusSuggestion {
@@ -84,6 +88,10 @@ interface ArgusState {
   busy: string | null;
   /** "Bitti mi? İşaretleyeyim mi?" teklifi */
   suggestion: ArgusSuggestion | null;
+  /** Nook'un 15 dk izlenince kendiliğinden bugüne yazdığı (panelde "Geri al") */
+  written: ArgusWritten | null;
+  /** Film sonuna kadar izlendi: puan sorulan kayıt */
+  rate: string | null;
   /** Aramadan seçilen kayıt — panelde ayrıntısı açılır */
   focusId: string | null;
   /** Şu an çalan ve Argus'la eşleşen şey: bugün ne kadar izlendi */
@@ -109,7 +117,84 @@ export interface ArgusLive extends ArgusSuggestion {
   needMs: number;
 }
 
-export const useArgus = create<ArgusState>(() => ({ snap: null, busy: null, suggestion: null, focusId: null, live: null, fresh: null }));
+/** Kendiliğinden yazılan kayıt: geri almak için önceki durum da tutulur */
+export interface ArgusWritten {
+  sug: ArgusSuggestion;
+  day: string;
+  /** Yazılan durum (etiket); bölümde null */
+  status: string | null;
+  /** Yazmadan önceki durum: geri alınca buna döner */
+  prev: string | null;
+}
+
+export const useArgus = create<ArgusState>(() => ({ snap: null, busy: null, suggestion: null, written: null, rate: null, focusId: null, live: null, fresh: null }));
+
+const sameLabel = (a: string | null | undefined, b: string) => !!a && a.toLocaleLowerCase("tr") === b.toLocaleLowerCase("tr");
+
+/**
+ * Kullanıcının kuralı: bir içerik bir günde 15 dk izlendiyse o güne izlendi yazılır — sormadan.
+ * Film sonuna kadar izlendiyse İzlendi; yarıda kaldıysa İzleniyor (daha önce İzlendi ise tekrar izleme,
+ * durum korunur). Bölümde durumu Argus kendisi yönetir. Ertesi gün yine 15 dk izlenirse o güne de yazılır.
+ */
+async function autoWrite(sug: ArgusSuggestion, ended: boolean) {
+  const item = findItem(sug.itemId);
+  if (!item) return;
+  const ep = sug.season && sug.episode ? { season: sug.season, episode: sug.episode } : null;
+  const prev = item.status ?? null;
+  const statuses = useArgus.getState().snap?.statuses ?? [];
+  const watched = statuses.find((x) => sameLabel(x, "İzlendi")) ?? null;
+  const watching = statuses.find((x) => sameLabel(x, "İzleniyor")) ?? null;
+  const status = ep ? null : ended || (watched && sameLabel(prev, watched)) ? (watched ?? prev) : (watching ?? prev);
+  const day = dayKey();
+  const s = useNook.getState();
+  try {
+    await argusMark(item.id, day, ep?.season, ep?.episode, status ?? undefined);
+    useArgus.setState({ written: { sug, day, status, prev } });
+    s.pushToast({
+      kind: "argus",
+      title: tt("{0}{1} bugüne yazıldı", item.title, ep ? ` ${epLabel(ep)}` : ""),
+      detail: `${status ? `${status} · ` : ""}${tt("Geri almak için üstüme gel")}`,
+      ms: 7000,
+    });
+    s.setPendingTab("argus");
+    playAntic("nod");
+  } catch (e) {
+    s.pushToast({ kind: "argus", title: tt("Argus'a yazılamadı"), detail: String(e), ms: 6000 });
+  } finally {
+    await refreshArgus();
+  }
+}
+
+/** Puan kartındaki "Kaydet" */
+export async function saveRating(itemId: string, scores: Record<string, number>) {
+  useArgus.setState({ rate: null });
+  const s = useNook.getState();
+  try {
+    await argusRate(itemId, scores);
+    s.pushToast({ kind: "argus", title: tt("Puan yazıldı"), detail: findItem(itemId)?.title ?? "", ms: 3500 });
+    playAntic("love");
+  } catch (e) {
+    s.pushToast({ kind: "argus", title: tt("Puan yazılamadı"), detail: String(e), ms: 6000 });
+  } finally {
+    await refreshArgus();
+  }
+}
+
+/** Kendiliğinden yazılanı geri al */
+export async function undoWritten() {
+  const w = useArgus.getState().written;
+  if (!w) return;
+  useArgus.setState({ written: null });
+  const s = useNook.getState();
+  try {
+    await argusUnmark(w.sug.itemId, w.day, w.sug.season ?? undefined, w.sug.episode ?? undefined, w.status !== w.prev ? (w.prev ?? undefined) : undefined);
+    s.pushToast({ kind: "argus", title: tt("Geri alındı"), detail: findItem(w.sug.itemId)?.title ?? "", ms: 3500 });
+  } catch (e) {
+    s.pushToast({ kind: "argus", title: tt("Geri alınamadı"), detail: String(e), ms: 6000 });
+  } finally {
+    await refreshArgus();
+  }
+}
 
 const REFRESH_MS = 60_000;
 const NEWS_KEY = "nook-argus-news";
@@ -599,8 +684,6 @@ const IDLE_END_MS = 8000;
 const PLAYED_KEY = "nook-argus-played";
 /** `asked`: cevaplanan (işaretlenen ya da "hayır" denen) — bir daha sorulmaz. `lastAsk`: son soruda izlenen süre */
 type PlayedStore = { day: string; ms: Record<string, number>; asked: string[]; lastAsk?: Record<string, number> };
-/** Soru cevapsız kaldıysa: bu kadar daha izleyip durdurunca yeniden sor */
-const REASK_AFTER_MS = 2 * 60_000;
 
 function loadPlayed(): PlayedStore {
   try {
@@ -610,7 +693,7 @@ function loadPlayed(): PlayedStore {
   } catch {
     /* bozuksa sıfırdan */
   }
-  return { day: dayKey(), ms: {}, asked: [] };
+  return { day: dayKey(), ms: {}, asked: [], lastAsk: {} };
 }
 
 function savePlayed(p: PlayedStore) {
@@ -661,7 +744,17 @@ export function useArgusDetect() {
   useEffect(() => {
     if (!isPrimary || !inTauri) return;
     let store = currentPlayed();
-    let cur: { key: string; sug: ArgusSuggestion; duration: number; idleSince: number | null } | null = null;
+    let cur: {
+      key: string;
+      sug: ArgusSuggestion;
+      duration: number;
+      idleSince: number | null;
+      /** Jenerik arası/sonrası sahne (TMDB); bilinmiyorsa null */
+      sting: { during: boolean; after: boolean } | null;
+      stingWarned: boolean;
+      /** Sonuna kadar izlendi (jeneriğe/sona geldi) */
+      ended: boolean;
+    } | null = null;
     let lastText = "";
     let lastSnap: ArgusSnapshot | null = null;
     let lastMatch: MediaMatch = { sug: null, fresh: null };
@@ -673,33 +766,31 @@ export function useArgusDetect() {
       const c = cur;
       cur = null;
       useArgus.setState({ live: null });
-      if (c) ask(c);
+      if (!c) return;
+      ask(c);
+      // Film sonuna kadar izlendi: puan sor (tekrar izlemede de — eski puan dolu gelir, istersen değiştirirsin)
+      const rk = `rate:${c.key}`;
+      if (c.ended && !c.sug.season && useArgus.getState().snap?.rating && !store.asked.includes(rk)) {
+        store.asked.push(rk);
+        savePlayed(store);
+        const item = findItem(c.sug.itemId);
+        useArgus.setState({ rate: c.sug.itemId });
+        const s = useNook.getState();
+        s.pushToast({ kind: "argus", title: tt("{0} nasıldı?", item?.title ?? ""), detail: tt("Puan vermek için üstüme gel"), ms: 9000 });
+        s.setPendingTab("argus");
+      }
     };
 
-    /**
-     * Süre dolduysa Argus'a yazmayı önerir. Cevaplandıysa bir daha sormaz; cevapsız kaldıysa
-     * izlemeye devam edilip yeniden durdurulunca tekrar sorar.
-     */
+    /** Bugün 15 dk izlendiyse Argus'a bugünün tarihiyle kendiliğinden yazar (günde bir kez) */
     const ask = (c: NonNullable<typeof cur>) => {
       if (store.asked.includes(c.key)) return;
-      const prev = store.lastAsk?.[c.key];
-      if (prev !== undefined && played(c.key) - prev < REASK_AFTER_MS) return;
       const item = findItem(c.sug.itemId);
       if (!item || played(c.key) < needFor(c.duration)) return;
-      // Bu bölümü bugün Argus'ta zaten işaretlemiş — sormaya gerek yok
-      if (c.sug.season && item.series?.seenToday.includes(`${c.sug.season}-${c.sug.episode}`)) return;
-      store.lastAsk = { ...store.lastAsk, [c.key]: played(c.key) };
+      store.asked.push(c.key);
       savePlayed(store);
-      useArgus.setState({ suggestion: c.sug });
-      const s = useNook.getState();
-      s.pushToast({
-        kind: "argus",
-        title: tt("{0}{1} bitti mi?", item.title, c.sug.season ? ` ${epLabel(c.sug as { season: number; episode: number })}` : ""),
-        detail: tt("{0} dk izledin · Üstüme gel, Argus'a işaretleyeyim", Math.round(played(c.key) / 60_000)),
-        ms: 9000,
-      });
-      s.setPendingTab("argus");
-      playAntic("surprised");
+      // Bu bölümü bugün Argus'ta zaten işaretlemiş
+      if (c.sug.season && item.series?.seenToday.includes(`${c.sug.season}-${c.sug.episode}`)) return;
+      void autoWrite(c.sug, c.ended);
     };
 
     /** Argus'ta olmayan şey birkaç dakika izlenince bir kez "ekleyeyim mi?" */
@@ -739,6 +830,25 @@ export function useArgusDetect() {
       });
     };
 
+    /** Jenerik geldi ve sonrasında sahne var: kapatma de (tam ekranda sol altta, değilse adada) */
+    const warnSting = (c: NonNullable<typeof cur>) => {
+      c.stingWarned = true;
+      const item = findItem(c.sug.itemId);
+      const st = c.sting;
+      if (!item || !st) return;
+      const detail =
+        st.during && st.after
+          ? tt("Biri jenerik arasında, biri en sonda · kapatma")
+          : st.during
+            ? tt("Jenerik arasında bir sahne var · kapatma")
+            : tt("Jeneriğin en sonunda bir sahne var · sonuna kadar bekle");
+      const title = st.during && st.after ? tt("Jenerik sonrası 2 sahne var") : tt("Jenerik sonrası sahne var");
+      const s = useNook.getState();
+      // Videonun ekranının sol altında çıkar (tam ekran şart değil)
+      void songToast({ id: Date.now(), title: item.title, artist: title, cover: posterSrc(item), show: null, minute: null, line: detail, ms: 15_000 }).catch(() => {});
+      if (!s.fullscreen) playAntic("surprised");
+    };
+
     const t = window.setInterval(() => {
       const now = Date.now();
       const step = Math.min(Math.max(0, now - lastTick), MAX_STEP_MS);
@@ -772,7 +882,16 @@ ${m.artist}`;
         const key = sugKey(sug);
         if (cur?.key !== key) {
           finish();
-          cur = { key, sug, duration: m.durationMs || 0, idleSince: null };
+          cur = { key, sug, duration: m.durationMs || 0, idleSince: null, sting: null, stingWarned: false, ended: false };
+          const movie = findItem(sug.itemId)?.tmdb?.match(/^movie:(\d+)$/);
+          if (movie && s.settings.argusStinger) {
+            const c = cur;
+            void argusStingers(Number(movie[1]))
+              .then((r) => {
+                if (r && (r.during || r.after)) c.sting = r;
+              })
+              .catch(() => {});
+          }
           // Argus'a eklenmeden önce izlenen süre yeni kayda geçer
           const tmdb = findItem(sug.itemId)?.tmdb;
           if (tmdb && store.ms[`tmdb:${tmdb}`]) {
@@ -786,8 +905,13 @@ ${m.artist}`;
         if (m.durationMs) cur.duration = m.durationMs;
         useArgus.setState({ live: { ...sug, playedMs: played(key), needMs: needFor(cur.duration) } });
         const pos = m.positionMs + (performance.now() - m.at);
-        // Jenerik: %93'e gelince bitti say
-        if (cur.duration && pos >= cur.duration * 0.93) finish();
+        // Jenerik: %93'e gelince bitti say. Jenerik arası/sonrası sahnesi olan filmde jenerik gelince
+        // "kapatma" denir ve film sonuna kadar (ya da durdurulana kadar) bitmiş sayılmaz.
+        // Uzun filmlerde jenerik son ~9 dk (Iron Man'de 11 dk erken kalıp final sahnesine denk geldi)
+        const credits = cur.duration > 60 * 60_000 ? Math.min(cur.duration * 0.95, cur.duration - 9 * 60_000) : cur.duration * 0.93;
+        if (cur.sting && !cur.stingWarned && cur.duration && pos >= credits) warnSting(cur);
+        if (cur.duration && pos >= cur.duration * 0.9) cur.ended = true;
+        if (cur.duration && pos >= cur.duration * (cur.sting ? 0.995 : 0.93)) finish();
       } else if (cur) {
         cur.idleSince ??= Date.now();
         if (!m || Date.now() - cur.idleSince > IDLE_END_MS) finish();

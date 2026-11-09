@@ -46,7 +46,7 @@ const NOT_GAMES: &[&str] = &[
 ];
 
 /// Hep en üstte durması gereken pencereler (etiket önekleri).
-const ON_TOP: &[&str] = &[crate::window::ISLAND, crate::argus::CARD, crate::argus::SOUND, crate::buddy::PERCH, crate::shield::PREFIX];
+const ON_TOP: &[&str] = &[crate::window::ISLAND, crate::argus::CARD, crate::argus::SOUND, crate::song_toast::LABEL, crate::buddy::PERCH, crate::shield::PREFIX];
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -336,6 +336,17 @@ fn webview_visible(app: &AppHandle, label: &str, on: bool) {
     }
     #[cfg(not(windows))]
     let _ = (app, label, on);
+}
+
+/// Öndeki pencerenin (oynatan tarayıcı) ekranı: sol, üst, sağ, alt (fiziksel px)
+pub fn foreground_screen(shared: &Shared) -> Option<(i32, i32, i32, i32)> {
+    imp::foreground_monitor(shared)
+}
+
+/// Pencereyi odak almadan en öne al (tam ekran şarkı bildirimi)
+#[cfg(windows)]
+pub fn raise_window(hwnd: isize) {
+    imp::raise(hwnd);
 }
 
 /// Pencerenin sahibi sürecin exe yolu (Odak bekçisi için)

@@ -633,6 +633,11 @@ export const argusSnapshot = (profile: string, today: string, dir: string) =>
 export const argusCheckDir = (dir: string) => invoke<string | null>("argus_check_dir", { dir });
 export const argusMark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
   invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode, status });
+/** Nook'un kendiliğinden yazdığını geri al: bugünün tarihi silinir, `status` verilirse durum ona döner */
+export const argusUnmark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
+  invoke<void>("argus_unmark", { rowId, today, season, episode, status });
+/** Argus'taki puanı yaz (kriter kimliği → 0–10; kriter yoksa "_genel") */
+export const argusRate = (rowId: string, scores: Record<string, number>) => invoke<void>("argus_rate", { rowId, scores });
 /** İzlerken Hum'un bulduğu şarkıyı Argus'taki içeriğin Müzikler listesine yazar */
 export const argusTmdbSearch = (query: string, lang: string) =>
   inTauri ? invoke<import("./argus").ArgusFresh[]>("argus_tmdb_search", { query, lang }) : Promise.resolve([] as import("./argus").ArgusFresh[]);
@@ -645,6 +650,22 @@ export interface CardPlace {
   x: number;
   right: boolean;
 }
+/** Tam ekranda sol alttaki şarkı bildirimi */
+export interface SongToastData {
+  id: number;
+  title: string;
+  artist: string;
+  cover: string | null;
+  /** Argus'a yazıldığı içerik ve dakika */
+  show: string | null;
+  minute: number | null;
+  /** Varsa alt satırda bu yazar (jenerik sonrası sahne uyarısı) */
+  line?: string;
+  /** Ekranda kalma süresi (varsayılan 6,5 sn) */
+  ms?: number;
+}
+export const songToast = (data: SongToastData) => invoke<void>("song_toast", { data });
+export const argusStingers = (movieId: number) => invoke<{ during: boolean; after: boolean } | null>("argus_stingers", { movieId });
 export const argusCard = (show: boolean, x: number, y: number, leftEnd: number) => invoke<CardPlace>("argus_card", { show, x, y, leftEnd });
 export const argusInstall = () => invoke<void>("argus_install");
 export const argusOpen = () => (inTauri ? invoke<boolean>("argus_open") : Promise.resolve(false));
