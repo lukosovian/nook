@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type ComponentType, type CSSProperties } from "react";
 import { motion } from "motion/react";
 import { normalizeColor, normalizeLook, type Look } from "../../lib/look";
 import { ANCHORS, EYE_SCALE_GLASSES, eyeGap, hasWebGL, hidesEyes, lensOn, SPAN, useBodyImageQueued } from "../../lib/nook3d";
@@ -22,6 +22,7 @@ export function NookFigure({
   smile = false,
   res,
   alive = false,
+  Body,
 }: {
   look: Look;
   color: string;
@@ -36,6 +37,8 @@ export function NookFigure({
   res?: number;
   /** Canlı dursun: ara sıra göz kırpar ve yana bakınır (kalkan sahneleri) */
   alive?: boolean;
+  /** Gövde resmini kendisi çizen bileşen (kalkan sahnesi gövdeyi sahnenin malzemesiyle boyar); `px` resmin kenarı */
+  Body?: ComponentType<{ src: string; px: number }>;
 }) {
   const img = useBodyImageQueued(look, color, res ?? figureRes(size));
   const [eyeL, eyeR, shineL, shineR] = eyesFor(expression, look.eyes);
@@ -52,7 +55,7 @@ export function NookFigure({
     <span className={`${/\b(absolute|fixed)\b/.test(className) ? "" : "relative "}inline-block shrink-0 ${className}`} style={{ width: size, height: size, ...style }}>
       {img ? (
         <span className="nook-fade absolute" style={{ width: span, height: span, left: (size - span) / 2, top: (size - span) / 2 }}>
-          <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />
+          {Body ? <Body src={img} px={span} /> : <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} />}
           {!hidesEyes(look) && (
             <motion.span
               className="absolute inset-0"
@@ -104,7 +107,8 @@ export function NookFigure({
             />
           )}
         </span>
-      ) : !hasWebGL() ? (
+      ) : alive || !hasWebGL() ? (
+        // Sahnedeki Nook'un 3B gövdesi hazırlanırken de düz küre durur: eller ve eşyalar gövdesiz kalmasın
         <FlatNook size={size} color={color} />
       ) : null}
     </span>

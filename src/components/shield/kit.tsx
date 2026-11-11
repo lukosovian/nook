@@ -8,12 +8,13 @@
  *  - Karakterler kendiliğinden değişmez: sahnenin bir olayı (iksir dökülür, deney patlar…) olunca
  *    o olayın Nook'u başka bir gövdeye/renge dönüşür (Actor `morph`, useBeat `n`).
  */
-import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useReducer, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
 import type { Look } from "../../lib/look";
 import { BODY_COLORS, DEFAULT_LOOK, EYE_STYLES, SHAPES, TEXTURES } from "../../lib/look";
 import type { Expression } from "../../store/nook";
 import { NookFigure } from "../mascot/Figure";
+import { castPool } from "../../lib/nook3d";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Medium, StyleDefs, StyleFilters } from "./styles";
 import { ClockStyle } from "./clocks";
@@ -27,11 +28,19 @@ export const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 
-/** Rastgele bir Nook: gövde, doku, gözler, renk (şapka, gözlük gibi rol eşyaları ayrı kalır) */
+/**
+ * Rastgele bir Nook: gövde, doku, gözler, renk (şapka, gözlük gibi rol eşyaları ayrı kalır). Kalkan her
+ * açıldığında bir gövde ailesi ve bir doku ailesi seçilir; oyuncular (dönüşenler de) o ailelerden gelir.
+ */
+const POOL = castPool();
+const CAST_SHAPES = SHAPES.filter((s) => POOL.shapes.includes(s.id));
+// Dokular sakin: düz vinil ya da peluş. Desenli/parlak dokular (ekose, galaksi, krom…) boyanmış arka
+// planın üstünde yapıştırma gibi duruyordu; sahnenin malzemesini gövdeye CastBody verir.
+const CAST_TEXTURES = TEXTURES.filter((t) => t.id === "smooth" || t.id === "plush");
 function randomBody() {
   return {
-    shape: pick(SHAPES).id,
-    texture: pick(TEXTURES).id,
+    shape: pick(CAST_SHAPES.length ? CAST_SHAPES : SHAPES).id,
+    texture: pick(CAST_TEXTURES.length ? CAST_TEXTURES : TEXTURES).id,
     eyes: pick(EYE_STYLES).id,
     color: pick(BODY_COLORS),
   };
@@ -42,8 +51,9 @@ function randomBody() {
  * olayında, olayın can alıcı anına denk gelsin diye `delay` ms sonra) başka bir Nook'a dönüşür.
  * Rol (eşyalar, hareketler) aynı kalır.
  */
-function useCastBody(morph: number | undefined, delay: number) {
-  const [body, setBody] = useState(randomBody);
+function useCastBody(morph: number | undefined, delay: number, color?: string) {
+  // İlk renk rolün tasarımdaki rengi (sahnenin paletine göre seçilmiş, arka plandan ayrışır); dönüşünce rastgele
+  const [body, setBody] = useState(() => ({ ...randomBody(), ...(color ? { color } : null) }));
   useEffect(() => {
     if (!morph) return;
     const t = window.setTimeout(() => setBody(randomBody()), delay);
@@ -258,6 +268,78 @@ export function Painted({ children, filter, pixel, look, seed }: { children: Rea
   return url ? <img src={url} alt="" draggable={false} className="pointer-events-none absolute left-0 top-0 select-none" style={{ width: W, height: H, imageRendering: pixel ? "pixelated" : undefined }} /> : null;
 }
 
+// ------------------------------------------------------------------ sahnenin malzemesiyle boyanan gövde
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((ok, fail) => {
+    const im = new Image();
+    im.onload = () => ok(im);
+    im.onerror = fail;
+    im.src = src;
+  });
+
+let filtersMarkup = "";
+/** Gövde resmini sahnenin tarz süzgecinden bir kez geçirip yeni bir resim üretir (çalışma anında süzgeç yok) */
+async function paintBody(src: string, filter: string, px: number): Promise<string> {
+  filtersMarkup ||= renderToStaticMarkup(
+    <svg>
+      <StyleFilters />
+    </svg>,
+  ).replace(/^<svg>/, "").replace(/<\/svg>$/, "");
+  const n = Math.min(640, Math.round(px * 2.5));
+  const flat = document.createElement("canvas");
+  flat.width = flat.height = n;
+  flat.getContext("2d")!.drawImage(await loadImage(src), 0, 0, n, n);
+  // Süzgeç ölçüleri sahne biriminde kalsın diye viewBox gövdenin sahnedeki boyu
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${n}" height="${n}" viewBox="0 0 ${px} ${px}">${filtersMarkup}<image href="${flat.toDataURL("image/png")}" width="${px}" height="${px}" filter="url(#${filter})"/></svg>`;
+  const blob = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  try {
+    const out = document.createElement("canvas");
+    out.width = out.height = n;
+    out.getContext("2d")!.drawImage(await loadImage(blob), 0, 0, n, n);
+    return await new Promise<string>((ok, fail) => out.toBlob((b) => (b ? ok(URL.createObjectURL(b)) : fail(new Error("boş"))), "image/png"));
+  } finally {
+    URL.revokeObjectURL(blob);
+  }
+}
+
+const skins = new Map<string, string>();
+
+/**
+ * Sahnedeki Nook'un gövdesi: sahnenin sanat tarzıyla (hamur, suluboya, keçe…) boyanmış resim. Arka plan
+ * elle boyanmış gibi dururken parlak 3B gövdeler üstüne yapıştırılmış görünüyordu; artık aynı malzemeden.
+ * Tarzı olmayan sahnede gövde olduğu gibi çizilir.
+ */
+function CastBody({ src, px }: { src: string; px: number }) {
+  const filter = useContext(ClockStyle);
+  const key = `${filter}|${Math.round(px)}|${src}`;
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!filter || skins.has(key)) return;
+    let alive = true;
+    baking++;
+    const done = () => void (baking = Math.max(0, baking - 1));
+    paintBody(src, filter, px).then(
+      (url) => {
+        skins.set(key, url);
+        done();
+        if (alive) bump();
+      },
+      () => {
+        // Boyanamadıysa gövde olduğu gibi kalsın
+        skins.set(key, src);
+        done();
+        if (alive) bump();
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const url = filter ? skins.get(key) : src;
+  return url ? <img src={url} alt="" draggable={false} className="absolute inset-0 h-full w-full" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }} /> : null;
+}
+
 /** Beyaz yüzen el (yüz biriminde) */
 export function Hand({ x, y, r = 2.7 }: { x: number; y: number; r?: number }) {
   return <ellipse cx={x} cy={y} rx={r * 1.12} ry={r} fill="url(#nk-hand)" style={{ filter: "drop-shadow(0 0.4px 0.6px rgba(0,0,0,0.45))" }} />;
@@ -272,6 +354,7 @@ export function Actor({
   y,
   size,
   look: lk,
+  color,
   expression = "idle",
   flip = false,
   front,
@@ -289,7 +372,7 @@ export function Actor({
   y: number;
   size: number;
   look: Look;
-  /** Rolün tasarımdaki rengi (oyuncu değiştikçe rastgele renk gelir) */
+  /** Rolün tasarımdaki rengi (oyuncu dönüşünce rastgele renk gelir) */
   color?: string;
   expression?: Expression;
   flip?: boolean;
@@ -308,12 +391,14 @@ export function Actor({
   shadow?: boolean;
 }) {
   // Rol aynı, oyuncu değişir: gövde/doku/göz/renk rastgele, aksesuarlar sahnenin
-  const body = useCastBody(morph, morphDelay);
+  const body = useCastBody(morph, morphDelay, color);
   const cast: Look = { ...lk, shape: body.shape, texture: body.texture, eyes: body.eyes };
   const id = `${body.shape}-${body.texture}-${body.eyes}-${body.color}`;
   const box = { left: -size / 2, top: -size / 2, width: size * 2, height: size * 2 };
+  // Eldeki eşyalar ve eller de sahnenin malzemesinden (gövdeyle aynı tarz süzgeci)
+  const art = useContext(ClockStyle);
   const svg = (children: ReactNode) => (
-    <svg viewBox="-12 -12 48 48" className="pointer-events-none absolute overflow-visible" style={box}>
+    <svg viewBox="-12 -12 48 48" className="pointer-events-none absolute overflow-visible" style={{ ...box, filter: art ? `url(#${art})` : undefined }}>
       {children}
     </svg>
   );
@@ -339,7 +424,7 @@ export function Actor({
                 exit={{ scale: 0.2, opacity: 0, rotate: 25, transition: { duration: 0.25 } }}
                 transition={{ type: "spring", stiffness: 320, damping: 16 }}
               >
-                <NookFigure look={cast} color={body.color} size={size} expression={expression} alive />
+                <NookFigure look={cast} color={body.color} size={size} expression={expression} alive Body={CastBody} />
               </motion.div>
             </AnimatePresence>
             <Poof k={id} />

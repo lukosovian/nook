@@ -1109,7 +1109,7 @@ pub(crate) fn qr_svg(data: &str) -> Option<String> {
     Some(code.render::<svg::Color>().min_dimensions(180, 180).quiet_zone(true).dark_color(svg::Color("#000")).light_color(svg::Color("#fff")).build())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remote_info() -> Info {
     let cfg = load();
     let hosts = net::addresses();

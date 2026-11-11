@@ -100,7 +100,7 @@ pub struct FileMeta {
 /// Bırakılan yolları doğrular, meta verisini döner ve görselleri asset protokolüne
 /// (küçük önizleme için) tek tek açar. Kapsam varsayılan olarak boştur — yalnızca
 /// kullanıcının Nook'a bıraktığı görseller okunabilir.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn inspect_paths(app: AppHandle, paths: Vec<String>) -> Vec<FileMeta> {
     let scope = app.asset_protocol_scope();
     paths

@@ -11,6 +11,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 const POLL: Duration = Duration::from_millis(700);
+/// İnen bir şey yokken klasöre bu aralıkla bakılır
+const IDLE_POLL: Duration = Duration::from_secs(2);
 const TEMP_EXTS: &[&str] = &["crdownload", "part", "opdownload", "partial", "download"];
 /// Bitmiş dosyanın "yeni" sayılması için en fazla bu kadar eski olması gerekir.
 const FRESH: Duration = Duration::from_secs(60);
@@ -45,8 +47,9 @@ fn display_name(p: &Path) -> String {
     }
 }
 
+/// Dosya türü dizin kaydından okunur: binlerce dosyalı klasörde her dosya için ayrıca diske sorulmaz
 fn list(dir: &Path) -> Vec<PathBuf> {
-    std::fs::read_dir(dir).map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.is_file()).collect()).unwrap_or_default()
+    std::fs::read_dir(dir).map(|rd| rd.flatten().filter(|e| e.file_type().is_ok_and(|t| t.is_file())).map(|e| e.path()).collect()).unwrap_or_default()
 }
 
 fn is_fresh(p: &Path) -> bool {
@@ -69,7 +72,7 @@ pub fn spawn(app: AppHandle) {
             let mut last: Vec<Active> = Vec::new();
 
             loop {
-                thread::sleep(POLL);
+                thread::sleep(if last.is_empty() && pending.is_empty() { IDLE_POLL } else { POLL });
                 let files = list(&dir);
                 let now = Instant::now();
 
@@ -114,7 +117,8 @@ pub fn spawn(app: AppHandle) {
                     }
                     true
                 });
-                seen.retain(|p| p.exists());
+                let present: HashSet<&PathBuf> = files.iter().collect();
+                seen.retain(|p| present.contains(p));
             }
         })
         .expect("downloads thread başlatılamadı");

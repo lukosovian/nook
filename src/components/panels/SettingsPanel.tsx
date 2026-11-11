@@ -13,7 +13,7 @@ import { startTour } from "../../lib/tour";
 import { openStudio, isStudio, studioGo } from "../../lib/studio";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
 import { chooseArgusDir, openArgus, useArgus } from "../../lib/argus";
-import { SULK_BELOW, useNook, type Settings } from "../../store/nook";
+import { SULK_BELOW, useNook, type Settings, FEATURED_SCENES } from "../../store/nook";
 import { latestNote, NOTES } from "../../lib/notes";
 import { normalizeColor, normalizeLook } from "../../lib/look";
 import { NookFigure } from "../mascot/Figure";
@@ -106,7 +106,7 @@ export type CatId = "general" | "island" | "notify" | "health" | "game" | "priva
 
 /** Ayarların kategorileri: önce ızgara, birine basınca kendi sayfası. `sections`: içindeki bölüm başlıkları (atlama için) */
 export const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; color: string; sections: string[] }[] = [
-  { id: "general", title: tt("Genel"), hint: tt("Dil, görünüm, ekran, boyut"), icon: Settings2, color: ACCENT.blue, sections: ["Nook", tt("Ekran"), tt("Erişilebilirlik")] },
+  { id: "general", title: tt("Genel"), hint: tt("Dil, görünüm, ekran, boyut"), icon: Settings2, color: ACCENT.blue, sections: ["Nook", tt("Ekran"), tt("Erişilebilirlik"), tt("Performans")] },
   { id: "island", title: tt("Ada ve Nook"), hint: tt("Uyku, gezinti, animasyonlar"), icon: Sparkles, color: ACCENT.pink, sections: [tt("Ada"), tt("Animasyonlar")] },
   { id: "notify", title: tt("Bildirimler"), hint: tt("Bildirim kartları, uyarılar"), icon: Bell, color: ACCENT.purple, sections: [tt("Bildirimler")] },
   { id: "health", title: tt("Sağlık"), hint: tt("Su, göz molası, odak bekçisi"), icon: HeartPulse, color: ACCENT.teal, sections: [tt("Mola hatırlatıcıları"), tt("Odak bekçisi")] },
@@ -235,6 +235,20 @@ export function CategoryBody({ id }: { id: CatId }) {
               <Dropdown options={VISION} value={s.colorVision} onChange={(v) => update({ colorVision: v })} />
             </Row>
             <PalettePreview />
+          </Section>
+          <Section title={tt("Performans")}>
+            <Row label={tt("Hafif kip")} hint={tt("Zayıf bilgisayarlar için: animasyonlar 30 karede, hava efektleri ve gezintiler kapalı")}>
+              <Toggle on={s.lightMode} onChange={(v) => update({ lightMode: v })} color={ACCENT.green} />
+            </Row>
+            <Row label={tt("\"Hey Nook\" dinlemesi")} hint={tt("Sürekli mikrofonu dinler; kapalıyken işlemci kullanmaz")}>
+              <Toggle on={s.wakeWord} onChange={(v) => update({ wakeWord: v })} color={ACCENT.teal} />
+            </Row>
+            <Row label={tt("Bildirim kartları")} hint={tt("Windows bildirimlerini okuyup adada gösterir")}>
+              <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} color={ACCENT.purple} />
+            </Row>
+            <Row label={tt("Ara sıra dışarı çıksın")} hint={tt("Pencereye tüner, iple sarkar, balık tutar")}>
+              <Toggle on={s.outings} onChange={(v) => update({ outings: v })} />
+            </Row>
           </Section>
         </>
       );
@@ -1893,7 +1907,10 @@ function ShieldSection() {
         <div className="py-2">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-[11px] text-label-2">{all ? tt("Hepsi geliyor") : tt("{0} sahne seçili", String(on.length))}</span>
-            <TextButton disabled={all} onClick={() => update({ shieldScenes: [], shieldSceneNext: 0 })}>{tt("Hepsini seç")}</TextButton>
+            <span className="flex gap-1.5">
+              <TextButton onClick={() => update({ shieldScenes: FEATURED_SCENES, shieldSceneNext: 0 })}>{tt("Öne çıkanlar")}</TextButton>
+              <TextButton disabled={all} onClick={() => update({ shieldScenes: [], shieldSceneNext: 0 })}>{tt("Hepsini seç")}</TextButton>
+            </span>
           </div>
           <div className="flex flex-wrap gap-1">
             {SCENE_LIST.map((sc) => {

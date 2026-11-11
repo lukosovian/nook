@@ -62,6 +62,9 @@ import {
 import { usePhoneSync } from "./hooks/usePhoneSync";
 import { useDiary } from "./lib/diary";
 import { useAutomations } from "./lib/automations";
+import { FREEZE_EVENT } from "./lib/log";
+import { useNook } from "./store/nook";
+import { tt } from "./lib/i18n";
 
 export default function App() {
   useSettingsSync();
@@ -119,6 +122,7 @@ export default function App() {
   usePlayOffers();
   useDailySummaryOpen();
   useChipPrefetch();
+  useFreezeCard();
   useUpdateCheck();
   useArgusFeed();
   useArgusDetect();
@@ -126,6 +130,32 @@ export default function App() {
   useFocusGuard();
 
   return <Island />;
+}
+
+/** Ada takılıp geri gelince, günde en çok bir kez: dokununca geribildirim bölümü açılır (günlük eklenebilir) */
+function useFreezeCard() {
+  useEffect(() => {
+    if (!isPrimary) return;
+    const KEY = "nook-freeze-card";
+    const on = (e: Event) => {
+      const day = new Date().toDateString();
+      try {
+        if (localStorage.getItem(KEY) === day) return;
+        localStorage.setItem(KEY, day);
+      } catch {
+        return;
+      }
+      useNook.getState().pushToast({
+        kind: "alert",
+        title: tt("Az önce {0} saniye takıldım", (e as CustomEvent<number>).detail),
+        detail: tt("Dokun: günlükle birlikte geribildirim gönder"),
+        studio: "settings:Geribildirim",
+        ms: 9000,
+      });
+    };
+    window.addEventListener(FREEZE_EVENT, on);
+    return () => window.removeEventListener(FREEZE_EVENT, on);
+  }, []);
 }
 
 /** Ana sayfa çiplerinin Nook'ları açılıştan biraz sonra arka planda çizilir — ada açılınca hazır olsunlar */

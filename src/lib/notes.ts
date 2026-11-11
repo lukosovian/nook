@@ -268,7 +268,13 @@ export type DemoId =
   | "notifysecs"
   | "gameclick"
   | "shieldscenes"
-  | "shieldart";
+  | "shieldart"
+  | "wakerest"
+  | "scenecast"
+  | "lightstart"
+  | "lightmode"
+  | "freezecard"
+  | "lowmem";
 
 export interface NoteItem {
   title: string;
@@ -287,6 +293,43 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.10",
+    date: tt("11 Kasım 2026"),
+    headline: tt("Daha hafif Nook: oyunda dinlenen \"Hey Nook\", kalkanda sahneyle bütünleşen Nook'lar, hafifleyen açılış"),
+    items: [
+      {
+        title: tt("\"Hey Nook\" oyunda dinlenir"),
+        text: tt("Tam ekran oyundayken \"Hey Nook\" dinlemesi durur, oyundan çıkınca kendiliğinden sürer; oyun sırasında işlemci oyuna kalır. Masaüstünde de daha az yer kaplar: seslenmeye benzeyen sesleri doğrularken en çok dört çekirdek kullanır, arkada televizyon ya da sohbet varken doğrulamaları seyrekleştirir."),
+        demo: "wakerest",
+      },
+      {
+        title: tt("Kalkanda sahneyle bütünleşen Nook'lar"),
+        text: tt("Nook'lar artık sahnenin malzemesinden: hamur sahnede hamur, suluboyada suluboya, keçede keçe gibi boyanır ve sahnenin kendi renklerini giyer; arka planın üstüne yapıştırılmış gibi durmazlar. Sahne açıldığında herkes hemen yerindedir, eller ve eşyalar gövdesiz görünmez; gövdeler çok daha çabuk ve hep birlikte gelir. Kalkanı her açtığında gövdeler değişir. Kalkan artık en özenli 17 sahneyle açılır; öbürleri Ayarlar › Gizlilik'te duruyor, istediğini açabilirsin."),
+        demo: "scenecast",
+      },
+      {
+        title: tt("Daha hafif açılış ve arka plan"),
+        text: tt("Nook açılırken kendi görünümünü yeniden hazırlamaz, kayıtlı resmini kullanır; ilk kurulumda ana sayfanın ve tanıtımın Nook'ları da hazır gelir. İndirilenler klasörüne inen bir şey yokken daha seyrek bakar ve kalabalık klasörlerde diski yormaz. Ayar sayfalarının bilgi toplaması arka planda yapılır; dosya ya da uygulama açarken de ada ve pencereler akıcı kalır. Sesli komut modeli bir süre kullanılmayınca bellekten çıkar."),
+        demo: "lightstart",
+      },
+      {
+        title: tt("Hafif kip ve Performans ayarları"),
+        text: tt("Ayarlar › Genel'de yeni Performans bölümü var. Hafif kip zayıf bilgisayarlar için: animasyonlar 30 karede çizilir, hava efektleri ve Nook'un gezintileri kapanır. Aynı yerde arka planda en çok iş yapan özellikleri (\"Hey Nook\" dinlemesi, bildirim kartları, gezintiler) tek tek kapatabilirsin."),
+        demo: "lightmode",
+      },
+      {
+        title: tt("Daha az bellek"),
+        text: tt("Ada tam ekran oyunda gizliyken ve sen bilgisayarın başında değilken Nook tuttuğu belleğin çoğunu Windows'a geri verir; dönünce kaldığı yerden sürer. Sesli komut modeli artık açılışta değil ilk dinlemede belleğe alınır, kayıtlı Nook resimleri de yalnızca gerektiğinde okunur."),
+        demo: "lowmem",
+      },
+      {
+        title: tt("Takılınca sana sorar"),
+        text: tt("Ada birkaç saniye yanıt vermezse, kendine gelince küçük bir kart çıkarır. Karta dokununca Studio'da Geribildirim açılır; günlük kayıtlarını ekleyip gönderirsen neyin takıldığı görülebilir. Günde en çok bir kez sorar."),
+        demo: "freezecard",
+      },
+    ],
+  },
   {
     version: "0.3.8",
     date: tt("5 Kasım 2026"),

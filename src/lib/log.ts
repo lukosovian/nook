@@ -21,6 +21,9 @@ function safe(v: unknown) {
 
 export const note = (...args: unknown[]) => send("info", args);
 
+/** Sayfa takılıp yeniden yanıt verdi (detail: kaç saniye) */
+export const FREEZE_EVENT = "nook-freeze";
+
 export function installLogging() {
   if (!inTauri) return;
   const warn = console.warn.bind(console);
@@ -51,6 +54,10 @@ function watchFreezes() {
     const now = performance.now();
     const gap = (now - last) / 1000;
     last = now;
-    if (gap > 5 && gap < 120 && document.visibilityState === "visible") send("warn", [`DONMA: arayüz (${windowLabel}) ${Math.round(gap)} sn takıldı`]);
+    if (gap > 5 && gap < 120 && document.visibilityState === "visible") {
+      send("warn", [`DONMA: arayüz (${windowLabel}) ${Math.round(gap)} sn takıldı`]);
+      // Ada, geribildirim kartını bununla çıkarır (bkz. App useFreezeCard)
+      window.dispatchEvent(new CustomEvent(FREEZE_EVENT, { detail: Math.round(gap) }));
+    }
   }, 1000);
 }

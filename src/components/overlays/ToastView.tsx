@@ -46,6 +46,7 @@ import {
 import { phoneCallAction, setInteractive, type SysEventKind } from "../../lib/bridge";
 import { isLive, useNook } from "../../store/nook";
 import { tt } from "../../lib/i18n";
+import { openStudio } from "../../lib/studio";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { CLAUDE_COLOR } from "../../lib/claude";
 import { replyToNotification, useWhatsApp, WA_COLOR } from "../../lib/whatsapp";
@@ -153,7 +154,7 @@ export function ToastView() {
   };
 
   // Yalnızca bildirimler tıklanınca bir yere gider; sistem kartlarının (şarj, USB…) tıklanacak yeri yok
-  const clickable = isWa || (toast?.kind === "notify" && !call);
+  const clickable = isWa || (toast?.kind === "notify" && !call) || !!toast?.studio;
   // Üstüne gelinince ada büyür (Island.tsx toastOpenHeight): metin kırpılmadan alt satırlara geçer
   const open = hovered && !!toast && (toast.kind === "notify" || !!toast.replyKey || !!toast.whatsappChat);
 
@@ -164,6 +165,11 @@ export function ToastView() {
       return;
     }
     if (!clickable) return;
+    if (toast?.studio) {
+      useNook.getState().shiftToast();
+      openStudio(toast.studio);
+      return;
+    }
     const s = useNook.getState();
     s.noteModuleUse("notify");
     s.setTab("notify");

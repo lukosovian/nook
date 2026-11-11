@@ -56,7 +56,7 @@ pub async fn disk_eject(root: String) -> Result<(), String> {
 }
 
 /// Bu bilgisayarın yerel ağdaki IPv4 adresi (dışarıya paket gönderilmez: UDP "bağlantısı" yalnızca yol seçer)
-#[tauri::command]
+#[tauri::command(async)]
 pub fn local_ip() -> Option<String> {
     let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     sock.connect("1.1.1.1:80").ok()?;

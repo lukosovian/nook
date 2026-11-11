@@ -22,17 +22,17 @@ function ClockCard({ x, y, w = 360, h = 190, t, rotate = 0 }: { x: number; y: nu
         className="absolute inset-0 flex flex-col items-center justify-center gap-1.5"
         style={{ background: t.bg, color: t.fg, borderRadius: t.radius ?? 18, boxShadow: t.shadow ?? `0 12px 28px -10px rgba(0,0,0,0.6), inset 0 0 0 5px ${t.edge}`, fontFamily: t.font, ...t.extra }}
       >
-        <span className="text-[68px] font-black leading-none tabular-nums">{c.time}</span>
-        <span className="flex items-center gap-2 text-[17px] font-semibold capitalize" style={{ color: t.sub }}>
+        <span className="text-[62px] font-black leading-none tabular-nums">{c.time}</span>
+        {/* Tarih ve hava ayrı satırlarda: tek satıra sığmayınca yazılar iki sütuna kırılıyordu */}
+        <span className="whitespace-nowrap text-[17px] font-semibold capitalize" style={{ color: t.sub }}>
           {c.date}
-          {c.wx && (
-            <>
-              <span className="opacity-50">·</span>
-              <c.wx.Icon size={17} strokeWidth={2.4} />
-              {c.wx.temp} {c.wx.label}
-            </>
-          )}
         </span>
+        {c.wx && (
+          <span className="flex items-center gap-2 whitespace-nowrap text-[16px] font-semibold capitalize" style={{ color: t.sub }}>
+            <c.wx.Icon size={17} strokeWidth={2.4} />
+            {c.wx.temp} {c.wx.label}
+          </span>
+        )}
       </div>
     </At>
   );

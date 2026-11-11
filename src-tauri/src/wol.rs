@@ -335,7 +335,7 @@ pub fn run_elevated(args: &str) -> Result<(), String> {
 #[cfg(windows)]
 pub use imp::fix_elevated;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn wol_status() -> WolStatus {
     #[cfg(windows)]
     return imp::status();

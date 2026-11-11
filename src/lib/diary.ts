@@ -166,20 +166,24 @@ const yesterdayKey = () => {
 export function useDiary() {
   useEffect(() => {
     if (!isPrimary) return;
+    // Yazılamadıysa (kota doldu, bağlantı yok) bir saat sonra yeniden denenir
+    let retryAt = 0;
     const check = async () => {
       const s = useNook.getState();
-      if (!s.settings.diary || !s.settings.geminiKey.trim()) return;
+      if (!s.settings.diary || !s.settings.geminiKey.trim() || Date.now() < retryAt) return;
       const now = new Date();
       const today = dayKey();
       const y = yesterdayKey();
       if (!s.diary[y] && now.getHours() >= 5 && facts(y)) {
         if (await writeDiary(y)) useNook.getState().pushToast({ kind: "chat", title: tt("Dünkü günlüğümü yazdım"), detail: tt("Studio ana sayfasında ya da telefonda oku"), ms: 8000 });
+        else retryAt = Date.now() + 60 * 60_000;
         return;
       }
       const night = now.getHours() > NIGHT.h || (now.getHours() === NIGHT.h && now.getMinutes() >= NIGHT.m);
       if (night && !s.diary[today]) {
         const text = await writeDiary(today);
         if (text) useNook.getState().pushToast({ kind: "chat", title: tt("Bugünü günlüğüme yazdım"), detail: tt("Studio ana sayfasında ya da telefonda oku"), ms: 8000 });
+        else retryAt = Date.now() + 60 * 60_000;
       }
     };
     // Açılışta dünkü günlük eksikse erkenden yazılsın (Studio ve telefon)

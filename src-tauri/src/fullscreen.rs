@@ -124,6 +124,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             // Vakti gelen alarm bir kez bildirilir: gizliyken sayfanın saati yavaşlar (Chromium arka plan kısıtlaması)
             let mut rung_for: i64 = 0;
             let mut last_fg: isize = 0;
+            let mut game_low = false;
             let mut tick: u32 = 0;
             let mut last_loop = Instant::now();
             loop {
@@ -212,6 +213,13 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 };
                 *shared.game_screen.lock().unwrap() = game_mon;
                 shared.game_front.store(in_session_game, Ordering::Relaxed);
+                // Oyun öndeyken (ada 2. ekrana geçmiş olsa da) pencereler belleklerini bırakır; oyundan çıkınca normale döner
+                if in_session_game != game_low {
+                    game_low = in_session_game;
+                    for w in app.webview_windows().values() {
+                        crate::window::memory_low(w, game_low);
+                    }
+                }
 
                 video = match (game_mon, detected.as_ref()) {
                     (Some(_), _) => None,
@@ -330,6 +338,8 @@ fn webview_visible(app: &AppHandle, label: &str, on: bool) {
         let _ = w.with_webview(move |pv| unsafe {
             let _ = pv.controller().SetIsVisible(on);
         });
+        // Gizliyken belleğini de bıraksın (oyuna kalsın); görününce eski hâline döner
+        crate::window::memory_low(&w, !on);
         if on {
             crate::window::clear_background(&w);
         }

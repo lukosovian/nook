@@ -100,11 +100,15 @@ if ($Yayinla) {
   try { & "$Root\supporters.ps1" } catch { Write-Host "Destekçiler güncellenemedi: $_" -ForegroundColor Yellow }
   Say "Commit atılıyor"
   # Takip edilen dosyalar + uygulama klasörlerindeki yeni dosyalar (masaüstü çöpü gibi kökteki başıboş dosyalar girmez)
-  git add -u
-  git add -A -- src src-tauri nook.ps1 supporters.ps1 "*.cmd" mobile
-  if (Test-Path "$Root\supporters.json") { git add supporters.json }
-  git commit -m "${Version}: $Notlar"
-  if ($LASTEXITCODE -ne 0) { throw "Commit atılamadı" }
+  # git uyarıları (satır sonu vb.) stderr'e yazar; "Stop" altında PowerShell bunları hata sayıp betiği kesiyordu
+  $ErrorActionPreference = "Continue"
+  git add -u 2>&1 | Out-Null
+  git add -A -- src src-tauri nook.ps1 supporters.ps1 "*.cmd" mobile 2>&1 | Out-Null
+  if (Test-Path "$Root\supporters.json") { git add supporters.json 2>&1 | Out-Null }
+  git commit -m "${Version}: $Notlar" 2>&1 | Out-Host
+  $ok = $LASTEXITCODE -eq 0
+  $ErrorActionPreference = "Stop"
+  if (-not $ok) { throw "Commit atılamadı" }
 
   Say "GitHub'a gönderiliyor"
   & "$Root\release.ps1" -SkipBuild $Notlar

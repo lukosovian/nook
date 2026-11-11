@@ -129,6 +129,16 @@ const progKey = (look: Look) => {
   return SLOTS.map((s) => groupOf(s, ids[s])).join("");
 };
 
+/**
+ * Kalkan sahnesinin oyuncu havuzu: tek gövde grubu ve tek doku grubu. Sahnedeki bütün Nook'lar aynı
+ * programı paylaşır; her oyuncu için ayrı program derlenmez (gövdeler saniyelerce geç geliyordu).
+ */
+export function castPool(): { shapes: Look["shape"][]; textures: Look["texture"][] } {
+  const any = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
+  const names = <T extends string>(ids: Record<T, number>, group: number[]) => (Object.keys(ids) as T[]).filter((k) => group.includes(ids[k]));
+  return { shapes: names(SHAPE_ID, any(GROUPS.uShape)), textures: names(TEX_ID, any(GROUPS.uTex)) };
+}
+
 /** Programın kaynağı: anahtardaki gruplarda olmayan parçaların karşılaştırmaları false olur */
 function pruned(key: string) {
   const keep = Object.fromEntries(SLOTS.map((s, i) => [s, new Set(GROUPS[s][+key[i]])])) as Record<Slot, Set<number>>;
@@ -334,13 +344,16 @@ const TAG = (() => {
   return (h >>> 0).toString(36);
 })();
 const DISK_MAX = 800;
-/** null: daha okunuyor */
-let disk: Map<string, string> | null = null;
+/**
+ * Diskteki resimlerin anahtarları (null: daha okunuyor). Resimlerin kendisi belleğe ancak istenince
+ * alınır: hepsini açılışta okumak her pencerede onlarca MB tutuyordu.
+ */
+let disk: Set<string> | null = null;
 let db: IDBDatabase | null = null;
 
 const diskReady: Promise<void> = new Promise((resolve) => {
   const done = () => {
-    disk ??= new Map();
+    disk ??= new Set();
     resolve();
   };
   try {
@@ -350,17 +363,16 @@ const diskReady: Promise<void> = new Promise((resolve) => {
     open.onerror = done;
     open.onsuccess = () => {
       db = open.result;
-      const found = new Map<string, string>();
+      const found = new Set<string>();
       const stale: IDBValidKey[] = [];
-      const tx = db.transaction("img", "readwrite");
-      const cur = tx.objectStore("img").openCursor();
-      cur.onsuccess = () => {
-        const c = cur.result;
-        if (!c) return;
-        const k = String(c.key);
-        if (k.startsWith(TAG + "|")) found.set(k.slice(TAG.length + 1), c.value as string);
-        else stale.push(c.key);
-        c.continue();
+      const tx = db.transaction("img", "readonly");
+      const all = tx.objectStore("img").getAllKeys();
+      all.onsuccess = () => {
+        for (const key of all.result) {
+          const k = String(key);
+          if (k.startsWith(TAG + "|")) found.add(k.slice(TAG.length + 1));
+          else stale.push(key);
+        }
       };
       tx.oncomplete = () => {
         disk = found;
@@ -386,18 +398,55 @@ function save(key: string, url: string) {
       disk.delete(old);
       st.delete(`${TAG}|${old}`);
     }
-    disk.set(key, url);
+    disk.add(key);
     st.put(url, `${TAG}|${key}`);
   } catch {
     /* disk dolu ya da kapalı: yalnızca bellekte kalır */
   }
 }
 
-/** Resim bellekte ya da diskte var mı (diskteyse belleğe alınır). Paketle gelen hazır resimler de sayılır. */
+/** Resim diskte ama daha belleğe alınmadı (okunuyor): o sırada programı derlemeye gerek yok */
+const onDisk = (key: string) => !cache.has(key) && !!disk?.has(key);
+const fetching = new Map<string, Promise<void>>();
+
+/** Diskteki resmi belleğe al; gelince onu bekleyen Nook'lar yenilenir. Okunamazsa anahtar düşer (çizilir). */
+function fetchDisk(key: string): Promise<void> {
+  const busy = fetching.get(key);
+  if (busy) return busy;
+  const p = new Promise<void>((resolve) => {
+    const finish = (url?: string) => {
+      fetching.delete(key);
+      if (url) {
+        if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
+        cache.set(key, url);
+      } else disk?.delete(key);
+      for (const m of [arrivals, waiting]) {
+        const fns = m.get(key);
+        m.delete(key);
+        fns?.forEach((fn) => fn());
+      }
+      resolve();
+    };
+    try {
+      const req = db!.transaction("img", "readonly").objectStore("img").get(`${TAG}|${key}`);
+      req.onsuccess = () => finish(typeof req.result === "string" ? req.result : undefined);
+      req.onerror = () => finish();
+    } catch {
+      finish();
+    }
+  });
+  fetching.set(key, p);
+  return p;
+}
+
+/** Resim bellekte mi. Paketle gelen hazır resimler sayılır; diskteki resim okunmaya başlar (bkz. onDisk). */
 function hasImage(key: string) {
   if (cache.has(key)) return true;
-  const d = (BAKED_TAG === TAG && BAKED[key] ? `/looks/${BAKED[key]}` : undefined) ?? disk?.get(key);
-  if (!d) return false;
+  const d = BAKED_TAG === TAG && BAKED[key] ? `/looks/${BAKED[key]}` : undefined;
+  if (!d) {
+    if (onDisk(key)) void fetchDisk(key);
+    return false;
+  }
   if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
   cache.set(key, d);
   return true;
@@ -429,6 +478,7 @@ export function bodyImage(look: Look, color: string, size: number): string | nul
   const key = keyOf(look, color, size);
   // En son kullanılan sona: silinecekler hep en eskiler olsun
   if (hasImage(key)) return touch(key);
+  if (onDisk(key)) return null;
   const r = readiness(look);
   if (r === "wait") return null;
   const url = r === "ok" ? draw(ctx!, progs.get(progKey(look))!, look, color, size) : null;
@@ -472,19 +522,28 @@ function touch(key: string) {
 }
 
 /** Görünümün programı hazır olunca bileşeni yenile (resmi zaten varsa programa gerek yok) */
-function useProgramReady(look: Look, have: boolean) {
+function useProgramReady(look: Look, have: boolean, key: string) {
   const [, bump] = useReducer((n: number) => n + 1, 0);
-  const pending = !have && readiness(look) === "wait";
+  // Diskteki resimler okunmadan derlemeye başlama: açılışta resim çoğunlukla diskte hazır, yine de her
+  // açılışta program derleniyordu (saniyelerce GPU işi, zayıf ekran kartında takılma)
+  // 0: disk listesi okunuyor · 1: resim diskten geliyor · 2: diskte yok
+  const stage = have ? 2 : !disk ? 0 : onDisk(key) ? 1 : 2;
+  const loading = stage < 2;
+  useEffect(() => {
+    if (stage === 0) void diskReady.then(bump);
+    else if (stage === 1) void fetchDisk(key).then(bump);
+  }, [stage, key]);
+  const pending = !have && !loading && readiness(look) === "wait";
   const pk = progKey(look);
   useEffect(() => {
     if (pending) whenReady(pk, bump);
   }, [pending, pk]);
-  return pending ? 0 : 1;
+  return loading ? -1 : pending ? 0 : 1;
 }
 
 export function useBodyImage(look: Look, color: string, size: number) {
   const key = keyOf(look, color, size);
-  const ready = useProgramReady(look, hasImage(key));
+  const ready = useProgramReady(look, hasImage(key), key);
   // Resim başka pencereden (Studio) gelirse programın derlenmesini beklemeden göster
   const [got, bump] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
@@ -493,7 +552,7 @@ export function useBodyImage(look: Look, color: string, size: number) {
     arrivals.get(key)!.add(bump);
     return () => void arrivals.get(key)?.delete(bump);
   }, [key]);
-  return useMemo(() => bodyImage(look, color, size), [look.shape, look.texture, look.glasses, look.head, look.neck, look.face, color, size, ready, got]); // eslint-disable-line react-hooks/exhaustive-deps
+  return useMemo(() => (ready < 0 ? null : bodyImage(look, color, size)), [look.shape, look.texture, look.glasses, look.head, look.neck, look.face, color, size, ready, got]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 // ------------------------------------------------------------------ sıralı çizim
@@ -520,7 +579,11 @@ function pump() {
   // Diskte/pakette olanların hepsi tek turda: her birine ayrı tur beklemek uzun listelerde saniyeler sürüyordu
   let fromDisk = false;
   for (let k = queue.length - 1; k >= 0; k--) {
-    if (!hasImage(queue[k].key)) continue;
+    if (!hasImage(queue[k].key)) {
+      // Diskten okunuyor: sıradan çıkar, gelince bekleyenleri fetchDisk yeniler
+      if (onDisk(queue[k].key)) queue.splice(k, 1);
+      continue;
+    }
     const [job] = queue.splice(k, 1);
     waiting.get(job.key)?.forEach((fn) => fn());
     waiting.delete(job.key);

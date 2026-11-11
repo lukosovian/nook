@@ -455,3 +455,22 @@ pub fn finish_drag(app: &AppHandle, label: &str) {
         let _ = app.emit("nook://island-pos", Some(DroppedPos { fx, fy }));
     }
 }
+
+/// WebView2'ye "az bellek kullan" de (gizliyken, bilgisayar boştayken): sayfa çalışmayı sürdürür ama
+/// tuttuğu belleğin çoğunu Windows'a geri verir; `low` false olunca normale döner.
+pub fn memory_low(win: &tauri::WebviewWindow, low: bool) {
+    #[cfg(windows)]
+    {
+        let _ = win.with_webview(move |pv| unsafe {
+            use webview2_com::Microsoft::Web::WebView2::Win32::{
+                ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+            };
+            use windows_core::Interface;
+            if let Ok(wv) = pv.controller().CoreWebView2().and_then(|c| c.cast::<ICoreWebView2_19>()) {
+                let _ = wv.SetMemoryUsageTargetLevel(if low { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW } else { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL });
+            }
+        });
+    }
+    #[cfg(not(windows))]
+    let _ = (win, low);
+}

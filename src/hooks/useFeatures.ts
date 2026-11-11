@@ -8,6 +8,7 @@ import {
   EVENTS,
   isPrimary,
   onlineState,
+  sttPreload,
   subscribe,
   voiceStart,
   voiceStop,
@@ -183,6 +184,8 @@ export function useDayTracker() {
         waterMinutes += 1;
         stretchMinutes += 1;
       }
+      // Aynı dakikada iki mola denk gelirse ilki kalır; ikincisi üstüne yazıp onu yutmasın
+      let shown = !!s.reminder;
       const resting = !!s.focus && s.focus.phase !== "work";
       const quiet = s.fullscreen || !!s.ringing || resting || isQuiet(s);
 
@@ -192,7 +195,8 @@ export function useDayTracker() {
       if (s.settings.eyeBreak) {
         if (eyeMinutes >= 20) {
           eyeMinutes = 0;
-          if (!quiet && !s.reminder) {
+          if (!quiet && !shown) {
+            shown = true;
             s.setReminder({ kind: "eye", phase: "due" });
             playAntic("wink");
           }
@@ -203,9 +207,10 @@ export function useDayTracker() {
 
       // Duruş & Esneme Hatırlatması (90 dakikada bir)
       if (s.settings.stretchBreak !== false) {
-        if (stretchMinutes >= 90) {
+        if (stretchMinutes >= 90 && !shown) {
           stretchMinutes = 0;
-          if (!quiet && !s.reminder) {
+          if (!quiet) {
+            shown = true;
             s.setReminder({ kind: "stretch", phase: "due" });
             playAntic("stretch");
           }
@@ -216,8 +221,9 @@ export function useDayTracker() {
 
       // Su Hatırlatması (telefona waterInfo() ile gider; Nook Mobil kendi bildirimini çıkarır)
       if (s.settings.waterEvery > 0) {
-        if (waterMinutes >= s.settings.waterEvery && !s.reminder && !s.fullscreen && !s.ringing && !isQuiet(s)) {
+        if (waterMinutes >= s.settings.waterEvery && !shown && !s.fullscreen && !s.ringing && !isQuiet(s)) {
           waterMinutes = 0;
+          shown = true;
           s.setReminder({ kind: "water", phase: "due" });
           playAntic("surprised");
         }
@@ -231,7 +237,7 @@ export function useDayTracker() {
       for (const h of habits) {
         if (!habitOn(h)) continue;
         const elapsedMin = h.lastDoneAt ? (nowTs - h.lastDoneAt) / 60_000 : 999;
-        if (elapsedMin >= h.intervalMin && !s.reminder && !quiet) {
+        if (elapsedMin >= h.intervalMin && !shown && !quiet) {
           useHabits.getState().updateHabit(h.id, { lastDoneAt: nowTs });
           s.setReminder({ kind: "habit", phase: "due", habitId: h.id, title: h.title, icon: h.icon });
           playAntic("nod");
@@ -391,6 +397,9 @@ export function useVoiceFeed() {
         s.setPinned(false);
         s.setListening(true);
         playSfx("attention");
+        // Konuşma tanıma modeli açılışta değil, ilk dinlemede belleğe alınır (bir saniyeden kısa sürer;
+        // açılışta yüklenince hiç konuşulmasa da yüzlerce MB tutuyordu)
+        if (s.settings.localStt) void sttPreload().catch(() => {});
         // Kullanıcı konuşurken bağlantı ve model listesi hazırlansın
         const key = s.settings.geminiKey.trim();
         if (key) {

@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 const RATE: usize = 16_000;
 /// 10 ms'lik kare (hem ses etkinliği hem MFCC adımı)
@@ -266,6 +266,9 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
     let mut phase = Phase::Idle;
     let mut preroll: std::collections::VecDeque<f32> = std::collections::VecDeque::with_capacity(HOP * 25);
     let mut cooldown = Instant::now();
+    // Art arda "Nook değil" çıkan doğrulamalar
+    let mut misses = 0u32;
+    let mut last_miss = Instant::now();
     let mut peak = 0f32;
     let mut last_level = Instant::now();
 
@@ -282,9 +285,11 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
                 loaded = Instant::now();
             }
             if paused_at.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
-                let now = crate::shield::is_on(&app) || !crate::privacy::mic_apps().is_empty();
+                // Tam ekran oyunda da durur: doğrulama (Whisper) çekirdekleri kaplayıp oyunu takıltıyordu
+                let game = app.state::<Arc<crate::state::Shared>>().game_front.load(Ordering::Relaxed);
+                let now = game || crate::shield::is_on(&app) || !crate::privacy::mic_apps().is_empty();
                 if now != paused {
-                    crate::log::write("info", if now { "hey nook: görüşme ya da kalkan, dinleme durdu" } else { "hey nook: dinleme sürüyor" });
+                    crate::log::write("info", if now { "hey nook: oyun, görüşme ya da kalkan, dinleme durdu" } else { "hey nook: dinleme sürüyor" });
                 }
                 paused = now;
                 paused_at = Some(Instant::now());
@@ -354,6 +359,7 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
                     }
                     match answer.try_recv() {
                         Ok(true) => {
+                            misses = 0;
                             let _ = app.emit("nook://wake-heard", Heard { score: score.max(0.7), woke: true });
                             let target = crate::shortcut::target(&app);
                             let _ = app.emit_to(target.as_str(), "nook://voice", crate::shortcut::VoiceEvent::Start);
@@ -362,6 +368,16 @@ fn run(stop: Arc<AtomicBool>, app: AppHandle) {
                         Err(std::sync::mpsc::TryRecvError::Empty) => Phase::Verify { audio, silent, spoke, started, score, answer },
                         // "Nook" denmemiş: söz bitene kadar bekle, sonra yeniden dinle
                         _ => {
+                            // Arkada televizyon ya da sohbet varken benzer sesler art arda gelir: bir dakikada
+                            // üçüncü yanlıştan sonra doğrulamalar seyrekleşir (4, 8, 16, en çok 30 sn ara)
+                            if last_miss.elapsed() > Duration::from_secs(60) {
+                                misses = 0;
+                            }
+                            misses += 1;
+                            last_miss = Instant::now();
+                            if misses >= 3 {
+                                cooldown = Instant::now() + Duration::from_secs((4u64 << (misses - 3).min(3)).min(30));
+                            }
                             let _ = app.emit("nook://wake-heard", Heard { score: score.min(0.6), woke: false });
                             if silent >= 30 {
                                 Phase::Idle
@@ -480,7 +496,7 @@ pub fn wake_config(enabled: bool, sensitivity: f32) -> WakeStatus {
     wake_status()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn wake_status() -> WakeStatus {
     WakeStatus { trained: load().templates.len(), listening: LISTENER.lock().unwrap().is_some() }
 }
@@ -510,7 +526,7 @@ pub fn wake_enroll_reset() {
 }
 
 /// Toplanan örnekleri kaydet; birbirine yeterince benzemiyorlarsa reddet
-#[tauri::command]
+#[tauri::command(async)]
 pub fn wake_enroll_save() -> Result<WakeStatus, String> {
     let templates = std::mem::take(&mut *PENDING.lock().unwrap());
     if templates.len() < NEED {

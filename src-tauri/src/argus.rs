@@ -157,7 +157,7 @@ pub fn set_custom(dir: Option<String>) {
 }
 
 /// Seçilen klasör (ya da onun içindeki/üstündeki) Argus mu — Ayarlar'daki "Klasörü seç" için
-#[tauri::command]
+#[tauri::command(async)]
 pub fn argus_check_dir(dir: String) -> Option<String> {
     let p = PathBuf::from(dir);
     root_of(&p).or_else(|| ["Argus", "ARGUS"].iter().map(|n| p.join(n)).find(|d| is_argus(d))).map(|d| d.to_string_lossy().into_owned())
@@ -1172,7 +1172,7 @@ pub fn argus_install() -> Result<(), String> {
 }
 
 /// Argus uygulamasını açar (zaten açıksa false döner).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn argus_open() -> Result<bool, String> {
     let dir = argus_dir().ok_or("Argus bulunamadı")?;
     if server_up() {

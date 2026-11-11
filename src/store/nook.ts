@@ -414,6 +414,8 @@ export interface Settings extends NativeSettings {
   clearText: boolean;
   /** Daha az hareket: kayan, büyüyen animasyonlar ve hava efektleri durur */
   calmMotion: boolean;
+  /** Hafif kip (zayıf bilgisayar): 30 kare, hava efektleri ve gezintiler kapalı */
+  lightMode: boolean;
   /** Nook ara sıra dışarı çıksın: pencere üstüne tüner, iple sarkar, boştayken balık tutar */
   outings: boolean;
   /** Kapalı adada boştayken saat ve hava */
@@ -456,6 +458,8 @@ export interface Settings extends NativeSettings {
   shieldSceneMode: SceneMode;
   /** Karışık / sırayla modunda gelen sahneler (boşsa hepsi) */
   shieldScenes: string[];
+  /** Öne çıkan sahnelere geçiş yapıldı (eski kayıtlarda yok) */
+  shieldCurated: boolean;
   /** "Hep aynısı" modunda gelen sahne */
   shieldScene: string;
   /** Sırayla modunda sıradaki sahnenin yeri */
@@ -572,6 +576,12 @@ export interface CapsuleCfg {
   claudeAction: boolean;
 }
 
+/**
+ * Kalkanın varsayılan sahneleri: en özenli olanlar. Öbürleri Ayarlar › Gizlilik'te duruyor, isteyen açar
+ * ("Hepsini seç" = boş liste = hepsi).
+ */
+export const FEATURED_SCENES = ["campfire", "cafe", "disco", "beach", "library", "mine", "zen", "snow", "arcade", "ocean", "cinema", "lab", "bunker", "ferris", "sketch", "autumn", "cabin"];
+
 export const DEFAULT_SETTINGS: Settings = {
   autostart: true,
   monitorMode: "primary",
@@ -657,6 +667,7 @@ export const DEFAULT_SETTINGS: Settings = {
   colorVision: "normal",
   clearText: false,
   calmMotion: false,
+  lightMode: false,
   // Eski kurulumlarda Türkçe, yeni kurulumda sistemin dili (bkz. lib/i18n)
   lang: initialLang,
   homeOrder: [],
@@ -673,7 +684,8 @@ export const DEFAULT_SETTINGS: Settings = {
   shieldMuteMic: true,
   shieldMuteCalls: true,
   shieldSceneMode: "random",
-  shieldScenes: [],
+  shieldScenes: FEATURED_SCENES,
+  shieldCurated: true,
   shieldScene: "campfire",
   shieldSceneNext: 0,
   clipIgnore: ["keepass", "keepassxc", "1password", "bitwarden", "lastpass", "dashlane"],
@@ -733,6 +745,8 @@ export interface Toast extends SysEvent {
   phoneKey?: string | null;
   /** Telefonda çalan arama (açılınca ya da bitince phoneKey ile kalkar) */
   call?: PhoneCall | null;
+  /** Karta dokununca açılacak Studio bölümü ("settings:Geribildirim" gibi) */
+  studio?: string;
 }
 
 const MAX_SHELF = 24;
@@ -930,7 +944,7 @@ interface NookState {
   setStats: (stats: StatsPayload) => void;
   setDevices: (devices: DevicesPayload) => void;
   setOsd: (osd: Osd | null) => void;
-  pushToast: (event: SysEvent & { icon?: string | null; ms?: number; replyKey?: string | null; whatsappChat?: string | null; phoneKey?: string | null; call?: PhoneCall | null }) => void;
+  pushToast: (event: SysEvent & { icon?: string | null; ms?: number; replyKey?: string | null; whatsappChat?: string | null; phoneKey?: string | null; call?: PhoneCall | null; studio?: string }) => void;
   shiftToast: () => void;
   updateSettings: (patch: Partial<Settings>) => void;
   setFullscreen: (fullscreen: boolean) => void;
@@ -1496,6 +1510,8 @@ export const useNook = create<NookState>()(
         const settings = { ...DEFAULT_SETTINGS, ...p.settings };
         settings.look = { ...DEFAULT_SETTINGS.look, ...p.settings?.look };
         settings.capsule = { ...DEFAULT_SETTINGS.capsule, ...p.settings?.capsule };
+        // Kalkan eskiden 34 sahnenin hepsiyle açılıyordu: hiç seçim yapmamış kullanıcı öne çıkanlara geçer (bir kez)
+        if (p.settings && p.settings.shieldCurated === undefined && !p.settings.shieldScenes?.length) settings.shieldScenes = FEATURED_SCENES;
         // Göz ve esneme molası eskiden varsayılan açıktı: kayıtta yoksa mevcut kullanıcıda açık kalsın
         if (p.settings && p.settings.eyeBreak === undefined) settings.eyeBreak = true;
         if (p.settings && p.settings.stretchBreak === undefined) settings.stretchBreak = true;

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { pauseFrames, setFrameRate } from "../lib/frameCap";
 import {
-  applySettings, remoteProfile, wakeConfig, sttPreload,
+  applySettings, remoteProfile, wakeConfig,
   clipboardClear,
   clipboardClearIf,
   clipboardPrune,
@@ -280,7 +280,7 @@ export function useStatsFeed() {
       const st = useNook.getState();
       st.setStats(s);
       // Pilde / enerji tasarrufunda animasyonlar 30 karede
-      setFrameRate(s.saver && st.settings.powerSaver ? 30 : 60);
+      setFrameRate((s.saver && st.settings.powerSaver) || st.settings.lightMode ? 30 : 60);
       if (!isPrimary || !st.settings.sysAlerts) return;
       const now = Date.now();
       // Oyundayken yük yüksek olur — o sırada uyarma
@@ -760,11 +760,6 @@ export function useSettingsSync() {
     if (!isPrimary) return;
     void syncAutostart(settings.autostart).catch((e) => console.warn("[nook] autostart", e));
   }, [settings.autostart]);
-  // Yerel konuşma tanıma açıksa model şimdiden belleğe yüklensin (ilk komut beklemesin)
-  useEffect(() => {
-    if (!isPrimary || !settings.localStt) return;
-    void sttPreload().catch(() => {});
-  }, [settings.localStt]);
   // "Hey Nook" dinleyicisi
   useEffect(() => {
     if (!isPrimary) return;

@@ -6,22 +6,30 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 /// Dosyayı varsayılan uygulamasıyla, kısayolu (.lnk) ya da URL'yi açar.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_path(path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
-        use windows_sys::Win32::UI::Shell::ShellExecuteW;
-        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-        let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
-        let (verb, target) = (wide("open"), wide(&path));
-        let code = unsafe {
-            ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), target.as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL)
-        } as isize;
-        // ShellExecute 32'den büyük değer dönerse başarılıdır.
-        if code <= 32 {
-            return Err(format!("açılamadı ({code})"));
-        }
-        Ok(())
+        // Açma saniyeler sürebilir (antivirüs taraması, ağ yolu): kendi iş parçacığında, kabuğun
+        // istediği tek iş parçacıklı COM ile; ana iş parçacığı (pencereler, tepsi) beklemez
+        std::thread::spawn(move || {
+            use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
+            use windows_sys::Win32::UI::Shell::ShellExecuteW;
+            use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+            let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+            let (verb, target) = (wide("open"), wide(&path));
+            let code = unsafe {
+                let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+                ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), target.as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL)
+            } as isize;
+            // ShellExecute 32'den büyük değer dönerse başarılıdır.
+            if code <= 32 {
+                return Err(format!("açılamadı ({code})"));
+            }
+            Ok(())
+        })
+        .join()
+        .unwrap_or_else(|_| Err("açılamadı".into()))
     }
     #[cfg(not(windows))]
     {
@@ -31,7 +39,7 @@ pub fn open_path(path: String) -> Result<(), String> {
 }
 
 /// Dosyayı Gezgin'de seçili olarak gösterir.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn reveal_path(path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -56,7 +64,7 @@ pub struct AppEntry {
 }
 
 /// Başlat menüsündeki kısayollar (tüm kullanıcılar + bu kullanıcı). Kaldırıcılar ve belgeler elenir.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_apps() -> Vec<AppEntry> {
     let roots: Vec<PathBuf> = [std::env::var_os("ProgramData"), std::env::var_os("APPDATA")]
         .into_iter()

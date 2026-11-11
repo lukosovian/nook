@@ -23,6 +23,7 @@ export function canGoOut(kind: Outing) {
   const s = useNook.getState();
   return (
     s.settings.outings &&
+    !s.settings.lightMode &&
     !s.outing &&
     !s.fullscreen &&
     !s.intro &&

@@ -69,7 +69,7 @@ pub fn media_resync() {
     RESEND.store(true, Ordering::Relaxed);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn media_control(action: String) -> Result<(), String> {
     imp::control(&action)
 }

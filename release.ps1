@@ -53,8 +53,10 @@ $Manifest = [ordered]@{
 [IO.File]::WriteAllText("$Out\latest.json", ($Manifest | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
 
 # Kodu gonder, sonra surumu GitHub'a yukle. git'in kayitli girisi (Git Credential Manager) kullanilir, ek arac gerekmez.
-git -C $Root push origin main
+# git ilerleme satırlarını stderr'e yazar; "Stop" altında bunlar hata sayılıp betik kesiliyordu
 $ErrorActionPreference = "Continue"
+git -C $Root push origin main 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "git push basarisiz" }
 # PowerShell 5.1 git'e satirlari bozarak aktariyor; istek LF satirli bir dosyadan okutulur
 $CredFile = Join-Path $env:TEMP "nook-cred.txt"
 [IO.File]::WriteAllText($CredFile, "protocol=https`nhost=github.com`n`n")

@@ -485,7 +485,7 @@ pub struct ClaudeSetup {
     statusline: &'static str,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_setup() -> ClaudeSetup {
     let present = claude_dir().is_some_and(|d| d.is_dir());
     let Ok((_, map)) = read_settings() else {
@@ -514,7 +514,7 @@ pub fn claude_setup() -> ClaudeSetup {
 }
 
 /// Hook'ları (ve başka durum satırı yoksa plan göstergesi için durum satırını) kurar. Yedeğin yolunu döner.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_connect() -> Result<Option<String>, String> {
     let exe = exe()?;
     let (path, mut map) = read_settings()?;
@@ -540,7 +540,7 @@ pub fn claude_connect() -> Result<Option<String>, String> {
     write_settings(&path, map)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_disconnect() -> Result<Option<String>, String> {
     let (path, mut map) = read_settings()?;
     let mut changed = strip_ours(&mut map);
@@ -559,7 +559,7 @@ pub fn claude_disconnect() -> Result<Option<String>, String> {
 }
 
 /// Kendi durum satırı olan kullanıcıda plan göstergesini aç/kapat: satırı Nook'la sarar ya da eski hâline döndürür.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_status_wrap(on: bool) -> Result<Option<String>, String> {
     let exe = exe()?;
     let (path, mut map) = read_settings()?;

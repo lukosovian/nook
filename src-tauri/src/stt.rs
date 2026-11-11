@@ -20,6 +20,9 @@ const URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggm
 const MIN_BYTES: u64 = 150_000_000;
 
 static CTX: Mutex<Option<WhisperContext>> = Mutex::new(None);
+/// Modelin son kullanıldığı an; bu kadar süre kullanılmazsa bellekten çıkarılır (yüzlerce MB)
+static LAST_USE: Mutex<Option<Instant>> = Mutex::new(None);
+const UNLOAD_AFTER: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 static DOWNLOADING: AtomicBool = AtomicBool::new(false);
 /// İndirme yüzdesi × 10
 static PROGRESS: AtomicU32 = AtomicU32::new(0);
@@ -42,7 +45,7 @@ pub struct SttStatus {
     loaded: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stt_status() -> SttStatus {
     SttStatus {
         installed: installed(),
@@ -121,7 +124,7 @@ fn download(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stt_delete() -> SttStatus {
     *CTX.lock().unwrap() = None;
     if let Some(p) = model_path() {
@@ -141,6 +144,19 @@ fn load() -> Result<(), String> {
     let c = WhisperContext::new_with_params(&path, WhisperContextParameters::default()).map_err(|e| format!("model yüklenemedi: {e}"))?;
     crate::log::write("info", &format!("whisper yüklendi: {} ms", t0.elapsed().as_millis()));
     *ctx = Some(c);
+    *LAST_USE.lock().unwrap() = Some(Instant::now());
+    // Uzun süre kullanılmayınca belleği geri ver; sonraki kullanımda yeniden yüklenir
+    let _ = std::thread::Builder::new().name("nook-stt-unload".into()).spawn(|| loop {
+        std::thread::sleep(std::time::Duration::from_secs(60));
+        if LAST_USE.lock().unwrap().is_some_and(|t| t.elapsed() < UNLOAD_AFTER) {
+            continue;
+        }
+        let mut ctx = CTX.lock().unwrap();
+        if ctx.take().is_some() {
+            crate::log::write("info", "whisper bellekten çıkarıldı (kullanılmıyor)");
+        }
+        return;
+    });
     Ok(())
 }
 
@@ -161,7 +177,7 @@ fn transcribe(audio: &str, prompt: &str, lang: &str) -> Result<String, String> {
     let bytes = base64::engine::general_purpose::STANDARD.decode(audio).map_err(|e| e.to_string())?;
     let data = bytes.windows(4).position(|w| w == b"data").map(|i| i + 8).ok_or("WAV değil")?;
     let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect();
-    run(samples, prompt, lang)
+    run(samples, prompt, lang, false)
 }
 
 /// Model indirilmiş mi ("Hey Nook" doğrulaması için)
@@ -181,7 +197,7 @@ pub fn heard_nook(samples: &[f32]) -> Option<bool> {
     }
     // İpucusuz "Hey Nook" → "HENOK", "Hanyuk"; "Nook" ipucuyla doğru yazılıyor, "Hey look", "Hey Luke",
     // "Notebook" yine olduğu gibi kalıyor ("Hey Nook!" ipucu ise "Hey now"u "Hey No!" yapıyordu)
-    let text = run(samples.to_vec(), "Nook", "tr").ok()?;
+    let text = run(samples.to_vec(), "Nook", "tr", true).ok()?;
     let ok = says_nook(&text);
     // Duyulan metin günlüğe yazılmaz (toplantı konuşması diske düşmesin), yalnızca sonuç
     crate::log::write("info", &format!("hey nook doğrulama: {}", if ok { "evet" } else { "hayır" }));
@@ -202,7 +218,9 @@ fn says_nook(text: &str) -> bool {
     })
 }
 
-fn run(mut samples: Vec<f32>, prompt: &str, lang: &str) -> Result<String, String> {
+/// `light`: arka plandaki "Hey Nook" doğrulaması; günde yüzlerce kez çalışabildiği için en çok 4 çekirdek kullanır
+/// (bütün çekirdekleri kaplayınca oyun ve arayüz takılıyordu). Sesli komut bütün hızıyla çözülür.
+fn run(mut samples: Vec<f32>, prompt: &str, lang: &str, light: bool) -> Result<String, String> {
     // Whisper en az 1 sn ister
     if samples.len() < 16_000 {
         samples.resize(16_000, 0.0);
@@ -217,7 +235,7 @@ fn run(mut samples: Vec<f32>, prompt: &str, lang: &str) -> Result<String, String
     // Whisper'ın bildiği dillerden biri (Nook'un dilleri hepsi öyle); değilse Türkçe
     p.set_language(Some(if lang.len() == 2 { lang } else { "tr" }));
     // Fiziksel çekirdek kadar (SMT iş parçacıkları ggml'de hızlandırmıyor)
-    p.set_n_threads((std::thread::available_parallelism().map_or(4, |n| n.get()) / 2).clamp(2, 8) as i32);
+    p.set_n_threads((std::thread::available_parallelism().map_or(4, |n| n.get()) / 2).clamp(2, if light { 4 } else { 8 }) as i32);
     p.set_translate(false);
     p.set_no_context(true);
     p.set_single_segment(true);
@@ -236,6 +254,7 @@ fn run(mut samples: Vec<f32>, prompt: &str, lang: &str) -> Result<String, String
         p.set_initial_prompt(prompt);
     }
     let t0 = Instant::now();
+    *LAST_USE.lock().unwrap() = Some(t0);
     state.full(p, &samples).map_err(|e| e.to_string())?;
     let text: String = state.as_iter().filter_map(|s| s.to_str_lossy().ok().map(|t| t.into_owned())).collect::<Vec<_>>().join(" ");
     crate::log::write("info", &format!("whisper: {:.1} sn ses, {} ms", secs, t0.elapsed().as_millis()));
@@ -274,7 +293,7 @@ mod tests {
             let ms = t0.elapsed().as_millis();
             let mut out = Vec::new();
             for prompt in ["Nook"] {
-                let text = super::run(samples.clone(), prompt, "tr").unwrap_or_default();
+                let text = super::run(samples.clone(), prompt, "tr", false).unwrap_or_default();
                 out.push(format!("[{}] {text:?}", if super::says_nook(&text) { "+" } else { "-" }));
             }
             println!("{} → {ok:?} ({ms} ms) {}", f.file_name().unwrap().to_string_lossy(), out.join("  "));

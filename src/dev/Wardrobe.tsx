@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { NookFigure } from "../components/mascot/Figure";
-import { CHIP_NOOKS, COLLECTION, DEFAULT_LOOK, EYE_STYLES, FACES, GLASSES, HEADS, NECKS, SHAPES, TEXTURES, type Look } from "../lib/look";
+import { CHIP_NOOKS, COLLECTION, DEFAULT_LOOK, SHOWCASE, TOUR_CHIPS, EYE_STYLES, FACES, GLASSES, HEADS, NECKS, SHAPES, TEXTURES, type Look } from "../lib/look";
 import { __bake, __programOf } from "../lib/nook3d";
 import { figureRes } from "../components/mascot/Figure";
 
@@ -86,8 +86,18 @@ function Bake() {
     const res = figureRes(31);
     const seen = new Set<string>();
     const list: { key: string; url: string; tag: string }[] = [];
-    for (const o of COLLECTION) {
-      const r = __bake!(o.look, o.color, res);
+    // Koleksiyon + ana sayfa çipleri + varsayılan büyük Nook + tanıtım turu: ilk açılışta hiçbiri için program derlenmesin
+    const jobs = [
+      ...COLLECTION.map((o) => ({ look: o.look, color: o.color, res })),
+      ...Object.values(CHIP_NOOKS).map((c) => ({ look: c.look, color: c.color, res: figureRes(22) })),
+      { look: DEFAULT_LOOK, color: "#F4F4F6", res: 512 },
+      // İlk açılıştaki tanıtım turu
+      { look: DEFAULT_LOOK, color: "#F4F4F6", res: figureRes(20) },
+      ...SHOWCASE.map((m) => ({ look: m.look, color: m.color, res: figureRes(m.size) })),
+      ...TOUR_CHIPS.map((c) => ({ look: c.look, color: c.body, res: figureRes(20) })),
+    ];
+    for (const o of jobs) {
+      const r = __bake!(o.look, o.color, o.res);
       if (r && !seen.has(r.key)) {
         seen.add(r.key);
         list.push(r);

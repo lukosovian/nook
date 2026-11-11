@@ -361,7 +361,7 @@ pub fn uninstall_cleanup() {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn outside_status() -> OutsideStatus {
     #[cfg(windows)]
     {

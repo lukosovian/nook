@@ -133,7 +133,7 @@ pub fn clipboard_clear(app: AppHandle) -> bool {
 }
 
 /// Geçmişteki görseli yeniden panoya koy
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clipboard_write_image(app: AppHandle, path: String) -> Result<(), String> {
     let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
     let mut dec = png::Decoder::new(std::io::BufReader::new(file));
@@ -158,7 +158,7 @@ pub fn clipboard_write_files(paths: Vec<String>) -> Result<(), String> {
 }
 
 /// Artık geçmişte olmayan görsel dosyalarını sil
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clipboard_prune(app: AppHandle, keep: Vec<String>) {
     let Some(dir) = clips_dir(&app) else { return };
     let Ok(rd) = std::fs::read_dir(&dir) else { return };

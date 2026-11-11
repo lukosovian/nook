@@ -272,6 +272,10 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         if now != asleep {
                             asleep = now;
                             let _ = app.emit("nook://idle", asleep);
+                            // Bilgisayar başında kimse yokken pencereler belleklerini bıraksın
+                            for w in app.webview_windows().values() {
+                                window::memory_low(w, asleep);
+                            }
                         }
                     }
                 }

@@ -154,7 +154,7 @@ pub fn log_dir() -> String {
 }
 
 /// Geribildirim formuna eklemek için son günlük satırlarını okur (varsayılan son 25 satır), en yeni günden geriye
-#[tauri::command]
+#[tauri::command(async)]
 pub fn recent_logs(max: Option<usize>) -> Vec<String> {
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let limit = max.unwrap_or(25).clamp(1, 100);
