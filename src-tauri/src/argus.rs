@@ -891,9 +891,10 @@ pub struct MarkResult {
 
 /// Bir bölümü (season/episode) ya da filmi (ikisi de yoksa) bugün izlendi olarak işaretler.
 #[tauri::command]
-/// `replace`: yarım kalan filmin önceki günü — devam edilince o izleme bugüne uzatılır (aralık; tekrar izleme sayılmaz).
-pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, replace: Option<String>) -> Result<MarkResult, String> {
-    tauri::async_runtime::spawn_blocking(move || mark_blocking_with(row_id, season, episode, status, today, replace))
+/// Filmde `start`: yarım kalan izlemenin Argus'a en son yazılan günü — o izleme bugüne uzatılır
+/// (başlangıç–bitiş aralığı, tekrar izleme sayılmaz).
+pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, start: Option<String>) -> Result<MarkResult, String> {
+    tauri::async_runtime::spawn_blocking(move || mark_blocking_with(row_id, season, episode, status, today, start))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -912,7 +913,7 @@ fn start_of(d: &Value) -> Option<&str> {
     d.as_str().map(|d| d.split('/').next().unwrap_or(d))
 }
 
-fn mark_blocking_with(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, replace: Option<String>) -> Result<MarkResult, String> {
+fn mark_blocking_with(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, start: Option<String>) -> Result<MarkResult, String> {
     let dir = argus_dir().ok_or("Argus bulunamadı")?;
     let (pid, board_id, meta) = {
         let c = CACHE.lock().unwrap();
@@ -967,17 +968,20 @@ fn mark_blocking_with(row_id: String, season: Option<u32>, episode: Option<u32>,
                 // İzlediği gün izleme tarihine yazılır (tekrar izlemede yeni tarih eklenir)
                 if let Some(iz) = meta.izleme.clone() {
                     let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
-                    // Yarım kalanın devamı: aynı izleme başlangıç–bitiş aralığı olur ("2026-11-09/2026-11-12")
-                    let mut joined = false;
-                    if let Some(r) = replace.as_deref().filter(|r| *r != today) {
-                        if let Some(i) = dates.iter().rposition(|d| day_of(d) == Some(r)) {
-                            let start = start_of(&dates[i]).unwrap_or(r).to_owned();
-                            dates[i] = Value::String(format!("{start}/{today}"));
-                            joined = true;
+                    match start.as_deref().filter(|st| *st != today) {
+                        // Yarım kalanın devamı: o günde biten kayıt aralık olur ("2026-11-09/2026-11-12")
+                        Some(st) => match dates.iter().rposition(|d| day_of(d) == Some(st)) {
+                            Some(i) => {
+                                let s0 = start_of(&dates[i]).unwrap_or(st).to_owned();
+                                dates[i] = Value::String(format!("{s0}/{today}"));
+                            }
+                            None => dates.push(Value::String(format!("{st}/{today}"))),
+                        },
+                        None => {
+                            if !dates.iter().any(|d| day_of(d) == Some(&today)) {
+                                dates.push(Value::String(today.clone()));
+                            }
                         }
-                    }
-                    if !joined && !dates.iter().any(|d| day_of(d) == Some(&today)) {
-                        dates.push(Value::String(today.clone()));
                     }
                     values.insert(iz.clone(), Value::Array(dates));
                     changed.push(iz);
@@ -1066,8 +1070,9 @@ fn unmark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, st
                 dates[i] = Value::String(if &start == r { start } else { format!("{start}/{r}") });
                 Some(())
             });
+            // Bugün biten tek gün ya da aralık silinir
             if ranged.is_none() {
-                drop_today(&mut dates);
+                dates.retain(|d| day_of(d) != Some(&today));
             }
             values.insert(iz.clone(), Value::Array(dates));
             changed.push(iz);

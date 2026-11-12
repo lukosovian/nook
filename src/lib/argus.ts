@@ -148,14 +148,17 @@ async function autoWrite(sug: ArgusSuggestion, ended: boolean) {
   const statuses = useArgus.getState().snap?.statuses ?? [];
   const watched = statuses.find((x) => sameLabel(x, "İzlendi")) ?? null;
   const watching = statuses.find((x) => sameLabel(x, "İzleniyor")) ?? null;
-  const status = ep ? null : ended || (watched && sameLabel(prev, watched)) ? (watched ?? prev) : (watching ?? prev);
+  // Yarım kalan film (tekrar izlemede de) İzleniyor olur; sonuna kadar izlenince İzlendi
+  const status = ep ? null : ended ? (watched ?? prev) : (watching ?? prev);
   const day = dayKey();
-  // Yarım kalmış filmin devamı: aynı izleme başlangıç–bitiş aralığı olur, tekrar izleme sayılmaz
-  const r = !ep ? item.resume?.day : undefined;
-  const replaced = r && r !== day && item.watchDates.includes(r) ? r : null;
+  // Yarım kalan filmin devamı: o izleme bugüne uzatılır (başlangıç–bitiş aralığı), tekrar izleme sayılmaz
+  // Kaldığın yer kaydı yoksa (eski Argus) İzleniyor durumundaki filmin son tarihi
+  const r = ep ? undefined : (item.resume?.day ?? (watching && sameLabel(prev, watching) ? [...item.watchDates].sort().at(-1) : undefined));
+  const start = r && r !== day && item.watchDates.includes(r) ? r : undefined;
+  const replaced = start ?? null;
   const s = useNook.getState();
   try {
-    await argusMark(item.id, day, ep?.season, ep?.episode, status ?? undefined, replaced ?? undefined);
+    await argusMark(item.id, day, ep?.season, ep?.episode, status ?? undefined, start);
     useArgus.setState({ written: { sug, day, status, prev, replaced } });
     s.pushToast({
       kind: "argus",
@@ -812,7 +815,7 @@ export function useArgusDetect() {
         if (item.resume) void argusProgress(item.id, true).catch(() => {});
         return;
       }
-      // Bugün tarih yazıldıysa bu izlemenin günü bugün; yazılmadıysa öncekinden devam
+      // Argus'a en son yazılan gün (aralığın bitişi): bugün yazıldıysa bugün, yoksa öncekinden devam
       const day = item.watchDates.includes(dayKey()) ? dayKey() : item.resume?.day;
       if (!day) return;
       void argusProgress(item.id, false, c.pos != null ? Math.round(c.pos) : undefined, c.duration || undefined, day)
