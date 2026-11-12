@@ -631,11 +631,15 @@ export const setInteractive = (on: boolean) => (inTauri ? invoke<void>("set_inte
 export const argusSnapshot = (profile: string, today: string, dir: string) =>
   inTauri ? invoke<import("./argus").ArgusSnapshot | null>("argus_snapshot", { profile, today, dir }) : Promise.resolve(null);
 export const argusCheckDir = (dir: string) => invoke<string | null>("argus_check_dir", { dir });
-export const argusMark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
-  invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode, status });
+/** `replace`: yarım kalan filmin önceki günü — o izleme bugüne uzatılır (aralık olur, tekrar izleme sayılmaz) */
+export const argusMark = (rowId: string, today: string, season?: number, episode?: number, status?: string, replace?: string) =>
+  invoke<{ completed: boolean; booted: boolean }>("argus_mark", { rowId, today, season, episode, status, replace });
 /** Nook'un kendiliğinden yazdığını geri al: bugünün tarihi silinir, `status` verilirse durum ona döner */
-export const argusUnmark = (rowId: string, today: string, season?: number, episode?: number, status?: string) =>
-  invoke<void>("argus_unmark", { rowId, today, season, episode, status });
+export const argusUnmark = (rowId: string, today: string, season?: number, episode?: number, status?: string, restore?: string) =>
+  invoke<void>("argus_unmark", { rowId, today, season, episode, status, restore });
+/** Yarım kalan filmin kaldığı yeri Argus'a yaz (`clear`: bitti, sil); `day`: Argus'a yazılan gün */
+export const argusProgress = (rowId: string, clear: boolean, atMs?: number, durationMs?: number, day?: string) =>
+  invoke<void>("argus_progress", { rowId, clear, atMs, durationMs, day });
 /** Argus'taki puanı yaz (kriter kimliği → 0–10; kriter yoksa "_genel") */
 export const argusRate = (rowId: string, scores: Record<string, number>) => invoke<void>("argus_rate", { rowId, scores });
 /** İzlerken Hum'un bulduğu şarkıyı Argus'taki içeriğin Müzikler listesine yazar */

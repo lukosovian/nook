@@ -74,6 +74,8 @@ pub struct Item {
     series: Option<Series>,
     /// TMDB kimliği ("movie:123" / "tv:456") — Argus'un tmdb.json'undan
     tmdb: Option<String>,
+    /// Yarım kalan film: { atMs, durationMs, day } — Argus'un progress.json'undan
+    resume: Option<Value>,
 }
 
 #[derive(Clone, Serialize)]
@@ -552,6 +554,7 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
     let rows = read_json(&pdir.join("rows").join(format!("{board_id}.json")))?;
     let episodes = read_json(&pdir.join("episodes.json")).unwrap_or(Value::Null);
     let watched = read_json(&pdir.join("watched.json")).unwrap_or(Value::Null);
+    let progress = read_json(&pdir.join("progress.json")).unwrap_or(Value::Null);
     let recent: HashMap<String, i64> = read_json(&pdir.join("recent-watch.json"))
         .and_then(|v| v.as_array().cloned())
         .unwrap_or_default()
@@ -670,6 +673,7 @@ fn build(dir: &Path, pid: &str, pname: &str, all: Vec<String>, today: &str) -> O
             watch_dates,
             series,
             tmdb: tmdb_refs.get(&id).and_then(|r| Some(format!("{}:{}", r.get("mediaType")?.as_str()?, r.get("id")?.as_u64()?))),
+            resume: progress.get(&id).filter(|v| v.is_object()).cloned(),
             id,
         });
     }
@@ -740,7 +744,7 @@ pub fn snapshot_blocking(app: &AppHandle, profile: Option<String>, today: String
         mtime(&pdir.join("watched.json")),
         mtime(&pdir.join("recent-watch.json")),
     );
-    let key = format!("{key}|{}", mtime(&pdir.join("tmdb.json")));
+    let key = format!("{key}|{}|{}", mtime(&pdir.join("tmdb.json")), mtime(&pdir.join("progress.json")));
     // rows/ klasörünün kendisi dosya yazılınca her zaman değişmeyebilir — dosyaların en yenisi
     let rows_m = std::fs::read_dir(pdir.join("rows"))
         .map(|r| r.flatten().map(|e| mtime(&e.path())).max().unwrap_or(0))
@@ -824,6 +828,33 @@ pub struct SongResult {
     duplicate: bool,
 }
 
+/// Yarım kalan filmin kaldığı yeri Argus'a yazar (detay penceresinde görünür); `clear`: bitti, silinir.
+/// `day`: o izleme için Argus'a yazılan gün (yoksa önceki korunur). Eski Argus bu uç noktayı bilmez: sessizce geçilir.
+#[tauri::command]
+pub async fn argus_progress(row_id: String, clear: bool, at_ms: Option<u64>, duration_ms: Option<u64>, day: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = argus_dir().ok_or("Argus bulunamadı")?;
+        let pid = {
+            let c = CACHE.lock().unwrap();
+            c.as_ref().ok_or("Argus henüz okunmadı")?.snap.profile_id.clone()
+        };
+        let server = Server::ensure(&dir)?;
+        let url = format!("{API}/api/profiles/{pid}/progress/{row_id}");
+        let res = if clear {
+            ureq::delete(&url).timeout(Duration::from_secs(10)).call().map(|_| ())
+        } else {
+            ureq::put(&url).timeout(Duration::from_secs(10)).send_json(json!({ "atMs": at_ms, "durationMs": duration_ms, "day": day })).map(|_| ())
+        };
+        drop(server);
+        match res {
+            Ok(()) | Err(ureq::Error::Status(404, _)) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// İzlerken Hum'un bulduğu şarkıyı içeriğin "Müzikler" listesine yazar (Argus kapalıysa görünmez açar).
 /// `at_ms`: içeriğin kaçıncı ms'sinde çaldı; `approx`: oynatıcı konum vermedi, izlenen süreden tahmin.
 #[tauri::command]
@@ -860,13 +891,28 @@ pub struct MarkResult {
 
 /// Bir bölümü (season/episode) ya da filmi (ikisi de yoksa) bugün izlendi olarak işaretler.
 #[tauri::command]
-pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<MarkResult, String> {
-    tauri::async_runtime::spawn_blocking(move || mark_blocking(row_id, season, episode, status, today))
+/// `replace`: yarım kalan filmin önceki günü — devam edilince o izleme bugüne uzatılır (aralık; tekrar izleme sayılmaz).
+pub async fn argus_mark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, replace: Option<String>) -> Result<MarkResult, String> {
+    tauri::async_runtime::spawn_blocking(move || mark_blocking_with(row_id, season, episode, status, today, replace))
         .await
         .map_err(|e| e.to_string())?
 }
 
 pub fn mark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<MarkResult, String> {
+    mark_blocking_with(row_id, season, episode, status, today, None)
+}
+
+/// Tarihin (aralıksa bitişin) günü — Argus aralığı "başlangıç/bitiş" yazar
+fn day_of(d: &Value) -> Option<&str> {
+    d.as_str().map(|d| d.rsplit('/').next().unwrap_or(d))
+}
+
+/// Aralığın başlangıç günü (tek günse kendisi)
+fn start_of(d: &Value) -> Option<&str> {
+    d.as_str().map(|d| d.split('/').next().unwrap_or(d))
+}
+
+fn mark_blocking_with(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, replace: Option<String>) -> Result<MarkResult, String> {
     let dir = argus_dir().ok_or("Argus bulunamadı")?;
     let (pid, board_id, meta) = {
         let c = CACHE.lock().unwrap();
@@ -921,7 +967,16 @@ pub fn mark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, 
                 // İzlediği gün izleme tarihine yazılır (tekrar izlemede yeni tarih eklenir)
                 if let Some(iz) = meta.izleme.clone() {
                     let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
-                    if !dates.iter().any(|d| d.as_str() == Some(&today)) {
+                    // Yarım kalanın devamı: aynı izleme başlangıç–bitiş aralığı olur ("2026-11-09/2026-11-12")
+                    let mut joined = false;
+                    if let Some(r) = replace.as_deref().filter(|r| *r != today) {
+                        if let Some(i) = dates.iter().rposition(|d| day_of(d) == Some(r)) {
+                            let start = start_of(&dates[i]).unwrap_or(r).to_owned();
+                            dates[i] = Value::String(format!("{start}/{today}"));
+                            joined = true;
+                        }
+                    }
+                    if !joined && !dates.iter().any(|d| day_of(d) == Some(&today)) {
                         dates.push(Value::String(today.clone()));
                     }
                     values.insert(iz.clone(), Value::Array(dates));
@@ -963,13 +1018,14 @@ pub async fn argus_rate(row_id: String, scores: HashMap<String, f64>) -> Result<
 /// Nook'un kendiliğinden yazdığını geri alır: bugünün tarihini siler, durumu önceki hâline döndürür
 /// (`status`: önceki durumun etiketi; yoksa durum değişmez).
 #[tauri::command]
-pub async fn argus_unmark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || unmark_blocking(row_id, season, episode, status, today))
+/// `restore`: yazarken bugüne uzatılan aralığın önceki bitişi — geri alınca ona döner.
+pub async fn argus_unmark(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, restore: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || unmark_blocking(row_id, season, episode, status, today, restore))
         .await
         .map_err(|e| e.to_string())?
 }
 
-fn unmark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String) -> Result<(), String> {
+fn unmark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, status: Option<String>, today: String, restore: Option<String>) -> Result<(), String> {
     let dir = argus_dir().ok_or("Argus bulunamadı")?;
     let (pid, board_id, meta) = {
         let c = CACHE.lock().unwrap();
@@ -1003,7 +1059,16 @@ fn unmark_blocking(row_id: String, season: Option<u32>, episode: Option<u32>, st
     if season.is_none() {
         if let Some(iz) = meta.izleme.clone() {
             let mut dates: Vec<Value> = values.get(&iz).and_then(|v| v.as_array().cloned()).unwrap_or_default();
-            drop_today(&mut dates);
+            // Bugüne uzatılan aralık eski bitişine döner; yoksa bugünün tarihi silinir
+            let ranged = restore.as_ref().and_then(|r| {
+                let i = dates.iter().position(|d| day_of(d) == Some(&today) && start_of(d) != Some(&today))?;
+                let start = start_of(&dates[i])?.to_owned();
+                dates[i] = Value::String(if &start == r { start } else { format!("{start}/{r}") });
+                Some(())
+            });
+            if ranged.is_none() {
+                drop_today(&mut dates);
+            }
             values.insert(iz.clone(), Value::Array(dates));
             changed.push(iz);
         }
@@ -1329,7 +1394,6 @@ pub fn follow_sound(window: &tauri::WebviewWindow) {
     apply(window, &slots, &before);
 }
 
-#[allow(clippy::too_many_arguments)]
 fn card_inner(window: &tauri::WebviewWindow, label: &str, w: f64, h: f64, interactive: bool, show: bool, x: f64, y: f64) -> Result<(), String> {
     let app = window.app_handle();
     // Pencere hiç gizlenip yeniden gösterilmez (show() odağı çalıp tam ekran oyunu alta atabilir);
