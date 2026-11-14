@@ -47,7 +47,7 @@ export function ArgusScreen({ pairing, onBack }: { pairing: Pairing; onBack: () 
   const mark = async (item: ArgusItem, season?: number, episode?: number) => {
     try {
       const r = await argusMark(pairing, item.id, season, episode);
-      say(r.completed ? `${item.title}: hepsi izlendi, İzlendi yapıldı` : season ? `${item.title} · ${epLabel(season, episode!)} izlendi` : `${item.title} izlendi`);
+      say(r.completed ? `${item.title}: çıkmış bütün bölümler izlendi` : season ? `${item.title} · ${epLabel(season, episode!)} izlendi` : `${item.title} izlendi`);
       setMarking(null);
       void load();
     } catch (e) {
@@ -496,7 +496,7 @@ function EpisodeList({ pairing, item, onSaved }: { pairing: Pairing; item: Argus
     try {
       const r = await argusSetEpisodes(pairing, item.id, add, remove);
       const parts = [add.length && `${add.length} bölüm izlendi`, remove.length && `${remove.length} bölümün işareti kaldırıldı`].filter(Boolean);
-      onSaved(r.completed ? `${item.title}: hepsi izlendi, İzlendi yapıldı` : `${item.title}: ${parts.join(", ")}`);
+      onSaved(r.completed ? `${item.title}: çıkmış bütün bölümler izlendi` : `${item.title}: ${parts.join(", ")}`);
     } catch (e) {
       setError(errText(e));
       setSaving(false);

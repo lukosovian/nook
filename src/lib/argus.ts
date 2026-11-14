@@ -156,10 +156,13 @@ async function autoWrite(sug: ArgusSuggestion, ended: boolean) {
   const r = ep ? undefined : (item.resume?.day ?? (watching && sameLabel(prev, watching) ? [...item.watchDates].sort().at(-1) : undefined));
   const start = r && r !== day && item.watchDates.includes(r) ? r : undefined;
   const replaced = start ?? null;
+  // Aynı gün ikinci yazma (İzleniyor → İzlendi): geri alınca ilk yazmadan önceki hâline dönsün
+  const before = useArgus.getState().written;
+  const again = !ep && before?.sug.itemId === sug.itemId && before.day === day;
   const s = useNook.getState();
   try {
     await argusMark(item.id, day, ep?.season, ep?.episode, status ?? undefined, start);
-    useArgus.setState({ written: { sug, day, status, prev, replaced } });
+    useArgus.setState({ written: again ? { ...before, sug, status } : { sug, day, status, prev, replaced } });
     s.pushToast({
       kind: "argus",
       title: tt("{0}{1} bugüne yazıldı", item.title, ep ? ` ${epLabel(ep)}` : ""),
@@ -237,7 +240,9 @@ export function watching(snap: ArgusSnapshot | null) {
 }
 
 /** Takip edilen (izlenen/izlenmiş) diziler — yeni bölüm haberleri için */
-const tracked = (snap: ArgusSnapshot) => snap.items.filter((i) => i.series && (isStatus(i, "izleniyor") || isStatus(i, "izlendi")));
+/** Argus'ta izlenmiş sayılan durumlar: İzlendi, Sezon Finali (çıkmış bölümler bitti, dizi sürüyor), Final (dizi bitti) */
+export const isWatchedStatus = (it: ArgusItem) => ["izlendi", "sezon finali", "final", "watched", "season finale", "finished"].some((s) => isStatus(it, s));
+const tracked = (snap: ArgusSnapshot) => snap.items.filter((i) => i.series && (isStatus(i, "izleniyor") || isWatchedStatus(i)));
 
 export interface CalendarEntry {
   item: ArgusItem;
@@ -420,7 +425,9 @@ function segments(text: string) {
       let t = seg;
       for (const re of [...EP_PATTERNS, ...BARE_EP_PATTERNS]) t = t.replace(new RegExp(re.source, "gi"), " ");
       t = norm(t.replace(/\(\s*(19|20)\d\d\s*\)/g, " ")).replace(JUNK, " ").replace(JUNK, " ");
-      return t.split(" ").filter(Boolean);
+      const w = t.split(" ").filter(Boolean);
+      // Sitelerin "Thor 1" yazdığı ilk film: Argus'ta yalnızca "Thor"
+      return w.length > 1 && w[w.length - 1] === "1" ? w.slice(0, -1) : w;
     })
     .filter((w) => w.length && !SITES.test(w.join(" ")));
 }
@@ -796,8 +803,16 @@ export function useArgusDetect() {
 
     /** Bugün 15 dk izlendiyse Argus'a bugünün tarihiyle kendiliğinden yazar (günde bir kez) */
     const ask = async (c: NonNullable<typeof cur>) => {
-      if (store.asked.includes(c.key)) return;
       const item = findItem(c.sug.itemId);
+      if (store.asked.includes(c.key)) {
+        // Bugün yarım diye İzleniyor yazıldı, sonra aynı gün sonuna kadar izlendi: İzlendi olur (tarih eklenmez)
+        const endKey = `end:${c.key}`;
+        if (!c.ended || c.sug.season || !item || !isStatus(item, "izleniyor") || store.asked.includes(endKey)) return;
+        store.asked.push(endKey);
+        savePlayed(store);
+        await autoWrite(c.sug, true);
+        return;
+      }
       // Yarım kalmış filmin sonu izlendiyse 15 dk beklenmez
       if (!item || (played(c.key) < needFor(c.duration) && !(c.ended && item.resume))) return;
       store.asked.push(c.key);
