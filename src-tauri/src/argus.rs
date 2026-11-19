@@ -1365,7 +1365,32 @@ fn update(window: &tauri::WebviewWindow, i: usize, show: bool, right_x: f64, lef
     slots[i] = CardSlot { visible: show, right_x, left_end, y, ..slots[i] };
     layout(window, &mut slots);
     apply(window, &slots, &before);
+    if before[i].visible && !show {
+        retire_later(window.app_handle().clone(), i);
+    }
     CardPlace { x: slots[i].x, right: slots[i].right }
+}
+
+/// Kart kapandıktan sonra bu kadar süre açılmazsa penceresi (ayrı bir WebView, ~55 MB) kapatılır;
+/// sonraki açılışta card_inner ilk seferdeki gibi (görünür, odaksız) yeniden oluşturur.
+const CARD_KEEP: std::time::Duration = std::time::Duration::from_secs(180);
+/// Her kapanışta artar: eski bekleyiş, arada kart açılıp yeniden kapandıysa pencereye dokunmaz
+static CARD_IDLE: [std::sync::atomic::AtomicU64; 2] = [std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0)];
+
+fn retire_later(app: tauri::AppHandle, i: usize) {
+    use std::sync::atomic::Ordering;
+    let mine = CARD_IDLE[i].fetch_add(1, Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        std::thread::sleep(CARD_KEEP);
+        // Kilit tutulurken kapatılır: aynı anda gelen "göster" kapanmakta olan pencereyi yerleştirmeye kalkmasın
+        let slots = SLOTS.lock().unwrap();
+        if slots[i].visible || CARD_IDLE[i].load(Ordering::SeqCst) != mine {
+            return;
+        }
+        if let Some(w) = app.get_webview_window([CARD, SOUND][i]) {
+            let _ = w.destroy();
+        }
+    });
 }
 
 /// İzlenen dizi/film kartı: adanın yanında ayrı, tıklanamaz küçük pencere.
@@ -1403,6 +1428,7 @@ fn card_inner(window: &tauri::WebviewWindow, label: &str, w: f64, h: f64, intera
     let app = window.app_handle();
     // Pencere hiç gizlenip yeniden gösterilmez (show() odağı çalıp tam ekran oyunu alta atabilir);
     // kart içeriği kendi animasyonuyla kaybolur, şeffaf ve tıklanamaz pencere yerinde kalır.
+    // Uzun süre açılmazsa pencere tümüyle kapatılır (bkz. retire_later) ve aşağıda yeniden oluşturulur.
     if !show {
         return Ok(());
     }

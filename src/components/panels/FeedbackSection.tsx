@@ -232,7 +232,7 @@ export function FeedbackSection() {
               onChange={(e) => setTitle(e.target.value)}
               placeholder={
                 kind === "bug"
-                  ? tt("Örn: Kısayol tuşuna basınca mikrofon durumu güncellenmiyor")
+                  ? tt("Örn: Tuşa basınca mikrofon durumu güncellenmiyor")
                   : tt("Örn: Spotify için şarkı sözlerini otomatik açma seçeneği")
               }
               className="w-full rounded-[12px] border border-white/[0.08] bg-well px-3 py-2 text-[12px] text-label outline-none placeholder:text-label-3 focus:border-white/25 focus:bg-well-hi"
@@ -265,7 +265,7 @@ export function FeedbackSection() {
                 rows={2}
                 value={steps}
                 onChange={(e) => setSteps(e.target.value)}
-                placeholder={tt("1. Nook Studio'yu aç\n2. Kısayollar sekmesine git\n3. ...")}
+                placeholder={tt("1. Nook Studio'yu aç\n2. Tuşlar sekmesine git\n3. ...")}
                 className="w-full resize-none rounded-[12px] border border-white/[0.08] bg-well px-3 py-1.5 text-[11.5px] text-label outline-none placeholder:text-label-3 focus:border-white/25 focus:bg-well-hi"
               />
             </div>

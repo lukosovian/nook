@@ -67,6 +67,7 @@ pub fn artwork_bytes() -> Option<(String, Vec<u8>)> {
 #[tauri::command]
 pub fn media_resync() {
     RESEND.store(true, Ordering::Relaxed);
+    imp::wake();
 }
 
 #[tauri::command(async)]
@@ -100,16 +101,24 @@ mod imp {
 
     use base64::{engine::general_purpose::STANDARD, Engine};
     use tauri::{AppHandle, Emitter};
+    use windows::Foundation::TypedEventHandler;
     use windows::Media::Control::{
-        GlobalSystemMediaTransportControlsSession as Session,
-        GlobalSystemMediaTransportControlsSessionManager as Manager,
-        GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
+        CurrentSessionChangedEventArgs, GlobalSystemMediaTransportControlsSession as Session, GlobalSystemMediaTransportControlsSessionManager as Manager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status, MediaPropertiesChangedEventArgs, PlaybackInfoChangedEventArgs, SessionsChangedEventArgs,
+        TimelinePropertiesChangedEventArgs,
     };
     use windows::Storage::Streams::DataReader;
 
     use super::{Media, RESEND};
 
+    /// Windows haber veremiyorsa (ya da kapak beklenirken) yoklama aralıkları: oynarken, duraklamışken, oynatıcı yokken
     const POLL: Duration = Duration::from_millis(700);
+    const POLL_PAUSED: Duration = Duration::from_millis(1500);
+    const POLL_IDLE: Duration = Duration::from_millis(2000);
+    /// Haberler çalışırken de duraklamış/boş durumda bu aralıkla bir kez bakılır (kaçan bir haber olursa)
+    const SAFETY: Duration = Duration::from_secs(3);
+    /// İki okuma arasındaki en kısa süre (art arda gelen haberler tek okumada toplanır)
+    const GAP: Duration = Duration::from_millis(400);
     /// Oynarken ilerleme çubuğu kaymasın diye bu aralıkla pozisyonu yeniden gönder.
     const RESYNC: Duration = Duration::from_secs(5);
     /// Kapak bazen parça bilgisinden biraz sonra hazır olur — birkaç kez dene.
@@ -117,11 +126,81 @@ mod imp {
     /// 1601-01-01 ile 1970-01-01 arası, 100 ns biriminde (Windows DateTime).
     const EPOCH_DIFF_100NS: i64 = 116_444_736_000_000_000;
 
+    /// İzleyici iş parçacığı: Windows'un medya haberleri ve RESEND onu uyandırır
+    static WATCHER: std::sync::OnceLock<thread::Thread> = std::sync::OnceLock::new();
+    /// Öndeki oturum değişti: haberler yeni oturuma bağlanmalı
+    static SESSION_CHANGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    pub fn wake() {
+        if let Some(t) = WATCHER.get() {
+            t.unpark();
+        }
+    }
+
+    /// Oturum listesi ya da öndeki oturum değişince uyandır
+    fn hook_manager(manager: &Manager) -> bool {
+        let changed = || {
+            SESSION_CHANGED.store(true, Ordering::Relaxed);
+            wake();
+        };
+        let a = manager.CurrentSessionChanged(&TypedEventHandler::<Manager, CurrentSessionChangedEventArgs>::new(move |_, _| {
+            changed();
+            Ok(())
+        }));
+        let b = manager.SessionsChanged(&TypedEventHandler::<Manager, SessionsChangedEventArgs>::new(move |_, _| {
+            changed();
+            Ok(())
+        }));
+        a.is_ok() && b.is_ok()
+    }
+
+    /// Bir oturumun parça, oynatma ve süre haberleri; bırakılınca kayıtlar silinir
+    struct Hooks {
+        session: Session,
+        app: String,
+        tokens: (i64, i64, i64),
+    }
+
+    impl Hooks {
+        fn new(session: &Session, app: &str) -> Option<Self> {
+            let a = session
+                .MediaPropertiesChanged(&TypedEventHandler::<Session, MediaPropertiesChangedEventArgs>::new(|_, _| {
+                    wake();
+                    Ok(())
+                }))
+                .ok()?;
+            let b = session
+                .PlaybackInfoChanged(&TypedEventHandler::<Session, PlaybackInfoChangedEventArgs>::new(|_, _| {
+                    wake();
+                    Ok(())
+                }))
+                .ok()?;
+            let c = session
+                .TimelinePropertiesChanged(&TypedEventHandler::<Session, TimelinePropertiesChangedEventArgs>::new(|_, _| {
+                    wake();
+                    Ok(())
+                }))
+                .ok()?;
+            Some(Self { session: session.clone(), app: app.to_owned(), tokens: (a, b, c) })
+        }
+    }
+
+    impl Drop for Hooks {
+        fn drop(&mut self) {
+            let _ = self.session.RemoveMediaPropertiesChanged(self.tokens.0);
+            let _ = self.session.RemovePlaybackInfoChanged(self.tokens.1);
+            let _ = self.session.RemoveTimelinePropertiesChanged(self.tokens.2);
+        }
+    }
+
     pub fn spawn(app: AppHandle) {
         thread::Builder::new()
             .name("nook-media".into())
             .spawn(move || {
+                let _ = WATCHER.set(thread::current());
                 let mut manager: Option<Manager> = None;
+                let mut manager_live = false;
+                let mut hooks: Option<Hooks> = None;
                 let mut last_sig = String::new();
                 let mut last_emit = Instant::now();
                 let mut art_key = String::new();
@@ -134,11 +213,14 @@ mod imp {
                     }
                     if manager.is_none() {
                         manager = Manager::RequestAsync().and_then(|op| op.join()).ok();
+                        manager_live = manager.as_ref().is_some_and(hook_manager);
                     }
 
                     let snap = manager.as_ref().and_then(|m| snapshot(m).ok().flatten());
+                    let playing = snap.as_ref().is_some_and(|(_, m)| m.playing);
                     match snap {
                         None => {
+                            hooks = None;
                             if last_sig != "none" {
                                 last_sig = "none".into();
                                 art_key.clear();
@@ -147,6 +229,11 @@ mod imp {
                             }
                         }
                         Some((session, mut media)) => {
+                            // Haberler öndeki oturuma bağlı: oturum değiştiyse yenisine bağlan
+                            if SESSION_CHANGED.swap(false, Ordering::Relaxed) || hooks.as_ref().is_none_or(|h| h.app != media.app) {
+                                drop(hooks.take());
+                                hooks = Hooks::new(&session, &media.app);
+                            }
                             if media.track_key != art_key {
                                 art_key = media.track_key.clone();
                                 art_tries = 0;
@@ -171,7 +258,27 @@ mod imp {
                         }
                     }
 
-                    thread::sleep(POLL);
+                    // Windows haber veriyorsa o zamana dek uyu: oynarken yalnızca konum tazelemesi (RESYNC) için,
+                    // duraklamışken/oynatıcı yokken seyrek bir güvenlik bakışı için uyanılır. Haber yoksa yoklanır.
+                    let none = last_sig == "none";
+                    let live = manager_live && (none || hooks.is_some());
+                    let wait = if !none && art_tries < ART_TRIES {
+                        POLL
+                    } else if !live {
+                        if none {
+                            POLL_IDLE
+                        } else if playing {
+                            POLL
+                        } else {
+                            POLL_PAUSED
+                        }
+                    } else if playing {
+                        RESYNC.saturating_sub(last_emit.elapsed()).max(POLL)
+                    } else {
+                        SAFETY
+                    };
+                    thread::sleep(GAP);
+                    thread::park_timeout(wait.saturating_sub(GAP));
                 }
             })
             .expect("media thread başlatılamadı");
@@ -250,6 +357,7 @@ mod imp {
             }
             if paused {
                 RESEND.store(true, Ordering::Relaxed);
+                wake();
             }
             Ok(paused)
         };
@@ -263,6 +371,7 @@ mod imp {
             let ok = session.TryChangePlaybackPositionAsync(ms as i64 * 10_000)?.join()?;
             if ok {
                 RESEND.store(true, Ordering::Relaxed);
+                wake();
             }
             Ok(ok)
         };
@@ -283,6 +392,7 @@ mod imp {
                 _ => return Ok(()),
             };
             RESEND.store(true, Ordering::Relaxed);
+            wake();
             Ok(())
         };
         run().map_err(|e| e.to_string())
@@ -292,6 +402,7 @@ mod imp {
 #[cfg(not(windows))]
 mod imp {
     pub fn spawn(_app: tauri::AppHandle) {}
+    pub fn wake() {}
     pub fn pause_all() -> bool {
         false
     }

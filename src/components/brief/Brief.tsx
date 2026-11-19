@@ -4,13 +4,14 @@
  */
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Download, Plus, Sparkles, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, EyeOff, Plus, SlidersHorizontal, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useHabits, getTodayWater } from "../../lib/habits";
 import { generateOnce, pickQuickModel } from "../../lib/ai";
 import { systemPrompt } from "../../lib/aiTools";
 import { clock } from "../../lib/alarm";
 import { calendar, epLabel, markNewsSeen, posterSrc, useArgus, weekStats, type CalendarEntry } from "../../lib/argus";
-import { closeBrief } from "../../lib/brief";
+import { closeBrief, setTodayTask, toggleTodayTask, useDayNote, useTodayTask } from "../../lib/brief";
+import { firstWeekTasks, isFirstWeek } from "../../lib/firstWeek";
 import { startFocus } from "../../lib/focus";
 import { BRIEF } from "../../lib/layout";
 import { easeOut } from "../../lib/motion";
@@ -20,6 +21,7 @@ import { modelsFor } from "../../hooks/useGemini";
 import { dayKey, useNook, type Tab } from "../../store/nook";
 import { ACCENT, Card, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { pct as fmtPct, tt, locale } from "../../lib/i18n";
+import { MoodPicker } from "./DayClose";
 
 const LINE_KEY = "nook-today-line";
 
@@ -108,8 +110,22 @@ export function Brief() {
 
   const tiles = useTiles();
   const hasShows = !!snap;
+  const dayNote = useDayNote();
+  // Küçük kartlar: kullanıcının seçtiği sırayla; "Düzenle" ile gizlenir, sıralanır
+  const [edit, setEdit] = useState(false);
+  const order = s.settings.briefTiles ?? TILE_IDS;
+  const shown = order.flatMap((id) => tiles.filter((t) => t.id === id));
+  const hiddenTiles = tiles.filter((t) => !shown.includes(t));
+  const toggleTile = (id: string) => s.updateSettings({ briefTiles: order.includes(id) ? order.filter((x) => x !== id) : [...order, id] });
+  const moveTile = (id: string, d: number) => {
+    const other = shown[shown.findIndex((t) => t.id === id) + d]?.id;
+    if (!other) return;
+    s.updateSettings({ briefTiles: order.map((x) => (x === id ? other : x === other ? id : x)) });
+  };
   // Bugünün günlüğü (gece yazılır) varsa kartların ilk satırının yerini alır
-  const visibleTiles = tiles.slice(0, (hasShows ? 6 : 9) - (todayDiary ? 3 : 0));
+  const visibleTiles = shown.slice(0, (hasShows ? 6 : 9) - (todayDiary ? 3 : 0));
+  // İlk hafta: sayılar daha boşken küçük kartların yerinde üç küçük görev
+  const firstWeek = !edit && isFirstWeek(s) ? firstWeekTasks(s) : null;
 
   return (
     <motion.div
@@ -134,6 +150,16 @@ export function Brief() {
               {progress === null ? tt("Yeni sürüm {0} · Güncelle", update) : tt("Güncelleniyor %{0}", progress)}
             </button>
           )}
+          <button
+            data-brief-edit
+            onClick={() => setEdit((v) => !v)}
+            title={tt("Kartları seç ve sırala")}
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-well-hi hover:text-label"
+            style={edit ? { background: tintBg(ACCENT.yellow, 16), color: tintText(ACCENT.yellow) } : { color: "var(--color-label-3)" }}
+          >
+            {edit ? <Check size={12} strokeWidth={2.6} /> : <SlidersHorizontal size={12} strokeWidth={2.4} />}
+            {edit ? tt("Bitti") : tt("Düzenle")}
+          </button>
           <button
             onClick={closeBrief}
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-label-3 transition-colors hover:bg-well-hi hover:text-label"
@@ -165,6 +191,14 @@ export function Brief() {
               <p className="text-center text-[11.5px] leading-snug text-label-3">{tt("Bugün senin için neler var, bir bakalım")}</p>
             )}
           </div>
+
+          <TodayTask />
+          {!s.settings.dayClose && (
+            <div className="relative mb-2 flex shrink-0 items-center justify-between gap-2 px-1">
+              <span className="whitespace-nowrap text-[10.5px] text-label-3">{tt("Bugün nasılsın?")}</span>
+              <MoodPicker size={18} />
+            </div>
+          )}
 
           <div className="relative shrink-0">
             {w ? (
@@ -224,8 +258,19 @@ export function Brief() {
             </Card>
           </motion.div>
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-3 gap-2.5" style={{ gridAutoRows: "1fr" }}>
-          {todayDiary && (
+        {dayNote && (
+          <motion.div {...enter(1)} className="flex shrink-0 items-center gap-2 rounded-[14px] border px-3 py-1.5" style={{ background: tintBg(ACCENT.purple, 9), borderColor: tintBg(ACCENT.purple, 24) }}>
+            <MiniNook color={ACCENT.purple} size={20} eyes="happy" />
+            <p className="min-w-0 flex-1 truncate text-[11.5px] text-label-2" title={dayNote}>
+              <span className="font-bold" style={{ color: tintText(ACCENT.purple) }}>
+                {tt("Dünden not")} ·{" "}
+              </span>
+              {dayNote}
+            </p>
+          </motion.div>
+        )}
+        <div className={`grid min-h-0 flex-1 grid-cols-3 gap-2.5 ${edit ? "-mr-1.5 overflow-y-auto pr-1.5" : ""}`} style={{ gridAutoRows: edit ? "54px" : "1fr" }}>
+          {todayDiary && !edit && (
             <motion.div {...enter(2)} className="col-span-3 min-h-0">
               <Card className="flex h-full gap-3 overflow-hidden px-3.5 py-2.5">
                 <MiniNook color={ACCENT.purple} size={22} eyes="happy" />
@@ -238,14 +283,130 @@ export function Brief() {
               </Card>
             </motion.div>
           )}
-          {visibleTiles.map((t, i) => (
-            <motion.div key={t.label} {...enter(2 + i)} className="min-h-0">
-              <Tile {...t} />
-            </motion.div>
-          ))}
+          {firstWeek ? (
+            firstWeek.map((t, i) => (
+              <motion.button
+                key={t.id}
+                {...enter(2 + i)}
+                onClick={() => openTab(t.tab)}
+                className={`flex min-h-0 items-center gap-2.5 rounded-[16px] border px-3 text-left transition-[filter] hover:brightness-125 ${hasShows ? "" : "col-span-3"}`}
+                style={{ background: tintBg(ACCENT.green, t.done ? 12 : 6), borderColor: tintBg(ACCENT.green, t.done ? 34 : 18) }}
+              >
+                <i className="flex size-[20px] shrink-0 items-center justify-center rounded-full border" style={{ borderColor: tintBg(ACCENT.green, 60), background: t.done ? ACCENT.green : "transparent", color: "#000" }}>
+                  {t.done && <Check size={12} strokeWidth={3.5} />}
+                </i>
+                <span className="min-w-0 leading-tight">
+                  <span className="block text-[9.5px] font-medium" style={{ color: tintText(ACCENT.green) }}>
+                    {tt("İlk haftan")} · {i + 1}/{firstWeek.length}
+                  </span>
+                  <span className={`block text-[12px] font-medium ${t.done ? "text-label-3 line-through" : "text-label"}`}>{t.title}</span>
+                  <span className="block truncate text-[10px] text-label-3" title={t.hint}>
+                    {t.hint}
+                  </span>
+                </span>
+              </motion.button>
+            ))
+          ) : edit ? (
+            [...shown, ...hiddenTiles].map((t) => {
+              const on = shown.includes(t);
+              return (
+                <div
+                  key={t.id}
+                  className="flex min-h-0 items-center gap-2 rounded-[16px] border pl-3 pr-1.5"
+                  style={{ opacity: on ? 1 : 0.45, background: `linear-gradient(180deg, ${tintBg(t.color, 11)} 0%, ${tintBg(t.color, 5)} 100%)`, borderColor: tintBg(t.color, 24) }}
+                >
+                  <MiniNook color={t.color} size={24} eyes={on ? "open" : "closed"} />
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium" style={{ color: tintText(t.color) }}>
+                    {t.label}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    {on && (
+                      <>
+                        <EditBtn label={tt("Öne al")} onClick={() => moveTile(t.id, -1)}>
+                          <ChevronLeft size={12} strokeWidth={2.6} />
+                        </EditBtn>
+                        <EditBtn label={tt("Sona al")} onClick={() => moveTile(t.id, 1)}>
+                          <ChevronRight size={12} strokeWidth={2.6} />
+                        </EditBtn>
+                      </>
+                    )}
+                    <EditBtn label={on ? tt("Gizle") : tt("Göster")} onClick={() => toggleTile(t.id)}>
+                      {on ? <Eye size={12} strokeWidth={2.4} /> : <EyeOff size={12} strokeWidth={2.4} />}
+                    </EditBtn>
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            visibleTiles.map((t, i) => (
+              <motion.div key={t.id} {...enter(2 + i)} className="min-h-0">
+                <Tile {...t} />
+              </motion.div>
+            ))
+          )}
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function EditBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} title={label} aria-label={label} className="flex size-[22px] items-center justify-center rounded-full text-label-2 hover:bg-white/15 hover:text-label">
+      {children}
+    </button>
+  );
+}
+
+/** Bugünün tek işi: yazılmadıysa tek satırlık kutu, yazıldıysa ✓ ile işaretlenen satır */
+function TodayTask() {
+  const task = useTodayTask();
+  const [text, setText] = useState("");
+  // Yazarken imleç dışarı kaçarsa özet kapanmasın; özet kalkınca tutuş da kalkar
+  useEffect(() => () => useNook.getState().setHold("brief-task", false), []);
+  if (task)
+    return (
+      <div className="relative mb-2 flex shrink-0 items-center gap-2 rounded-[14px] border px-2 py-1.5" style={{ background: tintBg(ACCENT.green, 9), borderColor: tintBg(ACCENT.green, 26) }}>
+        <button
+          onClick={toggleTodayTask}
+          title={task.done ? tt("Yapıldı · geri al") : tt("Yapıldı olarak işaretle")}
+          className="flex size-[20px] shrink-0 items-center justify-center rounded-full border"
+          style={{ borderColor: tintBg(ACCENT.green, 65), background: task.done ? ACCENT.green : "transparent", color: "#000" }}
+        >
+          {task.done && <Check size={12} strokeWidth={3.5} />}
+        </button>
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block text-[9.5px] text-label-3">{tt("Bugünün tek işi")}</span>
+          <span className={`block truncate text-[11.5px] font-medium ${task.done ? "line-through opacity-60" : ""}`} style={{ color: tintText(ACCENT.green) }} title={task.text}>
+            {task.text}
+          </span>
+        </span>
+        <button onClick={() => setTodayTask("")} title={tt("Değiştir")} aria-label={tt("Değiştir")} className="flex size-5 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label">
+          <X size={11} strokeWidth={2.4} />
+        </button>
+      </div>
+    );
+  return (
+    <form
+      className="relative mb-2 shrink-0"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setTodayTask(text);
+        setText("");
+        useNook.getState().setHold("brief-task", false);
+      }}
+    >
+      <input
+        value={text}
+        maxLength={80}
+        placeholder={tt("Bugün en önemli iş ne?")}
+        onChange={(e) => setText(e.target.value)}
+        onPointerDown={(e) => e.currentTarget.focus()}
+        onFocus={() => useNook.getState().setHold("brief-task", true)}
+        onBlur={() => useNook.getState().setHold("brief-task", false)}
+        className="h-8 w-full rounded-full border border-white/[0.08] bg-well px-3 text-[11.5px] text-label outline-none placeholder:text-label-3 focus:border-white/25"
+      />
+    </form>
   );
 }
 
@@ -267,7 +428,7 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
   const nextWeek = new Date();
   nextWeek.setDate(nextWeek.getDate() + 7);
   const weekday = d.toLocaleDateString(locale(), { weekday: "long" });
-  const badge = today ? tt("Bugün") : e.date === dayKey(tomorrow) ? tt("Yarın") : e.date === dayKey(nextWeek) ? `Haftaya ${weekday}` : weekday;
+  const badge = today ? tt("Bugün") : e.date === dayKey(tomorrow) ? tt("Yarın") : e.date === dayKey(nextWeek) ? tt("Haftaya {0}", weekday) : weekday;
   const hue = [ACCENT.orange, ACCENT.purple, ACCENT.blue, ACCENT.pink][i % 4];
   return (
     <div className="min-w-0 cursor-pointer transition-transform hover:-translate-y-0.5" role="button" title={tt("Argus'ta aç")} onClick={() => openTab("argus")}>
@@ -293,7 +454,11 @@ function Poster({ e, i }: { e: CalendarEntry; i: number }) {
   );
 }
 
+/** Küçük kartların kimlikleri, varsayılan sırayla (settings.briefTiles bunlardan seçer) */
+const TILE_IDS = ["alarm", "water", "yesterday", "night", "devices", "weekend", "screen", "pomodoro", "music"];
+
 interface TileData {
+  id: string;
   label: string;
   value: string;
   color: string;
@@ -313,7 +478,7 @@ function openTab(tab: Tab) {
   s.setTab(tab);
 }
 
-function Tile({ label, value, color, eyes = "open", action, open }: TileData) {
+function Tile({ label, value, color, eyes = "open", action, open }: Omit<TileData, "id">) {
   return (
     <div
       role={open ? "button" : undefined}
@@ -365,30 +530,33 @@ function useTiles(): TileData[] {
 
   const tiles: TileData[] = [
     {
+      id: "alarm",
       label: tt("Alarm"),
       value: alarms.length ? alarms.map((a) => `${clock(a)}${alarms.length === 1 && a.label ? ` ${a.label}` : ""}`).join(", ") : tt("Bugün yok"),
       color: ACCENT.orange,
       eyes: alarms.length ? "open" : "closed",
       open: "alarm",
     },
-    { label: tt("Su"), value: water ? tt("{0} bardak içtin", water) : tt("Henüz içmedin"), color: ACCENT.blue, eyes: water ? "happy" : "side", action: () => useHabits.getState().drinkGlass() },
+    { id: "water", label: tt("Su"), value: water ? tt("{0} bardak içtin", water) : tt("Henüz içmedin"), color: ACCENT.blue, eyes: water ? "happy" : "side", action: () => useHabits.getState().drinkGlass() },
     {
+      id: "yesterday",
       label: tt("Dün"),
-      value: [yesterday?.focus && `${mins(yesterday.focus)} odak`, yesterday?.game && `${mins(yesterday.game)} oyun`].filter(Boolean).join(" · ") || tt("Dinlenme günüydü"),
+      value: [yesterday?.focus && tt("{0} odak", mins(yesterday.focus)), yesterday?.game && tt("{0} oyun", mins(yesterday.game))].filter(Boolean).join(" · ") || tt("Dinlenme günüydü"),
       color: ACCENT.red,
       open: "report",
     },
-    { label: tt("Gece"), value: night ? tt("{0} bildirim geldi", night) : tt("Sessizdi"), color: ACCENT.purple, eyes: night ? "open" : "closed", open: "notify" },
+    { id: "night", label: tt("Gece"), value: night ? tt("{0} bildirim geldi", night) : tt("Sessizdi"), color: ACCENT.purple, eyes: night ? "open" : "closed", open: "notify" },
   ];
-  if (devs.length) tiles.push({ label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => fmtPct(d.pct)).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open", open: "devices" });
+  if (devs.length) tiles.push({ id: "devices", label: devs.map((d) => d.name).join(" · "), value: devs.map((d) => fmtPct(d.pct)).join(" · "), color: lowest <= 20 ? ACCENT.red : ACCENT.teal, eyes: lowest <= 20 ? "closed" : "open", open: "devices" });
   tiles.push({
+    id: "weekend",
     label: tt("Hafta sonu"),
     value: wd === 0 || wd === 6 ? tt("Keyfini çıkar") : wd === 5 ? tt("Yarın başlıyor") : tt("{0} gün kaldı", 6 - wd),
     color: ACCENT.yellow,
     eyes: wd === 0 || wd === 5 || wd === 6 ? "happy" : "open",
   });
-  if (yesterday?.active) tiles.push({ label: tt("Dün ekranda"), value: mins(yesterday.active), color: ACCENT.green, open: "report" });
-  if (!s.focus) tiles.push({ label: "Pomodoro", value: tt("Bir tur başlat"), color: ACCENT.pink, action: () => (startFocus("work", 0), closeBrief()) });
-  if (yesterday?.music) tiles.push({ label: tt("Dün müzik"), value: mins(yesterday.music), color: ACCENT.pink, eyes: "happy", open: "media" });
+  if (yesterday?.active) tiles.push({ id: "screen", label: tt("Dün ekranda"), value: mins(yesterday.active), color: ACCENT.green, open: "report" });
+  if (!s.focus) tiles.push({ id: "pomodoro", label: "Pomodoro", value: tt("Bir tur başlat"), color: ACCENT.pink, action: () => (startFocus("work", 0), closeBrief()) });
+  if (yesterday?.music) tiles.push({ id: "music", label: tt("Dün müzik"), value: mins(yesterday.music), color: ACCENT.pink, eyes: "happy", open: "media" });
   return tiles;
 }

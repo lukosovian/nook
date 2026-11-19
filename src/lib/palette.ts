@@ -49,7 +49,16 @@ export function useColorVision() {
   useEffect(() => apply(cvd), [cvd]);
 }
 
-/** Net yazı açıkken soluk gri yazılar açılır (koyu kartta okunaklı karşıtlık) */
+/**
+ * Klavyeyle gezinirken (Tab) yazı alanlarında da odak halkası çıksın, fareyle tıklayınca çıkmasın:
+ * styles.css › html[data-kbd]. Düğmelerde tarayıcının kendi :focus-visible'ı yeter.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", (e) => e.key === "Tab" && document.documentElement.setAttribute("data-kbd", ""), true);
+  window.addEventListener("pointerdown", () => document.documentElement.removeAttribute("data-kbd"), true);
+}
+
+/** Net yazı açıkken soluk gri yazılar varsayılandan (#9a9aa2 / #8a8a92) da açılır: daha yüksek karşıtlık */
 const CLEAR_TEXT: Record<string, string> = { "--color-label-2": "#c9c9cf", "--color-label-3": "#a4a4ac" };
 
 export function useClearText() {

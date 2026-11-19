@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
 import { AnimatePresence, motion, PresenceContext } from "motion/react";
 import { easeOut } from "../../lib/motion";
 import { isLive, useNook, type Tab } from "../../store/nook";
@@ -7,15 +7,11 @@ import { HomeBento } from "./Home";
 import { ModulesGrid } from "./Modules";
 import { MODULES, type Module } from "./moduleData";
 import { AlarmPanel } from "./AlarmPanel";
-import { HumPanel } from "./HumPanel";
 import { CalendarPanel } from "./CalendarPanel";
 import { RemindPanel } from "./RemindPanel";
-import { ArgusPanel } from "./ArgusPanel";
-import { ArchivePanel } from "./ArchivePanel";
 import { AppsPanel } from "./AppsPanel";
 import { FocusPanel } from "./FocusPanel";
 import { NotifyPanel } from "./NotifyPanel";
-import { PlayPanel } from "./PlayPanel";
 import { openBrief } from "../../lib/brief";
 import { openStudio } from "../../lib/studio";
 import { ek, useNookName } from "../../lib/look";
@@ -24,19 +20,25 @@ import { summaryDue } from "../../hooks/useFeatures";
 import { ChatPanel } from "./ChatPanel";
 import { ClipboardPanel } from "./ClipboardPanel";
 import { ControlPanel } from "./ControlPanel";
-import { DevicesPanel } from "./DevicesPanel";
 import { Boundary } from "../ui/Boundary";
 import { Frame } from "./Frame";
 import { MediaPanel } from "./MediaPanel";
 import { ScratchPanel } from "./ScratchPanel";
 import { ShelfPanel } from "./ShelfPanel";
-import { StatsPanel } from "./StatsPanel";
-import { ClaudePanel } from "./ClaudePanel";
-import { WhatsAppPanel } from "./WhatsAppPanel";
-import { HabitsPanel } from "./HabitsPanel";
-import { NewsPanel } from "./NewsPanel";
 
-const PANEL: Record<Module, () => React.JSX.Element> = {
+// Seyrek açılan bölümler ilk açıldıklarında yüklenir (ada açılışına binmesinler)
+const HumPanel = lazy(() => import("./HumPanel").then((m) => ({ default: m.HumPanel })));
+const ArgusPanel = lazy(() => import("./ArgusPanel").then((m) => ({ default: m.ArgusPanel })));
+const ArchivePanel = lazy(() => import("./ArchivePanel").then((m) => ({ default: m.ArchivePanel })));
+const PlayPanel = lazy(() => import("./PlayPanel").then((m) => ({ default: m.PlayPanel })));
+const DevicesPanel = lazy(() => import("./DevicesPanel").then((m) => ({ default: m.DevicesPanel })));
+const StatsPanel = lazy(() => import("./StatsPanel").then((m) => ({ default: m.StatsPanel })));
+const ClaudePanel = lazy(() => import("./ClaudePanel").then((m) => ({ default: m.ClaudePanel })));
+const WhatsAppPanel = lazy(() => import("./WhatsAppPanel").then((m) => ({ default: m.WhatsAppPanel })));
+const HabitsPanel = lazy(() => import("./HabitsPanel").then((m) => ({ default: m.HabitsPanel })));
+const NewsPanel = lazy(() => import("./NewsPanel").then((m) => ({ default: m.NewsPanel })));
+
+const PANEL: Record<Module, React.ComponentType> = {
   chat: () => <ChatPanel />,
   media: MediaPanel,
   shelf: ShelfPanel,
@@ -141,7 +143,9 @@ export function Panels() {
           <PresenceContext.Provider value={null}>
             <Boundary resetKey={tab}>
               <LiveVeil tab={tab}>
-                <Active />
+                <Suspense fallback={null}>
+                  <Active />
+                </Suspense>
               </LiveVeil>
             </Boundary>
           </PresenceContext.Provider>

@@ -6,6 +6,7 @@
 //!  - Düz metin yapıştır (Ctrl+Alt+V): panodaki biçim atılır, metin yapıştırılır
 //!  - Ses çıkışı (isteğe bağlı): seçili çıkışlar arasında sırayla geçer
 //!  - Hum (Ctrl+Alt+M): bilgisayarda çalan şarkıyı bul
+//!  - Parçacık seçici (Ctrl+Alt+P): adada parçacıklar listelenir, seçilen önceki pencereye yapıştırılır
 //!  - Kısayol tuşları (isteğe bağlı): basılınca ön yüz o tuşu çalıştırır ("nook://deck-key")
 
 use std::sync::{Arc, Mutex};
@@ -25,6 +26,8 @@ use crate::window::{self, ISLAND};
 static REGISTERED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Windows'un kaydetmeye izin vermediği (başka bir programın tuttuğu) kısayollar; arkada yeniden denenir
 static FAILED: Mutex<Vec<(String, Role)>> = Mutex::new(Vec::new());
+/// Şu an Windows'ta kayıtlı olan kısayollarımız (yalnızca bunlar bırakılır; alarmın Esc'ine dokunulmaz)
+static BOUND: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 #[derive(Clone)]
 enum Role {
@@ -37,6 +40,7 @@ enum Role {
     Output,
     Live,
     Hum,
+    Snippets,
     /// Kısayol tuşu (kimliği)
     Deck(String),
 }
@@ -61,27 +65,38 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         (settings.output_shortcut.as_str(), Role::Output),
         (settings.live_shortcut.as_str(), Role::Live),
         (settings.hum_shortcut.as_str(), Role::Hum),
+        (settings.snippet_shortcut.as_str(), Role::Snippets),
     ];
     list.extend(settings.deck_hotkeys.iter().map(|h| (h.accel.as_str(), Role::Deck(h.id.clone()))));
-    let wanted: Vec<String> = list
+    // "Oyunda kısayolları kapat": tam ekran oyun öndeyken kalkan dışındaki kısayollar bırakılır, tuşlar oyuna gider
+    let quiet = settings.shortcuts_off_in_game && app.state::<Arc<Shared>>().game_front.load(std::sync::atomic::Ordering::Relaxed);
+    let mut wanted: Vec<String> = list
         .iter()
         .map(|(s, r)| match r {
             Role::Deck(id) => format!("{s}={id}"),
             _ => s.to_string(),
         })
         .collect();
+    if quiet {
+        wanted.push("oyun".into());
+    }
     if *registered == wanted {
         return Ok(());
     }
     let gs = app.global_shortcut();
-    let _ = gs.unregister_all();
+    for accel in std::mem::take(&mut *BOUND.lock().unwrap()) {
+        let _ = gs.unregister(accel.as_str());
+    }
     registered.clear();
+    if quiet {
+        crate::log::write("info", "kısayollar oyun süresince bırakıldı (kalkan dışında)");
+    }
 
     let mut errors = Vec::new();
     let mut failed: Vec<(String, Role)> = Vec::new();
     let mut seen: Vec<String> = Vec::new();
     for (accel, role) in list {
-        if accel.trim().is_empty() {
+        if accel.trim().is_empty() || (quiet && !matches!(role, Role::Shield)) {
             continue;
         }
         // Aynı kısayol iki işe verildiyse yalnızca ilki çalışır
@@ -105,6 +120,12 @@ pub fn register(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     } else {
         Err(format!("Kısayol kaydedilemedi ({})", errors.join(", ")))
     }
+}
+
+/// Tam ekran oyun öne geldi ya da arkaya gitti: kısayollar ayara göre bırakılır ya da geri alınır
+pub fn game_changed(app: &AppHandle) {
+    let settings = app.state::<Arc<Shared>>().settings();
+    let _ = register(app, &settings);
 }
 
 /// Başka bir programın tuttuğu kısayollar (Windows kaydetmeye izin vermedi)
@@ -173,12 +194,19 @@ fn bind(app: &AppHandle, accel: &str, role: Role) -> Result<(), String> {
             (Role::Hum, ShortcutState::Pressed) => {
                 let _ = app.emit("nook://hum-toggle", ());
             }
+            (Role::Snippets, ShortcutState::Pressed) => {
+                if let Some(label) = open_island(app) {
+                    let _ = app.emit_to(label.as_str(), "nook://snippets", ());
+                }
+            }
             (Role::Deck(id), ShortcutState::Pressed) => {
                 let _ = app.emit_to(ISLAND, "nook://deck-key", id.clone());
             }
             _ => {}
         })
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    BOUND.lock().unwrap().push(accel.to_owned());
+    Ok(())
 }
 
 /// İmlecin olduğu ekrandaki adanın etiketi; yoksa ana ada.

@@ -23,6 +23,8 @@ export function islandModeOf(s: State): IslandMode {
   if (s.brief && isPrimary) return "brief";
   if (s.notes && isPrimary) return "notes";
   if (s.report && isPrimary) return "report";
+  // Günü kapat: üzerine gelinse de kart kalır (not yazılabilsin)
+  if (s.dayClose && isPrimary) return "dayclose";
   // Su hatırlatması cevaplanana kadar durur (üstüne gelince açılmaz ki düğmelere basılabilsin)
   // Otomasyon "çalışsın mı?" diye soruyor (aynı kart)
   if (s.reminder || (s.autoAsk && isPrimary)) return "reminder";

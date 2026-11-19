@@ -3,12 +3,16 @@
  * alçak gövde tonu); kapanırken inen, açılırken çıkan iki katmanlı bir klik.
  */
 let ctx: AudioContext | null = null;
+let idle = 0;
 
 export function micClick(on: boolean) {
   try {
     ctx ??= new AudioContext();
     const a = ctx;
     void a.resume();
+    // Kliğin ardından ses aygıtı bırakılır (açık bağlam boştayken de işlemci harcar)
+    window.clearTimeout(idle);
+    idle = window.setTimeout(() => void a.suspend(), 1500);
     const t = a.currentTime + 0.01;
     const out = a.createGain();
     out.gain.value = 0.55;

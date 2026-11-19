@@ -8,6 +8,7 @@ import { spring } from "../../lib/motion";
 import { useNook, type Pad } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
+import { offerUndo } from "../../lib/undo";
 
 const COLOR = ACCENT.yellow;
 /** Defter çizgilerinin aralığı (yazının satır yüksekliğiyle aynı) */
@@ -33,6 +34,19 @@ export function ScratchPanel() {
     const t = window.setTimeout(() => ref.current?.focus(), 140);
     return () => window.clearTimeout(t);
   }, [padId, preview]);
+
+  /** Sayfayı boşaltır (çöp kutusu, Esc); 5 sn "Geri al" metni aynı sayfaya geri koyar */
+  const clear = () => {
+    if (!note) return;
+    const old = note;
+    const id = pad.id;
+    setNote("");
+    offerUndo({
+      label: tt("{0} temizlendi", pad.title),
+      color: COLOR,
+      undo: () => useNook.setState((s) => ({ pads: s.pads.map((p) => (p.id === id ? { ...p, text: old, at: Date.now() } : p)), ...(s.padId === id ? { note: old } : {}) })),
+    });
+  };
 
   const write = (text: string) => {
     setNote(text);
@@ -135,14 +149,14 @@ export function ScratchPanel() {
           <Tool label={copied ? tt("Kopyalandı") : tt("Kopyala")} onClick={copy} disabled={!note} on={copied}>
             <Copy size={11.5} strokeWidth={2.4} />
           </Tool>
-          <Tool label={tt("Temizle (Esc)")} onClick={() => setNote("")} disabled={!note} danger>
+          <Tool label={tt("Temizle (Esc)")} onClick={clear} disabled={!note} danger>
             <Trash2 size={11.5} strokeWidth={2.4} />
           </Tool>
         </div>
 
         {/* Kâğıt: soluk çizgiler ve sarı kenar çizgisi */}
         <div
-          className="relative min-h-0 flex-1 overflow-hidden rounded-[14px] border border-white/[0.06]"
+          className="relative min-h-0 flex-1 overflow-hidden rounded-row border border-white/[0.06]"
           style={{
             background: `linear-gradient(90deg, transparent 21px, ${tintBg(COLOR, 35)} 21px, ${tintBg(COLOR, 35)} 22px, transparent 22px), repeating-linear-gradient(180deg, transparent 0, transparent ${LINE - 1}px, rgb(255 255 255 / 0.045) ${LINE - 1}px, rgb(255 255 255 / 0.045) ${LINE}px), rgb(255 255 255 / 0.03)`,
             backgroundPosition: `0 0, 0 9px, 0 0`,
@@ -157,7 +171,7 @@ export function ScratchPanel() {
               ref={ref}
               value={note}
               onChange={(e) => write(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && setNote("")}
+              onKeyDown={(e) => e.key === "Escape" && clear()}
               spellCheck={false}
               placeholder={tt("Aklından geçeni yaz… (# başlık, **kalın**, - liste)")}
               className="h-full w-full resize-none bg-transparent py-2 pl-8 pr-3 text-[13px] text-label outline-none placeholder:text-label-3"
@@ -166,9 +180,9 @@ export function ScratchPanel() {
           )}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between px-1 text-[9.5px] text-label-3">
+        <div className="flex shrink-0 items-center justify-between px-1 text-[10.5px] text-label-3">
           <span className="truncate">{note.length ? tt("{0} kelime · {1} karakter", words, note.length) : tt("Kendiliğinden kaydedilir")}</span>
-          <span className="shrink-0">{tt("Esc temizler")}</span>
+          <span className="shrink-0">{tt("Esc temizler · geri alınır")}</span>
         </div>
       </div>
     </div>
@@ -183,7 +197,7 @@ function Tool({ label, onClick, disabled, on, danger, children }: { label: strin
       disabled={disabled}
       title={label}
       aria-label={label}
-      className="group flex h-6 w-6 items-center justify-center rounded-[8px] text-label-2 transition-colors enabled:hover:bg-well-hi enabled:hover:text-label disabled:opacity-30"
+      className="group flex h-6 w-6 items-center justify-center rounded-badge text-label-2 transition-colors enabled:hover:bg-well-hi enabled:hover:text-label disabled:opacity-30"
       style={on ? { background: tintBg(c, 18), color: tintText(c) } : undefined}
     >
       {children}
@@ -191,16 +205,28 @@ function Tool({ label, onClick, disabled, on, danger, children }: { label: strin
   );
 }
 
-/** Sayfalar: tıkla geç, çift tıkla adını değiştir, × kapat (içi doluysa ikinci tıkla) */
+/** Sayfalar: tıkla geç, çift tıkla adını değiştir, × sil (5 sn geri alınır) */
 function Pages({ pads, active }: { pads: Pad[]; active: string }) {
   const { setPad, addPad } = useNook.getState();
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<string | null>(null);
-  useEffect(() => {
-    if (!confirm) return;
-    const t = window.setTimeout(() => setConfirm(null), 2500);
-    return () => window.clearTimeout(t);
-  }, [confirm]);
+  const remove = (p: Pad) => {
+    const before = useNook.getState();
+    const at = before.pads.findIndex((x) => x.id === p.id);
+    before.removePad(p.id);
+    // Boş sayfayı geri almaya gerek yok
+    if (!p.text) return;
+    offerUndo({
+      label: tt("{0} silindi", p.title),
+      color: COLOR,
+      undo: () =>
+        useNook.setState((s) => {
+          // Son sayfa silinince yerine açılan boş sayfa geri gelenle birlikte durmasın
+          const rest = s.pads.filter((x) => x.text || before.pads.some((b) => b.id === x.id));
+          const pads = [...rest.slice(0, at), p, ...rest.slice(at)];
+          return { pads, padId: p.id, note: p.text };
+        }),
+    });
+  };
 
   return (
     <div className="flex w-[118px] shrink-0 flex-col gap-1">
@@ -217,7 +243,7 @@ function Pages({ pads, active }: { pads: Pad[]; active: string }) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
                 transition={spring.pop}
-                className="group relative rounded-[11px] border px-2 py-1.5"
+                className="group relative rounded-row border px-2 py-1.5"
                 style={on ? { background: tintBg(COLOR, 13), borderColor: tintBg(COLOR, 42) } : { background: "rgb(255 255 255 / 0.03)", borderColor: "rgb(255 255 255 / 0.05)" }}
               >
                 {renaming === p.id ? (
@@ -240,18 +266,14 @@ function Pages({ pads, active }: { pads: Pad[]; active: string }) {
                     <span className="block truncate text-[11px] font-semibold" style={{ color: on ? tintText(COLOR) : "var(--color-label)" }}>
                       {p.title}
                     </span>
-                    <span className="block truncate text-[9.5px] text-label-3">{first || tt("Boş sayfa")}</span>
+                    <span className="block truncate text-[10.5px] text-label-3">{first || tt("Boş sayfa")}</span>
                   </button>
                 )}
                 <button
-                  onClick={() => {
-                    if (p.text && confirm !== p.id) return setConfirm(p.id);
-                    useNook.getState().removePad(p.id);
-                    setConfirm(null);
-                  }}
-                  title={confirm === p.id ? tt("Silmek için yeniden tıkla") : tt("Kapat")}
-                  className={`absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full transition ${confirm === p.id ? "opacity-100" : "text-label-3 opacity-0 hover:bg-white/10 hover:text-label group-hover:opacity-100"}`}
-                  style={confirm === p.id ? { background: tintBg(ACCENT.red, 30), color: tintText(ACCENT.red) } : undefined}
+                  onClick={() => remove(p)}
+                  title={tt("Sayfayı sil")}
+                  aria-label={tt("{0} sayfasını sil", p.title)}
+                  className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full text-label-3 opacity-50 transition hover:bg-white/10 hover:text-label focus-visible:opacity-100 group-hover:opacity-100"
                 >
                   <X size={9} strokeWidth={3} />
                 </button>
@@ -263,7 +285,7 @@ function Pages({ pads, active }: { pads: Pad[]; active: string }) {
       {pads.length < 8 && (
         <button
           onClick={addPad}
-          className="flex h-7 shrink-0 items-center justify-center gap-1 rounded-[11px] border border-dashed border-white/[0.12] text-[10.5px] font-semibold text-label-3 hover:border-white/25 hover:text-label"
+          className="flex h-7 shrink-0 items-center justify-center gap-1 rounded-row border border-dashed border-white/[0.12] text-[10.5px] font-semibold text-label-3 hover:border-white/25 hover:text-label"
         >
           <Plus size={11} strokeWidth={2.6} />
           {tt("Yeni sayfa")}
@@ -294,6 +316,7 @@ function Markdown({ text, onTask }: { text: string; onTask: (line: number) => vo
             <p key={i} className="flex items-center gap-1.5">
               <button
                 onClick={() => onTask(i)}
+                aria-label={done ? tt("Görev yapıldı: geri al") : tt("Görevi yapıldı işaretle")}
                 className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border"
                 style={{ borderColor: done ? COLOR : "rgb(255 255 255 / 0.3)", background: done ? tintBg(COLOR, 45) : undefined }}
               >

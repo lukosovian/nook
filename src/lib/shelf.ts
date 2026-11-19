@@ -6,10 +6,12 @@ import type { ShelfItem } from "../store/nook";
 let fallbackIcon: Promise<string> | undefined;
 
 /** Raftaki dosyayı native (OLE) sürükleme ile Discord'a, klasöre, tarayıcıya taşı. */
-export async function dragOut(item: ShelfItem, onDropped?: () => void) {
-  if (!inTauri) return;
-  const icon = item.isImage ? item.path : await (fallbackIcon ??= dragIconPath());
-  await startDrag({ item: [item.path], icon, mode: "copy" }, (e) => e.result === "Dropped" && onDropped?.());
+export async function dragOut(item: ShelfItem | ShelfItem[], onDropped?: () => void) {
+  // Dizi verilirse hepsi tek sürüklemede taşınır (rafta çoklu seçim)
+  const items = Array.isArray(item) ? item : [item];
+  if (!inTauri || !items.length) return;
+  const icon = items[0].isImage ? items[0].path : await (fallbackIcon ??= dragIconPath());
+  await startDrag({ item: items.map((i) => i.path), icon, mode: "copy" }, (e) => e.result === "Dropped" && onDropped?.());
 }
 
 /** Herhangi bir yolu (çıkarılmış arşiv dosyası, klasör) native sürükleme ile taşı */

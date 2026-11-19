@@ -3,7 +3,7 @@ import { EVENTS, isPrimary, releaseFocus, setInteractive, subscribe } from "../l
 import { startTour } from "../lib/tour";
 import { checkUpdate, useUpdate } from "../lib/update";
 import { tt } from "../lib/i18n";
-import { isQuiet, useNook } from "../store/nook";
+import { useNook } from "../store/nook";
 import { playAntic } from "./useAntics";
 
 const QUIET_MS = 3600_000;
@@ -11,7 +11,8 @@ const QUIET_MS = 3600_000;
 /** "1 saat sessiz" aç / kapat */
 export function toggleQuiet() {
   const s = useNook.getState();
-  if (isQuiet(s)) {
+  // Yalnızca "1 saat sessiz"in kendisi (sessiz saatler ayrı: Ayarlar › Bildirimler)
+  if ((s.settings.quietUntil ?? 0) > Date.now()) {
     s.updateSettings({ quietUntil: 0 });
     s.pushToast({ kind: "welcome", title: tt("Sessizlik bitti"), detail: tt("Kartlar ve hatırlatmalar geri geldi"), ms: 3500 });
     return;

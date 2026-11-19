@@ -71,7 +71,7 @@ export function useAntics() {
 
     const tick = () => {
       const s = useNook.getState();
-      s.setNight(isNight());
+      if (s.night !== isNight()) s.setNight(isNight());
       const free =
         s.mood === "idle" && !s.antic && !isSleeping(s) && !s.searching && !s.osd && !s.toasts.length && !s.relocating && !s.outing && !isWorking(s);
 

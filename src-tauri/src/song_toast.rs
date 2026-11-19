@@ -1,6 +1,6 @@
 //! Şarkı bildirimi: İzlerken Hum bir şarkı bulunca videonun ekranının sol altında (tam ekran video
 //! varsa onun ekranı, yoksa öndeki pencerenin ekranı) küçük, tıklanamaz bir çubuk çıkar. Argus kartı gibi ayrı pencere; hiç odak almaz (tarayıcı tam
-//! ekrandan çıkmasın), bir kez oluşturulur ve yerinde kalır, içeriği kendi animasyonuyla kaybolur.
+//! ekrandan çıkmasın), oluşturulunca yerinde kalır, içeriği kendi animasyonuyla kaybolur; birkaç dakika bildirim gelmezse kapatılır.
 
 use std::sync::{Arc, Mutex};
 
@@ -16,6 +16,9 @@ const MARGIN: f64 = 28.0;
 
 /// Pencere yeni açıldıysa sayfa yüklenince bunu alır
 static PENDING: Mutex<Option<serde_json::Value>> = Mutex::new(None);
+/// Bildirim sayacı: boşta kalan pencereyi kapatan bekleyiş, arada yeni bildirim geldiyse vazgeçer
+static USES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+const KEEP: std::time::Duration = std::time::Duration::from_secs(180);
 
 /// Şarkıyı videonun ekranının sol altında göster
 #[tauri::command]
@@ -89,6 +92,17 @@ pub async fn song_toast(app: AppHandle, data: serde_json::Value) -> Result<(), S
         });
     }
     let _ = app.emit_to(LABEL, "nook://song-toast", data);
+    // Son bildirimden sonra KEEP kadar yenisi gelmezse pencere (ayrı bir WebView, ~55 MB) kapatılır;
+    // sonraki şarkıda yukarıda ilk seferdeki gibi (görünür, odaksız) yeniden oluşturulur.
+    let mine = USES.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        std::thread::sleep(KEEP);
+        if USES.load(std::sync::atomic::Ordering::SeqCst) == mine {
+            if let Some(w) = app.get_webview_window(LABEL) {
+                let _ = w.destroy();
+            }
+        }
+    });
     Ok(())
 }
 

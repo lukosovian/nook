@@ -206,7 +206,7 @@ export function setupItems(r: SetupReport): { connect: SetupItem[]; wake: SetupI
   const ts = o.tailscaleState ?? (o.tailscaleUp ? "running" : o.tailscaleInstalled ? "stopped" : "missing");
   const connect: SetupItem[] = [
     ts === "missing"
-      ? { id: "ts", ok: false, text: "PC'de Tailscale kurulu değil", guide: { steps: ["PC'de Nook › Ayarlar › Telefon › Evden uzaktayken bağlanma › Kur'a bas.", "Kurulum bitince Google hesabınla giriş yap.", "Telefona da Tailscale'i kurup aynı hesapla giriş yap."] } }
+      ? { id: "ts", ok: false, text: "PC'de Tailscale kurulu değil", guide: { steps: ["PC'de Nook › Ayarlar › Telefon › Evden uzakta › Kur'a bas.", "Kurulum bitince Google hesabınla giriş yap.", "Telefona da Tailscale'i kurup aynı hesapla giriş yap."] } }
       : ts === "needs-login"
         ? { id: "ts", ok: false, text: "PC'de Tailscale'e giriş yapılmamış", guide: { steps: ["PC'de saatin yanındaki Tailscale simgesine tıkla › Log in.", "Telefondakiyle aynı hesapla giriş yap."] } }
         : ts === "running"
@@ -214,7 +214,7 @@ export function setupItems(r: SetupReport): { connect: SetupItem[]; wake: SetupI
           : { id: "ts", ok: false, text: "PC'de Tailscale kapalıydı; Nook yeniden bağlıyor" },
     o.firewall
       ? { id: "fw", ok: true, text: "PC'nin güvenlik duvarı telefona izin veriyor" }
-      : { id: "fw", ok: false, text: "PC'nin güvenlik duvarı izni yok", guide: { steps: ["PC'de Nook › Ayarlar › Telefon › Evden uzaktayken bağlanma › “İzin ver”e bas ve Windows'un sorusuna Evet de."] } },
+      : { id: "fw", ok: false, text: "PC'nin güvenlik duvarı izni yok", guide: { steps: ["PC'de Nook › Ayarlar › Telefon › Evden uzakta › “İzin ver”e bas ve Windows'un sorusuna Evet de."] } },
   ];
   const card = w.magicPacket !== false && w.wakeArmed !== false;
   const wake: SetupItem[] = [];

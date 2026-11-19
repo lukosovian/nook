@@ -10,6 +10,7 @@ import { useNook } from "../store/nook";
 import { normalizeColor, normalizeLook, SHOWCASE, TOUR_CHIPS } from "./look";
 import { prefetchBodies } from "./nook3d";
 import { figureRes } from "../components/mascot/Figure";
+import { applyChattiness } from "./chattiness";
 
 /** Ada küçülme animasyonu bitmeden pencere küçülmesin */
 const SHRINK_AFTER_MS = 700;
@@ -38,6 +39,9 @@ export async function startTour() {
 }
 
 export function endTour() {
+  // Yeni kurulum: son adımda başka bir şey seçilmediyse "Dengeli" (mevcut kullanıcının ayarlarına dokunulmaz)
+  const st = useNook.getState();
+  if (st.tour && !st.toured && !st.settings.chattiness) applyChattiness("balanced");
   useNook.getState().setTour(false);
   // Yeni kullanıcı tanıtımda zaten her şeyi gördü: mevcut yama notu ona ayrıca açılmasın
   if (!useNook.getState().notesSeen) useNook.getState().setNotesSeen(latestNote().version);

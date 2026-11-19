@@ -34,7 +34,7 @@ export const tintBg = (c: string, pct = 13) => `color-mix(in srgb, ${c} ${pct}%,
 
 export function Card({ className = "", children, style }: { className?: string; children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className={`nook-card rounded-[18px] ${className}`} style={style}>
+    <div className={`nook-card rounded-card ${className}`} style={style}>
       {children}
     </div>
   );
@@ -43,7 +43,7 @@ export function Card({ className = "", children, style }: { className?: string; 
 /** İç kuyucuk: kart içindeki ikincil yüzey */
 export function Well({ className = "", children, style }: { className?: string; children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className={`rounded-[14px] bg-well ${className}`} style={style}>
+    <div className={`rounded-row bg-well ${className}`} style={style}>
       {children}
     </div>
   );
@@ -136,22 +136,106 @@ export function Chip({
         <span className="block truncate text-[12px] font-medium" style={{ color: active ? tintText(color) : "var(--color-label-2)" }}>
           {label}
         </span>
-        {sub && <span className="block truncate text-[10px] text-label-3">{sub}</span>}
+        {sub && <span className="block truncate text-[10.5px] text-label-3">{sub}</span>}
       </span>
     </Comp>
   );
 }
 
-/** Boş durum: soluk mini Nook + iki satır. */
-export function EmptyState({ title, hint, color = "#8a8a93" }: { icon?: LucideIcon; title: string; hint: string; color?: string }) {
+/**
+ * Boş durum: modülün renginde uyuklayan mini Nook, iki satır ve (varsa) tek bir eylem düğmesi.
+ * `icon` eski çağrılar için duruyor; çizilmez.
+ */
+export function EmptyState({
+  title,
+  hint,
+  color = "#8a8a93",
+  action,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  hint: string;
+  color?: string;
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2.5 text-center">
-      <MiniNook color={color} size={30} eyes="side" />
+      <span className="relative">
+        <MiniNook color={color} size={34} eyes="closed" />
+        <motion.span
+          aria-hidden
+          className="absolute -right-2.5 -top-2 font-round text-[10.5px] font-extrabold"
+          style={{ color: tintText(color) }}
+          animate={{ opacity: [0.2, 0.9, 0.2], y: [1, -2, 1] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          z
+        </motion.span>
+      </span>
       <div>
         <p className="text-[13px] font-medium text-label">{title}</p>
-        <p className="mt-0.5 text-[11px] text-label-3">{hint}</p>
+        <p className="mx-auto mt-0.5 max-w-[340px] text-[11px] text-label-3">{hint}</p>
       </div>
+      {action && (
+        <motion.button
+          whileTap={{ scale: 0.94 }}
+          transition={spring.pop}
+          onClick={action.onClick}
+          className="h-7 rounded-full border px-3.5 text-[11.5px] font-semibold"
+          style={{ background: tintBg(color, 16), borderColor: tintBg(color, 42), color: tintText(color) }}
+        >
+          {action.label}
+        </motion.button>
+      )}
     </div>
+  );
+}
+
+/**
+ * Bölümün tek ana düğmesi: 36 px, modül renginde üstten ışık alan dolgu. Açık renklerde (sarı, turkuaz,
+ * turuncu) yazı koyu, koyu renklerde (mor, mavi, kırmızı) beyaz olur.
+ */
+export function PrimaryButton({
+  color = ACCENT.purple,
+  onClick,
+  disabled,
+  children,
+  className = "",
+  title,
+}: {
+  color?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      transition={spring.pop}
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      className={`flex h-9 items-center justify-center gap-1.5 rounded-row px-4 text-[12.5px] font-bold disabled:opacity-40 ${className}`}
+      style={{
+        background: `linear-gradient(180deg, color-mix(in srgb, ${color} 70%, white), ${color})`,
+        // Rengin açıklığına göre: açık dolguda koyu, koyu dolguda beyaz yazı
+        color: `oklch(from ${color} clamp(0.17, (0.68 - l) * 999, 1) 0 0)`,
+        boxShadow: `inset 0 1px 0 rgb(255 255 255 / 0.4), 0 6px 16px -8px ${color}`,
+      }}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+/** Bölüm başlığı: küçük, büyük harf, aralıklı. `color` verilirse o rengin açık tonu. */
+export function SectionLabel({ children, color, className = "" }: { children: React.ReactNode; color?: string; className?: string }) {
+  return (
+    <p className={`text-[10.5px] font-semibold uppercase tracking-[0.08em] ${color ? "" : "text-label-3"} ${className}`} style={color ? { color: tintText(color) } : undefined}>
+      {children}
+    </p>
   );
 }
 
@@ -183,11 +267,12 @@ export function TextButton({
 }
 
 /** Anahtar: topuz küçük bir küre; açıkken iz renkli parlar. */
-export function Toggle({ on, onChange, color = ACCENT.teal }: { on: boolean; onChange: (v: boolean) => void; color?: string }) {
+export function Toggle({ on, onChange, color = ACCENT.teal, label }: { on: boolean; onChange: (v: boolean) => void; color?: string; /** Ekran okuyucu için ad (yanında görünür etiket yoksa) */ label?: string }) {
   return (
     <button
       role="switch"
       aria-checked={on}
+      aria-label={label}
       onClick={() => onChange(!on)}
       className={`relative flex h-[18px] w-[34px] shrink-0 items-center rounded-full border p-[2px] transition-colors duration-200 ${on ? "justify-end" : "justify-start"}`}
       style={{ background: on ? tintBg(color, 30) : "rgb(255 255 255 / 0.05)", borderColor: on ? tintBg(color, 60) : "rgb(255 255 255 / 0.08)" }}
@@ -270,12 +355,15 @@ export function Dropdown<T extends string | number>({
   onChange,
   color = ACCENT.teal,
   maxWidth = 170,
+  label,
 }: {
   options: { id: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   color?: string;
   maxWidth?: number;
+  /** Ekran okuyucu için ad (ne seçildiği) */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -334,6 +422,8 @@ export function Dropdown<T extends string | number>({
       <button
         ref={button}
         data-dropdown
+        aria-label={label}
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className="flex min-w-0 items-center gap-1 rounded-full bg-well py-0.5 pl-2.5 pr-1.5 text-[11px] font-medium text-label transition-colors hover:bg-well-hi"
         style={{ maxWidth }}
@@ -346,7 +436,7 @@ export function Dropdown<T extends string | number>({
           {open && pos && (
             <motion.div
               ref={menu}
-              className="fixed z-[100] overflow-y-auto rounded-[14px] border border-white/10 p-1 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.9)]"
+              className="fixed z-[100] overflow-y-auto rounded-row border border-white/10 p-1 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.9)]"
               style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxHeight, background: "#161618" }}
               initial={{ opacity: 0, scale: 0.96, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -363,7 +453,7 @@ export function Dropdown<T extends string | number>({
                       onChange(o.id);
                       setOpen(false);
                     }}
-                    className="flex w-full items-center gap-1.5 rounded-[10px] px-2 py-[5px] text-left text-[11.5px] transition-colors hover:bg-well-hi"
+                    className="flex w-full items-center gap-1.5 rounded-badge px-2 py-[5px] text-left text-[11.5px] transition-colors hover:bg-well-hi"
                     style={sel ? { color: tintText(color), background: tintBg(color, 12) } : { color: "var(--color-label-2)" }}
                   >
                     <span className="min-w-0 flex-1">{o.label}</span>

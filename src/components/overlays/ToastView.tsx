@@ -47,6 +47,7 @@ import { phoneCallAction, setInteractive, type SysEventKind } from "../../lib/br
 import { isLive, useNook } from "../../store/nook";
 import { tt } from "../../lib/i18n";
 import { openStudio } from "../../lib/studio";
+import { installUpdate } from "../../lib/update";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { CLAUDE_COLOR } from "../../lib/claude";
 import { replyToNotification, useWhatsApp, WA_COLOR } from "../../lib/whatsapp";
@@ -272,8 +273,21 @@ export function ToastView() {
                   )}
                 </div>
 
-                {(canReply || isWa || clickable || call) && (
+                {(canReply || isWa || clickable || call || toast.kind === "update") && (
                   <div className="flex shrink-0 items-center gap-1">
+                    {toast.kind === "update" && (
+                      <button
+                        onClick={() => {
+                          dismiss();
+                          void installUpdate();
+                        }}
+                        className="flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold transition-transform active:scale-95"
+                        style={{ background: tintBg(accentColor, 20), borderColor: tintBg(accentColor, 46), color: tintText(accentColor) }}
+                      >
+                        <Download size={11.5} strokeWidth={2.5} />
+                        {tt("Güncelle")}
+                      </button>
+                    )}
                     {call?.canDecline && (
                       <button
                         onClick={() => callAction("decline")}

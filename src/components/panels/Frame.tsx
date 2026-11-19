@@ -54,6 +54,7 @@ import { ek, useNookName } from "../../lib/look";
 import { pickGreeting } from "../../lib/greet";
 import { shortLeft, timerLine, usePowerTimer } from "../../lib/powerTimer";
 import { pct as fmtPct, tt, locale } from "../../lib/i18n";
+import { useUpdate } from "../../lib/update";
 import { allProfiles, MAX_PROFILES, newProfile, userProfiles } from "../../lib/profiles";
 import { SoundBody } from "../SoundCard";
 import { lineAt, lyricOffset, useLyrics } from "../../lib/lyrics";
@@ -214,6 +215,8 @@ function Dock() {
     s.setTab(t);
   };
   const on = (t: Tab) => !searching && tab === t;
+  // Yeni sürüm hazırsa Studio simgesinde yeşil nokta
+  const updateReady = useUpdate((s) => !!s.available && s.progress === null);
   return (
     <div className="absolute bottom-0 left-0 top-0 border-r border-white/[0.06] bg-white/[0.022]" style={{ width: ex.dock }}>
       <div className="flex flex-col items-center gap-1 pb-3 pt-2.5" style={{ zoom: ex.zoom, width: ex.dock / ex.zoom, height: ex.height / ex.zoom }}>
@@ -223,7 +226,7 @@ function Dock() {
         <DockIcon icon={Search} label={tt("Ara")} color={HUB_COLOR.search} active={searching} onClick={() => useNook.getState().setSearching(true)} />
         <div className="flex-1" />
         {/* Studio'nun kendisi, görünüm ve ayarlar Nook Studio'da (ayrı pencere) */}
-        <DockIcon icon={AppWindow} label="Nook Studio" color={ACCENT.purple} active={false} onClick={() => openStudio("home")} />
+        <DockIcon icon={AppWindow} label={updateReady ? tt("Nook Studio · yeni sürüm hazır") : "Nook Studio"} color={ACCENT.purple} active={false} dot={updateReady} onClick={() => openStudio(updateReady ? `settings:${tt("Hakkında")}` : "home")} />
         <DockIcon icon={Shirt} label={tt("Görünüm · Nook Studio")} color={ACCENT.pink} active={false} onClick={() => openStudio("look")} />
         <DockIcon icon={Settings} label={tt("Ayarlar · Nook Studio")} color={ACCENT.gray} active={false} onClick={() => openStudio("settings")} />
       </div>
@@ -231,7 +234,7 @@ function Dock() {
   );
 }
 
-function DockIcon({ icon: Icon, label, color, active, onClick }: { icon: LucideIcon; label: string; color: string; active: boolean; onClick: () => void }) {
+function DockIcon({ icon: Icon, label, color, active, dot, onClick }: { icon: LucideIcon; label: string; color: string; active: boolean; dot?: boolean; onClick: () => void }) {
   return (
     <motion.button
       onClick={onClick}
@@ -248,6 +251,8 @@ function DockIcon({ icon: Icon, label, color, active, onClick }: { icon: LucideI
         />
       )}
       <Icon size={14} strokeWidth={2.3} className="relative" fill={active && Icon === House ? "currentColor" : "none"} />
+      {/* Yeni sürüm hazır */}
+      {dot && <span className="absolute right-[5px] top-[5px] h-[7px] w-[7px] rounded-full bg-green ring-2 ring-black" />}
     </motion.button>
   );
 }

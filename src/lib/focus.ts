@@ -4,7 +4,7 @@
  */
 import { playAntic } from "../hooks/useAntics";
 import { alarmRing } from "./bridge";
-import { useNook, type FocusPhase } from "../store/nook";
+import { isQuiet, useNook, type FocusPhase } from "../store/nook";
 import { tt } from "./i18n";
 
 export const PHASE_LABEL: Record<FocusPhase, string> = { work: tt("Odak"), break: tt("Kısa mola"), long: tt("Uzun mola") };
@@ -63,7 +63,7 @@ function notify(kind: "focus" | "break", title: string, detail: string, antic: "
   const s = useNook.getState();
   s.pushToast({ kind, title, detail, ms: 5000 });
   playAntic(antic);
-  if (s.settings.alarmSound) void alarmRing(true, s.settings.alarmSound, true);
+  if (s.settings.alarmSound && !isQuiet(s) && !s.fullscreen && !s.ringing) void alarmRing(true, s.settings.alarmSound, true);
 }
 
 /** "12:05" biçimi */

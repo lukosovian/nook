@@ -8,6 +8,10 @@
  */
 
 let interval = 1000 / 60;
+let baseFps = 60;
+/** Ada kapalıyken (küçük çentik) 30 kare yeter */
+let calm = false;
+const CALM_FPS = 30;
 /** Kısa, hızlı animasyonlar (açılış) sırasında sınır kalkar — ekranın kendi hızında akıcı çizilir */
 let boosted = false;
 // Kare zamanlamasındaki titremeye pay — 60 Hz ekranda hiçbir kare atlanmasın
@@ -90,7 +94,14 @@ window.cancelAnimationFrame = (id) => {
 
 /** Saniyedeki en fazla kare (pilde / enerji tasarrufunda 30) */
 export function setFrameRate(fps: number) {
-  interval = 1000 / fps;
+  baseFps = fps;
+  interval = 1000 / (calm ? Math.min(fps, CALM_FPS) : fps);
+}
+
+/** Ada kapalı ve sakinken kare hızını düşürür; açılınca hemen eski hızına döner */
+export function calmFrames(on: boolean) {
+  calm = on;
+  setFrameRate(baseFps);
 }
 
 /** Açılış gibi kısa ve hızlı hareketlerde kare sınırını geçici olarak kaldırır */

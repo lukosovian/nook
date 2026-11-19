@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { AlarmClock, BellOff, Check, Pill, Timer } from "lucide-react";
 import { stopAlarm } from "../../hooks/useAlarms";
-import { clock, isMedicine } from "../../lib/alarm";
+import { clock, isMedicine, SNOOZE } from "../../lib/alarm";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
@@ -16,7 +16,7 @@ export function AlarmView() {
 
   return (
     <motion.div
-      className="absolute inset-y-0 left-[66px] right-3 flex cursor-pointer items-center gap-3"
+      className="absolute inset-y-0 left-[66px] right-3 flex cursor-pointer items-center gap-2"
       onClick={() => stopAlarm()}
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0, transition: { delay: 0.08, duration: 0.2 } }}
@@ -30,9 +30,29 @@ export function AlarmView() {
           {clock(ringing)}
         </p>
         <p className="mt-1 truncate text-[11px] text-label-2">{ringing.label || tt("Alarm")}</p>
-        <p className="mt-0.5 truncate text-[9.5px] text-label-3">{tt("Esc ya da dokun: kapat")}</p>
+        <p className="mt-0.5 truncate text-[9.5px] text-label-3">{tt("Esc: kapat")}</p>
       </div>
-      <Action icon={Timer} label={tt("5 dk")} color={ACCENT.blue} onClick={() => stopAlarm(5)} />
+      {/* Ertele: süreyi seç (5 / 10 / 15 dk) */}
+      <div
+        className="flex h-9 shrink-0 items-center gap-0.5 rounded-full border pl-2 pr-1"
+        style={{ background: tintBg(ACCENT.blue, 14), borderColor: tintBg(ACCENT.blue, 38), color: tintText(ACCENT.blue) }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Timer size={13} strokeWidth={2.5} className="mr-0.5" />
+        {SNOOZE.map((m) => (
+          <motion.button
+            key={m}
+            whileTap={{ scale: 0.88 }}
+            transition={spring.pop}
+            onClick={() => stopAlarm(m)}
+            title={tt("{0} dakika ertele", m)}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums hover:bg-white/10"
+          >
+            {m}
+          </motion.button>
+        ))}
+        <span className="pr-1 text-[10px] font-medium opacity-70">{tt("dk")}</span>
+      </div>
       {pill ? (
         <Action icon={Check} label={tt("Aldım")} color={ACCENT.green} onClick={() => stopAlarm()} strong />
       ) : (
@@ -63,8 +83,8 @@ function Action({
         e.stopPropagation();
         onClick();
       }}
-      title={label === "5 dk" ? tt("5 dakika ertele") : tt("Alarmı kapat")}
-      className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium"
+      title={tt("Alarmı kapat")}
+      className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium"
       style={{
         background: tintBg(color, strong ? 26 : 14),
         borderColor: tintBg(color, strong ? 60 : 38),

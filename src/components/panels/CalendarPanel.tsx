@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, BellOff, ChevronLeft, ChevronRight, Link2, Plus, Repeat, X } from "lucide-react";
+import { Bell, BellOff, ChevronLeft, ChevronRight, Hourglass, Link2, Plus, Repeat, X } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { spring } from "../../lib/motion";
 import { dayKey, occursOn, remindAt, useNook, type CalEvent, type EventRepeat, type ExtEvent } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
 import { tt, locale } from "../../lib/i18n";
+import { nextCountdowns } from "../../lib/countdown";
+import { extDays } from "../../lib/ics";
 
 const COLOR = ACCENT.blue;
 /** Abone takvimden (Google/Outlook) gelenler */
@@ -59,9 +61,16 @@ export function CalendarPanel() {
   const busyDays = useMemo(() => new Set(events.map((e) => e.day)), [events]);
   // Tekrarlı etkinlikler ızgaradaki her tekrar gününde de nokta koyar
   const repeating = useMemo(() => events.filter((e) => e.repeat), [events]);
-  const extDays = useMemo(() => new Set(ext.map((e) => e.day)), [ext]);
+  // Birkaç gün süren abone etkinlik, kapladığı her günde görünür
+  const extByDay = useMemo(() => {
+    const m = new Map<string, ExtEvent[]>();
+    for (const e of ext) for (const k of extDays(e)) m.set(k, [...(m.get(k) ?? []), e]);
+    return m;
+  }, [ext]);
   const list = events.filter((e) => occursOn(e, day));
-  const extList = ext.filter((e) => e.day === day);
+  const extList = extByDay.get(day) ?? [];
+  // Geri sayılan günler: "Tatil · 12 gün" (yalnızca çizimde hesaplanır)
+  const countdowns = nextCountdowns(events, 2);
 
   // Pazartesiyle başlayan 6 haftalık ızgara
   const cells = useMemo(() => {
@@ -127,10 +136,10 @@ export function CalendarPanel() {
                 >
                   {c.getDate()}
                 </span>
-                {(busy || extDays.has(k)) && (
+                {(busy || extByDay.has(k)) && (
                   <span className="absolute bottom-[1px] flex gap-[2px]">
                     {busy && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(COLOR, 40) : COLOR }} />}
-                    {extDays.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(EXT, 40) : EXT }} />}
+                    {extByDay.has(k) && <span className="h-[3px] w-[3px] rounded-full" style={{ background: other ? tintBg(EXT, 40) : EXT }} />}
                   </span>
                 )}
                 </span>
@@ -142,11 +151,25 @@ export function CalendarPanel() {
 
       {/* Gün */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="mb-1.5 truncate text-[12px] font-medium capitalize text-label">
-          {dayLabel}
-          {day === today && <span className="ml-1.5 text-[10px] font-normal normal-case" style={{ color: tintText(COLOR) }}>{tt("bugün")}</span>}
-        </p>
-        <DayList list={list} ext={extList} />
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <p className="min-w-0 flex-1 truncate text-[12px] font-medium capitalize text-label">
+            {dayLabel}
+            {day === today && <span className="ml-1.5 text-[10px] font-normal normal-case" style={{ color: tintText(COLOR) }}>{tt("bugün")}</span>}
+          </p>
+          {countdowns.map((c) => (
+            <span
+              key={c.id}
+              className="flex max-w-[130px] shrink-0 items-center gap-1 rounded-full px-2 py-[1px] text-[10px] font-semibold"
+              style={{ background: tintBg(ACCENT.orange, 16), color: tintText(ACCENT.orange) }}
+              title={tt("Geri sayılan gün")}
+            >
+              <Hourglass size={9} strokeWidth={2.6} className="shrink-0" />
+              <span className="truncate">{c.title}</span>
+              <span className="shrink-0 tabular-nums">· {c.days === 0 ? tt("bugün") : tt("{0} gün", c.days)}</span>
+            </span>
+          ))}
+        </div>
+        <DayList list={list} ext={extList} day={day} />
       </div>
     </div>
     <AddRow day={day} />
@@ -154,7 +177,7 @@ export function CalendarPanel() {
   );
 }
 
-function DayList({ list, ext }: { list: CalEvent[]; ext: ExtEvent[] }) {
+function DayList({ list, ext, day }: { list: CalEvent[]; ext: ExtEvent[]; day: string }) {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("calendar", scroller);
   const alarms = useNook((s) => s.alarms);
@@ -169,7 +192,7 @@ function DayList({ list, ext }: { list: CalEvent[]; ext: ExtEvent[] }) {
           title={tt("Abone takvimden · {0}", e.allDay ? tt("gün boyu") : `${e.time}–${new Date(e.end).toTimeString().slice(0, 5)}`)}
         >
           <span className="w-9 shrink-0 font-display text-[12.5px] font-medium tabular-nums" style={{ color: tintText(EXT) }}>
-            {e.time || tt("Gün")}
+            {(e.day === day && e.time) || tt("Gün")}
           </span>
           <span className="min-w-0 flex-1 truncate text-[11.5px] text-label">{e.title}</span>
           <Link2 size={10} strokeWidth={2.4} className="shrink-0" style={{ color: tintText(EXT) }} />
@@ -195,6 +218,16 @@ function DayList({ list, ext }: { list: CalEvent[]; ext: ExtEvent[] }) {
                 {e.time || tt("Gün")}
               </span>
               <span className="min-w-0 flex-1 truncate text-[11.5px] text-label">{e.title}</span>
+              {/* Geri say: gün gelene dek üstte "Tatil · 12 gün" diye görünür */}
+              <button
+                onClick={() => useNook.setState((s) => ({ events: s.events.map((x) => (x.id === e.id ? { ...x, countdown: !x.countdown } : x)) }))}
+                title={e.countdown ? tt("Geri sayılıyor (kapatmak için tıkla)") : tt("Bu güne geri say")}
+                aria-label={tt("Bu güne geri say")}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full hover:bg-well-hi"
+                style={{ color: e.countdown ? tintText(ACCENT.orange) : "var(--color-label-3)", opacity: e.countdown ? 1 : 0.5 }}
+              >
+                <Hourglass size={10} strokeWidth={2.4} />
+              </button>
               {e.repeat && (
                 <span className="flex shrink-0 items-center text-label-3" title={REPEAT.find((r) => r.id === e.repeat)?.label}>
                   <Repeat size={10} strokeWidth={2.4} />
@@ -232,15 +265,17 @@ function AddRow({ day }: { day: string }) {
   const [repeat, setRepeat] = useState(0);
   const rp = REPEAT[repeat];
   const [bad, setBad] = useState(false);
+  const [countdown, setCountdown] = useState(false);
   const opt = REMIND[remind];
 
   const add = () => {
     const t = parseTime(time);
     if (t === null) return setBad(true);
     if (!title.trim()) return;
-    useNook.getState().addEvent({ day, time: t, title: title.trim(), remind: opt.min, ...(rp.id ? { repeat: rp.id } : {}) });
+    useNook.getState().addEvent({ day, time: t, title: title.trim(), remind: opt.min, ...(rp.id ? { repeat: rp.id } : {}), ...(countdown ? { countdown } : {}) });
     setTitle("");
     setTime("");
+    setCountdown(false);
   };
 
   return (
@@ -296,6 +331,19 @@ function AddRow({ day }: { day: string }) {
             {rp.label}
           </motion.span>
         </AnimatePresence>
+      </button>
+      <button
+        onClick={() => setCountdown((c) => !c)}
+        title={countdown ? tt("Geri sayılacak: gün gelene dek üstte görünür") : tt("Bu güne geri say")}
+        aria-label={tt("Bu güne geri say")}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border"
+        style={
+          countdown
+            ? { background: tintBg(ACCENT.orange, 14), borderColor: tintBg(ACCENT.orange, 40), color: tintText(ACCENT.orange) }
+            : { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-3)" }
+        }
+      >
+        <Hourglass size={11} strokeWidth={2.4} />
       </button>
       <motion.button
         whileTap={{ scale: 0.9 }}

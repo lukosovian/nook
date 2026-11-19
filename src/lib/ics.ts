@@ -37,13 +37,20 @@ function parseEvents(text: string): Map<string, Prop[]>[] {
       if (cur) out.push(cur);
       cur = null;
     } else if (cur) {
-      const colon = line.indexOf(":");
+      // Tırnak içindeki ":" ve ";" ayraç değildir: TZID="(UTC+03:00) Istanbul"
+      const cuts: number[] = [];
+      let colon = -1;
+      for (let i = 0, quoted = false; i < line.length && colon < 0; i++) {
+        if (line[i] === '"') quoted = !quoted;
+        else if (!quoted && line[i] === ";") cuts.push(i);
+        else if (!quoted && line[i] === ":") colon = i;
+      }
       if (colon < 0) continue;
-      const [name, ...rest] = line.slice(0, colon).split(";");
+      const [name, ...rest] = [...cuts, colon].map((end, i) => line.slice(i ? cuts[i - 1] + 1 : 0, end));
       const params: Record<string, string> = {};
       for (const r of rest) {
-        const [k, v] = r.split("=");
-        if (k && v) params[k.toUpperCase()] = v.replace(/^"|"$/g, "");
+        const eq = r.indexOf("=");
+        if (eq > 0 && eq < r.length - 1) params[r.slice(0, eq).toUpperCase()] = r.slice(eq + 1).replace(/^"|"$/g, "");
       }
       const key = name.toUpperCase();
       cur.set(key, [...(cur.get(key) ?? []), { value: line.slice(colon + 1), params }]);
@@ -51,6 +58,64 @@ function parseEvents(text: string): Map<string, Prop[]>[] {
   }
   return out;
 }
+
+/** Outlook'un yazdığı Windows saat dilimi adları → Intl'in tanıdığı IANA adları */
+const WINDOWS_TZ: Record<string, string> = {
+  UTC: "Etc/UTC",
+  "Turkey Standard Time": "Europe/Istanbul",
+  "GMT Standard Time": "Europe/London",
+  "Greenwich Standard Time": "Atlantic/Reykjavik",
+  "W. Europe Standard Time": "Europe/Berlin",
+  "Central Europe Standard Time": "Europe/Budapest",
+  "Central European Standard Time": "Europe/Warsaw",
+  "Romance Standard Time": "Europe/Paris",
+  "E. Europe Standard Time": "Europe/Chisinau",
+  "FLE Standard Time": "Europe/Kiev",
+  "GTB Standard Time": "Europe/Bucharest",
+  "Russian Standard Time": "Europe/Moscow",
+  "Belarus Standard Time": "Europe/Minsk",
+  "Israel Standard Time": "Asia/Jerusalem",
+  "Middle East Standard Time": "Asia/Beirut",
+  "Jordan Standard Time": "Asia/Amman",
+  "Egypt Standard Time": "Africa/Cairo",
+  "South Africa Standard Time": "Africa/Johannesburg",
+  "W. Central Africa Standard Time": "Africa/Lagos",
+  "E. Africa Standard Time": "Africa/Nairobi",
+  "Arab Standard Time": "Asia/Riyadh",
+  "Arabian Standard Time": "Asia/Dubai",
+  "Iran Standard Time": "Asia/Tehran",
+  "Azerbaijan Standard Time": "Asia/Baku",
+  "Georgian Standard Time": "Asia/Tbilisi",
+  "West Asia Standard Time": "Asia/Tashkent",
+  "Central Asia Standard Time": "Asia/Almaty",
+  "Pakistan Standard Time": "Asia/Karachi",
+  "India Standard Time": "Asia/Kolkata",
+  "Bangladesh Standard Time": "Asia/Dhaka",
+  "SE Asia Standard Time": "Asia/Bangkok",
+  "China Standard Time": "Asia/Shanghai",
+  "Singapore Standard Time": "Asia/Singapore",
+  "Taipei Standard Time": "Asia/Taipei",
+  "Tokyo Standard Time": "Asia/Tokyo",
+  "Korea Standard Time": "Asia/Seoul",
+  "W. Australia Standard Time": "Australia/Perth",
+  "Cen. Australia Standard Time": "Australia/Adelaide",
+  "E. Australia Standard Time": "Australia/Brisbane",
+  "AUS Eastern Standard Time": "Australia/Sydney",
+  "New Zealand Standard Time": "Pacific/Auckland",
+  "Hawaiian Standard Time": "Pacific/Honolulu",
+  "Alaskan Standard Time": "America/Anchorage",
+  "Pacific Standard Time": "America/Los_Angeles",
+  "US Mountain Standard Time": "America/Phoenix",
+  "Mountain Standard Time": "America/Denver",
+  "Central Standard Time": "America/Chicago",
+  "Canada Central Standard Time": "America/Regina",
+  "Central Standard Time (Mexico)": "America/Mexico_City",
+  "Eastern Standard Time": "America/New_York",
+  "Atlantic Standard Time": "America/Halifax",
+  "SA Pacific Standard Time": "America/Bogota",
+  "Argentina Standard Time": "America/Buenos_Aires",
+  "E. South America Standard Time": "America/Sao_Paulo",
+};
 
 /** Bir saat diliminin o andaki UTC farkı (ms); tanınmayan dilimde null */
 function tzOffset(utc: number, tz: string): number | null {
@@ -93,7 +158,7 @@ function parseStamp(p: Prop): Stamp | null {
   const [, y, mo, d, h, mi, , z] = m;
   if (h === undefined || p.params.VALUE === "DATE") return { at: new Date(+y, +mo - 1, +d).getTime(), allDay: true, local: true };
   if (z) return { at: Date.UTC(+y, +mo - 1, +d, +h, +mi), allDay: false, local: false };
-  const tz = p.params.TZID;
+  const tz = p.params.TZID && (WINDOWS_TZ[p.params.TZID] ?? p.params.TZID);
   return { at: wallToMs(+y, +mo - 1, +d, +h, +mi, tz), allDay: false, local: true, tz };
 }
 
@@ -252,6 +317,19 @@ export function parseIcs(text: string, feed: number, now = Date.now()): ExtEvent
     }
   }
   return out.sort((a, b) => a.start - b.start);
+}
+
+/** Etkinliğin kapladığı günler (başlangıç … bitiş): birkaç gün süren etkinlik her gününde görünür */
+export function extDays(e: Pick<ExtEvent, "day" | "start" | "end">): string[] {
+  const out = [e.day];
+  const d = new Date(e.start);
+  // Bitiş anı dahil değildir: gece yarısı biten (gün boyu) etkinlik ertesi güne taşmaz
+  for (let i = 1; i < 62; i++) {
+    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    if (t.getTime() >= e.end) break;
+    out.push(dayKey(t));
+  }
+  return out;
 }
 
 /** iCal metin kaçışları: \n \, \; \\ */

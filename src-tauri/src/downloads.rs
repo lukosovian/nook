@@ -13,6 +13,8 @@ use tauri::{AppHandle, Emitter, Manager};
 const POLL: Duration = Duration::from_millis(700);
 /// İnen bir şey yokken klasöre bu aralıkla bakılır
 const IDLE_POLL: Duration = Duration::from_secs(2);
+/// Klasör değişmemiş görünse de bu aralıkla yeniden listelenir
+const FULL_LIST: Duration = Duration::from_secs(20);
 const TEMP_EXTS: &[&str] = &["crdownload", "part", "opdownload", "partial", "download"];
 /// Bitmiş dosyanın "yeni" sayılması için en fazla bu kadar eski olması gerekir.
 const FRESH: Duration = Duration::from_secs(60);
@@ -70,9 +72,19 @@ pub fn spawn(app: AppHandle) {
             // Firefox son dosyayı 0 baytla önceden oluşturur; .part bitene kadar bekle.
             let mut pending: HashSet<PathBuf> = HashSet::new();
             let mut last: Vec<Active> = Vec::new();
+            // Boştayken klasörün değişme zamanı aynıysa yeniden listelenmez (yine de 20 sn'de bir tam bakılır)
+            let mut dir_mtime: Option<SystemTime> = None;
+            let mut listed = Instant::now();
 
             loop {
-                thread::sleep(if last.is_empty() && pending.is_empty() { IDLE_POLL } else { POLL });
+                let idle = last.is_empty() && pending.is_empty();
+                thread::sleep(if idle { IDLE_POLL } else { POLL });
+                let mtime = std::fs::metadata(&dir).and_then(|m| m.modified()).ok();
+                if idle && mtime.is_some() && mtime == dir_mtime && listed.elapsed() < FULL_LIST {
+                    continue;
+                }
+                dir_mtime = mtime;
+                listed = Instant::now();
                 let files = list(&dir);
                 let now = Instant::now();
 

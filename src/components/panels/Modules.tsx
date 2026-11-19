@@ -1,18 +1,28 @@
 /**
- * Bütün modüller: kaydırmasız renkli ızgara (her biri giyinik küçük bir Nook). "Düzenle" ile sürükleyip
- * sıralanır, göz simgesiyle ana sayfadan gizlenir; bir profil seçiliyken o profilin bölümleri seçilir.
+ * Bütün modüller: üç başlıklı bant (Gün, İçerik, Araçlar) ve altta Studio'da açılanların şeridi; her biri
+ * giyinik küçük bir Nook. "Düzenle" ile tek ızgaraya döner: sürükleyip sıralanır, göz simgesiyle ana
+ * sayfadan gizlenir; bir profil seçiliyken o profilin bölümleri seçilir.
  */
 import { useEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue } from "motion/react";
-import { Check, Eye, EyeOff, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, Check, Eye, EyeOff, SlidersHorizontal } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { useNook, type Tab } from "../../store/nook";
 import { allProfiles, userProfiles, type ProfileDef } from "../../lib/profiles";
-import { tintBg, tintText } from "../ui/primitives";
+import { SectionLabel, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
-import { Breath, byProfile, ChipNook, openModule, useAvailable, useModuleStatus, type ChipState, type ModuleDef, type Status } from "./moduleData";
+import { Breath, byProfile, ChipNook, openModule, useAvailable, useModuleStatus, type ChipState, type Module, type ModuleDef, type Status } from "./moduleData";
 
 const TILE_H = 66;
+
+/** Bantlar: her modül bir bantta durur (listede olmayan yeni modül Araçlar'a düşer). `cols`: banttaki sütun */
+const BANDS: { label: string; ids: Module[]; cols: number; fr: number }[] = [
+  { label: tt("Gün"), ids: ["today", "alarm", "remind", "calendar", "habits", "focus"], cols: 2, fr: 2.3 },
+  { label: tt("İçerik"), ids: ["media", "hum", "shelf", "clip", "note", "news"], cols: 2, fr: 2 },
+  { label: tt("Araçlar"), ids: ["control", "notify", "apps", "stats", "whatsapp", "play", "argus", "claude", "devices"], cols: 3, fr: 2.85 },
+];
+/** Adayı kapatıp Nook Studio'da açılanlar: ayrı şeritte, ok işaretiyle */
+const STUDIO_IDS: Module[] = ["report", "look", "notes", "year"];
 
 /** `manage`: Studio'da yalnızca düzenlenir (kareye basınca adada bölüm açılmaz) */
 export function ModulesGrid({ manage = false }: { manage?: boolean }) {
@@ -171,6 +181,14 @@ export function ModulesGrid({ manage = false }: { manage?: boolean }) {
     window.addEventListener("pointercancel", up);
   };
 
+  // Bantlar: kullanıcı sırasını dizdiyse ya da profil seçtiyse onun sırası, yoksa bandın kendi sırası
+  const ownOrder = useNook((s) => s.settings.homeOrder.length > 0) || !!forProfile;
+  const studio = modules.filter((m) => STUDIO_IDS.includes(m.id));
+  const bands = BANDS.map((b, bi) => {
+    const list = modules.filter((m) => !STUDIO_IDS.includes(m.id) && (b.ids.includes(m.id) || (bi === BANDS.length - 1 && !BANDS.some((x) => x.ids.includes(m.id)))));
+    return { ...b, list: ownOrder ? list : [...list].sort((x, y) => b.ids.indexOf(x.id) - b.ids.indexOf(y.id)) };
+  }).filter((b) => b.list.length);
+
   const ghost = dragId ? modules.find((m) => m.id === dragId) : null;
   // Hep üç sıra: modül eklendikçe sütun artar, ızgara kaydırma çubuğuna taşmaz
   const cols = Math.max(6, Math.ceil(modules.length / 3));
@@ -179,6 +197,31 @@ export function ModulesGrid({ manage = false }: { manage?: boolean }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div ref={scroller} className="relative -mr-1.5 min-h-0 flex-1 overflow-y-auto pr-1.5 pt-1.5 pb-1" style={{ overflowAnchor: "none" }}>
+        {!editing && (
+          <div className="grid h-full gap-x-3" style={{ gridTemplateColumns: bands.map((b) => `minmax(0, ${b.fr}fr)`).join(" ") }}>
+            {bands.map((b, bi) => (
+              <div key={b.label} className="flex min-h-0 min-w-0 flex-col gap-1">
+                <SectionLabel className="shrink-0 pl-0.5">{b.label}</SectionLabel>
+                <div
+                  className="grid min-h-0 flex-1 gap-1.5"
+                  style={{ gridTemplateColumns: `repeat(${b.cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${Math.max(3, Math.ceil(b.list.length / b.cols))}, minmax(0, 1fr))` }}
+                >
+                  {b.list.map((m, i) => {
+                    const st = sub[m.id];
+                    const state: ChipState = st?.state ?? "idle";
+                    return (
+                      <div key={m.id} className="relative min-h-0 min-w-0">
+                        {(state === "active" || state === "alert") && <Breath color={m.color} alert={state === "alert"} radius={16} />}
+                        <Tile m={m} st={st} state={state} dim={!forProfile && isOff(m.id)} editing={false} manage={manage} band delay={Math.min(bi * 3 + i, 18) * 0.012} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {editing && (
         <div className="grid gap-1.5" style={{ gridAutoRows: TILE_H, gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {modules.map((m, i) => {
             const st = sub[m.id];
@@ -220,6 +263,7 @@ export function ModulesGrid({ manage = false }: { manage?: boolean }) {
             );
           })}
         </div>
+        )}
         {/* Elde tutulan kare */}
         {ghost && (
           <motion.div
@@ -240,10 +284,27 @@ export function ModulesGrid({ manage = false }: { manage?: boolean }) {
       <div className="flex shrink-0 items-center gap-2 rounded-[14px] border border-dashed border-white/[0.09] bg-white/[0.02] py-1 pl-3 pr-1">
         {editing && forProfile ? (
           <ProfileEditor key={forProfile.id} profile={forProfile} />
+        ) : editing ? (
+          <p className="min-w-0 flex-1 truncate text-[10.5px] text-label-3">{tt("Sürükleyip sırala · göz simgesiyle ana sayfadan gizle")}</p>
         ) : (
-          <p className="min-w-0 flex-1 truncate text-[10.5px] text-label-3">
-            {editing ? tt("Sürükleyip sırala · göz simgesiyle ana sayfadan gizle") : tt("Sık açtıkların ana sayfada üstte durur")}
-          </p>
+          // Studio şeridi: bunlar adayı kapatır, Nook Studio'da açılır
+          <div className="flex min-w-0 flex-1 items-center gap-1.5" title={tt("Bunlar Nook Studio'da açılır")}>
+            <SectionLabel className="shrink-0">Studio</SectionLabel>
+            {studio.map((m) => (
+              <motion.button
+                key={m.id}
+                onClick={() => !manage && openModule(m.id)}
+                title={m.desc}
+                whileTap={{ scale: 0.95 }}
+                animate={{ opacity: !forProfile && isOff(m.id) ? 0.35 : 1 }}
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-[3px] text-[10.5px] font-semibold"
+                style={{ background: tintBg(m.color, 10), borderColor: tintBg(m.color, 30), color: tintText(m.color) }}
+              >
+                {m.label}
+                <ArrowUpRight size={11} strokeWidth={2.6} />
+              </motion.button>
+            ))}
+          </div>
         )}
         <motion.button
           onClick={() => setEditing(!editing)}
@@ -261,7 +322,7 @@ export function ModulesGrid({ manage = false }: { manage?: boolean }) {
 }
 
 /** Izgaradaki kare: ortada giyinik Nook, altında ad ve kısa bilgi */
-function Tile({ m, st, state, dim, editing, manage = false, tight = false, delay }: { m: ModuleDef; st: Status | undefined; state: ChipState; dim: boolean; editing: boolean; manage?: boolean; tight?: boolean; delay: number }) {
+function Tile({ m, st, state, dim, editing, manage = false, tight = false, band = false, delay }: { m: ModuleDef; st: Status | undefined; state: ChipState; dim: boolean; editing: boolean; manage?: boolean; tight?: boolean; band?: boolean; delay: number }) {
   const on = state === "active" || state === "alert";
   return (
     <motion.button
@@ -272,16 +333,18 @@ function Tile({ m, st, state, dim, editing, manage = false, tight = false, delay
       whileHover={editing ? undefined : { y: -2 }}
       whileTap={editing ? undefined : { scale: 0.94 }}
       transition={{ type: "spring", stiffness: 500, damping: 30, delay }}
-      className={`flex h-full w-full min-w-0 flex-col items-center justify-center gap-1 rounded-[16px] border ${tight ? "px-0.5" : "px-1"} ${editing ? "pointer-events-none" : ""}`}
+      className={`flex h-full w-full min-w-0 flex-col items-center justify-center ${band ? "gap-0.5" : "gap-1"} rounded-[16px] border ${tight ? "px-0.5" : "px-1"} ${editing ? "pointer-events-none" : ""}`}
       style={{
         background: `linear-gradient(160deg, ${tintBg(m.color, on ? 22 : 14)} 0%, ${tintBg(m.color, 5)} 100%)`,
         borderColor: tintBg(m.color, on ? 62 : 30),
       }}
     >
-      <ChipNook id={m.id} color={m.color} state={state} soon={!!st?.soon} size={26} />
-      <span className={`w-full truncate text-center font-bold ${tight ? "text-[10px] tracking-tight" : "text-[11px]"}`} style={{ color: tintText(m.color) }}>
+      <ChipNook id={m.id} color={m.color} state={state} soon={!!st?.soon} size={band ? (st?.setup ? 18 : 22) : 26} />
+      {/* Bantta ad kırpılmaz: sığmazsa ikinci satıra geçer */}
+      <span className={`w-full text-center font-bold ${band ? "break-words text-[10.5px] leading-[1.1] tracking-tight" : `truncate ${tight ? "text-[10px] tracking-tight" : "text-[11px]"}`}`} style={{ color: tintText(m.color) }}>
         {m.label}
       </span>
+      {band && st?.setup && <span className="whitespace-nowrap rounded-full bg-black/35 px-1.5 text-[8.5px] font-semibold leading-[12px] text-label-2">{tt("Kurulum ister")}</span>}
     </motion.button>
   );
 }

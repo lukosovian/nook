@@ -8,7 +8,10 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
+/// Kayıt defteri izlenemezse bu aralıkla yoklanır
 const POLL: Duration = Duration::from_secs(1);
+/// İzlenirken de bu aralıkla bir kez bakılır (kaçan bir bildirim olursa)
+const RESCAN: Duration = Duration::from_secs(15);
 
 #[derive(Clone, Serialize, PartialEq, Default)]
 pub struct Privacy {
@@ -22,14 +25,26 @@ pub fn spawn(app: AppHandle) {
         .spawn(move || {
             let mut prev = Privacy::default();
             let mut first = true;
+            // Windows kayıt defteri değişince haber verir: her saniye taramak yerine yalnızca değişince bakılır
+            let watch = imp::Watch::new();
             loop {
+                // Önce izleme kurulur, sonra okunur: arada olan değişiklik kaçmaz
+                let armed = watch.as_ref().is_some_and(|w| w.arm());
                 let now = Privacy { mic: imp::in_use("microphone"), camera: imp::in_use("webcam") };
                 if first || now != prev {
                     first = false;
                     let _ = app.emit("nook://privacy", &now);
                     prev = now;
                 }
-                thread::sleep(POLL);
+                match &watch {
+                    // Başlangıç ve bitiş değerleri art arda yazılır: kısa bir an bekleyip tek seferde oku
+                    Some(w) if armed => {
+                        if w.wait(RESCAN) {
+                            thread::sleep(Duration::from_millis(80));
+                        }
+                    }
+                    _ => thread::sleep(POLL),
+                }
             }
         })
         .expect("privacy thread başlatılamadı");
@@ -54,7 +69,8 @@ fn pretty(name: &str, non_packaged: bool) -> String {
 
 /// Kayıt defterindeki yol ("C:#Users#…#nook.exe") bu uygulamanın kendisi mi
 fn is_self(name: &str) -> bool {
-    let Ok(exe) = std::env::current_exe() else { return false };
+    static EXE: std::sync::OnceLock<Option<std::path::PathBuf>> = std::sync::OnceLock::new();
+    let Some(exe) = EXE.get_or_init(|| std::env::current_exe().ok()) else { return false };
     name.replace('#', "\\").eq_ignore_ascii_case(&exe.to_string_lossy())
 }
 
@@ -66,6 +82,31 @@ mod imp {
     use super::{is_self, pretty};
 
     const BASE: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore";
+
+    /// ConsentStore altındaki değişiklikleri (alt anahtarlar dahil) bir olayla bildiren izleyici
+    pub struct Watch {
+        key: RegKey,
+        event: windows_sys::Win32::Foundation::HANDLE,
+    }
+
+    impl Watch {
+        pub fn new() -> Option<Self> {
+            let key = RegKey::predef(HKEY_CURRENT_USER).open_subkey(BASE).ok()?;
+            let event = unsafe { windows_sys::Win32::System::Threading::CreateEventW(std::ptr::null(), 0, 0, std::ptr::null()) };
+            (!event.is_null()).then_some(Self { key, event })
+        }
+
+        /// Sıradaki değişiklik için bildirimi kur (her bildirimden sonra yeniden kurulmalı)
+        pub fn arm(&self) -> bool {
+            use windows_sys::Win32::System::Registry::{RegNotifyChangeKeyValue, REG_NOTIFY_CHANGE_LAST_SET, REG_NOTIFY_CHANGE_NAME};
+            unsafe { RegNotifyChangeKeyValue(self.key.raw_handle(), 1, REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_NAME, self.event, 1) == 0 }
+        }
+
+        /// Değişiklik olana ya da süre dolana dek bekle; değişiklik olduysa true
+        pub fn wait(&self, timeout: std::time::Duration) -> bool {
+            unsafe { windows_sys::Win32::System::Threading::WaitForSingleObject(self.event, timeout.as_millis() as u32) == 0 }
+        }
+    }
 
     pub fn in_use(kind: &str) -> Vec<String> {
         let mut apps = Vec::new();
@@ -105,5 +146,19 @@ mod imp {
 mod imp {
     pub fn in_use(_kind: &str) -> Vec<String> {
         Vec::new()
+    }
+
+    pub struct Watch;
+
+    impl Watch {
+        pub fn new() -> Option<Self> {
+            None
+        }
+        pub fn arm(&self) -> bool {
+            false
+        }
+        pub fn wait(&self, _timeout: std::time::Duration) -> bool {
+            false
+        }
     }
 }

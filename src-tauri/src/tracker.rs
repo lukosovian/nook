@@ -21,6 +21,10 @@ use crate::state::{MonitorMode, Shared};
 use crate::window::{self, ISLAND};
 
 const TICK: Duration = Duration::from_millis(16);
+/// İmleç adalardan uzakta ve tuş basılı değilken: seyrek yokla (boşta işlemciyi uyandırma)
+const TICK_FAR: Duration = Duration::from_millis(50);
+/// Bilgisayar başında kimse yokken
+const TICK_ASLEEP: Duration = Duration::from_millis(200);
 /// İmleç olaylarını webview'a en fazla bu sıklıkla gönder (ana iş parçacığını boğmasın).
 const EMIT_EVERY: Duration = Duration::from_millis(33);
 /// Hit rect'e bu kadar (mantıksal px) yakın imleç, gözler tarafından takip edilir.
@@ -134,8 +138,11 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut monitors_at = Instant::now() - MONITOR_REFRESH;
             let mut candidate: Option<(Monitor, Instant)> = None;
             let mut last_pos: Option<(f64, f64)> = None;
+            let mut tick = TICK;
 
             loop {
+                // Bu turda hızlı izleme gerekiyor mu (imleç yakında, tuş basılı, ada sürükleniyor)
+                let mut busy = shared.dragging.load(std::sync::atomic::Ordering::Relaxed);
                 // Ada sürüklenip bırakıldı: yeni yeri kaydettir
                 if shared.dragging.load(std::sync::atomic::Ordering::Relaxed) && !left_button_down() {
                     shared.dragging.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -145,7 +152,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 if let Some((px, py)) = cursor_position(&app) {
                     if let Some((lx, ly)) = last_pos {
                         let d = ((px - lx).powi(2) + (py - ly).powi(2)).sqrt();
-                        if d < MAX_STEP_PX {
+                        if d < MAX_STEP_PX * (tick.as_millis() as f64 / TICK.as_millis() as f64) {
                             MOUSE_PX.fetch_add(d.round() as u64, Ordering::Relaxed);
                         }
                     }
@@ -164,6 +171,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         .is_some_and(|(l, t, r, b)| px >= l as f64 && px < r as f64 && py >= t as f64 && py < b as f64);
 
                     let down = left_button_down();
+                    busy |= down || !forced.is_empty();
                     let mut over_any = false;
                     for (label, ws) in &windows {
                         let locked = shield_locked || (gated && label != window::ISLAND);
@@ -238,6 +246,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                             // Yalnızca gönderilen konumu hatırla — ara hareketler bir sonraki gönderimde gider
                             p.last = (x, y);
                         }
+                        busy |= near;
                         p.inside = inside;
                         p.near = near;
                         p.file_drag = file_drag;
@@ -280,7 +289,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                     }
                 }
 
-                thread::sleep(TICK);
+                tick = if busy { TICK } else if asleep { TICK_ASLEEP } else { TICK_FAR };
+                thread::sleep(tick);
             }
         })
         .expect("tracker thread başlatılamadı");

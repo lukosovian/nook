@@ -268,8 +268,23 @@ mod ts {
         ts_cli(&args).is_some_and(|o| o.status.success())
     }
 
-    pub fn state() -> TsState {
-        *STATE.lock().unwrap()
+    /// Ayarlar ekranı için durum: zamanlı yoklama yalnızca "Tailscale'i açık tut" açıkken çalıştığından
+    /// burada istek üzerine bakılır (ekran açıkken en çok 20 sn'de bir; arada son bilinen döner)
+    pub fn peek() -> TsState {
+        static LAST: Mutex<Option<Instant>> = Mutex::new(None);
+        let due = {
+            let mut last = LAST.lock().unwrap();
+            let due = last.is_none_or(|t| t.elapsed() > Duration::from_secs(20));
+            if due {
+                *last = Some(Instant::now());
+            }
+            due
+        };
+        if due {
+            keep(false)
+        } else {
+            *STATE.lock().unwrap()
+        }
     }
 
     /// Durumu döner. `reconnect` (Ayarlar'da "Tailscale'i açık tut" ya da kullanıcı düğmeye bastı):
@@ -374,7 +389,7 @@ pub fn outside_status() -> OutsideStatus {
             mac: crate::remote::primary_mac(),
             wan: wan_ip(),
             phone_qr: crate::remote::qr_svg("https://play.google.com/store/apps/details?id=com.tailscale.ipn"),
-            tailscale_state: if hosts.iter().any(|h| h.starts_with("100.")) { TsState::Running } else { ts::state() },
+            tailscale_state: if hosts.iter().any(|h| h.starts_with("100.")) { TsState::Running } else { ts::peek() },
         }
     }
     #[cfg(not(windows))]
@@ -755,7 +770,7 @@ pub fn home_ip() -> Option<String> {
     }
 }
 
-/// İki dakikada bir: telefon köprüsü açıksa Tailscale'i açık tutar. Yarım saatte bir: ayar açıksa
+/// İki dakikada bir: telefon köprüsü ve "Tailscale'i açık tut" açıksa Tailscale'i açık tutar. Yarım saatte bir: ayar açıksa
 /// modemdeki yönlendirmeyi tazeler.
 pub fn spawn() {
     std::thread::Builder::new()
@@ -766,8 +781,9 @@ pub fn spawn() {
             let mut tick: u64 = 0;
             loop {
                 #[cfg(windows)]
-                if crate::remote::enabled() {
-                    ts::keep(TS_KEEP.load(std::sync::atomic::Ordering::Relaxed));
+                // Yalnızca "Tailscale'i açık tut" açıkken: kapalıyken boşuna süreç başlatılmaz (durum istenince bakılır)
+                if crate::remote::enabled() && TS_KEEP.load(std::sync::atomic::Ordering::Relaxed) {
+                    ts::keep(true);
                 }
                 if tick % 15 == 0 && wake_on() {
                     refresh_wake();
@@ -788,8 +804,8 @@ pub fn setup_report() -> serde_json::Value {
     let mut out = outside_status();
     out.phone_qr = None;
     #[cfg(windows)]
-    if !out.tailscale_up && out.tailscale_installed {
-        out.tailscale_state = ts::keep(TS_KEEP.load(std::sync::atomic::Ordering::Relaxed));
+    if !out.tailscale_up && out.tailscale_installed && TS_KEEP.load(std::sync::atomic::Ordering::Relaxed) {
+        out.tailscale_state = ts::keep(true);
     }
     serde_json::json!({
         "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),

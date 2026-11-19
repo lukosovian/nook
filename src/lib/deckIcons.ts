@@ -1,6 +1,7 @@
 /** Kısayol tuşlarının simgeleri: masaüstünde ve Nook Mobil'de aynı adlarla (yalnızca simge, başka bağımlılık yok) */
 import {
   AppWindow,
+  BellOff,
   Bluetooth,
   Camera,
   Clock,
@@ -63,6 +64,7 @@ export const DECK_ICONS: Record<string, LucideIcon> = {
   level: Volume1,
   say: MessageCircle,
   wait: Hourglass,
+  quiet: BellOff,
   clock: Clock,
   phone: Smartphone,
 };

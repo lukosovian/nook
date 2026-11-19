@@ -379,7 +379,7 @@ export function AiArt() {
             <TextInput wide value={s.userName} placeholder={tt("Adın")} onChange={(v) => update({ userName: v })} />
           </div>
         </SetupRow>
-        <p className="text-[10.5px] text-label-3">{tt("Şimdi atlarsan sonra Ayarlar › Yapay zekâ'dan girebilirsin.")}</p>
+        <p className="text-[10.5px] text-label-3">{tt("Şimdi atlarsan sonra Ayarlar › Sohbet ve asistan'dan girebilirsin.")}</p>
       </div>
     </div>
   );

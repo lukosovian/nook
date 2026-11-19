@@ -21,6 +21,7 @@ import { useUnifiedWaChats, useWhatsApp, WA_COLOR } from "../../lib/whatsapp";
 import { isTurkish, locale, pct, tt } from "../../lib/i18n";
 import { formatSize } from "../../lib/format";
 import { SKY_LABEL } from "../../lib/weather";
+import { FIRST_WEEK_DAYS } from "../../lib/firstWeek";
 
 export type Module = Exclude<Tab, "home" | "modules">;
 export interface ModuleDef {
@@ -47,7 +48,7 @@ export const MODULES: ModuleDef[] = [
   { id: "habits", label: tt("Alışkanlıklar"), color: ACCENT.teal, desc: tt("Su, göz dinlendirme, esneme") },
   { id: "news", label: tt("Haberler"), color: ACCENT.red, desc: tt("Son başlıklar") },
   { id: "calendar", label: tt("Takvim"), color: ACCENT.blue, desc: tt("Etkinlikler, geri sayım") },
-  { id: "apps", label: tt("Uygulamalar"), color: ACCENT.blue, desc: tt("Sık açtığın uygulamalar") },
+  { id: "apps", label: tt("Tuşlar"), color: ACCENT.blue, desc: tt("Tek basışta çalışan tuşların") },
   { id: "notify", label: tt("Bildirimler"), color: ACCENT.purple, desc: tt("Windows ve telefon bildirimleri") },
   { id: "control", label: tt("Kontrol"), color: ACCENT.green, desc: tt("Wi-Fi, uygulama bazlı ses") },
   { id: "devices", label: "Lukonnect", color: ACCENT.blue, desc: tt("Mouse, kulaklık pili") },
@@ -76,6 +77,8 @@ export interface Status {
   progress?: number;
   /** Kartın alt satırı: solda açıklama, sağda kısa bilgi */
   foot?: [string, string?];
+  /** Kurulmadan çalışmaz (WhatsApp, Argus, Claude Code): ızgarada "Kurulum ister" rozeti */
+  setup?: boolean;
 }
 
 /** Kullanıcının dizdiği sıra; listede olmayan (yeni) bölümler sona eklenir */
@@ -105,7 +108,13 @@ export function useAvailable(draft?: string[] | null) {
 }
 
 /** Nook'un kullanıldığı ilk bu kadar gün "yeni gelen" sayılır */
-export const NEWCOMER_DAYS = 7;
+export const NEWCOMER_DAYS = FIRST_WEEK_DAYS;
+
+/**
+ * İlk haftanın ana sayfası: kurulum ya da başka uygulama istemeyenler önde. İlk ikisi büyük kart,
+ * sonraki dördü küçük kart, son üçü alttaki hızlı çipler. Listede olmayanlar kendi sırasıyla arkada.
+ */
+export const NEWCOMER_ORDER: Module[] = ["today", "media", "shelf", "note", "alarm", "focus", "clip", "calendar", "control"];
 
 /**
  * İlk hafta (Nook'un kullanıldığı ilk 7 gün): henüz açılmamış bölümün çipinde canlı bilgi yerine ne işe
@@ -117,7 +126,13 @@ export function useExplain(id: string) {
 
 /** En çok açılanlar önde; eşit puanda (hiç açılmamışlar) kullanıcının dizdiği sıra */
 export function byUse<T extends { id: string }>(list: T[], use: Record<string, { score: number; at: number }>, newcomer: boolean) {
-  if (newcomer) return list;
+  if (newcomer) {
+    const at = (id: string) => {
+      const i = NEWCOMER_ORDER.indexOf(id as Module);
+      return i < 0 ? NEWCOMER_ORDER.length : i;
+    };
+    return list.map((m, i) => ({ m, i })).sort((a, b) => at(a.m.id) - at(b.m.id) || a.i - b.i).map((x) => x.m);
+  }
   const now = Date.now();
   const score = (id: string) => (use[id] ? moduleScore(use[id], now) : 0);
   return list
@@ -256,6 +271,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
           text: waWebStatus === "ready" ? tt("Sohbetler hazır") : tt("Mesajlar"),
           state: waWebStatus === "ready" ? ("idle" as const) : ("empty" as const),
           foot: [waWebStatus === "ready" ? tt("WhatsApp Web bağlı") : tt("Bildirimden ya da Web'den yanıtla")] as [string],
+          setup: waWebStatus !== "ready",
         };
       }
       return {
@@ -338,7 +354,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
       progress: focus ? 1 - remaining(focus, now) / focus.total : undefined,
       foot: focus ? [PHASE_LABEL[focus.phase], tt("{0}. tur", focus.round + 1)] : [tt("25 dk odaklan")],
     },
-    apps: { text: apps ? tt("{0} kısayol", apps) : tt("Ekle"), state: apps ? "idle" : "empty", value: apps ? String(apps) : undefined, foot: [apps ? tt("{0} kısayol", apps) : tt("Uygulama ekle")] },
+    apps: { text: apps ? tt("{0} tuş", apps) : tt("Ekle"), state: apps ? "idle" : "empty", value: apps ? String(apps) : undefined, foot: [apps ? tt("{0} tuş", apps) : tt("Tuş ekle")] },
     notify: {
       text: notifs.length ? tt("{0} bildirim", notifs.length) : tt("Sessiz"),
       state: notifs.length ? "idle" : "empty",
@@ -360,6 +376,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
       state: newToday.length ? "active" : "idle",
       value: newToday.length ? String(newToday.length) : watchingList.length ? String(watchingList.length) : undefined,
       foot: argusSnap ? [newToday.length ? tt("Bugün yeni bölüm") : tt("İzlediğin diziler"), watchingList.length ? tt("{0} dizi", watchingList.length) : undefined] : [tt("Dizi ve film listen")],
+      setup: !argusSnap,
     },
     claude: (() => {
       const list = Object.values(claudeSessions).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -371,7 +388,7 @@ export function useModuleStatus(): Partial<Record<Module, Status>> {
         progress: used != null ? used / 100 : undefined,
         foot: [tt("5 saatlik limit"), five && five.resetsAt > now && used ? tt("{0} yenilenir", untilShort(five.resetsAt - now)) : used === 0 ? tt("Tamamen boş") : undefined] as [string, string?],
       };
-      if (!claudeHooked) return { text: tt("Bağla"), state: "empty" as const, foot: [tt("Claude Code'u bağla")] as [string] };
+      if (!claudeHooked) return { text: tt("Bağla"), state: "empty" as const, foot: [tt("Claude Code'u bağla")] as [string], setup: true };
       if (claudeAsks) return { ...base, text: tt("Onay bekliyor"), state: "alert" as const };
       if (working) return { ...base, text: live ? tt("Çalışıyor") : `${working.project} · ${working.action}`, state: "active" as const };
       return { ...base, text: list.length ? tt("{0} oturum", list.length) : tt("Hazır"), state: "idle" as const };

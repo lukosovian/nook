@@ -2,7 +2,7 @@
  * Adanın fiziksel formları. Tüm ölçüler mantıksal (CSS) px.
  * Ada ekranın üst kenarına yapışık bir çentik: üst köşeler düz, `radius` yalnızca alt köşeler.
  */
-export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum";
+export type IslandMode = "collapsed" | "intro" | "feeding" | "expanded" | "search" | "osd" | "toast" | "alarm" | "tour" | "reminder" | "dayclose" | "brief" | "notes" | "report" | "guard" | "gate" | "claude" | "hum";
 
 export const ISLAND: Record<IslandMode, { width: number; height: number; radius: number }> = {
   collapsed: { width: 128, height: 34, radius: 14 },
@@ -20,6 +20,8 @@ export const ISLAND: Record<IslandMode, { width: number; height: number; radius:
   alarm: { width: 360, height: 70, radius: 26 },
   /** Su hatırlatması: cevaplanana kadar durur */
   reminder: { width: 440, height: 66, radius: 26 },
+  /** Günü kapat: akşam kartı (bugünün özeti, ruh hâli, yarına not) */
+  dayclose: { width: 620, height: 184, radius: 34 },
   /** Odak bekçisi: Nook cama vurup saati gösterir */
   guard: { width: 500, height: 78, radius: 28 },
   /** Açılış kilidi: parola adada yazılır */
@@ -243,6 +245,8 @@ export function mascotPose(mode: IslandMode, width = ISLAND[mode].width, view: V
     case "alarm":
     case "reminder":
       return center(36, height / 2 + 2, 1.45);
+    case "dayclose":
+      return center(52, 64, 2.3);
     case "claude":
       return center(40, height / 2, 1.5);
     case "hum":

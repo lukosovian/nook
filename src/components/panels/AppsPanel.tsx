@@ -29,9 +29,9 @@ import { tt } from "../../lib/i18n";
 let appsCache: Promise<AppEntry[]> | undefined;
 
 /**
- * Kısayollar (Stream Deck gibi): basılabilir tuşlar tek listede: eylemler (mikrofon, ses, masaüstü, kilit…)
+ * Tuşlar (Stream Deck gibi): basılabilir tuşlar tek listede: eylemler (mikrofon, ses, masaüstü, kilit…)
  * ve uygulama/klasör tuşları. "+" ile uygulama ya da hazır eylem eklenir; gelişmiş tuşlar ve otomasyonlar
- * Nook Studio › Kısayollar'da kurulur. Hepsi silinirse hazır tuşlar tek basışta geri gelir.
+ * Nook Studio › Tuşlar ve otomasyonlar'da kurulur. Hepsi silinirse hazır tuşlar tek basışta geri gelir.
  */
 export function AppsPanel() {
   const deck = useDeck();
@@ -44,7 +44,7 @@ export function AppsPanel() {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex shrink-0 items-center justify-between">
-        <p className="text-[10.5px] text-label-3">{editing ? tt("Kaldırmak için tuşa bas") : tt("Bas, çalışsın · otomasyonlar: Studio › Kısayollar")}</p>
+        <p className="text-[10.5px] text-label-3">{editing ? tt("Kaldırmak için tuşa bas") : tt("Bas, çalışsın · otomasyonlar: Studio › Tuşlar")}</p>
         {deck.length > 0 && <TextButton onClick={() => setEditing((v) => !v)}>{editing ? tt("Bitti") : tt("Düzenle")}</TextButton>}
       </div>
       <div className="grid min-h-0 flex-1 auto-rows-[66px] grid-cols-5 gap-2 overflow-y-auto p-0.5 pr-1">

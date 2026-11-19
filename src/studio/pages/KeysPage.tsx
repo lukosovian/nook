@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, AppWindow, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Globe, Keyboard, Mic, Play, Plus, RotateCcw, Search, Trash2, Wand2, X, Zap } from "lucide-react";
+import { AlertTriangle, AppWindow, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookmarkPlus, Check, Globe, Keyboard, Mic, Play, Plus, RotateCcw, Search, Trash2, Wand2, X, Zap } from "lucide-react";
 import { fileIcon, listApps, type AppEntry, type QuickState } from "../../lib/bridge";
 import {
   ACTIONS,
@@ -16,9 +16,11 @@ import {
   appPathOf,
   DECK_COLORS,
   DECK_ICONS,
+  DECK_TEMPLATES,
   DEFAULT_DECK,
   getDeck,
   isDangerous,
+  keyFromTemplate,
   keyVisual,
   nextQuick,
   quickLit,
@@ -29,7 +31,10 @@ import {
   useQuickState,
   type DeckKey,
   type DeckStep,
+  type DeckTemplate,
 } from "../../lib/deck";
+import { removeWithUndo } from "../../lib/undo";
+import { UndoBar } from "../../components/overlays/UndoBar";
 import {
   autoSafe,
   CONDITIONS,
@@ -123,13 +128,28 @@ function KeysTab() {
     resetDeck();
     setSel(DEFAULT_DECK[0].id);
   };
+  // Şablonlar: hazır olanlar ve kullanıcının kaydettikleri. Eklenen şablon sıradan bir tuştur, düzenleyicide açılır
+  const mine = useNook((s) => s.settings.deckTemplates);
+  const putMine = (deckTemplates: DeckTemplate[]) => useNook.getState().updateSettings({ deckTemplates });
+  const addTemplate = (t: DeckTemplate) => {
+    const k = keyFromTemplate(t);
+    save([...getDeck(), k]);
+    setSel(k.id);
+  };
+  const [kept, setKept] = useState(false);
+  const keepTemplate = () => {
+    if (!key) return;
+    putMine([...useNook.getState().settings.deckTemplates, { ...keyFromTemplate(key), label: key.label }].slice(-12));
+    setKept(true);
+    window.setTimeout(() => setKept(false), 1400);
+  };
 
   return (
     <Page wide>
       <PageHeader
         icon={Keyboard}
         color={ACCENT.blue}
-        title={tt("Kısayollar")}
+        title={tt("Tuşlar ve otomasyonlar")}
         subtitle={tt("Tek basışta çalışan kısayol tuşların")}
         actions={
           <>
@@ -143,6 +163,7 @@ function KeysTab() {
 
       <div className="grid grid-cols-[minmax(0,1fr)_330px] gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         {/* Tuşlar */}
+        <div className="min-w-0 space-y-4">
         <Panel
           title={tt("Tuşların")}
           hint={tt("Seç, sağda düzenle")}
@@ -175,6 +196,30 @@ function KeysTab() {
             {tt("Kapat, yeniden başlat ve uyku tuşları yanlışlıkla basılmasın diye ikinci basışta çalışır. Mikrofon ve ses tuşları açık/kapalı olduğunu simgesiyle ve ışığıyla gösterir. “Ana sayfada göster” dediğin tuşlar adanın ana sayfasında, alt sırada da durur.")}
           </p>
         </Panel>
+
+        <Panel title={tt("Hazır şablonlar")} hint={tt("Tek dokunuşla tuş olur, sonra istediğin gibi değiştir")} delay={0.04}>
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+            {DECK_TEMPLATES.map((t) => (
+              <TemplateRow key={t.id} t={t} onAdd={() => addTemplate(t)} />
+            ))}
+          </div>
+          {mine.length > 0 && (
+            <>
+              <p className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-label-3">{tt("Senin şablonların")}</p>
+              <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+                {mine.map((t) => (
+                  <TemplateRow
+                    key={t.id}
+                    t={t}
+                    onAdd={() => addTemplate(t)}
+                    onRemove={() => removeWithUndo(() => useNook.getState().settings.deckTemplates, putMine, (x) => x.id === t.id, tt("“{0}” şablonu silindi", t.label), ACCENT.blue)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </Panel>
+        </div>
 
         {/* Düzenleyici */}
         <Panel title={key ? tt("Tuşu düzenle") : tt("Bir tuş seç")} right={key && <KeyTest k={key} />}>
@@ -249,13 +294,53 @@ function KeysTab() {
                 <Label>{key.steps.length > 1 ? tt("Ne yapsın ({0} adım, sırayla)", key.steps.length) : tt("Ne yapsın")}</Label>
                 <Steps steps={key.steps} onChange={setSteps} />
               </div>
+
+              <Btn color={ACCENT.blue} ghost={!kept} disabled={!key.steps.length} onClick={keepTemplate}>
+                {kept ? <Check size={13} /> : <BookmarkPlus size={13} />} {kept ? tt("Şablonlarına eklendi") : tt("Şablon olarak kaydet")}
+              </Btn>
             </div>
           ) : (
             <p className="text-[12.5px] text-label-3">{tt("Soldan bir tuş seç ya da yeni tuş ekle")}</p>
           )}
         </Panel>
       </div>
+      {/* Silinen şablon için "Geri al" şeridi (Studio penceresinin altında) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 h-14">
+        <div className="pointer-events-auto">
+          <UndoBar show />
+        </div>
+      </div>
     </Page>
+  );
+}
+
+/** Şablon satırı: simge, ad, adımların özeti; basınca tuş olarak eklenir. Kullanıcının şablonu silinebilir */
+function TemplateRow({ t, onAdd, onRemove }: { t: DeckTemplate; onAdd: () => void; onRemove?: () => void }) {
+  const Icon = DECK_ICONS[t.icon] ?? Zap;
+  return (
+    <div role="button" onClick={onAdd} title={tt("Tuş olarak ekle")} className="flex cursor-pointer items-center gap-2.5 rounded-[14px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-left hover:bg-white/[0.06]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]" style={{ background: tintBg(t.color, 20), color: tintText(t.color) }}>
+        <Icon size={15} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12.5px] font-semibold text-label">{t.label}</span>
+        <span className="block truncate text-[11px] text-label-3">{t.steps.map(stepLabel).join(", ")}</span>
+      </span>
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          title={tt("Şablonu sil")}
+          aria-label={tt("Şablonu sil")}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-white/10 hover:text-label"
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
+      <Plus size={14} className="shrink-0 text-label-3" />
+    </div>
   );
 }
 
@@ -459,6 +544,20 @@ function StepRow({ step, index, count, onEdit, onMove, onRemove }: { step: DeckS
           style={{ marginLeft: 24 }}
         />
       )}
+      {step.kind === "quiet" && (
+        <div className="mt-2 flex gap-1 pl-6">
+          {[30, 60, 120, 240].map((min) => (
+            <button
+              key={min}
+              onClick={() => onEdit({ ...step, min })}
+              className="h-6 rounded-full border px-2.5 text-[11px] font-semibold"
+              style={step.min === min ? { background: tintBg(color, 20), borderColor: tintBg(color, 45), color: tintText(color) } : { borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-3)" }}
+            >
+              {min % 60 ? tt("{0} dk", min) : tt("{0} sa", min / 60)}
+            </button>
+          ))}
+        </div>
+      )}
       {step.kind === "wait" && (
         <div className="mt-2 flex gap-1 pl-6">
           {[2, 5, 10, 30, 60].map((sec) => (
@@ -632,7 +731,7 @@ function AutoTab() {
       <PageHeader
         icon={Keyboard}
         color={ACCENT.blue}
-        title={tt("Kısayollar")}
+        title={tt("Tuşlar ve otomasyonlar")}
         subtitle={tt("Bir şey olunca Nook senin yerine yapar")}
         actions={
           <>

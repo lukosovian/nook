@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { useNook, type NookNotif, type NotifItem } from "../../store/nook";
-import { Check, MessageCircle, Reply, SendHorizontal, X } from "lucide-react";
-import { ACCENT, EmptyState, MiniNook, Segmented, TextButton, Toggle, tintBg, tintText } from "../ui/primitives";
+import { useNook, type NookNotif, type NotifItem, type NotifyRule } from "../../store/nook";
+import { Check, ChevronDown, MessageCircle, Reply, SendHorizontal, X } from "lucide-react";
+import { ACCENT, Dropdown, EmptyState, MiniNook, SectionLabel, Segmented, TextButton, Toggle, tintBg, tintText } from "../ui/primitives";
+import { removeWithUndo } from "../../lib/undo";
 import { STYLE } from "../overlays/ToastView";
 import { tt, locale } from "../../lib/i18n";
 import { notifyStatus } from "../../lib/bridge";
@@ -44,7 +45,8 @@ function NookList({ tabs }: { tabs: React.ReactNode }) {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory("notify-nook", scroller);
   const items = useNook((s) => s.nookNotifs);
-  const clear = useNook((s) => s.clearNookNotifs);
+  const clear = () =>
+    removeWithUndo(() => useNook.getState().nookNotifs, (nookNotifs) => useNook.setState({ nookNotifs }), () => true, tt("{0} Nook bildirimi temizlendi", items.length), ACCENT.purple);
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex shrink-0 items-center justify-between gap-2">
@@ -76,11 +78,11 @@ function NookRow({ n }: { n: NookNotif }) {
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="flex items-start gap-2.5 rounded-[14px] border px-2.5 py-2"
+      className="flex items-start gap-2.5 rounded-row border px-2.5 py-2"
       style={{ background: tintBg(st.color, 6), borderColor: tintBg(st.color, 18) }}
     >
       {n.icon ? (
-        <img src={n.icon} alt="" draggable={false} className="mt-0.5 h-6 w-6 shrink-0 rounded-[6px] object-cover" />
+        <img src={n.icon} alt="" draggable={false} className="mt-0.5 h-6 w-6 shrink-0 rounded-badge object-cover" />
       ) : (
         <span className="mt-0.5">
           <MiniNook color={st.color} size={24} icon={st.icon} />
@@ -89,7 +91,7 @@ function NookRow({ n }: { n: NookNotif }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-[12px] font-medium" style={{ color: tintText(st.color) }}>{n.title}</span>
-          <span className="shrink-0 text-[10px] tabular-nums text-label-3">{ago(n.at)}</span>
+          <span className="shrink-0 text-[10.5px] tabular-nums text-label-3">{ago(n.at)}</span>
         </div>
         {n.detail && <p className="line-clamp-2 text-[11px] leading-snug text-label-2">{n.detail}</p>}
       </div>
@@ -97,18 +99,49 @@ function NookRow({ n }: { n: NookNotif }) {
   );
 }
 
-/** Windows bildirimleri ya da (phone) telefondan gelenler */
+/** Listeden çıkarır; 5 sn "Geri al" sunar */
+const dropNotifs = (gone: (n: NotifItem) => boolean, label: string) =>
+  removeWithUndo(() => useNook.getState().notifications, (notifications) => useNook.setState({ notifications }), gone, label, ACCENT.purple);
+
+/** 0 bugün · 1 dün · 2 daha eski */
+const dayBucket = (at: number) => {
+  const today = new Date().setHours(0, 0, 0, 0);
+  return at >= today ? 0 : at >= today - 86_400_000 ? 1 : 2;
+};
+
+/**
+ * Windows bildirimleri ya da (phone) telefondan gelenler: uygulamaya göre gruplu ("Discord · 4"),
+ * gruplar gün ayraçlarıyla (Bugün / Dün / Daha eski); gruba tıklayınca bildirimleri açılır.
+ */
 function WindowsList({ tabs, phone }: { tabs: React.ReactNode; phone: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
   useScrollMemory(phone ? "notify-phone" : "notify", scroller);
   const all = useNook((s) => s.notifications);
   const items = all.filter((n) => !!n.phone === phone);
   const on = useNook((s) => s.settings.notifications);
+  const rules = useNook((s) => s.settings.notifyRules);
   const update = useNook((s) => s.updateSettings);
-  const clear = useNook((s) => s.clearNotifications);
+  // Önizlemede ?open ile ilk grup açık gelir
+  const [open, setOpen] = useState<string[]>(() => (import.meta.env.DEV && new URLSearchParams(location.search).has("open") ? ["Discord"] : []));
   // "Bildirim yok" ile "okuyamıyorum" ayrı görünsün
   const [readable, setReadable] = useState<boolean | null>(null);
   useEffect(() => void notifyStatus().then(setReadable).catch(() => undefined), []);
+
+  // Liste en yeniden eskiye: grubun ilk öğesi en yenisi, gruplar da en yenilerine göre sıralı
+  const groups: NotifItem[][] = [];
+  for (const n of items) {
+    const g = groups.find((x) => x[0].app === n.app);
+    if (g) g.push(n);
+    else groups.push([n]);
+  }
+  // Kuralı olup listede bildirimi kalmayan uygulamalar (susturulan hiç gelmez): buradan geri açılır
+  const ruled = Object.entries(rules ?? {}).filter(([app, r]) => r !== "show" && !groups.some((g) => g[0].app === app));
+  const setRule = (app: string, rule: NotifyRule) => {
+    const next = { ...useNook.getState().settings.notifyRules };
+    if (rule === "show") delete next[app];
+    else next[app] = rule;
+    update({ notifyRules: next });
+  };
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -117,10 +150,11 @@ function WindowsList({ tabs, phone }: { tabs: React.ReactNode; phone: boolean })
         <label className="ml-auto flex items-center gap-2 text-[11px] text-label-2">
           <Toggle on={on} onChange={(v) => update({ notifications: v })} color={ACCENT.purple} />{tt("Adada göster")}</label>
         {items.length > 0 && (
-          <TextButton tone="danger" onClick={clear}>{tt("Temizle")}</TextButton>
+          <TextButton tone="danger" onClick={() => dropNotifs((n) => !!n.phone === phone, tt("{0} bildirim temizlendi", items.length))}>{tt("Temizle")}</TextButton>
         )}
       </div>
       {!items.length ? (
+        <div className="min-h-0 flex-1">
         <EmptyState
           title={!on ? tt("Bildirimler kapalı") : !phone && readable === false ? tt("Bildirimleri okuyamıyorum") : tt("Bildirim yok")}
           hint={
@@ -133,14 +167,42 @@ function WindowsList({ tabs, phone }: { tabs: React.ReactNode; phone: boolean })
                   : tt("Discord, WhatsApp, Mail… bildirimleri burada birikir")
           }
           color={ACCENT.purple}
+          action={!on ? { label: tt("Bildirimleri aç"), onClick: () => update({ notifications: true }) } : undefined}
         />
+        </div>
       ) : (
         <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-          <AnimatePresence initial={false}>
-            {items.map((n) => (
-              <Row key={n.id} n={n} />
-            ))}
-          </AnimatePresence>
+          {groups.map((g, i) => {
+            const day = dayBucket(g[0].at);
+            return (
+              <Fragment key={g[0].app}>
+                {(i === 0 || day !== dayBucket(groups[i - 1][0].at)) && <SectionLabel className="px-1 pt-0.5">{[tt("Bugün"), tt("Dün"), tt("Daha eski")][day]}</SectionLabel>}
+                <Group
+                  items={g}
+                  rule={rules?.[g[0].app] ?? "show"}
+                  onRule={(r) => setRule(g[0].app, r)}
+                  open={open.includes(g[0].app)}
+                  onToggle={() => setOpen((o) => (o.includes(g[0].app) ? o.filter((x) => x !== g[0].app) : [...o, g[0].app]))}
+                />
+              </Fragment>
+            );
+          })}
+        </div>
+      )}
+      {ruled.length > 0 && (
+        <div className="flex shrink-0 items-center gap-1 overflow-hidden text-[10.5px] text-label-3">
+          <span className="shrink-0">{tt("Kurallı:")}</span>
+          {ruled.map(([app, r]) => (
+            <button
+              key={app}
+              onClick={() => setRule(app, "show")}
+              title={tt("{0}: yeniden adada göster", app)}
+              className="flex min-w-0 shrink items-center gap-1 rounded-full bg-well px-2 py-[2px] text-label-2 hover:bg-well-hi hover:text-label"
+            >
+              <span className="truncate">{app} · {r === "mute" ? tt("Susturuldu") : tt("Yalnızca biriktir")}</span>
+              <X size={10} strokeWidth={2.6} className="shrink-0" />
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -166,6 +228,77 @@ const appColor = (app: string) => {
   for (const c of k) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return APP_COLORS[h % APP_COLORS.length];
 };
+
+/**
+ * Bir uygulamanın bildirimleri: kapalıyken "Discord · 4" ve son mesaj; tıklayınca hepsi açılır.
+ * Başlıkta saat, uygulamanın kuralı (adada göster / yalnızca biriktir / sustur) ve grubu kaldıran ×.
+ */
+function Group({ items, rule, onRule, open, onToggle }: { items: NotifItem[]; rule: NotifyRule; onRule: (r: NotifyRule) => void; open: boolean; onToggle: () => void }) {
+  const n = items[0];
+  const c = appColor(n.app);
+  return (
+    <div className="rounded-row border" style={{ background: tintBg(c, 6), borderColor: tintBg(c, 18) }}>
+      <div className="group flex items-center gap-1.5 py-1.5 pl-2 pr-1.5">
+        <button onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 rounded-badge text-left">
+          {n.icon ? (
+            <img src={n.icon} alt="" draggable={false} className="h-7 w-7 shrink-0 rounded-badge object-contain" />
+          ) : (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-badge text-[12px] font-extrabold" style={{ background: tintBg(c, 25), color: tintText(c) }}>
+              {n.app.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="flex items-center gap-1">
+              <span className="truncate text-[12px] font-bold text-label">{n.app}</span>
+              {items.length > 1 && (
+                <span className="shrink-0 text-[11px] font-semibold tabular-nums" style={{ color: tintText(c) }}>
+                  · {items.length}
+                </span>
+              )}
+              <ChevronDown size={11} strokeWidth={2.6} className={`shrink-0 text-label-3 transition-transform ${open ? "rotate-180" : ""}`} />
+            </span>
+            {!open && (
+              <span className="block truncate text-[11px] text-label-2">
+                {n.title}
+                {n.body ? `: ${n.body}` : ""}
+              </span>
+            )}
+          </span>
+        </button>
+        <span className="shrink-0 text-[10.5px] tabular-nums text-label-3">{ago(n.at)}</span>
+        <Dropdown
+          label={tt("{0} bildirimleri", n.app)}
+          value={rule}
+          onChange={onRule}
+          color={c}
+          maxWidth={122}
+          options={[
+            { id: "show", label: tt("Adada göster") },
+            { id: "collect", label: tt("Yalnızca biriktir") },
+            { id: "mute", label: tt("Sustur") },
+          ]}
+        />
+        <button
+          onClick={() => dropNotifs((x) => !!x.phone === !!n.phone && x.app === n.app, items.length > 1 ? tt("{0} · {1} bildirim kaldırıldı", n.app, items.length) : tt("{0} bildirimi kaldırıldı", n.app))}
+          title={tt("Grubu kaldır")}
+          aria-label={tt("{0} bildirimlerini kaldır", n.app)}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-label-3 opacity-50 transition-opacity hover:bg-white/10 hover:text-label focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          <X size={11} strokeWidth={2.6} />
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-1 px-1.5 pb-1.5">
+          <AnimatePresence initial={false}>
+            {items.map((x) => (
+              <Row key={x.id} n={x} />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Row({ n }: { n: NotifItem }) {
   const c = appColor(n.app);
@@ -196,95 +329,82 @@ function Row({ n }: { n: NotifItem }) {
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="group relative flex items-start gap-2.5 rounded-[14px] border px-2.5 py-2"
-      style={{ background: tintBg(c, 6), borderColor: tintBg(c, 18) }}
+      className="group/row rounded-badge bg-black/25 py-1.5 pl-2.5 pr-1.5"
     >
-      {n.icon ? (
-        <img src={n.icon} alt="" draggable={false} className="mt-0.5 h-7 w-7 shrink-0 rounded-[8px] object-contain" />
-      ) : (
-        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] text-[12px] font-extrabold" style={{ background: tintBg(c, 25), color: tintText(c) }}>
-          {n.app.slice(0, 1).toUpperCase()}
-        </span>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="min-w-0 truncate text-[12px] font-bold text-label">
-            {n.title}
-            <span className="ml-1.5 text-[10px] font-medium" style={{ color: tintText(c) }}>
-              {n.app}
-            </span>
-          </span>
-          <span className="shrink-0 text-[10px] tabular-nums text-label-3 transition-opacity group-hover:opacity-0">{ago(n.at)}</span>
-        </div>
-        {n.body && <p className="line-clamp-2 text-[11px] leading-snug text-label-2">{n.body}</p>}
-        {(canReply || isWa || sent) && (
-          <div className="mt-1.5 flex items-center gap-1.5">
-            {replying ? (
-              <div className="flex flex-1 items-center gap-1">
-                <input
-                  type="text"
-                  autoFocus
-                  value={text}
-                  placeholder={tt("{0} kişisine yanıt yaz…", n.title)}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void send();
-                    else if (e.key === "Escape") setReplying(false);
-                  }}
-                  className="h-6 min-w-0 flex-1 rounded-full border border-white/10 bg-well px-2.5 text-[11px] text-label outline-none placeholder:text-label-3 focus:border-white/25"
-                />
-                <button
-                  onClick={() => void send()}
-                  disabled={!text.trim()}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border disabled:opacity-35"
-                  style={{ background: tintBg(c, 20), borderColor: tintBg(c, 45), color: tintText(c) }}
-                >
-                  <SendHorizontal size={11} strokeWidth={2.5} />
-                </button>
-              </div>
-            ) : (
-              <>
-                {sent && (
-                  <span className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: tintText(ACCENT.green) }}>
-                    <Check size={10.5} strokeWidth={2.8} />
-                    {tt("Gönderildi")}
-                  </span>
-                )}
-                {canReply && (
-                  <button
-                    onClick={() => setReplying(true)}
-                    className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors"
-                    style={{ background: tintBg(c, 14), borderColor: tintBg(c, 34), color: tintText(c) }}
-                  >
-                    <Reply size={10} strokeWidth={2.5} />
-                    {tt("Yanıtla")}
-                  </button>
-                )}
-                {isWa && (
-                  <button
-                    onClick={openWa}
-                    className="flex items-center gap-1 rounded-full bg-well px-2 py-0.5 text-[10px] font-medium text-label-2 hover:bg-well-hi hover:text-label"
-                  >
-                    <MessageCircle size={10} strokeWidth={2.4} />
-                    {tt("Sohbet")}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
+      {/* Saat hep görünür; × soluk durur, üzerine gelince ya da odaklanınca belirginleşir */}
+      <div className="flex items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-label">{n.title}</span>
+        <span className="shrink-0 text-[10.5px] tabular-nums text-label-3">{ago(n.at)}</span>
+        <button
+          onClick={() => dropNotifs((x) => x.id === n.id, tt("Bildirim kaldırıldı"))}
+          title={tt("Kaldır")}
+          aria-label={tt("Kaldır")}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-label-3 opacity-50 transition-opacity hover:bg-white/10 hover:text-label focus-visible:opacity-100 group-hover/row:opacity-100"
+        >
+          <X size={11} strokeWidth={2.6} />
+        </button>
       </div>
-      <button
-        onClick={() => useNook.getState().removeNotification(n.id)}
-        title={tt("Kaldır")}
-        className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-label-3 opacity-0 transition-opacity hover:bg-white/10 hover:text-label group-hover:opacity-100"
-      >
-        <X size={11} strokeWidth={2.6} />
-      </button>
+      {n.body && <p className="line-clamp-2 pr-1 text-[11px] leading-snug text-label-2">{n.body}</p>}
+      {(canReply || isWa || sent) && (
+        <div className="mt-1.5 flex items-center gap-1.5">
+          {replying ? (
+            <div className="flex flex-1 items-center gap-1">
+              <input
+                type="text"
+                autoFocus
+                value={text}
+                placeholder={tt("{0} kişisine yanıt yaz…", n.title)}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void send();
+                  else if (e.key === "Escape") setReplying(false);
+                }}
+                className="h-6 min-w-0 flex-1 rounded-full border border-white/10 bg-well px-2.5 text-[11px] text-label outline-none placeholder:text-label-3 focus:border-white/25"
+              />
+              <button
+                onClick={() => void send()}
+                disabled={!text.trim()}
+                aria-label={tt("Gönder")}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border disabled:opacity-35"
+                style={{ background: tintBg(c, 20), borderColor: tintBg(c, 45), color: tintText(c) }}
+              >
+                <SendHorizontal size={11} strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : (
+            <>
+              {sent && (
+                <span className="flex items-center gap-1 text-[10.5px] font-semibold" style={{ color: tintText(ACCENT.green) }}>
+                  <Check size={10.5} strokeWidth={2.8} />
+                  {tt("Gönderildi")}
+                </span>
+              )}
+              {canReply && (
+                <button
+                  onClick={() => setReplying(true)}
+                  className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold transition-colors"
+                  style={{ background: tintBg(c, 14), borderColor: tintBg(c, 34), color: tintText(c) }}
+                >
+                  <Reply size={10} strokeWidth={2.5} />
+                  {tt("Yanıtla")}
+                </button>
+              )}
+              {isWa && (
+                <button
+                  onClick={openWa}
+                  className="flex items-center gap-1 rounded-full bg-well px-2 py-0.5 text-[10.5px] font-medium text-label-2 hover:bg-well-hi hover:text-label"
+                >
+                  <MessageCircle size={10} strokeWidth={2.4} />
+                  {tt("Sohbet")}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

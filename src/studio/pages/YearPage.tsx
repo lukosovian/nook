@@ -6,7 +6,8 @@ import { normalizeColor, normalizeLook, useNookName } from "../../lib/look";
 import { useNook } from "../../store/nook";
 import { NookFigure } from "../../components/mascot/Figure";
 import { ACCENT, MiniNook, tintBg, tintText } from "../../components/ui/primitives";
-import { tt } from "../../lib/i18n";
+import { dec, locale, tt } from "../../lib/i18n";
+import { moodOf } from "../../components/brief/DayClose";
 import { Page, PageHeader } from "../ui";
 
 export function YearPage() {
@@ -15,6 +16,13 @@ export function YearPage() {
   const color = normalizeColor(useNook((s) => s.settings.faceColor));
   const { slides, years, year, setYear, y } = useYearSlides();
   const [first, ...rest] = slides;
+  // Ruh hâli: günlük seçimlerin ay ay ortalaması (hiç seçilmediyse şerit görünmez)
+  const moods = Object.entries(y.moods ?? {});
+  const moodMonths = Array.from({ length: 12 }, (_, i) => {
+    const vals = moods.filter(([d]) => Number(d.slice(0, 2)) === i + 1).map(([, v]) => v);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  });
+  const moodAvg = moods.length ? moods.reduce((a, [, v]) => a + v, 0) / moods.length : 0;
 
   return (
     <Page wide>
@@ -63,6 +71,26 @@ export function YearPage() {
           </div>
         </motion.div>
       </div>
+
+      {moods.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="nook-card mb-4 flex items-center gap-6 rounded-[24px] px-6 py-4">
+          <div className="shrink-0">
+            <p className="text-[13px] font-bold text-label">{tt("Ruh hâlin")}</p>
+            <p className="text-[11.5px] text-label-3">{tt("{0} gün · ortalama {1} / 5", moods.length, dec(moodAvg, 1))}</p>
+          </div>
+          <div className="flex min-w-0 flex-1 justify-between">
+            {moodMonths.map((v, i) => {
+              const m = v ? moodOf(v) : null;
+              return (
+                <span key={i} className="flex flex-col items-center gap-1.5" title={m ? tt("{0} · {1} / 5", m.label, dec(v, 1)) : undefined}>
+                  {m ? <MiniNook color={m.color} size={26} eyes={m.eyes} /> : <i className="block size-[26px] rounded-full border border-dashed border-white/15" />}
+                  <span className="text-[10px] text-label-3">{new Date(2024, i, 1).toLocaleDateString(locale(), { month: "short" })}</span>
+                </span>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Diğer sayfalar */}
       <div className="grid grid-cols-4 gap-4">

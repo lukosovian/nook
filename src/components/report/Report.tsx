@@ -7,7 +7,8 @@ import { motion } from "motion/react";
 import type { weekStats } from "../../lib/argus";
 import { easeOut } from "../../lib/motion";
 import { dayKey, EMPTY_DAY, type DayStats } from "../../store/nook";
-import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, Card, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { moodOf } from "../brief/DayClose";
 import { dec, pct, tt, locale } from "../../lib/i18n";
 
 export const hm = (min: number) => (min >= 60 ? tt("{0} sa", Math.floor(min / 60)) + (min % 60 ? tt(" {0} dk", Math.round(min % 60)) : "") : tt("{0} dk", Math.round(min)));
@@ -227,6 +228,33 @@ export function Breakdown({ g }: { g: ReturnType<typeof grade> }) {
         </p>
       </div>
     </Card>
+  );
+}
+
+/** Ruh hâlin: haftanın yedi günü, seçilen yüzlerle (seçilmeyen gün boş halka) ve ortalaması */
+export function MoodWeek({ week }: { week: Day[] }) {
+  const picked = week.filter((d) => d.stats.mood > 0);
+  const avg = picked.length ? picked.reduce((a, d) => a + d.stats.mood, 0) / picked.length : 0;
+  return (
+    <div className="rounded-[14px] bg-white/[0.045] px-3 py-2">
+      <div className="flex items-baseline justify-between gap-2 text-[12px]">
+        <span className="shrink-0 text-label-3">{tt("Ruh hâlin")}</span>
+        <span className="truncate tabular-nums" style={{ color: avg ? tintText(moodOf(avg).color) : "var(--color-label-3)" }}>
+          {avg ? tt("{0} · {1} / 5", moodOf(avg).label, dec(avg, avg % 1 ? 1 : 0)) : tt("Henüz seçilmedi")}
+        </span>
+      </div>
+      <div className="mt-2 flex justify-between">
+        {week.map((d, i) => {
+          const m = d.stats.mood > 0 ? moodOf(d.stats.mood) : null;
+          return (
+            <span key={i} className="flex flex-col items-center gap-1" title={m?.label}>
+              {m ? <MiniNook color={m.color} size={22} eyes={m.eyes} /> : <i className="block size-[22px] rounded-full border border-dashed border-white/15" />}
+              <span className="text-[9.5px] text-label-3">{d.date.toLocaleDateString(locale(), { weekday: "short" })}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { UpdateAnimPref } from "../components/overlays/UpdateAnims";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist, type PersistStorage } from "zustand/middleware";
 import type { DeckKey } from "../lib/deck";
 import type { Automation, AutoRun } from "../lib/automations";
 import type {
@@ -16,7 +16,7 @@ import type {
   SysEvent,
   SysEventKind,
 } from "../lib/bridge";
-import { nextFire, type Alarm } from "../lib/alarm";
+import { MISSED_AFTER_MS, nextFire, repeatOf, type Alarm } from "../lib/alarm";
 import { DJ_MOVES, MAX_HUMS, type HumEntry, type HumState } from "../lib/hum";
 import type { ToolNote } from "../lib/aiTools";
 import type { Weather } from "../lib/weather";
@@ -204,6 +204,8 @@ export interface DayStats {
   /** Gün boyu sevgi ortalaması için */
   moodSum: number;
   moodN: number;
+  /** Kullanıcının o gün için seçtiği ruh hâli (1–5; 0 = seçilmedi) */
+  mood: number;
   /** İçilen bardak su */
   water: number;
   /** İmlecin ekranda aldığı yol (cm) — Nook'un günlüğü */
@@ -244,11 +246,13 @@ export interface YearStats {
   days: string[];
   /** Sanatçı başına dinlenen dakika (en çok 60 sanatçı) */
   artists: Record<string, number>;
+  /** Günlük ruh hâli ("AA-GG" → 1–5): yıl özetindeki aylık şerit için */
+  moods?: Record<string, number>;
 }
 
 export const emptyYear = (): YearStats => ({ active: 0, music: 0, focus: 0, pomodoros: 0, game: 0, notifs: 0, care: 0, water: 0, plays: 0, feeds: 0, songs: 0, hours: Array(24).fill(0), days: [], artists: {} });
 
-export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0, water: 0, mouse: 0 };
+export const EMPTY_DAY: DayStats = { music: 0, focus: 0, pomodoros: 0, game: 0, active: 0, notifs: 0, care: 0, moodSum: 0, moodN: 0, mood: 0, water: 0, mouse: 0 };
 
 /** Yerel tarih anahtarı: 2026-10-02 */
 export const dayKey = (d = new Date()) =>
@@ -288,6 +292,17 @@ export interface ClipItem {
   /** Kopyalayan uygulama */
   app?: string;
 }
+
+/** Pano › Parçacıklar: adlandırılmış hazır metin; `trigger` ("/adres") aramada yazılınca kopyalanır */
+export interface Snippet {
+  id: string;
+  name: string;
+  text: string;
+  trigger?: string;
+}
+
+/** Bir uygulamanın bildirimleri: adada kart + liste · yalnızca liste · hiç */
+export type NotifyRule = "show" | "collect" | "mute";
 
 /** Karalama defterinin bir sekmesi */
 export interface Pad {
@@ -354,10 +369,17 @@ export interface Settings extends NativeSettings {
   alarmSound: number;
   /** Gemini API anahtarı — yalnızca bu bilgisayarda saklanır */
   geminiKey: string;
+  /** Sohbetin, sesli komutun ve ekrana sor'un zekâsı */
+  aiProvider: "gemini" | "claude";
+  /** Anthropic API anahtarı (yalnızca bu bilgisayarda) */
+  claudeKey: string;
+  claudeModel: string;
   /** Gemini modeli; boşsa en yeni "Pro" seçilir */
   aiModel: string;
   /** Nook'un sana hitap ettiği ad */
   userName: string;
+  /** "Ne kadar konuşkan olayım?" seçimi (lib/chattiness); hiç seçilmediyse yok */
+  chattiness?: "quiet" | "balanced" | "lively";
   /** Nook'un senin hakkında hatırladıkları */
   memories: string[];
   /** Kopyalanan yabancı metni Türkçeye çevir */
@@ -369,6 +391,8 @@ export interface Settings extends NativeSettings {
   freeTranslate: boolean | null;
   /** Tepsiden "1 saat sessiz": bu ana kadar (ms) kartlar, hatırlatmalar ve sesler susar; alarm ve takvim yine çalar */
   quietUntil: number;
+  /** Sessiz saatler: her gün bu aralıkta ("SS:DD") "1 saat sessiz" gibi susar; gece yarısını aşabilir */
+  quietHours?: { on: boolean; from: string; to: string };
   /** Panoya kart, IBAN, anahtar, şifre kopyalanınca uyar ve bir dakika sonra sil */
   sensitiveGuard: boolean;
   /** Windows bildirimlerini adada göster */
@@ -386,6 +410,13 @@ export interface Settings extends NativeSettings {
   waterEvery: number;
   /** Günün ilk açılışında özet */
   dailySummary: boolean;
+  /** Günün özetindeki küçük kartlar: görünenlerin sırası (yoksa hepsi, varsayılan sırayla) */
+  briefTiles?: string[];
+  /** Akşam "Günü kapat" kartı ve saati ("21:30") */
+  dayClose: boolean;
+  dayCloseAt: string;
+  /** Tuşlar: kullanıcının kaydettiği şablonlar */
+  deckTemplates: { id: string; label: string; icon: string; color: string; steps: import("../lib/deck").DeckStep[] }[];
   /** Nook her gece günün mizahi günlüğünü yazar (Gemini) */
   diary: boolean;
   /** Oyundan çıkınca özet kartı */
@@ -476,6 +507,10 @@ export interface Settings extends NativeSettings {
   colorNoHash: boolean;
   /** Raftan dışarı bırakılan öğe raftan kalksın (sabitlenenler kalır) */
   shelfRemoveAfterDrop: boolean;
+  /** 7 günden eski, sabitlenmemiş raf öğeleri kendiliğinden kalksın */
+  shelfAutoClean: boolean;
+  /** Uygulama başına bildirim kuralı (anahtar: bildirimdeki uygulama adı); kayıt yoksa "show" */
+  notifyRules: Record<string, NotifyRule>;
   /** Ses karıştırıcıda gizlenen / sabitlenen uygulamalar (anahtar) */
   mixerHidden: string[];
   mixerPinned: string[];
@@ -528,6 +563,12 @@ export interface CalEvent {
   reminder?: boolean;
   /** Tekrar: her hafta aynı gün, her ay aynı tarih, her yıl aynı gün. `day` hep sıradaki tekrarın günüdür. */
   repeat?: EventRepeat;
+  /** Tekrarlı hatırlatma ("her salı", "hafta içi"): çalacağı günler (0 pazar); alarmı tekrarlı kurulur */
+  days?: number[];
+  /** Hatırlatma çalmadan vakti geçti (Nook kapalıydı ya da bilgisayar uyuyordu) */
+  missed?: boolean;
+  /** Geri sayılan gün: takvimde "Tatil · 12 gün" diye gösterilir */
+  countdown?: boolean;
 }
 export type EventRepeat = "week" | "month" | "year";
 
@@ -605,6 +646,9 @@ export const DEFAULT_SETTINGS: Settings = {
   weatherCity: "",
   alarmSound: 1,
   geminiKey: "",
+  aiProvider: "gemini",
+  claudeKey: "",
+  claudeModel: "claude-opus-5-5",
   aiModel: "",
   userName: "",
   memories: [],
@@ -612,6 +656,7 @@ export const DEFAULT_SETTINGS: Settings = {
   translate: false,
   freeTranslate: null,
   quietUntil: 0,
+  quietHours: { on: false, from: "23:00", to: "08:00" },
   notifications: true,
   focusMute: true,
   focusWork: 25,
@@ -622,6 +667,9 @@ export const DEFAULT_SETTINGS: Settings = {
   stretchBreak: false,
   waterEvery: 60,
   dailySummary: true,
+  dayClose: true,
+  dayCloseAt: "21:30",
+  deckTemplates: [],
   diary: true,
   gameSummary: true,
   gameIntro: true,
@@ -696,8 +744,11 @@ export const DEFAULT_SETTINGS: Settings = {
   colorFormat: "hex",
   colorNoHash: false,
   shelfShake: true,
+  shortcutsOffInGame: true,
   shelfShortcut: "Ctrl+Alt+S",
   shelfRemoveAfterDrop: false,
+  shelfAutoClean: false,
+  notifyRules: {},
   outputShortcut: "",
   outputCycle: [],
   headphoneDrop: 0,
@@ -712,6 +763,7 @@ export const DEFAULT_SETTINGS: Settings = {
   liveMask: true,
   liveShortcut: "Ctrl+Alt+L",
   humShortcut: "Ctrl+Alt+M",
+  snippetShortcut: "Ctrl+Alt+P",
   humAuto: false,
   wakeWord: false,
   wakeSensitivity: 0.5,
@@ -770,6 +822,7 @@ interface NookState {
   tab: Tab;
   shelf: ShelfItem[];
   clips: ClipItem[];
+  snippets: Snippet[];
   /** Açık karalama sekmesinin metni (pads içindekinin kopyası) */
   note: string;
   pads: Pad[];
@@ -861,6 +914,13 @@ interface NookState {
   pendingTab: Tab | null;
   /** Günlük özetin en son gösterildiği gün */
   summaryDay: string;
+  /** Bugünün tek işi (lib/brief) */
+  todayTask: { day: string; text: string; done: boolean } | null;
+  /** "Yarına bir not": yazıldığı gün ve özetin onu gösterdiği gün */
+  dayNote: { day: string; text: string; shown?: string } | null;
+  /** "Günü kapat" kartının en son açıldığı gün; `dayClose`: kart şu an açık */
+  dayCloseDay: string;
+  dayClose: boolean;
   /** Günlük için son birkaç günün ayrıntıları (gün → kayıt) */
   dayLog: Record<string, DayLog>;
   /** Nook'un günlükleri (gün → yazı), son iki hafta */
@@ -971,8 +1031,10 @@ interface NookState {
   setAlarmSilent: (id: string, silent: boolean) => void;
   removeAlarm: (id: string) => void;
   /** Çalma anı geldi: tekrar eden alarm bir sonrakine kurulur, tek seferlik kapanır/silinir */
-  fireAlarm: (id: string) => void;
-  /** Uygulama kapalıyken kaçırılan alarmları sessizce ileri al */
+  fireAlarm: (id: string, missed?: boolean) => void;
+  /** Tekrarlı alarmın sıradaki çalmasını bir kez atla (ya da vazgeç) */
+  skipAlarm: (id: string, skip: boolean) => void;
+  /** Uygulama kapalıyken kaçırılanlar: tekrarlılar ileri alınır, tek seferlikler "kaçırıldı" olur (10 dk'dan yenisi çalmak üzere kalır) */
   rescheduleAlarms: () => void;
   setRinging: (a: Alarm | null) => void;
   setHum: (hum: HumState | null) => void;
@@ -986,7 +1048,8 @@ interface NookState {
   setTalking: (b: boolean) => void;
   setFocus: (f: FocusState | null) => void;
   pushNotification: (n: NotificationPayload) => void;
-  clearNotifications: () => void;
+  /** Yalnızca Windows (false) ya da telefon (true) bildirimleri */
+  clearNotifications: (phone: boolean) => void;
   removeNotification: (id: number) => void;
   clearNookNotifs: () => void;
   setDeck: (deck: DeckKey[]) => void;
@@ -1026,6 +1089,57 @@ interface NookState {
 
 const push = (list: number[], v: number) => [...list, v].slice(-HISTORY);
 
+/**
+ * Kalıcı kayıt: depo saniyede birkaç kez değişir (istatistik, imleç, animasyon) ama kalıcı alanlar
+ * nadiren. Hiçbiri değişmediyse bütün durumu yeniden yazıya çevirip diske yazma.
+ */
+let savedState: Record<string, unknown> | null = null;
+let savedRaw: string | null = null;
+const noIcon = <T extends { icon?: string | null }>(n: T): T => (n.icon ? { ...n, icon: null } : n);
+/** Kayıtta simge yok: öbür pencerenin kaydı okunurken (rehydrate) bellekteki simgeler korunur */
+const keepIcons = <T extends { id: string | number; icon?: string | null }>(saved: T[] | undefined, mem: T[]): T[] =>
+  saved ? saved.map((n) => (n.icon ? n : { ...n, icon: mem.find((m) => m.id === n.id)?.icon ?? null })) : mem;
+
+/** Oyun geçmişinde günlük kayıt bu kadar gün tutulur */
+const GAME_LOG_DAYS = 400;
+/**
+ * Daha eski günler ayının ilk gününde toplanır: kayıt sınırsız büyümez, Oyun geçmişi'nin yıl görünümündeki
+ * aylık toplamlar değişmez.
+ */
+function foldGameLog(log: NookState["gameLog"]): NookState["gameLog"] {
+  const cut = dayKey(new Date(Date.now() - GAME_LOG_DAYS * 86_400_000));
+  if (!Object.keys(log).some((day) => day < cut && !day.endsWith("-01"))) return log;
+  const out: NookState["gameLog"] = {};
+  for (const [day, games] of Object.entries(log)) {
+    const cur = (out[day < cut ? `${day.slice(0, 8)}01` : day] ??= {});
+    for (const [app, secs] of Object.entries(games)) cur[app] = (cur[app] ?? 0) + secs;
+  }
+  return out;
+}
+const lazyStorage: PersistStorage<Record<string, unknown>> = {
+  getItem: (name) => {
+    savedRaw = localStorage.getItem(name);
+    return savedRaw ? JSON.parse(savedRaw) : null;
+  },
+  setItem: (name, value) => {
+    const st = value.state;
+    const prev = savedState;
+    if (prev && Object.keys(st).every((k) => st[k] === prev[k])) return;
+    savedState = st;
+    // Ekran görüntüleri büyük — kaydedilmez
+    const chat = (st.chat as ChatItem[] | undefined)?.map(({ image: _image, ...m }) => m);
+    // Bildirim simgeleri (gömülü resim) de: yeniden açılınca uygulamanın baş harfi / küçük Nook görünür
+    const notifications = (st.notifications as NotifItem[] | undefined)?.map(noIcon);
+    const nookNotifs = (st.nookNotifs as NookNotif[] | undefined)?.map(noIcon);
+    const raw = JSON.stringify({ ...value, state: { ...st, chat, notifications, nookNotifs } });
+    // Öbür pencereden gelen kaydı aynen geri yazma (pencereler birbirini uyandırmasın)
+    if (raw === savedRaw) return;
+    savedRaw = raw;
+    localStorage.setItem(name, raw);
+  },
+  removeItem: (name) => localStorage.removeItem(name),
+};
+
 export const useNook = create<NookState>()(
   persist(
     (set) => ({
@@ -1040,6 +1154,7 @@ export const useNook = create<NookState>()(
       tab: "home",
       shelf: [],
       clips: [],
+      snippets: [],
       note: "",
       pads: [{ id: "pad-1", title: "Not 1", text: "", at: Date.now() }],
       padId: "pad-1",
@@ -1096,6 +1211,10 @@ export const useNook = create<NookState>()(
       attachment: null,
       pendingTab: null,
       summaryDay: "",
+      todayTask: null,
+      dayNote: null,
+      dayCloseDay: "",
+      dayClose: false,
       dayLog: {},
       diary: {},
       gameLog: {},
@@ -1221,7 +1340,11 @@ export const useNook = create<NookState>()(
           return { pads, note: pads.find((p) => p.id === s.padId)?.text ?? "" };
         }),
       setStopwatch: (stopwatch) => set({ stopwatch }),
-      setExtEvents: (extEvents) => set({ extEvents, extSyncedAt: Date.now() }),
+      // Yalnızca 30 gün öncesinden 400 gün sonrasına kadar olanlar tutulur
+      setExtEvents: (list) => {
+        const now = Date.now();
+        set({ extEvents: list.filter((e) => e.start >= now - 30 * 86_400_000 && e.start <= now + 400 * 86_400_000), extSyncedAt: now });
+      },
 
       setMedia: (m) =>
         set((s) => {
@@ -1262,7 +1385,7 @@ export const useNook = create<NookState>()(
       pushToast: (event) =>
         set((s) => ({
           nookNotifs: logToast(s.nookNotifs, event),
-          ...(isQuiet(s) && !QUIET_ALLOWED.has(event.kind) ? {} : { toasts: event.call ? [{ ...event, id: crypto.randomUUID() }, ...s.toasts].slice(0, 5) : [...s.toasts, { ...event, id: crypto.randomUUID() }].slice(-5) }),
+          ...(isQuiet(s) && !QUIET_ALLOWED.has(event.kind) && !event.call ? {} : { toasts: event.call ? [{ ...event, id: crypto.randomUUID() }, ...s.toasts].slice(0, 5) : [...s.toasts.slice(0, 1), ...[...s.toasts.slice(1), { ...event, id: crypto.randomUUID() }].slice(s.toasts.length ? -4 : -5)] }),
         })),
       shiftToast: () => set((s) => ({ toasts: s.toasts.slice(1) })),
 
@@ -1298,35 +1421,54 @@ export const useNook = create<NookState>()(
           ),
         })),
       toggleAlarm: (id, enabled) =>
-        set((s) => ({ alarms: s.alarms.map((a) => (a.id === id ? { ...a, enabled, next: enabled ? nextFire(a) : null } : a)) })),
+        set((s) => ({ alarms: s.alarms.map((a) => (a.id === id ? { ...a, enabled, skipped: undefined, next: enabled ? nextFire(a) : null } : a)) })),
       updateAlarm: (id, patch) =>
         set((s) => ({
           alarms: s.alarms
-            .map((a) => (a.id === id ? { ...a, ...patch, enabled: true, next: nextFire({ ...a, ...patch }) } : a))
+            .map((a) => (a.id === id ? { ...a, ...patch, oneShot: false, enabled: true, skipped: undefined, next: nextFire({ ...a, ...patch }) } : a))
             .sort((x, y) => (x.next ?? Infinity) - (y.next ?? Infinity)),
         })),
       removeAlarm: (id) => set((s) => ({ alarms: s.alarms.filter((a) => a.id !== id) })),
       setAlarmSilent: (id, silent) => set((s) => ({ alarms: s.alarms.map((a) => (a.id === id ? { ...a, silent } : a)) })),
-      fireAlarm: (id) =>
+      fireAlarm: (id, missed) =>
         set((s) => ({
           alarms: s.alarms
             .filter((a) => !(a.id === id && a.oneShot))
             .map((a) =>
-              a.id !== id ? a : a.repeat === "once" ? { ...a, enabled: false, next: null } : { ...a, next: nextFire(a, Date.now() + 1000) },
+              a.id !== id ? a : a.repeat === "once" ? { ...a, enabled: false, next: null } : { ...a, skipped: undefined, next: nextFire(a, Date.now() + 1000) },
             ),
+          // Çalmadan geçen tek seferlik hatırlatma "kaçırıldı" olarak kalır
+          ...(missed && s.alarms.some((a) => a.id === id && a.oneShot) ? { events: s.events.map((e) => (e.alarmId === id ? { ...e, missed: true } : e)) } : {}),
         })),
-      rescheduleAlarms: () =>
+      skipAlarm: (id, skip) =>
         set((s) => ({
           alarms: s.alarms
-            .filter((a) => !(a.oneShot && a.next !== null && a.next < Date.now() - 60_000))
             .map((a) =>
-              a.enabled && a.next !== null && a.next < Date.now() - 60_000
-                ? a.repeat === "once"
-                  ? { ...a, enabled: false, next: null }
-                  : { ...a, next: nextFire(a) }
-                : a,
-            ),
+              a.id !== id || a.repeat === "once" || !a.enabled || a.next === null || skip === !!a.skipped
+                ? a
+                : skip
+                  ? { ...a, skipped: a.next, next: nextFire(a, a.next) }
+                  : { ...a, skipped: undefined, next: nextFire(a) },
+            )
+            .sort((x, y) => (x.next ?? Infinity) - (y.next ?? Infinity)),
         })),
+      rescheduleAlarms: () =>
+        set((s) => {
+          const late = (a: Alarm) => a.next !== null && a.next < Date.now() - MISSED_AFTER_MS;
+          const missed = new Set(s.alarms.filter((a) => a.oneShot && late(a)).map((a) => a.id));
+          return {
+            events: missed.size ? s.events.map((e) => (e.alarmId && missed.has(e.alarmId) ? { ...e, missed: true } : e)) : s.events,
+            alarms: s.alarms
+              .filter((a) => !missed.has(a.id))
+              .map((a) =>
+                a.enabled && late(a)
+                  ? a.repeat === "once"
+                    ? { ...a, enabled: false, next: null }
+                    : { ...a, skipped: undefined, next: nextFire(a) }
+                  : a,
+              ),
+          };
+        }),
       setRinging: (ringing) => set({ ringing }),
       setHum: (hum) => set({ hum }),
       addHum: (e) =>
@@ -1345,7 +1487,7 @@ export const useNook = create<NookState>()(
       setFocus: (focus) => set({ focus }),
       pushNotification: (n) =>
         set((s) => ({ notifications: [{ ...n, at: Date.now() }, ...s.notifications.filter((x) => x.id !== n.id)].slice(0, MAX_NOTIFS) })),
-      clearNotifications: () => set({ notifications: [] }),
+      clearNotifications: (phone) => set((s) => ({ notifications: s.notifications.filter((n) => !!n.phone !== phone) })),
       removeNotification: (id) => set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
       clearNookNotifs: () => set({ nookNotifs: [] }),
       setDeck: (deck) => set({ deck: deck.slice(0, 24) }),
@@ -1410,7 +1552,9 @@ export const useNook = create<NookState>()(
         set((s) => {
           const key = dayKey();
           const cur = s.gameLog[key] ?? {};
-          return { gameLog: { ...s.gameLog, [key]: { ...cur, [app]: (cur[app] ?? 0) + secs } } };
+          // Yeni güne geçerken eski günler toparlanır
+          const log = s.gameLog[key] ? s.gameLog : foldGameLog(s.gameLog);
+          return { gameLog: { ...log, [key]: { ...cur, [app]: (cur[app] ?? 0) + secs } } };
         }),
       setBrief: (brief) => set({ brief }),
       setNotes: (notes) => set({ notes }),
@@ -1430,7 +1574,13 @@ export const useNook = create<NookState>()(
           let alarms = s.alarms;
           let alarmId: string | undefined;
           // Hatırlatma: o an çalan tek seferlik alarm (sesi, tam ekranda uyanması alarmlarla aynı)
-          if (at !== null && at > Date.now()) {
+          if (e.reminder && e.days?.length) {
+            // Tekrarlı hatırlatma: seçili günlerde çalan alarm
+            alarmId = crypto.randomUUID();
+            const [hour, minute] = (e.time || "09:00").split(":").map(Number);
+            const a = { hour, minute, ...repeatOf(e.days) };
+            alarms = [...alarms, { ...a, id: alarmId, label: e.title, enabled: true, next: nextFire(a) }].sort((x, y) => (x.next ?? Infinity) - (y.next ?? Infinity));
+          } else if (at !== null && at > Date.now()) {
             alarmId = crypto.randomUUID();
             const d = new Date(at);
             const label = e.time ? `${e.title} · ${e.time}` : e.title;
@@ -1441,7 +1591,7 @@ export const useNook = create<NookState>()(
           const events = [...s.events, { ...e, id, alarmId }]
             .sort((x, y) => (x.day + (x.time || "00:00")).localeCompare(y.day + (y.time || "00:00")))
             // Üç aydan eski etkinlikler atılır
-            .filter((x) => x.day >= dayKey(new Date(Date.now() - 90 * 86_400_000)));
+            .filter((x) => !!x.days?.length || x.day >= dayKey(new Date(Date.now() - 90 * 86_400_000)));
           return { events, alarms };
         }),
       removeEvent: (id) =>
@@ -1462,10 +1612,11 @@ export const useNook = create<NookState>()(
     }),
     {
       name: "nook",
-      storage: createJSONStorage(() => localStorage),
+      storage: lazyStorage as PersistStorage<unknown> as never,
       partialize: (s) => ({
         shelf: s.shelf,
         clips: s.clips,
+        snippets: s.snippets,
         tab: s.tab,
         settings: s.settings,
         affection: s.affection,
@@ -1475,7 +1626,7 @@ export const useNook = create<NookState>()(
         alarms: s.alarms,
         hums: s.hums,
         // Ekran görüntüleri büyük — kaydedilmez
-        chat: s.chat.map(({ image: _image, ...m }) => m),
+        chat: s.chat,
         focus: s.focus,
         notifications: s.notifications,
         nookNotifs: s.nookNotifs,
@@ -1486,6 +1637,9 @@ export const useNook = create<NookState>()(
         days: s.days,
         scores: s.scores,
         summaryDay: s.summaryDay,
+        todayTask: s.todayTask,
+        dayNote: s.dayNote,
+        dayCloseDay: s.dayCloseDay,
         dayLog: s.dayLog,
         diary: s.diary,
         gameLog: s.gameLog,
@@ -1532,7 +1686,7 @@ export const useNook = create<NookState>()(
         const pads = p.pads?.length ? p.pads : current.pads;
         const padId = pads.some((x) => x.id === p.padId) ? p.padId! : pads[0].id;
         const note = pads.find((x) => x.id === padId)?.text ?? "";
-        return { ...current, ...p, settings, pads, padId, note };
+        return { ...current, ...p, settings, pads, padId, note, notifications: keepIcons(p.notifications, current.notifications), nookNotifs: keepIcons(p.nookNotifs, current.nookNotifs) };
       },
     },
   ),
@@ -1596,8 +1750,17 @@ export const moduleScore = (u: { score: number; at: number }, now = Date.now()) 
 export const isSleeping = (s: Pick<NookState, "asleep" | "media">) => s.asleep && !s.media?.playing;
 
 /** Yayın maskesi açık mı: elle açıldı/kapandıysa o, yoksa algılama (ayar açıksa) */
-/** Tepsiden "1 saat sessiz" açık mı */
-export const isQuiet = (s: Pick<NookState, "settings">) => (s.settings.quietUntil ?? 0) > Date.now();
+/** Günlük sessiz saatlerin içinde miyiz (Ayarlar › Bildirimler); aralık gece yarısını aşabilir */
+export function inQuietHours(q: Settings["quietHours"], now = new Date()): boolean {
+  if (!q?.on) return false;
+  const min = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const [from, to, cur] = [min(q.from), min(q.to), now.getHours() * 60 + now.getMinutes()];
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return false;
+  return from < to ? cur >= from && cur < to : cur >= from || cur < to;
+}
+
+/** Sessiz mi: tepsiden "1 saat sessiz" açık ya da sessiz saatlerin içindeyiz */
+export const isQuiet = (s: Pick<NookState, "settings">) => (s.settings.quietUntil ?? 0) > Date.now() || inQuietHours(s.settings.quietHours);
 
 /** Sessizken bile gösterilen kartlar: takvim, pil bitiyor, hassas veri uyarısı, güncelleme */
 const QUIET_ALLOWED = new Set<SysEventKind>(["calendar", "battery-low", "sensitive", "update"]);

@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { AppWindow, Bluetooth, Power, ChevronLeft, Eye, EyeOff, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, Pin, SlidersHorizontal, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { AppWindow, Bluetooth, Power, ChevronLeft, ChevronRight, Eye, EyeOff, Headphones, Lock, Mic, MicOff, Moon, MonitorOff, Pin, SlidersHorizontal, Speaker, Sun, SunDim, Volume1, Volume2, VolumeX, Wifi, WifiOff, type LucideIcon } from "lucide-react";
 import { brightnessGet, brightnessSet, fileIcon, mixerList, mixerOutput, mixerSet, quickAction, quickInput, quickOutput, quickSet, quickState, quickVolume, type AppVolume, type AudioOutput, type QuickKey, type QuickState } from "../../lib/bridge";
 import { useNook } from "../../store/nook";
 import { spring } from "../../lib/motion";
-import { ACCENT, Dropdown, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, Dropdown, EmptyState, SectionLabel, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 import { PowerTimerView } from "./PowerTimerView";
 import { shortLeft, usePowerTimer } from "../../lib/powerTimer";
 
 /**
  * Kontrol: solda telefonlardaki gibi kalın ses ve parlaklık kaydırıcıları (parmağınla/fareyle
- * yukarı-aşağı sürükle), sağda Grok Bot çipleri — açıkken renkli, kapalıyken soluk.
+ * yukarı-aşağı sürükle); altında "Anahtarlar" (aç/kapa: açıkken dolu renkli, kapalıyken nötr, altında
+ * Açık/Kapalı) ve "Eylemler" (tek seferlik işler: çerçeveli satır + ok).
  * Wi-Fi/Bluetooth donanımı olmayan bilgisayarda o düğmeler görünmez. Durum 2 sn'de bir tazelenir.
  */
 export function ControlPanel() {
@@ -78,8 +79,8 @@ export function ControlPanel() {
   const outputs = s?.outputs ?? [];
   const current = outputs.find((o) => o.default) ?? null;
   const nextOutput = outputs.length > 1 ? outputs[(outputs.findIndex((o) => o.default) + 1) % outputs.length] : null;
-  // Wi-Fi, Bluetooth, ses çıkışı, (ses kaydırıcısı yoksa) Ses + her zaman olan dört düğme
-  const toggles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (nextOutput ? 1 : 0) + (vol == null ? 1 : 0) + 6;
+  // Wi-Fi, Bluetooth, ses çıkışı, (ses kaydırıcısı yoksa) Ses + her zaman olan Karanlık ve Mikrofon
+  const tiles = (s?.wifi != null ? 1 : 0) + (s?.bluetooth != null ? 1 : 0) + (nextOutput ? 1 : 0) + (vol == null ? 1 : 0) + 2;
   if (mixer) return <AppMixer onBack={() => setMixer(false)} />;
   if (timerOpen) return <PowerTimerView onBack={() => setTimerOpen(false)} />;
   return (
@@ -116,33 +117,39 @@ export function ControlPanel() {
         </div>
       )}
 
-      {/* Altta büyük aç/kapa kareleri */}
-      <div className={`grid min-h-0 flex-1 gap-1.5 ${toggles > 8 ? "grid-cols-5" : "grid-cols-4"}`} style={{ gridAutoRows: "minmax(0, 1fr)" }}>
-        {s?.wifi != null && <Toggle label="Wi-Fi" icon={s.wifi ? Wifi : WifiOff} on={s.wifi} color={ACCENT.blue} busy={busy === "wifi"} onClick={() => toggle("wifi", !s.wifi)} />}
-        {s?.bluetooth != null && <Toggle label="Bluetooth" icon={Bluetooth} on={s.bluetooth} color={ACCENT.blue} busy={busy === "bluetooth"} onClick={() => toggle("bluetooth", !s.bluetooth)} />}
+      {/* Anahtarlar: açıkken dolu renkli, kapalıyken nötr */}
+      <SectionLabel className="-mb-1 shrink-0">{tt("Anahtarlar")}</SectionLabel>
+      <div className="grid min-h-0 flex-1 gap-1.5" style={{ gridTemplateColumns: `repeat(${tiles}, minmax(0, 1fr))`, gridAutoRows: "minmax(0, 1fr)" }}>
+        {s?.wifi != null && <ToggleTile label="Wi-Fi" icon={s.wifi ? Wifi : WifiOff} on={s.wifi} color={ACCENT.blue} busy={busy === "wifi"} onClick={() => toggle("wifi", !s.wifi)} />}
+        {s?.bluetooth != null && <ToggleTile label="Bluetooth" icon={Bluetooth} on={s.bluetooth} color={ACCENT.blue} busy={busy === "bluetooth"} onClick={() => toggle("bluetooth", !s.bluetooth)} />}
         {nextOutput && current && (
-          <Toggle label={shortName(current.name)} icon={current.headphone ? Headphones : Speaker} on color={ACCENT.pink} tip={tt("{0}\nTıkla: çıkışı seç", current.name)} onClick={() => setMixer(true)} />
+          <ToggleTile label={shortName(current.name)} status={tt("Ses çıkışı")} icon={current.headphone ? Headphones : Speaker} on color={ACCENT.pink} tip={tt("{0}\nTıkla: çıkışı seç", current.name)} onClick={() => setMixer(true)} />
         )}
-        <Toggle label={s?.dark ? tt("Karanlık") : tt("Aydınlık")} icon={s?.dark ? Moon : Sun} on={!!s?.dark} color={ACCENT.purple} busy={busy === "dark"} onClick={() => toggle("dark", !s?.dark)} />
-        <Toggle label={s?.micMuted ? tt("Mik. kapalı") : tt("Mikrofon")} icon={s?.micMuted ? MicOff : Mic} on={!!s?.micMuted} color={ACCENT.orange} disabled={s?.micMuted == null} busy={busy === "mic"} onClick={() => toggle("mic", !s?.micMuted)} />
+        <ToggleTile label={tt("Karanlık")} icon={s?.dark ? Moon : Sun} on={!!s?.dark} color={ACCENT.purple} busy={busy === "dark"} onClick={() => toggle("dark", !s?.dark)} />
+        {/* "Açık" = mikrofon dinliyor; kapalıyken (sessizde) nötr */}
+        <ToggleTile label={tt("Mikrofon")} icon={s?.micMuted ? MicOff : Mic} on={s?.micMuted === false} color={ACCENT.orange} disabled={s?.micMuted == null} busy={busy === "mic"} onClick={() => toggle("mic", !s?.micMuted)} />
         {vol == null && (
-          <Toggle label={s?.muted ? tt("Ses kapalı") : tt("Ses açık")} icon={s?.muted ? VolumeX : Volume2} on={!!s?.muted} color={ACCENT.red} disabled={s?.muted == null} busy={busy === "mute"} onClick={() => toggle("mute", !s?.muted)} />
+          <ToggleTile label={tt("Ses")} icon={s?.muted ? VolumeX : Volume2} on={s?.muted === false} color={ACCENT.pink} disabled={s?.muted == null} busy={busy === "mute"} onClick={() => toggle("mute", !s?.muted)} />
         )}
-        <Toggle label={tt("Kilitle")} icon={Lock} color={ACCENT.teal} action onClick={() => void quickAction("lock")} />
-        <Toggle label={tt("Ekranı kapat")} icon={MonitorOff} color={ACCENT.teal} action onClick={() => void quickAction("screen-off")} />
-        <Toggle label={tt("Uygulama sesi")} icon={SlidersHorizontal} color={ACCENT.pink} action onClick={() => setMixer(true)} />
-        <Toggle
-          label={timer ? shortLeft(timer.at - Date.now()) : tt("Zamanlı kapat")}
+      </div>
+
+      {/* Eylemler: tek seferlik işler — dolu değil, çerçeveli ve oklu */}
+      <SectionLabel className="-mb-1 shrink-0">{tt("Eylemler")}</SectionLabel>
+      <div className="grid shrink-0 grid-cols-2 gap-1.5">
+        <ActionRow label={tt("Kilitle")} icon={Lock} color={ACCENT.teal} onClick={() => void quickAction("lock")} />
+        <ActionRow label={tt("Ekranı kapat")} icon={MonitorOff} color={ACCENT.teal} onClick={() => void quickAction("screen-off")} />
+        <ActionRow label={tt("Uygulama sesi")} icon={SlidersHorizontal} color={ACCENT.pink} onClick={() => setMixer(true)} />
+        <ActionRow
+          label={timer ? tt("Zamanlı kapat · {0}", shortLeft(timer.at - Date.now())) : tt("Zamanlı kapat")}
           icon={Power}
-          on={!!timer}
           color={ACCENT.red}
-          action={!timer}
+          active={!!timer}
           tip={tt("Bilgisayarı belli bir süre sonra kapat, yeniden başlat ya da uyut")}
           onClick={() => setTimerOpen(true)}
         />
       </div>
       {error && (
-        <p className="shrink-0 truncate text-[10px] text-red/90" title={error}>
+        <p className="shrink-0 truncate text-[10.5px] text-red/90" title={error}>
           {error}
         </p>
       )}
@@ -217,14 +224,14 @@ function AppMixer({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="mb-1 flex items-center gap-1">
-        <button onClick={onBack} className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title={tt("Geri")}>
+        <button onClick={onBack} className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label" title={tt("Geri")} aria-label={tt("Geri")}>
           <ChevronLeft size={13} strokeWidth={2.4} />
         </button>
         <span className="text-[11.5px] font-medium text-label-2">{tt("Uygulama sesi")}</span>
         {hiddenCount > 0 && (
           <button
             onClick={() => setShowHidden((v) => !v)}
-            className="ml-auto flex items-center gap-1 rounded-full px-2 py-[2px] text-[10px] font-medium text-label-3 hover:bg-well-hi hover:text-label"
+            className="ml-auto flex items-center gap-1 rounded-full px-2 py-[2px] text-[10.5px] font-medium text-label-3 hover:bg-well-hi hover:text-label"
             title={showHidden ? tt("Gizlenenleri sakla") : tt("Gizlenenleri göster")}
           >
             {showHidden ? <EyeOff size={10} strokeWidth={2.4} /> : <Eye size={10} strokeWidth={2.4} />}
@@ -244,14 +251,14 @@ function AppMixer({ onBack }: { onBack: () => void }) {
       )}
       <div className="-mr-1.5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1.5">
         {list === null && <p className="py-4 text-center text-[11px] text-label-3">{tt("Yükleniyor…")}</p>}
-        {list?.length === 0 && <p className="py-4 text-center text-[11px] text-label-3">{tt("Şu an ses çıkaran bir uygulama yok")}</p>}
+        {list?.length === 0 && <EmptyState title={tt("Ortalık sessiz")} hint={tt("Şu an ses çıkaran bir uygulama yok")} color={ACCENT.pink} />}
         {list?.map((a) => {
           const pct = Math.round((a.muted ? 0 : a.volume) * 100);
           const isPinned = pinned.includes(a.key);
           const isHidden = hidden.includes(a.key);
           const own = a.output ? outputs.find((o) => o.id === a.output) : null;
           return (
-            <div key={a.key} className={`group flex items-center gap-1.5 rounded-[12px] bg-well px-2 py-1.5 ${isHidden ? "opacity-50" : ""}`}>
+            <div key={a.key} className={`group flex items-center gap-1.5 rounded-row bg-well px-2 py-1.5 ${isHidden ? "opacity-50" : ""}`}>
               <AppIcon path={a.path} />
               <span className="w-[66px] shrink-0 truncate text-[11px] font-medium text-label" title={a.name}>
                 {isPinned && <Pin size={8} strokeWidth={3} className="mr-0.5 inline align-[-1px]" style={{ color: tintText(ACCENT.yellow) }} />}
@@ -272,26 +279,25 @@ function AppMixer({ onBack }: { onBack: () => void }) {
                 className="min-w-0 flex-1"
                 style={{ accentColor: ACCENT.pink }}
               />
-              {/* Yüzde; üzerine gelince sabitle / gizle */}
-              <div className="relative h-[22px] w-[40px] shrink-0">
-                <span className="absolute inset-0 flex items-center justify-end text-[10px] tabular-nums text-label-3 transition-opacity group-hover:opacity-0">{pct}</span>
-                <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                  <SmallButton
-                    label={isPinned ? tt("Sabitlemeyi kaldır") : tt("Üste sabitle")}
-                    onClick={() => update({ mixerPinned: isPinned ? pinned.filter((k) => k !== a.key) : [...pinned, a.key] })}
-                    color={isPinned ? ACCENT.yellow : undefined}
-                  >
-                    <Pin size={10} strokeWidth={2.4} />
-                  </SmallButton>
-                  <SmallButton label={isHidden ? tt("Listede göster") : tt("Listeden gizle")} onClick={() => update({ mixerHidden: isHidden ? hidden.filter((k) => k !== a.key) : [...hidden, a.key] })}>
-                    {isHidden ? <Eye size={10} strokeWidth={2.4} /> : <EyeOff size={10} strokeWidth={2.4} />}
-                  </SmallButton>
-                </div>
+              {/* Yüzde, sabitle ve gizle hep görünür (soluk); üzerine gelince ya da odaklanınca belirginleşir */}
+              <span className="w-[22px] shrink-0 text-right text-[10.5px] tabular-nums text-label-3">{pct}</span>
+              <div className="flex shrink-0 items-center gap-0.5 opacity-50 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                <SmallButton
+                  label={isPinned ? tt("Sabitlemeyi kaldır") : tt("Üste sabitle")}
+                  onClick={() => update({ mixerPinned: isPinned ? pinned.filter((k) => k !== a.key) : [...pinned, a.key] })}
+                  color={isPinned ? ACCENT.yellow : undefined}
+                >
+                  <Pin size={10} strokeWidth={2.4} />
+                </SmallButton>
+                <SmallButton label={isHidden ? tt("Listede göster") : tt("Listeden gizle")} onClick={() => update({ mixerHidden: isHidden ? hidden.filter((k) => k !== a.key) : [...hidden, a.key] })}>
+                  {isHidden ? <Eye size={10} strokeWidth={2.4} /> : <EyeOff size={10} strokeWidth={2.4} />}
+                </SmallButton>
               </div>
               {a.key !== "system" && outputs.length > 1 && (
                 <button
                   onClick={() => cycleOutput(a)}
                   title={tt("Çıkış: {0}\nTıkla: sıradaki", own ? own.name : tt("Varsayılan"))}
+                  aria-label={tt("Çıkış: {0}", own ? own.name : tt("Varsayılan"))}
                   className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full hover:bg-well-hi"
                   style={{ color: own ? tintText(ACCENT.purple) : "var(--color-label-3)", background: own ? tintBg(ACCENT.purple, 16) : undefined }}
                 >
@@ -304,6 +310,7 @@ function AppMixer({ onBack }: { onBack: () => void }) {
                   void mixerSet(a.key, undefined, !a.muted);
                 }}
                 title={a.muted ? tt("Sesi aç") : tt("Sessize al")}
+                aria-label={a.muted ? tt("Sesi aç") : tt("Sessize al")}
                 className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full hover:bg-well-hi"
                 style={{ color: a.muted ? tintText(ACCENT.red) : "var(--color-label-2)" }}
               >
@@ -313,7 +320,7 @@ function AppMixer({ onBack }: { onBack: () => void }) {
           );
         })}
       </div>
-      {error && <p className="truncate pt-1 text-[10px] text-red/90" title={error}>{error}</p>}
+      {error && <p className="truncate pt-1 text-[10.5px] text-red/90" title={error}>{error}</p>}
     </div>
   );
 }
@@ -405,12 +412,12 @@ function SliderCard({
 
   return (
     <div
-      className="min-w-0 flex-1 rounded-[16px] border px-3 py-2"
+      className="min-w-0 flex-1 rounded-tile border px-3 py-2"
       style={{ background: tintBg(color, 7), borderColor: tintBg(color, 24) }}
       onWheel={(e) => onChange(Math.max(0, Math.min(1, value + (e.deltaY < 0 ? 0.04 : -0.04))))}
     >
       <div className="flex items-center gap-1.5">
-        <button onClick={onIcon} disabled={!onIcon} className="flex h-6 w-6 items-center justify-center rounded-[8px] enabled:hover:bg-white/10" style={{ color: tintText(color) }} title={onIcon ? tt("Sessize al / aç") : undefined}>
+        <button onClick={onIcon} disabled={!onIcon} className="flex h-6 w-6 items-center justify-center rounded-badge enabled:hover:bg-white/10" style={{ color: tintText(color) }} title={onIcon ? tt("Sessize al / aç") : undefined} aria-label={onIcon ? tt("Sessize al / aç") : label}>
           <Icon size={14} strokeWidth={2.4} />
         </button>
         <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-label">{label}</span>
@@ -421,6 +428,11 @@ function SliderCard({
       <div
         ref={track}
         role="slider"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          const d = e.key === "ArrowRight" || e.key === "ArrowUp" ? 0.05 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -0.05 : 0;
+          if (d) onChange(Math.max(0, Math.min(1, value + d)));
+        }}
         aria-label={label}
         aria-valuenow={Math.round(shown * 100)}
         className="relative mt-2 h-4 cursor-pointer touch-none select-none"
@@ -462,18 +474,21 @@ function SliderCard({
   );
 }
 
-function Toggle({
+/** Aç/kapa karesi: açıkken modül renginde dolu, kapalıyken nötr; adın altında durumu yazar */
+function ToggleTile({
   label,
+  status,
   icon: Icon,
   on = false,
   color,
   disabled,
   busy,
-  action,
   tip,
   onClick,
 }: {
   label: string;
+  /** Adın altındaki durum (verilmezse Açık / Kapalı) */
+  status?: string;
   /** Üstüne gelince görünen açıklama (verilmezse ad) */
   tip?: string;
   icon: LucideIcon;
@@ -481,11 +496,8 @@ function Toggle({
   color: string;
   disabled?: boolean;
   busy?: boolean;
-  /** Tek seferlik işlem (anahtar değil) */
-  action?: boolean;
   onClick: () => void;
 }) {
-  const lit = on || action;
   return (
     <motion.button
       whileTap={{ scale: 0.95 }}
@@ -493,19 +505,43 @@ function Toggle({
       disabled={disabled}
       onClick={onClick}
       title={tip ?? label}
-      className="flex min-h-0 min-w-0 flex-col items-center justify-center gap-1.5 rounded-[16px] border px-1 transition-colors disabled:opacity-35"
-      style={{ background: lit ? tintBg(color, on ? 16 : 6) : "rgb(255 255 255 / 0.03)", borderColor: lit ? tintBg(color, on ? 45 : 18) : "rgb(255 255 255 / 0.06)" }}
+      aria-pressed={on}
+      className="flex min-h-0 min-w-0 flex-col items-center justify-center gap-1 rounded-tile border px-1 transition-colors disabled:opacity-35"
+      style={{ background: on ? tintBg(color, 18) : "rgb(255 255 255 / 0.03)", borderColor: on ? tintBg(color, 48) : "rgb(255 255 255 / 0.06)" }}
     >
       <motion.span
-        className="flex h-8 w-8 items-center justify-center rounded-[11px]"
-        style={{ background: lit ? tintBg(color, on ? 30 : 16) : "rgb(255 255 255 / 0.06)", color: lit ? tintText(color) : "var(--color-label-3)", boxShadow: on ? `0 0 14px -4px ${color}` : undefined }}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-badge"
+        style={{ background: on ? tintBg(color, 32) : "rgb(255 255 255 / 0.06)", color: on ? tintText(color) : "var(--color-label-3)", boxShadow: on ? `0 0 14px -4px ${color}` : undefined }}
         animate={{ opacity: busy ? 0.5 : 1 }}
       >
-        <Icon size={16} strokeWidth={2.3} />
+        <Icon size={14} strokeWidth={2.3} />
       </motion.span>
-      <span className="w-full truncate text-center text-[10.5px] font-semibold" style={{ color: on ? tintText(color) : "var(--color-label-2)" }}>
+      <span className="w-full leading-tight">
+        <span className="block truncate text-center text-[10.5px] font-semibold" style={{ color: on ? tintText(color) : "var(--color-label-2)" }}>
+          {label}
+        </span>
+        <span className="block truncate text-center text-[10.5px] text-label-3">{status ?? (on ? tt("Açık") : tt("Kapalı"))}</span>
+      </span>
+    </motion.button>
+  );
+}
+
+/** Tek seferlik eylem (anahtar değil): çerçeveli satır, sonunda ok. `active`: kurulu bir şey var (zamanlayıcı) */
+function ActionRow({ label, icon: Icon, color, active, tip, onClick }: { label: string; icon: LucideIcon; color: string; active?: boolean; tip?: string; onClick: () => void }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      transition={spring.pop}
+      onClick={onClick}
+      title={tip ?? label}
+      className="flex h-[30px] min-w-0 items-center gap-2 rounded-row border px-2.5 text-left transition-colors hover:bg-well"
+      style={{ borderColor: active ? tintBg(color, 48) : "rgb(255 255 255 / 0.12)", background: active ? tintBg(color, 12) : undefined }}
+    >
+      <Icon size={13} strokeWidth={2.3} className="shrink-0" style={{ color: tintText(color) }} />
+      <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" style={{ color: active ? tintText(color) : "var(--color-label)" }}>
         {label}
       </span>
+      <ChevronRight size={12} strokeWidth={2.4} className="shrink-0 text-label-3" />
     </motion.button>
   );
 }

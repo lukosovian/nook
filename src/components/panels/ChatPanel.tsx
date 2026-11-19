@@ -1,20 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AlarmClock, AppWindow, ArrowUp, Brain, CircleAlert, Clapperboard, Globe, Mic, Music, Square, StickyNote, Target, ToggleRight, X, type LucideIcon } from "lucide-react";
+import { AlarmClock, AppWindow, ArrowUp, Brain, Check, CircleAlert, Clapperboard, ExternalLink, Globe, MessageCircle, Mic, Monitor, Music, Sparkles, Square, StickyNote, Target, ToggleRight, X, type LucideIcon } from "lucide-react";
 import { toggleVoice } from "../../hooks/useFeatures";
-import { useGemini } from "../../hooks/useGemini";
+import { useAi } from "../../hooks/useGemini";
 import { isPinnedBottom, useScrollMemory } from "../../hooks/useScrollMemory";
-import { isPrimary, setInteractive } from "../../lib/bridge";
-import { studioGo } from "../../lib/studio";
+import { openPath, setInteractive } from "../../lib/bridge";
+import { isStudio } from "../../lib/studio";
+import { prettyKeys } from "../../lib/shortcuts";
+import { KeyInput } from "./SettingsPanel";
 import type { ToolNote } from "../../lib/aiTools";
 import { sendChat, stopChat } from "../../lib/chat";
 import { spring } from "../../lib/motion";
 import { useNook, type ChatItem } from "../../store/nook";
 import { ek, useNookName } from "../../lib/look";
-import { ACCENT, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, Segmented, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
-const SUGGESTIONS = [tt("Bana bir şaka anlat"), tt("Yarın 8'de alarm kur"), tt("25 dakika odaklanalım"), tt("Mikrofonumu kapat"), tt("Şu an ne çalıyor?")];
 const SCREEN_SUGGESTIONS = [tt("Bu ne?"), tt("Özetle"), tt("Bu hatayı nasıl çözerim?"), tt("Türkçeye çevir")];
 
 const NOTE_STYLE: Record<ToolNote["icon"], { icon: LucideIcon; color: string }> = {
@@ -42,14 +43,30 @@ function unpin() {
 export function ChatPanel({ autoFocus = true }: { autoFocus?: boolean }) {
   const chat = useNook((s) => s.chat);
   const busy = useNook((s) => s.chatBusy);
-  const model = useNook((s) => s.settings.aiModel);
   const attachment = useNook((s) => s.attachment);
   const listening = useNook((s) => s.listening);
   const name = useNookName();
   const [draft, setDraft] = useState("");
-  const gemini = useGemini();
+  const gemini = useAi();
+  const model = gemini.model;
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const askKeys = useNook((s) => s.settings.askShortcut);
+  const voiceKeys = useNook((s) => s.settings.voiceShortcut);
+  // Geliştirmede ?aiok: anahtar varmış gibi (boş sohbetin önizlemesi)
+  const status = import.meta.env.DEV && new URLSearchParams(location.search).has("aiok") ? "ok" : gemini.status;
+  // Kurulum kartı bu açılışta göründüyse anahtar tutunca bir an "Bağlandı" der, sonra sohbete geçer
+  const [setup, setSetup] = useState(status === "nokey" || status === "error");
+  const [connected, setConnected] = useState(false);
+  useEffect(() => {
+    if (status === "nokey" || status === "error") return setSetup(true);
+    if (status !== "ok" || !setup) return;
+    setSetup(false);
+    setConnected(true);
+    const t = window.setTimeout(() => setConnected(false), 1400);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   useEffect(() => {
     const t = autoFocus ? window.setTimeout(() => input.current?.focus(), 160) : 0;
@@ -81,23 +98,73 @@ export function ChatPanel({ autoFocus = true }: { autoFocus?: boolean }) {
     void sendChat(text, { image });
   };
 
-  const ready = gemini.status === "ok" && !!model;
+  const ready = status === "ok" && (!!model || status !== gemini.status);
+
+  const starters: { icon: LucideIcon; color: string; title: string; text: string; keys?: string; run?: () => void }[] = [
+    { icon: MessageCircle, color: ACCENT.purple, title: tt("Sor"), text: tt("Bana bir şaka anlat"), run: () => send(tt("Bana bir şaka anlat")) },
+    {
+      icon: Sparkles,
+      color: ACCENT.yellow,
+      title: tt("Yaptır"),
+      text: tt("Yarın 8'de alarm kur"),
+      run: () => {
+        setDraft(tt("Yarın 8'de alarm kur"));
+        input.current?.focus();
+      },
+    },
+    { icon: Monitor, color: ACCENT.blue, title: tt("Ekrana sor"), text: tt("Ekranındakini sor"), keys: askKeys },
+    { icon: Mic, color: ACCENT.pink, title: tt("Sesle"), text: tt("Bas, konuş, yine bas"), keys: voiceKeys, run: () => void toggleVoice() },
+  ];
 
   return (
     <div className="flex h-full flex-col gap-2">
       <div ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {gemini.status !== "ok" ? (
-          <NotReady state={gemini} />
-        ) : !chat.length || attachment ? (
+        {status !== "ok" || connected ? (
+          setup || connected ? (
+            <SetupCard state={gemini} connected={connected} />
+          ) : (
+            <p className="flex h-full items-center justify-center text-[12px] text-label-2">{tt("{0} bağlanıyor…", gemini.provider === "claude" ? "Claude" : "Gemini")}</p>
+          )
+        ) : attachment ? (
           <div className="flex h-full flex-col items-center justify-center gap-2">
-            <p className="text-[11px] text-label-3">{attachment ? tt("Ekranına baktım — ne sormak istersin?") : tt("Bana bir şey sor ya da bir iş ver")}</p>
+            <p className="text-[11px] text-label-3">{tt("Ekranına baktım — ne sormak istersin?")}</p>
             <div className="flex flex-wrap justify-center gap-1">
-              {(attachment ? SCREEN_SUGGESTIONS : SUGGESTIONS).map((s) => (
+              {SCREEN_SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => send(s)} className="rounded-full bg-well px-2.5 py-0.5 text-[11px] text-label-2 transition-colors hover:bg-well-hi hover:text-label">
                   {s}
                 </button>
               ))}
             </div>
+          </div>
+        ) : !chat.length ? (
+          // Boş sohbet: dört başlangıç kartı (sor, yaptır, ekrana sor, sesle)
+          <div className="grid h-full grid-cols-2 content-center gap-2">
+            {starters.map((c, i) => (
+              <motion.button
+                key={c.title}
+                onClick={c.run}
+                disabled={!c.run}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileTap={c.run ? { scale: 0.97 } : undefined}
+                transition={{ type: "spring", stiffness: 460, damping: 32, delay: i * 0.03 }}
+                className={`flex min-w-0 items-center gap-2.5 rounded-[16px] border px-3 py-2.5 text-left ${c.run ? "" : "cursor-default"}`}
+                style={{ background: `linear-gradient(150deg, ${tintBg(c.color, 13)} 0%, ${tintBg(c.color, 4)} 100%)`, borderColor: tintBg(c.color, 32) }}
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: tintBg(c.color, 22), color: tintText(c.color) }}>
+                  <c.icon size={17} strokeWidth={2.3} />
+                </span>
+                <span className="min-w-0 flex-1 leading-tight">
+                  <span className="flex items-center gap-1.5">
+                    <span className="whitespace-nowrap text-[13px] font-bold" style={{ color: tintText(c.color) }}>
+                      {c.title}
+                    </span>
+                    {c.keys && <span className="truncate rounded-[6px] bg-black/30 px-1.5 py-[1px] text-[10px] font-semibold text-label-2">{prettyKeys(c.keys).replace(/ \+ /g, "+")}</span>}
+                  </span>
+                  <span className="mt-[3px] block truncate text-[11.5px] text-label-2">{c.keys || !c.run ? c.text : `“${c.text}”`}</span>
+                </span>
+              </motion.button>
+            ))}
           </div>
         ) : (
           <AnimatePresence initial={false}>
@@ -230,26 +297,85 @@ function Typing() {
   );
 }
 
-/** Anahtar yok / geçersiz / kontrol ediliyor */
-function NotReady({ state }: { state: ReturnType<typeof useGemini> }) {
-  // Studio'da Ayarlar › Asistan sayfası; adada Ayarlar sekmesi
-  const go = () => (isPrimary ? useNook.getState().setTab("settings") : studioGo("settings", tt("Yapay zekâ")));
+/**
+ * Anahtar yokken sohbetin içindeki üç adımlı kurulum: anahtarı al, buraya yapıştır, dene.
+ * Üstte Gemini / Claude seçimi; anahtar tutunca "Bağlandı" der ve sohbet açılır.
+ */
+function SetupCard({ state, connected }: { state: ReturnType<typeof useAi>; connected: boolean }) {
+  const s = useNook((st) => st.settings);
+  const update = useNook((st) => st.updateSettings);
+  const claude = state.provider === "claude";
+  const status = connected ? "ok" : state.status;
+  const site = claude ? "console.anthropic.com" : "aistudio.google.com";
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-      <p className="text-[12px] leading-relaxed text-label-2">
-        {state.status === "checking"
-          ? tt("Gemini'ye bağlanıyorum…")
-          : state.status === "error"
-            ? tt("Gemini'ye bağlanamadım: {0}", state.error)
-            : tt("Konuşabilmem için ücretsiz bir Gemini anahtarı lazım: Google hesabınla bir dakikada alınır, Ayarlar › Asistan'a yapıştırırsın. Anahtar olmadan Nook'un geri kalanı aynen çalışır.")}
+    <div className="flex h-full flex-col justify-center gap-2">
+      <div className="flex items-center gap-2">
+        <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-label">{tt("Konuşabilmem için bir anahtar lazım")}</p>
+        <Segmented
+          id="chat-ai"
+          color={ACCENT.purple}
+          value={state.provider}
+          onChange={(v) => update({ aiProvider: v })}
+          options={[
+            { id: "gemini", label: "Gemini" },
+            { id: "claude", label: "Claude" },
+          ]}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <SetupStep n={1} title={tt("Anahtarı al")} hint={claude ? tt("Hesabınla gir → \"Create Key\"") : tt("Google hesabınla gir → \"Create API key\"")}>
+          <button
+            onClick={() => void openPath(claude ? "https://console.anthropic.com/settings/keys" : "https://aistudio.google.com/apikey")}
+            className="flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-[3px] text-[11px] font-medium"
+            style={{ background: tintBg(ACCENT.blue, 16), borderColor: tintBg(ACCENT.blue, 40), color: tintText(ACCENT.blue) }}
+          >
+            {site}
+            <ExternalLink size={11} strokeWidth={2.4} />
+          </button>
+        </SetupStep>
+        <SetupStep n={2} title={tt("Buraya yapıştır")} hint={status === "error" ? state.error || tt("Bu anahtar çalışmadı") : tt("Yalnızca bu bilgisayarda saklanır.")} bad={status === "error"}>
+          {claude ? <KeyInput key="claude" value={s.claudeKey} placeholder="sk-ant-…" onChange={(v) => update({ claudeKey: v })} /> : <KeyInput key="gemini" value={s.geminiKey} onChange={(v) => update({ geminiKey: v })} />}
+        </SetupStep>
+        <SetupStep
+          n={3}
+          title={tt("Dene")}
+          done={status === "ok"}
+          hint={status === "ok" ? tt("Artık konuşabiliriz.") : status === "error" ? tt("Anahtarı kontrol edip yeniden yapıştır.") : tt("Yapıştırınca kendim denerim.")}
+        >
+          <p className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold" style={{ color: status === "ok" ? tintText(ACCENT.green) : "var(--color-label-2)" }}>
+            {status === "ok" && <Check size={13} strokeWidth={3} />}
+            {status === "ok" ? tt("Bağlandı") : status === "checking" ? tt("Deneniyor…") : status === "error" ? tt("Olmadı") : tt("Bekliyorum")}
+          </p>
+        </SetupStep>
+      </div>
+      <div className="flex items-center gap-2">
+        <p className="min-w-0 flex-1 text-[10.5px] leading-snug text-label-3">
+          {claude ? tt("Claude için ücretli bir Anthropic API anahtarı gerekir; Gemini ücretsizdir.") : tt("Gemini anahtarı ücretsiz, bir dakikada alınır. Anahtarsız da Nook'un gerisi çalışır.")}
+        </p>
+        {!isStudio && (
+          <button onClick={() => useNook.getState().setTab("home")} className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium text-label-3 transition-colors hover:bg-well-hi hover:text-label">
+            {tt("Şimdilik geç")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SetupStep({ n, title, hint, done, bad, children }: { n: number; title: string; hint: string; done?: boolean; bad?: boolean; children: React.ReactNode }) {
+  const c = done ? ACCENT.green : ACCENT.purple;
+  return (
+    <div className="flex min-h-[40px] min-w-0 items-center gap-2.5 rounded-[14px] border px-2.5 py-1.5" style={{ background: tintBg(c, 7), borderColor: tintBg(c, 26) }}>
+      <p className="flex w-[124px] shrink-0 items-center gap-1.5 text-[12.5px] font-bold text-label">
+        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10.5px]" style={{ background: tintBg(c, 28), color: tintText(c) }}>
+          {n}
+        </span>
+        {title}
       </p>
-      {state.status !== "checking" && (
-        <button
-          onClick={go}
-          className="rounded-full border px-3 py-1 text-[11.5px] font-medium"
-          style={{ background: tintBg(ACCENT.purple, 16), borderColor: tintBg(ACCENT.purple, 40), color: tintText(ACCENT.purple) }}
-        >{tt("Ayarlar'a git")}</button>
-      )}
+      <div className="shrink-0">{children}</div>
+      <p className="line-clamp-2 min-w-0 flex-1 break-words text-[10.5px] leading-snug" style={{ color: bad ? "var(--color-red)" : "var(--color-label-3)" }}>
+        {hint}
+      </p>
     </div>
   );
 }

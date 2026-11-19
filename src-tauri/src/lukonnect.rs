@@ -127,13 +127,18 @@ pub fn spawn(app: AppHandle) {
         .name("nook-lukonnect".into())
         .spawn(move || {
             let mut prev: Option<Devices> = None;
+            let mut rounds: u32 = 0;
             loop {
                 let now = snapshot(&dir);
                 // İlk okumada olay üretme (açılışta "pil azalıyor" patlamasın).
                 if let Some(p) = &prev {
                     events(&app, &now, p);
                 }
-                let _ = app.emit("nook://devices", &now);
+                // Değişmediyse webview'ı uyandırma; geç bağlanan dinleyici için arada bir yine gönder
+                rounds += 1;
+                if prev.as_ref() != Some(&now) || rounds % 15 == 1 {
+                    let _ = app.emit("nook://devices", &now);
+                }
                 prev = Some(now);
                 thread::sleep(POLL);
             }

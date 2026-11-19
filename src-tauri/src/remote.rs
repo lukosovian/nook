@@ -461,6 +461,10 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
         (Method::Get, "/v1/power/timer") => json_res(200, json!({ "timer": crate::powertimer::get() })),
         (Method::Post, "/v1/power/timer") => {
             let v = serde_json::from_slice::<Value>(body).unwrap_or(Value::Null);
+            // Kurmak uzaktan kontrol iznine bağlı; kurulu zamanlayıcıyı iptal etmek her zaman serbest
+            if v["at"].as_i64().is_some() && !load().control {
+                return err(403, "Bilgisayarı kapatmak için PC'de Nook › Ayarlar › Telefon'dan \"Telefondan uzaktan kontrol\"ü aç");
+            }
             let t = v["at"].as_i64().map(|at| crate::powertimer::PowerTimer {
                 at,
                 action: v["action"].as_str().unwrap_or("shutdown").to_owned(),
@@ -488,6 +492,10 @@ fn route(method: &Method, path: &str, query: &str, body: &[u8]) -> Response<std:
         }
         (Method::Post, "/v1/power") => {
             let action = serde_json::from_slice::<Value>(body).ok().and_then(|v| v["action"].as_str().map(str::to_owned)).unwrap_or_default();
+            // Kapatma, yeniden başlatma ve uyku uzaktan kontrol iznine bağlı (kilitleme ve ekranı kapatma değil)
+            if matches!(action.as_str(), "shutdown" | "restart" | "sleep") && !load().control {
+                return err(403, "Bilgisayarı kapatmak için PC'de Nook › Ayarlar › Telefon'dan \"Telefondan uzaktan kontrol\"ü aç");
+            }
             match power(&action) {
                 Ok(()) => json_res(200, json!({ "ok": true })),
                 Err(e) => err(400, &e),
@@ -1151,11 +1159,20 @@ pub fn remote_control_set(on: bool) -> Info {
     remote_info()
 }
 
+/// Köprü açık mı: ön yüz kapalıyken telefon aynasını hiç hazırlamaz
+#[tauri::command]
+pub fn remote_enabled() -> bool {
+    enabled()
+}
+
 #[tauri::command]
 pub fn remote_set(enabled: bool) -> Info {
     let mut cfg = load();
     cfg.enabled = enabled;
     store(cfg);
+    if let Some(app) = APP.lock().unwrap().as_ref() {
+        let _ = tauri::Emitter::emit(app, "nook://remote-enabled", enabled);
+    }
     if enabled {
         start();
     } else {

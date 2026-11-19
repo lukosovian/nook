@@ -113,6 +113,8 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
         .name("nook-fullscreen".into())
         .spawn(move || {
             let mut hidden: HashSet<String> = HashSet::new();
+            // Her gizle/göster kararında artar: gecikmeli gizleme, arada daha yeni bir karar verildiyse uygulanmaz
+            let decisions: Arc<std::sync::Mutex<std::collections::HashMap<String, u64>>> = Arc::default();
             let mut session: Option<Session> = None;
             // Oyun yüzünden 2. ekrana taşındıysa önceki ekranı hatırla; oyun kapanınca geri dön
             let mut game_displaced: Option<Monitor> = None;
@@ -216,6 +218,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 // Oyun öndeyken (ada 2. ekrana geçmiş olsa da) pencereler belleklerini bırakır; oyundan çıkınca normale döner
                 if in_session_game != game_low {
                     game_low = in_session_game;
+                    crate::shortcut::game_changed(&app);
                     for w in app.webview_windows().values() {
                         crate::window::memory_low(w, game_low);
                     }
@@ -240,6 +243,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                                     game_displaced = Some(cur_mon);
                                 }
                                 if hidden.remove(crate::window::ISLAND) {
+                                    *decisions.lock().unwrap().entry(crate::window::ISLAND.into()).or_default() += 1;
                                     if let Some(ws) = shared.windows.lock().unwrap().get(crate::window::ISLAND).copied() {
                                         webview_visible(&app, crate::window::ISLAND, true);
                                         imp::show(ws.hwnd, true);
@@ -288,12 +292,25 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                         let _ = app.emit_to(label.as_str(), "nook://fullscreen", true);
                         let hwnd = ws.hwnd;
                         let (app, label) = (app.clone(), label.clone());
+                        let decisions = decisions.clone();
+                        let mine = {
+                            let mut d = decisions.lock().unwrap();
+                            let n = d.entry(label.clone()).or_default();
+                            *n += 1;
+                            *n
+                        };
                         thread::spawn(move || {
                             thread::sleep(HIDE_AFTER);
+                            // Kilit gizleme bitene dek tutulur: araya "göster" giremez
+                            let d = decisions.lock().unwrap();
+                            if d.get(&label) != Some(&mine) {
+                                return;
+                            }
                             imp::show(hwnd, false);
                             webview_visible(&app, &label, false);
                         });
                     } else if !covered && hidden.remove(&label) {
+                        *decisions.lock().unwrap().entry(label.clone()).or_default() += 1;
                         crate::log::write("info", &format!("ada yeniden göründü ({label}): tam ekran bitti"));
                         // Önce WebView2 uyansın (çizim ve zamanlayıcılar hemen dönsün), sonra pencere
                         webview_visible(&app, &label, true);

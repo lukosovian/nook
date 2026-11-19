@@ -26,7 +26,7 @@ import { warmGemini } from "../lib/ai";
 import { modelsFor } from "./useGemini";
 import { appsCached } from "../lib/bridge";
 import { playSfx } from "../lib/sfx";
-import { openBrief } from "../lib/brief";
+import { dayCloseDue, openBrief, openDayClose } from "../lib/brief";
 import { notesDue, openNotes } from "../lib/notes";
 import { nextPhase, remaining } from "../lib/focus";
 import { dayKey, isQuiet, isSleeping, useNook } from "../store/nook";
@@ -77,15 +77,16 @@ let eyeMinutes = 0;
 /** "İçtim": Nook da bardağıyla içer, sonra hatırlatma kapanır. Hatırlatma yokken de (Bugün'den) kaydedilebilir. */
 export function drankWater() {
   const s = useNook.getState();
-  if (s.reminder?.phase === "drinking") return;
   waterMinutes = 0;
   waterLast = Date.now();
-  s.setReminder({ kind: "water", phase: "drinking" });
   s.track({ water: 1 });
   s.care(2);
+  // İçme animasyonu sürerken ya da başka bir mola kartı beklerken yalnızca sayılır
+  if (s.reminder && !(s.reminder.kind === "water" && s.reminder.phase !== "drinking")) return;
+  s.setReminder({ kind: "water", phase: "drinking" });
   playAntic("drink");
   window.setTimeout(() => {
-    useNook.getState().setReminder(null);
+    if (useNook.getState().reminder?.kind === "water") useNook.getState().setReminder(null);
     playAntic("love");
   }, 2400);
 }
@@ -108,6 +109,12 @@ export function snoozeReminder(kind?: "water" | "eye" | "stretch" | "habit") {
 /** "Sonra": 15 dakika sonra yeniden hatırlat. */
 export function snoozeWater() {
   snoozeReminder("water");
+}
+
+/** Alışkanlıklar'dan "Yaptım": sıradaki hatırlatma baştan sayılsın */
+export function resetBreak(id: string) {
+  if (id === "eyes") eyeMinutes = 0;
+  else if (id === "stretch") stretchMinutes = 0;
 }
 
 /** Göz Dinlendirme tamamlandı (20-20-20 kuralı) */
@@ -179,6 +186,8 @@ export function useDayTracker() {
         return;
       }
       eyeMinutes += 1;
+      // Akşam "Günü kapat" kartı: günde bir kez, ada boşta ve kapalıyken
+      if (dayCloseDue() && islandModeOf(s) === "collapsed" && !s.fullscreen && !isQuiet(s)) openDayClose();
       // Hatırlatma ekranda beklerken sayaç ilerlemez
       if (!s.reminder) {
         waterMinutes += 1;
@@ -276,6 +285,9 @@ export function useNotificationFeed() {
       const s = useNook.getState();
       useWhatsApp.getState().ingestNotification(n);
       if (!s.settings.notifications) return;
+      // Uygulama kuralı (Bildirimler › grup başlığı): "mute" hiç alınmaz, "collect" listeye girer ama kart açmaz
+      const rule = s.settings.notifyRules?.[n.app];
+      if (rule === "mute") return;
       s.pushNotification(n);
       s.track({ notifs: 1 });
       const focusing = s.settings.focusMute && s.focus?.phase === "work" && s.focus.endsAt !== null;
@@ -285,7 +297,7 @@ export function useNotificationFeed() {
         note(
           `bildirim kartı (${n.app}): ${s.fullscreen ? "tam ekran, gösterilmedi" : focusing ? "odak, gösterilmedi" : n.quiet ? "eski, gösterilmedi" : isQuiet(s) ? "sessiz kip, gösterilmedi" : "kuyruğa girdi"} · ada=${islandModeOf(s)} · sırada=${s.toasts.length}`,
         );
-      if (s.fullscreen || focusing || n.quiet) return;
+      if (s.fullscreen || focusing || n.quiet || rule === "collect") return;
 
       // Kullanıcının kendi gönderdiği mesajlar ("Sen: ...") bildirim kartı oluşturmasın
       const rawBody = (n.body ?? "").trim();
@@ -557,18 +569,19 @@ export function useDailySummaryOpen() {
   useEffect(() => {
     if (!isPrimary) return;
     let wait: number | undefined;
-    let done = false;
+    // Özetin bu oturumda açıldığı gün: ertesi gün (bilgisayar yalnızca uyuduysa) yeniden açılabilsin
+    let done = "";
     const tryOpen = () => {
       const s = useNook.getState();
       // İlk kurulumda tanıtım var; oyun/alarm sırasında araya girme — ilk üzerine gelişte açılır
-      if (done || s.intro || s.gate || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes || s.report) return;
+      if (done === dayKey() || s.intro || s.gate || s.tour || !s.toured || s.fullscreen || s.ringing || s.notes || s.report) return;
       // Güncellemeden sonra önce yama notları; kapanınca sıra özete gelir
       if (notesDue()) {
         void openNotes();
         return;
       }
       if (!summaryDue()) return;
-      done = true;
+      done = dayKey();
       try {
         localStorage.setItem(SHOWCASE_KEY, SHOWCASE);
       } catch {
@@ -589,6 +602,11 @@ export function useDailySummaryOpen() {
       if (prev.notes && !st.notes) {
         window.clearTimeout(wait);
         wait = window.setTimeout(tryOpen, 1500);
+      }
+      // Yeni bir güne uykudan/boştan dönüş: Nook hiç kapanmadıysa da günün özeti açılsın
+      if (prev.asleep && !st.asleep && done !== dayKey() && summaryDue()) {
+        window.clearTimeout(wait);
+        wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);
       }
     });
     if (!useNook.getState().intro) wait = window.setTimeout(tryOpen, SUMMARY_DELAY_MS);

@@ -25,6 +25,25 @@ const LEVELS: Record<AtmosphereLevel, { n: number; rest: number; alpha: number }
 type Lv = (typeof LEVELS)[AtmosphereLevel];
 const count = (base: number, lv: Lv) => Math.max(2, Math.round(base * lv.n));
 
+/** Sürekli dönen katmanlar (güneş, gece, sis) bu kadar oynar, sonra dinlenir */
+const PLAY_SEC = 8;
+/** Dinlenmeye geçiş: döngü neredeyse oradan yumuşakça durur */
+const SETTLE = { duration: 1.2, ease: "easeInOut" } as const;
+
+/**
+ * "Bir tur oyna, dinlen": Az ve Orta'da katman PLAY_SEC oynar, sonra (Az'da daha uzun) kıpırtısız bekler;
+ * beklerken hiç animasyon çalışmaz, kare çizilmez. Yüksek'te hiç dinlenmez.
+ */
+function useResting(lv: Lv) {
+  const [resting, setResting] = useState(false);
+  useEffect(() => {
+    if (!lv.rest) return;
+    const t = window.setTimeout(() => setResting((r) => !r), (resting ? lv.rest * 2 : PLAY_SEC) * 1000);
+    return () => window.clearTimeout(t);
+  }, [resting, lv]);
+  return resting && lv.rest > 0;
+}
+
 interface IslandAtmosphereProps {
   width?: number;
   height?: number;
@@ -78,10 +97,12 @@ export function IslandAtmosphere({ width: _width = 240, height: _height = 36, ov
   // "Pilde yavaşla" açıkken yalnızca gerçekten pildeyken / Windows tasarrufundayken susar
   const saving = useNook((s) => (!!s.stats?.saver && s.settings.powerSaver) || s.settings.lightMode);
   // Daha az hareket (Ayarlar ya da Windows'ta animasyonlar kapalı)
+  const asleep = useNook((s) => s.asleep);
   const calm = settings.calmMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Ayarlardan kapatıldıysa, tasarruf modundaysa ya da daha az hareket isteniyorsa çizme
-  if (!override && (!settings.weatherAtmosphere || saving || calm)) {
+  // Bilgisayar başında kimse yokken de çizilmez (boşuna kare harcamasın)
+  if (!override && (!settings.weatherAtmosphere || saving || calm || asleep)) {
     return null;
   }
 
@@ -95,20 +116,21 @@ export function IslandAtmosphere({ width: _width = 240, height: _height = 36, ov
       style={{ opacity: lv.alpha }}
     >
       <AnimatePresence mode="wait">
-        {kind === "sunny" && <SunnyLayer key="sunny" />}
+        {kind === "sunny" && <SunnyLayer key="sunny" lv={lv} />}
         {kind === "rain" && <RainLayer key="rain" heavy={false} lv={lv} />}
         {kind === "storm" && <RainLayer key="storm" heavy={true} lv={lv} />}
         {kind === "snow" && <SnowLayer key="snow" lv={lv} />}
         {kind === "autumn" && <AutumnLayer key="autumn" lv={lv} />}
-        {kind === "night" && <NightLayer key="night" />}
-        {kind === "fog" && <FogLayer key="fog" />}
+        {kind === "night" && <NightLayer key="night" lv={lv} />}
+        {kind === "fog" && <FogLayer key="fog" lv={lv} />}
       </AnimatePresence>
     </div>
   );
 }
 
 /** 1. GÜNEŞ & IŞIK HUZMESİ (Sunny / Sunbeam) */
-function SunnyLayer() {
+function SunnyLayer({ lv }: { lv: Lv }) {
+  const resting = useResting(lv);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -137,17 +159,27 @@ function SunnyLayer() {
           key={i}
           className="absolute h-1 w-1 rounded-full bg-amber-200"
           style={{ left: p.x, top: "25%", boxShadow: "0 0 6px #ffcc00" }}
-          animate={{
-            y: [-4, 6, -4],
-            opacity: [0.2, 0.75, 0.2],
-            scale: [0.8, 1.2, 0.8],
-          }}
-          transition={{
-            duration: p.d,
-            delay: p.delay,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          initial={{ y: 1, opacity: 0.45, scale: 1 }}
+          animate={
+            resting
+              ? { y: 1, opacity: 0.45, scale: 1 }
+              : {
+                  y: [1, 6, -4, 1],
+                  opacity: [0.45, 0.75, 0.2, 0.45],
+                  scale: [1, 1.2, 0.8, 1],
+                }
+          }
+          transition={
+            resting
+              ? SETTLE
+              : {
+                  duration: p.d,
+                  delay: p.delay,
+                  times: [0, 0.25, 0.75, 1],
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+          }
         />
       ))}
     </motion.div>
@@ -210,16 +242,14 @@ function RainLayer({ heavy, lv }: { heavy?: boolean; lv: Lv }) {
 
       {/* Düşen yağmur çizgileri */}
       {drops.map((d) => (
+        // Boydan boya görünmez bir sütun kayar (y yüzdesi = adanın boyu): `top` gibi yerleşimi yormaz
         <motion.div
           key={d.id}
-          className="absolute w-[1px] rounded-full bg-gradient-to-b from-transparent via-cyan-200/50 to-cyan-300/80"
-          style={{
-            left: d.left,
-            height: d.height,
-            transform: "rotate(15deg)",
-          }}
+          className="absolute top-0 h-full w-0"
+          style={{ left: d.left }}
+          initial={{ y: "-20%", opacity: 0 }}
           animate={{
-            top: ["-20%", "110%"],
+            y: ["-20%", "110%"],
             opacity: [0, 0.75, 0],
           }}
           transition={{
@@ -229,7 +259,12 @@ function RainLayer({ heavy, lv }: { heavy?: boolean; lv: Lv }) {
             repeatDelay: lv.rest * 0.3,
             ease: "linear",
           }}
-        />
+        >
+          <div
+            className="absolute left-0 top-0 w-[1px] rounded-full bg-gradient-to-b from-transparent via-cyan-200/50 to-cyan-300/80"
+            style={{ height: d.height, transform: "rotate(15deg)" }}
+          />
+        </motion.div>
       ))}
 
       {/* Alttaki su sıçramaları (ripple) */}
@@ -272,15 +307,11 @@ function SnowLayer({ lv }: { lv: Lv }) {
       {flakes.map((f) => (
         <motion.div
           key={f.id}
-          className="absolute rounded-full bg-white/80"
-          style={{
-            left: f.left,
-            width: f.size,
-            height: f.size,
-            boxShadow: "0 0 3px rgba(255,255,255,0.8)",
-          }}
+          className="absolute top-0 h-full w-0"
+          style={{ left: f.left }}
+          initial={{ y: "-10%", opacity: 0 }}
           animate={{
-            top: ["-10%", "110%"],
+            y: ["-10%", "110%"],
             x: [0, f.sway, 0],
             opacity: [0, 0.85, 0],
           }}
@@ -291,7 +322,16 @@ function SnowLayer({ lv }: { lv: Lv }) {
             repeatDelay: lv.rest * 0.5,
             ease: "easeInOut",
           }}
-        />
+        >
+          <div
+            className="absolute left-0 top-0 rounded-full bg-white/80"
+            style={{
+              width: f.size,
+              height: f.size,
+              boxShadow: "0 0 3px rgba(255,255,255,0.8)",
+            }}
+          />
+        </motion.div>
       ))}
     </motion.div>
   );
@@ -324,12 +364,12 @@ function AutumnLayer({ lv }: { lv: Lv }) {
       {leaves.map((l) => (
         <motion.div
           key={l.id}
-          className="absolute"
+          className="absolute top-0 h-full w-0"
           style={{ left: l.left }}
+          initial={{ y: "-15%", opacity: 0 }}
           animate={{
-            top: ["-15%", "115%"],
+            y: ["-15%", "115%"],
             x: [0, 14 * l.rotateDir, -8 * l.rotateDir, 10 * l.rotateDir],
-            rotate: [0, 120 * l.rotateDir, 280 * l.rotateDir],
             opacity: [0, 0.75, 0.7, 0],
           }}
           transition={{
@@ -340,10 +380,23 @@ function AutumnLayer({ lv }: { lv: Lv }) {
             ease: "easeInOut",
           }}
         >
-          {/* Minik stilize yaprak SVG */}
-          <svg width="7" height="9" viewBox="0 0 10 14" fill={l.color} opacity={0.85}>
-            <path d="M5 0C5 0 10 4 10 9C10 11.5 7.8 14 5 14C2.2 14 0 11.5 0 9C0 4 5 0 5 0Z" />
-          </svg>
+          {/* Yaprak kendi ekseninde döner (sütunun değil) */}
+          <motion.div
+            className="absolute left-0 top-0"
+            animate={{ rotate: [0, 120 * l.rotateDir, 280 * l.rotateDir] }}
+            transition={{
+              duration: l.duration,
+              delay: l.delay,
+              repeat: Infinity,
+              repeatDelay: lv.rest,
+              ease: "easeInOut",
+            }}
+          >
+            {/* Minik stilize yaprak SVG */}
+            <svg width="7" height="9" viewBox="0 0 10 14" fill={l.color} opacity={0.85}>
+              <path d="M5 0C5 0 10 4 10 9C10 11.5 7.8 14 5 14C2.2 14 0 11.5 0 9C0 4 5 0 5 0Z" />
+            </svg>
+          </motion.div>
         </motion.div>
       ))}
     </motion.div>
@@ -351,7 +404,8 @@ function AutumnLayer({ lv }: { lv: Lv }) {
 }
 
 /** 5. GECE YILDIZLARI & ATEŞ BÖCEĞİ (Night Stars & Firefly) */
-function NightLayer() {
+function NightLayer({ lv }: { lv: Lv }) {
+  const resting = useResting(lv);
   const stars = useMemo(() => {
     return [
       { x: "12%", y: "25%", s: 1.2, d: 2.1, delay: 0 },
@@ -391,44 +445,62 @@ function NightLayer() {
             height: st.s,
             boxShadow: "0 0 3px rgba(186,230,253,0.9)",
           }}
-          animate={{
-            opacity: [0.15, 0.85, 0.15],
-            scale: [0.8, 1.3, 0.8],
-          }}
-          transition={{
-            duration: st.d,
-            delay: st.delay,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          initial={{ opacity: 0.5, scale: 1.05 }}
+          animate={
+            resting
+              ? { opacity: 0.5, scale: 1.05 }
+              : {
+                  opacity: [0.5, 0.85, 0.15, 0.5],
+                  scale: [1.05, 1.3, 0.8, 1.05],
+                }
+          }
+          transition={
+            resting
+              ? SETTLE
+              : {
+                  duration: st.d,
+                  delay: st.delay,
+                  times: [0, 0.25, 0.75, 1],
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+          }
         />
       ))}
 
       {/* Uçuşan sevimli parıldayan ateş böceği (Firefly) */}
+      {/* Ada boyunda görünmez bir katman kayar (x/y yüzdesi = adanın eni/boyu); dinlenirken böcek söner */}
       <motion.div
-        className="absolute h-1.5 w-1.5 rounded-full"
-        style={{
-          background: "#a3e635",
-          boxShadow: "0 0 8px 1px #a3e635, 0 0 16px 2px #4ade80",
-        }}
-        animate={{
-          left: ["18%", "45%", "72%", "35%", "18%"],
-          top: ["30%", "70%", "35%", "20%", "30%"],
-          opacity: [0.3, 0.95, 0.2, 0.85, 0.3],
-          scale: [0.8, 1.2, 0.7, 1.1, 0.8],
-        }}
-        transition={{
-          duration: 7.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
+        className="absolute inset-0"
+        initial={{ x: "18%", y: "30%", opacity: 1 }}
+        animate={resting ? { x: "18%", y: "30%", opacity: 0 } : { x: ["18%", "45%", "72%", "35%", "18%"], y: ["30%", "70%", "35%", "20%", "30%"], opacity: 1 }}
+        transition={resting ? SETTLE : { duration: 7.5, repeat: Infinity, ease: "easeInOut", opacity: { duration: 0.8 } }}
+      >
+        <motion.div
+          className="absolute left-0 top-0 h-1.5 w-1.5 rounded-full"
+          style={{
+            background: "#a3e635",
+            boxShadow: "0 0 8px 1px #a3e635, 0 0 16px 2px #4ade80",
+          }}
+          initial={{ opacity: 0.3, scale: 0.8 }}
+          animate={
+            resting
+              ? { opacity: 0.3, scale: 0.8 }
+              : {
+                  opacity: [0.3, 0.95, 0.2, 0.85, 0.3],
+                  scale: [0.8, 1.2, 0.7, 1.1, 0.8],
+                }
+          }
+          transition={resting ? SETTLE : { duration: 7.5, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </motion.div>
     </motion.div>
   );
 }
 
 /** 6. SİS / PUS (Fog / Mist) */
-function FogLayer() {
+function FogLayer({ lv }: { lv: Lv }) {
+  const resting = useResting(lv);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -443,15 +515,8 @@ function FogLayer() {
           background: "radial-gradient(ellipse at 50% 60%, rgba(200,220,240,0.5) 0%, transparent 70%)",
           filter: "blur(6px)",
         }}
-        animate={{
-          x: [0, 35, 0],
-          opacity: [0.18, 0.28, 0.18],
-        }}
-        transition={{
-          duration: 6.0,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+        animate={resting ? { x: 0, opacity: 0.18 } : { x: [0, 35, 0], opacity: [0.18, 0.28, 0.18] }}
+        transition={resting ? SETTLE : { duration: 6.0, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         className="absolute -bottom-4 right-[-10px] h-12 w-44 rounded-full opacity-20"
@@ -459,15 +524,8 @@ function FogLayer() {
           background: "radial-gradient(ellipse at 50% 60%, rgba(210,230,250,0.45) 0%, transparent 70%)",
           filter: "blur(6px)",
         }}
-        animate={{
-          x: [0, -30, 0],
-          opacity: [0.14, 0.24, 0.14],
-        }}
-        transition={{
-          duration: 7.2,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+        animate={resting ? { x: 0, opacity: 0.14 } : { x: [0, -30, 0], opacity: [0.14, 0.24, 0.14] }}
+        transition={resting ? SETTLE : { duration: 7.2, repeat: Infinity, ease: "easeInOut" }}
       />
     </motion.div>
   );

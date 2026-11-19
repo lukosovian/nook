@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
-import { AudioLines, Bell, Check, Eye, EyeOff, Gamepad2, HeartPulse, HelpCircle, Info, Keyboard, LayoutGrid, Lock, Play, Settings2, ShieldCheck, Smartphone, Sparkles, X, type LucideIcon } from "lucide-react";
-import { useGemini } from "../../hooks/useGemini";
+import { AudioLines, Bell, BellRing, Check, ChevronDown, Eye, EyeOff, FolderUp, Gamepad2, HeartPulse, HelpCircle, Info, Keyboard, LayoutGrid, Lock, MonitorSmartphone, Moon, Music, Play, Power, QrCode, Settings2, ShieldCheck, Smartphone, Sparkles, X, type LucideIcon } from "lucide-react";
+import { useClaudeAi, useGemini } from "../../hooks/useGemini";
+import { CLAUDE_MODELS } from "../../lib/anthropic";
 import { sttDelete, sttDownload, sttStatus, type SttStatus } from "../../lib/bridge";
 import { INVESTORS, refreshSupporters, REPO_URL, useSupporters } from "../../lib/supporters";
 import { EVENTS, subscribe, wakeEnroll, wakeEnrollReset, wakeEnrollSave, wakeForget, wakeStatus, type WakeHeard, type WakeStatus } from "../../lib/bridge";
@@ -13,18 +14,20 @@ import { startTour } from "../../lib/tour";
 import { openStudio, isStudio, studioGo } from "../../lib/studio";
 import { checkUpdate, installUpdate, useUpdate } from "../../lib/update";
 import { chooseArgusDir, openArgus, useArgus } from "../../lib/argus";
-import { SULK_BELOW, useNook, type Settings, FEATURED_SCENES } from "../../store/nook";
+import { DEFAULT_SETTINGS, inQuietHours, SULK_BELOW, useNook, type Settings, FEATURED_SCENES } from "../../store/nook";
+import { applyChattiness, CHATTINESS, chattinessPatch } from "../../lib/chattiness";
+import { fold } from "../../lib/search";
 import { latestNote, NOTES } from "../../lib/notes";
 import { normalizeColor, normalizeLook } from "../../lib/look";
 import { NookFigure } from "../mascot/Figure";
 import { motion } from "motion/react";
-import { ACCENT, Bar, MiniNook, Segmented, TextButton, Toggle, Dropdown, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, Bar, MiniNook, PrimaryButton, SectionLabel, Segmented, TextButton, Toggle, Dropdown, tintBg, tintText } from "../ui/primitives";
 import { INTRO_KINDS } from "../overlays/Intro";
 import { MOVE_KINDS } from "../../lib/moveFx";
 import { IntroPreview, MovePreview, UpdateAnimGallery } from "./EffectPreview";
 import { UpdateBody } from "../overlays/UpdateAnims";
 import { LangDropdown } from "../ui/LangPicker";
-import { tt } from "../../lib/i18n";
+import { isTurkish, pct, tt } from "../../lib/i18n";
 import { playSfx, type Sfx } from "../../lib/sfx";
 import { activeScenes, SCENE_LIST, type SceneMode } from "../shield/catalog";
 import { conflictOf, duplicateOf, isFailed, prettyKeys, SHORTCUTS, spareShortcut, useInstalledApps, useShortcutFailures } from "../../lib/shortcuts";
@@ -66,12 +69,12 @@ const LOG_DAYS: { id: number; label: string }[] = [
 ];
 
 const SCALES: { id: number; label: string }[] = [
-  { id: 0.8, label: "%80" },
-  { id: 0.9, label: "%90" },
-  { id: 1, label: "%100" },
-  { id: 1.15, label: "%115" },
-  { id: 1.3, label: "%130" },
-  { id: 1.5, label: "%150" },
+  { id: 0.8, label: pct(80) },
+  { id: 0.9, label: pct(90) },
+  { id: 1, label: pct(100) },
+  { id: 1.15, label: pct(115) },
+  { id: 1.3, label: pct(130) },
+  { id: 1.5, label: pct(150) },
 ];
 
 const VISION: { id: Settings["colorVision"]; label: string }[] = [
@@ -106,25 +109,62 @@ export type CatId = "general" | "island" | "notify" | "health" | "game" | "priva
 
 /** Ayarların kategorileri: önce ızgara, birine basınca kendi sayfası. `sections`: içindeki bölüm başlıkları (atlama için) */
 export const CATS: { id: CatId; title: string; hint: string; icon: LucideIcon; color: string; sections: string[] }[] = [
-  { id: "general", title: tt("Genel"), hint: tt("Dil, görünüm, ekran, boyut"), icon: Settings2, color: ACCENT.blue, sections: ["Nook", tt("Ekran"), tt("Erişilebilirlik"), tt("Performans")] },
+  { id: "general", title: tt("Genel"), hint: tt("Dil, görünüm, ekran, boyut"), icon: Settings2, color: ACCENT.blue, sections: ["Nook", tt("Gün"), tt("Ekran"), tt("Erişilebilirlik"), tt("Performans")] },
   { id: "island", title: tt("Ada ve Nook"), hint: tt("Uyku, gezinti, animasyonlar"), icon: Sparkles, color: ACCENT.pink, sections: [tt("Ada"), tt("Animasyonlar")] },
-  { id: "notify", title: tt("Bildirimler"), hint: tt("Bildirim kartları, uyarılar"), icon: Bell, color: ACCENT.purple, sections: [tt("Bildirimler")] },
+  { id: "notify", title: tt("Bildirimler"), hint: tt("Bildirim kartları, sessiz saatler, uyarılar"), icon: Bell, color: ACCENT.purple, sections: [tt("Bildirimler")] },
   { id: "health", title: tt("Sağlık"), hint: tt("Su, göz molası, odak bekçisi"), icon: HeartPulse, color: ACCENT.teal, sections: [tt("Mola hatırlatıcıları"), tt("Odak bekçisi")] },
   { id: "game", title: tt("Tam ekran"), hint: tt("Oyun ve video, oyun özeti, mola"), icon: Gamepad2, color: ACCENT.orange, sections: [tt("Tam ekran")] },
   { id: "privacy", title: tt("Gizlilik"), hint: tt("Kalkan, parola, yayın, hassas veri"), icon: ShieldCheck, color: ACCENT.red, sections: [tt("Yayın ve hassas veri"), tt("Gizlilik kalkanı"), tt("Parola kilidi")] },
-  { id: "voice", title: tt("Asistan"), hint: tt("Gemini, Hey Nook, sesler"), icon: AudioLines, color: ACCENT.yellow, sections: [tt("Yapay zekâ"), "Hey Nook", tt("Ses")] },
-  { id: "modules", title: tt("Modüller"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
+  { id: "voice", title: tt("Sohbet ve asistan"), hint: tt("Gemini ya da Claude, Hey Nook, sesler"), icon: AudioLines, color: ACCENT.yellow, sections: [tt("Yapay zekâ"), "Hey Nook", tt("Ses")] },
+  { id: "modules", title: tt("Modül ayarları"), hint: tt("Pano, Raf, Takvim, Hum, Argus"), icon: LayoutGrid, color: ACCENT.green, sections: [tt("Pano ve notlar"), tt("Raf"), tt("Takvim"), tt("Hava durumu"), "Hum", "Argus"] },
   { id: "shortcuts", title: tt("Klavye kısayolları"), hint: tt("Her yerde çalışan tuşlar"), icon: Keyboard, color: ACCENT.blue, sections: [tt("Klavye kısayolları")] },
   { id: "phone", title: tt("Telefon"), hint: tt("Nook Mobil, uzaktan açma"), icon: Smartphone, color: ACCENT.teal, sections: [tt("Telefon")] },
   { id: "about", title: tt("Hakkında"), hint: tt("Tanıtım, güncelleme, geribildirim, destekçiler"), icon: Info, color: ACCENT.gray, sections: [tt("Hakkında"), tt("Günlük kayıtları"), tt("Geribildirim"), tt("Destekçiler")] },
 ];
 
-/** Bölüm başlığından kategorisi ("Ayarlar › Kısayollar"a gönderme gibi) */
-export const catOf = (section: string) => CATS.find((c) => c.sections.some((t) => t === section || t.startsWith(section) || section.startsWith(t)))?.id ?? null;
+/** Bölüm başlığından kategorisi ("Ayarlar › Klavye kısayolları"na gönderme gibi); önce tam ad, sonra başı tutan */
+export const catOf = (section: string) =>
+  (CATS.find((c) => c.sections.includes(section)) ?? CATS.find((c) => c.sections.some((t) => t.startsWith(section) || section.startsWith(t))))?.id ?? null;
 
 /**
- * Ayarlarda arama: kategoriler alt alta çizilmişken eşleşmeyen satırlar ve bölümler gizlenir
- * (ada ve Studio aynı süzgeci kullanır). `setEmpty`: hiçbir şey eşleşmedi mi.
+ * Studio › Ayarlar'ın satırlara verdiği bağlam: arama metni (`fold`lanmış; ararken dolu), satırın kategorisi
+ * ve bir kategoriye (istenirse içindeki satıra) atlama.
+ */
+export const SettingsNav = createContext<{ q: string; cat: CatId | null; jump: (id: CatId, row?: string) => void }>({
+  q: "",
+  cat: null,
+  jump: (id) => openStudio(`settings:${CATS.find((c) => c.id === id)!.sections[0]}`),
+});
+
+/** Arama hiçbir şey bulamayınca: yazılana en çok benzeyen satırlar (ortak baş harfler + ortak harf ikilileri) */
+export function nearestRows(el: HTMLElement, q: string, n = 3): { label: string; cat: CatId }[] {
+  const grams = (s: string) => new Set(Array.from({ length: Math.max(0, s.length - 1) }, (_, i) => s.slice(i, i + 2)));
+  const qg = grams(q);
+  const score = (w: string) => {
+    let p = 0;
+    while (p < q.length && p < w.length && q[p] === w[p]) p++;
+    const wg = grams(w);
+    let both = 0;
+    qg.forEach((g) => wg.has(g) && both++);
+    return p / q.length + (2 * both) / (qg.size + wg.size || 1);
+  };
+  const seen = new Set<string>();
+  return [...el.querySelectorAll<HTMLElement>("[data-row][data-label]")]
+    .map((row) => ({
+      label: row.dataset.label!,
+      cat: row.closest<HTMLElement>("[data-cat]")?.dataset.cat as CatId,
+      score: Math.max(0, ...(row.dataset.row ?? "").split(/\s+/).filter(Boolean).map(score)),
+    }))
+    .filter((r) => r.cat && r.score > 0.55)
+    .sort((a, b) => b.score - a.score)
+    .filter((r) => !seen.has(r.label) && seen.add(r.label))
+    .slice(0, n);
+}
+
+/**
+ * Ayarlarda arama: kategoriler alt alta çizilmişken eşleşmeyen satırlar ve bölümler gizlenir.
+ * `q` `fold`lanmış gelir (büyük/küçük harf ve ı/i fark etmez); satırların eş anlamlı anahtar sözcükleri de
+ * aranır. `setEmpty`: hiçbir şey eşleşmedi mi.
  */
 export function useSettingsFilter(scroller: React.RefObject<HTMLElement | null>, q: string, setEmpty: (v: boolean) => void) {
   useEffect(() => {
@@ -141,7 +181,7 @@ export function useSettingsFilter(scroller: React.RefObject<HTMLElement | null>,
       el.querySelectorAll<HTMLElement>("[data-cat]").forEach((catEl) => {
         let catHit = false;
         catEl.querySelectorAll<HTMLElement>("section[data-sec]").forEach((sec) => {
-          const secHit = (sec.dataset.sec ?? "").toLocaleLowerCase("tr").includes(q);
+          const secHit = fold(sec.dataset.sec ?? "").includes(q);
           let any = false;
           sec.querySelectorAll<HTMLElement>("[data-row]").forEach((row) => {
             const hit = secHit || (row.dataset.row ?? "").includes(q);
@@ -188,19 +228,35 @@ export function CategoryBody({ id }: { id: CatId }) {
       return (
         <>
           <Section title="Nook">
-            <Row label={tt("Dil") + (tt("Dil") === "Language" ? "" : " · Language")}>
+            <Row label={tt("Dil") + (tt("Dil") === "Language" ? "" : " · Language")} keys="dil language lisan çeviri türkçe english ingilizce">
               <LangDropdown />
             </Row>
             <Affection />
-            <Row label={tt("Adı ve görünümü")} hint={tt("Şekli, gözleri, şapkası, rengi")}>
+            <Row label={tt("Adı ve görünümü")} hint={tt("Şekli, gözleri, şapkası, rengi")} keys="isim ad kıyafet tema renk karakter">
               <TextButton onClick={() => openStudio("look")}>{tt("Düzenle")}</TextButton>
             </Row>
-            <Row label={tt("Windows açılınca başlat")}>
+            <Row label={tt("Windows açılınca başlat")} keys="başlangıç otomatik açılış autostart startup">
               <Toggle on={s.autostart} onChange={(v) => update({ autostart: v })} />
             </Row>
           </Section>
+          <Section title={tt("Gün")}>
+            <Row label={tt("Günün ilk açılışında özet")} hint={tt("Hava, takvim, yeni bölümler")} keys="sabah brifing günaydın günlük özet">
+              <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
+            </Row>
+            <Row label={tt("Nook'un günlüğü")} hint={tt("Gece günün mizahi bir özetini kendi ağzından yazar (Gemini ile)")} keys="günce diary gece özet">
+              <Toggle on={s.diary} onChange={(v) => update({ diary: v })} color={ACCENT.purple} />
+            </Row>
+            <Row label={tt("Akşam Günü kapat kartı")} hint={tt("Akşam ada boştayken bugünün özeti, ruh hâlin ve yarına bir not; seçtiğin saatten sonra açılır")} keys="akşam gün sonu kapanış ruh hali mood yarına not">
+              <div className="flex items-center gap-1.5">
+                {s.dayClose && (
+                  <input type="time" aria-label={tt("Günü kapat saati")} value={s.dayCloseAt} onChange={(e) => e.target.value && update({ dayCloseAt: e.target.value })} className="rounded-full bg-well px-2 py-0.5 text-[11px] font-medium tabular-nums text-label outline-none [color-scheme:dark] focus:bg-well-hi" />
+                )}
+                <Toggle on={s.dayClose} onChange={(v) => update({ dayClose: v })} color={ACCENT.purple} />
+              </div>
+            </Row>
+          </Section>
           <Section title={tt("Ekran")}>
-            <Row label={tt("Hangi ekranda")} hint={tt("Ana ekran, imlecin olduğu, hepsi ya da seçtiğin")}>
+            <Row label={tt("Hangi ekranda")} hint={tt("Ana ekran, imlecin olduğu, hepsi ya da seçtiğin")} keys="monitör ikinci ekran çoklu ekran">
               <Segmented id="monitor" options={MONITOR_MODES} value={s.monitorMode} onChange={(v) => update({ monitorMode: v })} color={ACCENT.blue} />
             </Row>
             {s.monitorMode === "fixed" && (
@@ -210,45 +266,39 @@ export function CategoryBody({ id }: { id: CatId }) {
                   onChange={(v) => update({ monitorName: v || null })}
                   maxWidth={150}
                   color={ACCENT.blue}
-                  options={[{ id: "", label: tt("Ana ekran") }, ...monitors.map((m, i) => ({ id: m.name, label: `${i + 1}. ekran · ${m.width}×${m.height}` }))]}
+                  options={[{ id: "", label: tt("Ana ekran") }, ...monitors.map((m, i) => ({ id: m.name, label: tt("{0}. ekran · {1}×{2}", i + 1, m.width, m.height) }))]}
                 />
               </Row>
             )}
             <Row label={tt("Adanın yeri")} hint={s.islandPos ? tt("Taşındı · üstteki ✥ ile sürükle") : tt("Üst orta · üstteki ✥ ile sürükle")}>
               <TextButton disabled={!s.islandPos} onClick={() => update({ islandPos: null })}>{tt("Ortala")}</TextButton>
             </Row>
-            <Row label={tt("Tam ekranda ikinci ekrana geç")} hint={tt("Oyun ya da tam ekran video açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
-              <Toggle on={s.gameSecondScreen} onChange={(v) => update({ gameSecondScreen: v })} color={ACCENT.blue} />
-            </Row>
+            <Elsewhere label={tt("Tam ekranda ikinci ekrana geç")} cat="game" />
           </Section>
           <Section title={tt("Erişilebilirlik")}>
-            <Row label={tt("Arayüz boyutu")}>
+            <Row label={tt("Arayüz boyutu")} keys="yazı boyutu büyüt küçült ölçek zoom font">
               <Segmented id="scale" options={SCALES} value={s.uiScale} onChange={(v) => update({ uiScale: v })} />
             </Row>
-            <Row label={tt("Net yazı")} hint={tt("Soluk gri yazılar açılır, koyu kartta daha kolay okunur")}>
+            <Row label={tt("Net yazı")} hint={tt("Soluk gri yazılar açılır, koyu kartta daha kolay okunur")} keys="kontrast okunabilirlik karanlık dark tema">
               <Toggle on={s.clearText} onChange={(v) => update({ clearText: v })} color={ACCENT.yellow} />
             </Row>
             <Row label={tt("Daha az hareket")} hint={tt("Kayan, büyüyen animasyonlar ve hava efektleri durur. Windows'ta animasyonlar kapalıysa kendiliğinden azalır")}>
               <Toggle on={s.calmMotion} onChange={(v) => update({ calmMotion: v })} color={ACCENT.teal} />
             </Row>
-            <Row label={tt("Renk körlüğü paleti")}>
+            <Row label={tt("Renk körlüğü paleti")} keys="renk körü tema renkler">
               <Dropdown options={VISION} value={s.colorVision} onChange={(v) => update({ colorVision: v })} />
             </Row>
             <PalettePreview />
           </Section>
           <Section title={tt("Performans")}>
-            <Row label={tt("Hafif kip")} hint={tt("Zayıf bilgisayarlar için: animasyonlar 30 karede, hava efektleri ve gezintiler kapalı")}>
+            <Row label={tt("Hafif kip")} hint={tt("Zayıf bilgisayarlar için: animasyonlar 30 karede, hava efektleri ve gezintiler kapalı")} keys="performans hız yavaş kasma fps işlemci cpu ram bellek">
               <Toggle on={s.lightMode} onChange={(v) => update({ lightMode: v })} color={ACCENT.green} />
             </Row>
             <Row label={tt("\"Hey Nook\" dinlemesi")} hint={tt("Sürekli mikrofonu dinler; kapalıyken işlemci kullanmaz")}>
               <Toggle on={s.wakeWord} onChange={(v) => update({ wakeWord: v })} color={ACCENT.teal} />
             </Row>
-            <Row label={tt("Bildirim kartları")} hint={tt("Windows bildirimlerini okuyup adada gösterir")}>
-              <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} color={ACCENT.purple} />
-            </Row>
-            <Row label={tt("Ara sıra dışarı çıksın")} hint={tt("Pencereye tüner, iple sarkar, balık tutar")}>
-              <Toggle on={s.outings} onChange={(v) => update({ outings: v })} />
-            </Row>
+            <Elsewhere label={tt("Windows bildirimleri")} cat="notify" />
+            <Elsewhere label={tt("Ara sıra dışarı çıksın")} cat="island" />
           </Section>
         </>
       );
@@ -256,23 +306,18 @@ export function CategoryBody({ id }: { id: CatId }) {
       return (
         <>
           <Section title={tt("Ada")}>
-            <Row label={tt("Uyuma süresi")} hint={tt("Bu kadar dokunulmazsa Nook uyur")}>
+            <ChattinessRow />
+            <Row label={tt("Uyuma süresi")} hint={tt("Bu kadar dokunulmazsa Nook uyur")} keys="uyku boşta bekleme">
               <Segmented id="sleep" options={SLEEP} value={s.sleepAfterSec} onChange={(v) => update({ sleepAfterSec: v })} />
             </Row>
-            <Row label={tt("Ara sıra dışarı çıksın")} hint={tt("Pencereye tüner, iple sarkar, balık tutar")}>
+            <Row label={tt("Ara sıra dışarı çıksın")} hint={tt("Pencereye tüner, iple sarkar, balık tutar")} keys="gezinti gezi dolaş">
               <Toggle on={s.outings} onChange={(v) => update({ outings: v })} />
             </Row>
-            <Row label={tt("Ses kartı")} hint={tt("Ada açılınca solunda ses düzeyi kartı")}>
+            <Row label={tt("Ses kartı")} hint={tt("Ada açılınca solunda ses düzeyi kartı")} keys="ses volume hoparlör">
               <Toggle on={s.soundCard} onChange={(v) => update({ soundCard: v })} color={ACCENT.green} />
             </Row>
-            <Row label={tt("Pilde yavaşla")} hint={tt("Pildeyken ve tasarruf modunda animasyonlar azalır")}>
+            <Row label={tt("Pilde yavaşla")} hint={tt("Pildeyken ve tasarruf modunda animasyonlar azalır")} keys="pil batarya şarj tasarruf">
               <Toggle on={s.powerSaver} onChange={(v) => update({ powerSaver: v })} />
-            </Row>
-            <Row label={tt("Günün ilk açılışında özet")} hint={tt("Hava, takvim, yeni bölümler")}>
-              <Toggle on={s.dailySummary} onChange={(v) => update({ dailySummary: v })} />
-            </Row>
-            <Row label={tt("Nook'un günlüğü")} hint={tt("Gece günün mizahi bir özetini kendi ağzından yazar (Gemini ile)")}>
-              <Toggle on={s.diary} onChange={(v) => update({ diary: v })} color={ACCENT.purple} />
             </Row>
             <Row label={tt("Dönünce karşıla")} hint={tt("Bu kadar süre yokken dönünce Nook sevinir")}>
               <Segmented id="settings-welcome" options={WELCOME} value={s.welcomeBack} onChange={(v) => update({ welcomeBack: v })} color={ACCENT.pink} />
@@ -322,39 +367,32 @@ export function CategoryBody({ id }: { id: CatId }) {
     case "notify":
       return (
         <Section title={tt("Bildirimler")}>
-          <Row label={tt("Windows bildirimleri")} hint={tt("Gelen bildirimler adada kart olarak görünür")}>
+          <Row label={tt("Windows bildirimleri")} hint={tt("Gelen bildirimler adada kart olarak görünür")} keys="bildirim kartları notification uyarı">
             <Toggle on={s.notifications} onChange={(v) => update({ notifications: v })} />
           </Row>
+          <QuietHoursRow />
           <Row label={tt("Kart ekranda kalma süresi")} hint={tt("Windows, telefon ve WhatsApp bildirim kartları; üstüne gelince süre durur")}>
             <Segmented id="settings-notify-secs" options={NOTIFY_SECS} value={s.notifySecs ?? 0} onChange={(v) => update({ notifySecs: v })} />
           </Row>
           <Row label={tt("WhatsApp bildirim kartları")} hint={tt("Mesaj gelince adada hızlı yanıt kartı çıkar; kapatırsan yalnızca modülde birikir")}>
             <Toggle on={s.whatsappNotify} onChange={(v) => update({ whatsappNotify: v })} color={ACCENT.green} />
           </Row>
-          <Row label={tt("Olay kartları")} hint={tt("Şarj, USB, kulaklık, internet gibi olaylar")}>
+          <Row label={tt("Olay kartları")} hint={tt("Şarj, USB, kulaklık, internet gibi olaylar")} keys="wifi kablosuz internet pil batarya şarj bluetooth">
             <Toggle on={s.events} onChange={(v) => update({ events: v })} />
           </Row>
-          <Row label={tt("Ses / parlaklık göstergesi")}>
+          <Row label={tt("Ses / parlaklık göstergesi")} keys="ses volume hoparlör ekran ışığı osd">
             <Toggle on={s.osd} onChange={(v) => update({ osd: v })} />
           </Row>
-          <Row label={tt("Sistem uyarıları")} hint={tt("Uzun süre yüksek işlemci / bellek, dolan disk")}>
+          <Row label={tt("Sistem uyarıları")} hint={tt("Uzun süre yüksek işlemci / bellek, dolan disk")} keys="cpu ram depolama sıcaklık">
             <Toggle on={s.sysAlerts} onChange={(v) => update({ sysAlerts: v })} color={ACCENT.orange} />
           </Row>
-          <Row label={tt("Kopyalanan yabancı metni çevir")} hint={tt("Açıksa yabancı dilde görünen kopyalar çevrilmek için Gemini'ye gönderilir")}>
-            <Toggle on={s.translate} onChange={(v) => update({ translate: v })} />
-          </Row>
-          {s.translate && !s.geminiKey.trim() && (
-            <Row label={tt("Gemini anahtarı yokken MyMemory ile çevir")} hint={tt("Açıksa metin ücretsiz çeviri servisi MyMemory'ye gider")}>
-              <Toggle on={s.freeTranslate === true} onChange={(v) => update({ freeTranslate: v })} color={ACCENT.purple} />
-            </Row>
-          )}
         </Section>
       );
     case "health":
       return (
         <>
           <Section title={tt("Mola hatırlatıcıları")}>
-            <Row label={tt("Su hatırlatıcısı")} hint={tt("Oyunda ve tam ekranda susar; telefonda da çıkar")}>
+            <Row label={tt("Su hatırlatıcısı")} hint={tt("Oyunda ve tam ekranda susar; telefonda da çıkar")} keys="su iç bardak sağlık">
               <Segmented id="settings-water" options={WATER} value={s.waterEvery} onChange={(v) => update({ waterEvery: v })} color={ACCENT.blue} />
             </Row>
             <Row label={tt("Göz molası")} hint={tt("20 dakikada bir 20 saniye uzağa bak")}>
@@ -386,7 +424,7 @@ export function CategoryBody({ id }: { id: CatId }) {
           <Row label={tt("Oyunda / tam ekranda gizlen")}>
             <Toggle on={s.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
           </Row>
-          <Row label={tt("Tam ekranda ikinci ekrana geç")} hint={tt("Oyun ya da tam ekran video açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")}>
+          <Row label={tt("Tam ekranda ikinci ekrana geç")} hint={tt("Oyun ya da tam ekran video açıkken başka bir ekran varsa gizlenmek yerine oraya geçer")} keys="monitör çoklu ekran">
             <Toggle on={s.gameSecondScreen} onChange={(v) => update({ gameSecondScreen: v })} color={ACCENT.blue} />
           </Row>
           <Row label={tt("Oyun açılınca özet")} hint={tt("Kısa süre oyunun üstünde merhaba der")}>
@@ -430,7 +468,7 @@ export function CategoryBody({ id }: { id: CatId }) {
           <ShelfSection />
           <CalendarSection />
           <Section title={tt("Hava durumu")}>
-            <Row label={tt("Hava durumu")} hint={tt("Bugün kartında ve günün özetinde")}>
+            <Row label={tt("Hava durumu")} hint={tt("Bugün kartında ve günün özetinde")} keys="hava sıcaklık yağmur weather">
               <Toggle on={s.weather} onChange={(v) => update({ weather: v })} />
             </Row>
             {s.weather && (
@@ -448,7 +486,7 @@ export function CategoryBody({ id }: { id: CatId }) {
             )}
           </Section>
           <Section title="Hum">
-            <Row label={tt("Otomatik Hum")} hint={tt("Bilgisayarda çalan şarkıları arkada tanıyıp kaydeder; mikrofon kullanmaz")}>
+            <Row label={tt("Otomatik Hum")} hint={tt("Bilgisayarda çalan şarkıları arkada tanıyıp kaydeder; mikrofon kullanmaz")} keys="müzik şarkı tanıma shazam">
               <Toggle on={s.humAuto} onChange={(v) => update({ humAuto: v })} color={ACCENT.purple} />
             </Row>
           </Section>
@@ -538,7 +576,7 @@ function AboutHero() {
             </div>
           ) : progress !== null ? (
             <span className="text-[12.5px] font-bold tabular-nums" style={{ color: tintText(ACCENT.green) }}>
-              {tt("İndiriliyor %{0}", progress)}
+              {tt("İndiriliyor {0}", pct(progress))}
             </span>
           ) : available ? (
             <>
@@ -576,7 +614,7 @@ export function ArgusSection() {
           value={s.argusProfile && snap.profiles.includes(s.argusProfile) ? s.argusProfile : ""}
           onChange={(v) => update({ argusProfile: v })}
           color={ACCENT.orange}
-          options={[{ id: "", label: `Otomatik (${snap.profile})` }, ...snap.profiles.map((p) => ({ id: p, label: p }))]}
+          options={[{ id: "", label: tt("Otomatik ({0})", snap.profile) }, ...snap.profiles.map((p) => ({ id: p, label: p }))]}
         />
       </Row>
       <Row label={tt("Yeni bölüm haberleri")}>
@@ -624,12 +662,15 @@ export function ArgusSection() {
   );
 }
 
-/** Nook Mobil: telefon bu PC'ye bağlanır (kapat, uyut, ekran görüntüsü…). QR gizli anahtarı taşıdığı için
- *  yalnızca istenince ve bir dakikalığına görünür. */
+/** Nook Mobil: telefon bu PC'ye bağlanır (kapat, uyut, ekran görüntüsü…). Üç adımlı sihirbaz: İndir · Eşleştir · Dene.
+ *  Eşleştirme QR'ı gizli anahtarı taşıdığı için yalnızca istenince görünür, telefon bağlanınca gizlenir.
+ *  İleri düzey her şey (güvenlik duvarı, Tailscale, uzaktan açma) açılır başlıkların altında. */
 function PhoneSection() {
   const [info, setInfo] = useState<RemoteInfo | null>(null);
   const [showQr, setShowQr] = useState(false);
-  const [appQr, setAppQr] = useState(false);
+  // Sihirbazda kullanıcının geldiği adım (telefon bağlanınca kendiliğinden "Dene")
+  const [step, setStep] = useState(1);
+  const studio = useContext(SettingsLook) === "studio";
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [fw, setFw] = useState<"idle" | "busy" | "ok" | string>("idle");
@@ -656,82 +697,100 @@ function PhoneSection() {
     setInfo(await remoteSet(on).finally(() => setBusy(false)));
     if (!on) setShowQr(false);
   };
+  const paired = !!info.lastSeen;
+  const live = paired && Date.now() - info.lastSeen! < 60_000;
+  // Sihirbazın adımı: telefon bir kez bağlandıysa "Dene", yoksa kullanıcının geldiği yer
+  const cur = paired ? 3 : step;
+  const stateOf = (n: number): StepState => ((n === 1 ? cur > 1 : n === 2 ? paired : live) ? "done" : n === cur ? "current" : "todo");
+  const note = `leading-snug text-label-3 ${studio ? "text-[11px]" : "text-[10px]"}`;
+  const hint = `font-semibold text-label ${studio ? "text-[12.5px]" : "text-[11.5px]"}`;
   return (
     <Section title={tt("Telefon")}>
-      <Row label={tt("Nook Mobil bu PC'ye bağlanabilsin")}>
+      <Row label={tt("Nook Mobil bu PC'ye bağlanabilsin")} keys="telefon mobil android eşleştir eşle qr kod bağlan uzaktan">
         <Toggle on={info.enabled} onChange={(v) => void toggle(v)} color={ACCENT.blue} />
       </Row>
-      {!info.enabled && (
-        <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
-          {tt("Açınca telefondan bu PC'yi kapatabilir, uyutabilir, kilitleyebilir ve ekran görüntüsü alabilirsin. Bağlantı yalnızca eşleştirdiğin telefona açıktır.")}
-        </p>
-      )}
+      <div className="py-2.5">
+        <SectionLabel>{tt("Telefonla neler yapılır")}</SectionLabel>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {PHONE_CAN.map(({ icon: Icon, label, color }) => (
+            <span key={label} className="flex items-center gap-1.5 rounded-full border py-[3px] pl-2 pr-2.5 text-[11px] font-medium" style={{ background: tintBg(color, 12), borderColor: tintBg(color, 30), color: tintText(color) }}>
+              <Icon size={12} strokeWidth={2.4} />
+              {label}
+            </span>
+          ))}
+        </div>
+        {!info.enabled && <p className={`mt-2 ${note}`}>{tt("Bağlantı yalnızca eşleştirdiğin telefona açıktır; açınca üç adımda eşleşirsin.")}</p>}
+      </div>
       {info.enabled && !info.running && !busy && (
-        <p className="pb-1 text-[10px] text-red/90">{tt("Köprü başlatılamadı: {0} numaralı bağlantı noktası başka bir uygulamada olabilir.", info.port)}</p>
+        <p className="py-1 text-[10px] text-red/90">{tt("Köprü başlatılamadı: {0} numaralı bağlantı noktası başka bir uygulamada olabilir.", info.port)}</p>
       )}
       {info.enabled && (
         <>
-          {/* Mobil Bağlantı & Bildirim Sağlığı */}
-          <div className="my-2 rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{
-                    background: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "var(--color-sys-green)" : "var(--color-sys-yellow)",
-                    boxShadow: info.lastSeen && Date.now() - info.lastSeen < 60_000 ? "0 0 8px var(--color-sys-green)" : "none",
+          <div className={`grid gap-2 py-2.5 ${studio ? "grid-cols-3" : "grid-cols-1"}`}>
+            <StepCard n={1} title={tt("İndir")} state={stateOf(1)}>
+              <QrBox svg={info.appQr} size={112} />
+              <p className={hint}>{tt("Telefonun kamerasıyla okut")}</p>
+              <p className={note}>{tt("Nook Mobil (Android) iner. Android “bilinmeyen uygulamaları yükle” izni isteyebilir; izin verip kur. Sonraki güncellemeler uygulamanın içinden gelir.")}</p>
+              {cur === 1 && (
+                <PrimaryButton color={ACCENT.blue} onClick={() => setStep(2)} className="mt-auto h-8 w-full">
+                  {tt("İndirdim")}
+                </PrimaryButton>
+              )}
+            </StepCard>
+            <StepCard n={2} title={tt("Eşleştir")} state={stateOf(2)}>
+              {showQr ? (
+                <QrBox svg={info.qr} size={160} />
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowQr(true);
+                    setStep(2);
                   }}
-                />
-                <div className="min-w-0">
-                  <span className="block truncate text-[11.5px] font-bold text-white">
-                    {info.lastSeen && Date.now() - info.lastSeen < 60_000
-                      ? tt("Telefon Bağlı (Canlı)")
-                      : info.lastSeen
-                        ? tt("Son görülme: {0} dk önce", Math.max(1, Math.round((Date.now() - info.lastSeen) / 60_000)))
-                        : tt("Telefon bekleniyor")}
-                  </span>
-                  <span className="block truncate text-[9.5px] text-label-3">
-                    {info.lastIp ? tt("{0} · bağlantı noktası {1}", info.lastIp, info.port) : tt("Henüz bağlantı isteği gelmedi")}
-                  </span>
-                </div>
+                  className="flex h-[160px] w-[160px] shrink-0 flex-col items-center justify-center gap-2 rounded-row border border-dashed border-white/15 bg-well text-label-2 transition-colors hover:bg-well-hi hover:text-label"
+                >
+                  <QrCode size={44} strokeWidth={1.4} />
+                  <span className="font-semibold">{tt("Eşleştirme kodunu göster")}</span>
+                </button>
+              )}
+              <p className={hint}>{tt("Nook Mobil'in içinden okut")}</p>
+              <p className={note}>{tt("Uygulamayı aç, “PC ekle”ye bas. Telefon bağlanınca kod kendiliğinden gizlenir. Kimseyle paylaşma: bu PC'yi yönetmenin anahtarı.")}</p>
+              {showQr && <TextButton onClick={() => setShowQr(false)}>{tt("Gizle")}</TextButton>}
+            </StepCard>
+            <StepCard n={3} title={tt("Dene")} state={stateOf(3)}>
+              <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-2">
+                <span className="relative flex h-4 w-4 items-center justify-center">
+                  {!live && <motion.span className="absolute inset-0 rounded-full" style={{ background: ACCENT.yellow }} animate={{ scale: [1, 2.1], opacity: [0.45, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }} />}
+                  <span className="relative h-2.5 w-2.5 rounded-full" style={{ background: live ? ACCENT.green : ACCENT.yellow, boxShadow: live ? `0 0 10px ${ACCENT.green}` : "none" }} />
+                </span>
+                <p className={hint} style={live ? { color: tintText(ACCENT.green) } : undefined}>
+                  {live ? tt("Bağlandı") : paired ? tt("Son görülme: {0} dk önce", Math.max(1, Math.round((Date.now() - info.lastSeen!) / 60_000))) : tt("Telefon bekleniyor…")}
+                </p>
+                <p className={note}>{info.lastIp ? tt("{0} · bağlantı noktası {1}", info.lastIp, info.port) : tt("Kodu okutunca burası kendiliğinden yeşile döner")}</p>
               </div>
-
-              <TextButton
-                onClick={async () => {
+              <PrimaryButton
+                color={ACCENT.blue}
+                className="mt-auto h-8 w-full"
+                onClick={() => {
                   setTesting(true);
-                  await remoteTestNotification();
-                  await remoteInfo().then(setInfo);
-                  setTimeout(() => setTesting(false), 2000);
+                  void remoteTestNotification()
+                    .then(remoteInfo)
+                    .then(setInfo)
+                    .finally(() => window.setTimeout(() => setTesting(false), 2000));
                 }}
               >
-                {testing ? tt("Gönderildi ✓") : tt("Bildirimi Test Et")}
-              </TextButton>
-            </div>
+                {testing ? tt("Gönderildi ✓") : tt("Bildirimi test et")}
+              </PrimaryButton>
+            </StepCard>
           </div>
-
-          <Row label={tt("1. Nook Mobil'i telefona indir (Android)")}>
-            <TextButton onClick={() => setAppQr((v) => !v)}>{appQr ? tt("Gizle") : tt("İndirme kodu")}</TextButton>
+          <Row label={tt("Telefondan uzaktan kontrol")} keys="ekran fare klavye kumanda uzaktan masaüstü">
+            <Toggle on={!!info.control} onChange={(v) => void remoteControlSet(v).then(setInfo)} color={ACCENT.blue} />
           </Row>
-          {appQr && info.appQr && (
-            <div className="flex items-center gap-3 py-2">
-              <div className="h-[118px] w-[118px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: info.appQr }} />
-              <p className="text-[10.5px] leading-snug text-label-2">
-                {tt("Telefonun kamerasıyla okut, Nook Mobil indirilir. Açınca Android “bilinmeyen uygulamaları yükle” izni isteyebilir; izin verip kur. Sonraki güncellemeler uygulamanın içinden gelir.")}
-              </p>
-            </div>
-          )}
-          <Row label={tt("2. Nook Mobil'i açıp bu PC'yle eşleştir")}>
-            <TextButton onClick={() => setShowQr((v) => !v)}>{showQr ? tt("Gizle") : tt("Eşleştirme kodu")}</TextButton>
-          </Row>
-          {showQr && info.qr && (
-            <div className="flex items-center gap-3 py-2">
-              <div className="h-[118px] w-[118px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: info.qr }} />
-              <p className="text-[10.5px] leading-snug text-label-2">
-                {tt("Telefonun kamerasıyla değil, Nook Mobil'in içinden okut: uygulamayı aç, “PC ekle”ye bas. Telefon bağlanınca kod kendiliğinden gizlenir. Kimseyle paylaşma: bu PC'yi yönetmenin anahtarı.")}
-              </p>
-            </div>
-          )}
-          {!info.lastSeen && (
+          <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+            {info.control
+              ? tt("Telefondan bu PC'nin ekranını görüp fare ve klavyeyle kullanabilir, bilgisayarı kapatıp uyutabilirsin. Kontrol başlayınca adada görünür.")
+              : tt("Kapalıyken telefon bu PC'nin ekranını göremez, ekran görüntüsü alamaz; bilgisayarı kapatamaz ve uyutamaz. Açınca eşleştirdiğin telefondan ekranı görüp fareyi ve klavyeyi kullanabilirsin.")}
+          </p>
+          <Fold title={tt("Bağlanmıyor mu?")} hint={tt("Güvenlik duvarı izni, Genel ağ")} keys="güvenlik duvarı firewall genel ağ özel ağ bağlanamıyor bulamıyor wifi kablosuz">
             <Row label={tt("Telefon bu PC'yi bulamıyor mu? Güvenlik duvarı engelliyor olabilir")}>
               {fw === "ok" ? (
                 <span className="text-[11px] text-label-2">{tt("İzin verildi")}</span>
@@ -749,28 +808,21 @@ function PhoneSection() {
                 </TextButton>
               )}
             </Row>
-          )}
-          {fw !== "idle" && fw !== "busy" && fw !== "ok" && <p className="pb-1 text-[10px] text-red/90">{fw}</p>}
-          {!info.lastSeen && (
-            <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
+            {fw !== "idle" && fw !== "busy" && fw !== "ok" && <p className="pb-1 text-[10px] text-red/90">{fw}</p>}
+            <p className="pb-1 text-[10px] text-label-3">
               {tt("Ev ağın Windows'ta Genel ağ olarak işaretliyse telefon bağlanamaz: Windows Ayarlar › Ağ ve İnternet › Wi-Fi'den ağı Özel yap.")}
             </p>
-          )}
-          <Row label={tt("Telefondan uzaktan kontrol")}>
-            <Toggle on={!!info.control} onChange={(v) => void remoteControlSet(v).then(setInfo)} color={ACCENT.blue} />
-          </Row>
-          <p className="-mt-0.5 pb-1 text-[10px] text-label-3">
-            {info.control
-              ? tt("Telefondan bu PC'nin ekranını görüp fare ve klavyeyle kullanabilirsin. Kontrol başlayınca adada görünür.")
-              : tt("Kapalıyken telefon bu PC'nin ekranını göremez, ekran görüntüsü de alamaz. Açınca eşleştirdiğin telefondan ekranı görüp fareyi ve klavyeyi kullanabilirsin.")}
-          </p>
-          <OutsideSetup />
-          <WakeSetup />
+          </Fold>
+          <Fold title={tt("Evden uzakta")} hint={tt("Tailscale ile her yerden bağlan, telefondan PC'yi aç")} keys="tailscale vpn dışarıdan uzaktan uyandır wake on lan wol modem bios">
+            <OutsideSetup />
+            <WakeSetup />
+          </Fold>
           <Row label={tt("Eşleşmeyi sıfırla (telefonun bağlantısı kopar)")}>
             <TextButton
               tone="danger"
               onClick={() => {
                 setShowQr(false);
+                setStep(1);
                 void remoteReset().then(setInfo);
               }}
             >
@@ -783,10 +835,71 @@ function PhoneSection() {
   );
 }
 
+const PHONE_CAN: { icon: LucideIcon; label: string; color: string }[] = [
+  { icon: Music, label: tt("Müziği yönet"), color: ACCENT.pink },
+  { icon: MonitorSmartphone, label: tt("Ekranı gör"), color: ACCENT.blue },
+  { icon: FolderUp, label: tt("Rafa dosya at"), color: ACCENT.teal },
+  { icon: BellRing, label: tt("Bildirimler PC'de"), color: ACCENT.purple },
+  { icon: Power, label: tt("Aç / kapat"), color: ACCENT.orange },
+];
+
+type StepState = "done" | "current" | "todo";
+
+/** Eşleştirme sihirbazının bir adımı: sıradaki adım renkli çerçeveli, biten adımın numarası tike döner */
+function StepCard({ n, title, state, children }: { n: number; title: string; state: StepState; children: React.ReactNode }) {
+  const c = state === "done" ? ACCENT.green : ACCENT.blue;
+  return (
+    <div
+      className="flex flex-col items-center gap-2 rounded-tile border p-3 text-center transition-colors"
+      style={state === "current" ? { background: tintBg(c, 10), borderColor: tintBg(c, 50) } : { background: "var(--color-well)", borderColor: "rgb(255 255 255 / 0.06)" }}
+    >
+      <div className="flex w-full items-center gap-2">
+        <span
+          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11.5px] font-extrabold"
+          style={state === "todo" ? { background: "var(--color-well-hi)", color: "var(--color-label-3)" } : { background: c, color: "#000" }}
+        >
+          {state === "done" ? <Check size={12} strokeWidth={3.2} /> : n}
+        </span>
+        <span className={`text-[13px] font-bold ${state === "todo" ? "text-label-2" : "text-label"}`}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** QR kodu (beyaz zeminde); kod henüz yoksa kesik çizgili yer tutucu */
+function QrBox({ svg, size }: { svg: string | null | undefined; size: number }) {
+  return svg ? (
+    <div className="shrink-0 overflow-hidden rounded-row bg-white p-1 [&>svg]:h-full [&>svg]:w-full" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />
+  ) : (
+    <div className="flex shrink-0 items-center justify-center rounded-row border border-dashed border-white/15 text-label-3" style={{ width: size, height: size }}>
+      <QrCode size={Math.round(size * 0.36)} strokeWidth={1.4} />
+    </div>
+  );
+}
+
+/** Açılır başlık: ileri düzey ayarlar kapalı durur. Aramada başlığı ve `keys`i aranır. */
+function Fold({ title, hint, keys, children }: { title: string; hint?: string; keys?: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const studio = useContext(SettingsLook) === "studio";
+  return (
+    <div data-row={fold(`${title} ${hint ?? ""} ${keys ?? ""}`)} data-label={title}>
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className={`flex w-full items-center justify-between gap-2 text-left ${studio ? "min-h-[46px] py-2.5" : "min-h-[30px] py-1"}`}>
+        <span className="min-w-0">
+          <span className={`block text-label ${studio ? "text-[13.5px] font-semibold" : "text-[12px]"}`}>{title}</span>
+          {hint && <span className={`block leading-snug text-label-3 ${studio ? "text-[11.5px]" : "text-[10px]"}`}>{hint}</span>}
+        </span>
+        <ChevronDown size={15} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="divide-y divide-white/[0.05] pb-1.5 pl-3">{children}</div>}
+    </div>
+  );
+}
+
 /** Tarif kutusu: numaralı adımlar ve alttaki not (wakeGuide.ts; telefonda da aynısı görünür) */
 function GuideBox({ guide }: { guide: Guide }) {
   return (
-    <div className="rounded-lg bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
+    <div className="rounded-badge bg-well px-2 py-1.5 text-[10.5px] leading-snug text-label-2">
       {guide.title && <p className="mb-0.5 text-label-3">{guide.title}</p>}
       <ol className="list-decimal space-y-0.5 pl-3.5">
         {guide.steps.map((s) => (
@@ -1019,7 +1132,7 @@ function OutsideSetup() {
         </CheckRow>
         {qr && st.phoneQr && (
           <div className="flex items-center gap-3 py-1">
-            <div className="h-[96px] w-[96px] shrink-0 overflow-hidden rounded-xl bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: st.phoneQr }} />
+            <QrBox svg={st.phoneQr} size={96} />
             <p className="text-[10.5px] leading-snug text-label-2">
               {tt("Telefonun kamerasıyla okut, Play Store'da Tailscale açılır. Kurup bu PC'deki hesapla giriş yap; Nook Mobil yeni adresi kendisi öğrenir, kodu yeniden okutmana gerek yok.")}
             </p>
@@ -1071,19 +1184,20 @@ function UpdateRow() {
   return (
     <Row label={current ? tt("Sürüm {0}", current) : tt("Sürüm")}>
       {progress !== null ? (
-        <span className="text-[11px] font-medium tabular-nums" style={{ color: ACCENT.green }}>{tt("İndiriliyor %{0}", progress)}
+        <span className="text-[11px] font-medium tabular-nums" style={{ color: tintText(ACCENT.green) }}>
+          {tt("İndiriliyor {0}", pct(progress))}
         </span>
       ) : available ? (
         <div className="flex items-center gap-1">
           {status && <span className="max-w-[220px] text-[10.5px] leading-snug" style={{ color: tintText(ACCENT.red) }}>{status}</span>}
           <TextButton onClick={() => void installUpdate()}>
-            <span style={{ color: ACCENT.green }}>{status ? tt("Yeniden dene") : tt("{0} sürümüne güncelle", available)}</span>
+            <span style={{ color: tintText(ACCENT.green) }}>{status ? tt("Yeniden dene") : tt("{0} sürümüne güncelle", available)}</span>
           </TextButton>
         </div>
       ) : (
         <div className="flex items-center gap-1">
-          {status && <span className="text-[10.5px] text-label-3">{status}</span>}
-          <TextButton onClick={() => void checkUpdate(true)}>{tt("Denetle")}</TextButton>
+          <span className="text-[10.5px] text-label-3">{status || tt("Nook güncel")}</span>
+          <TextButton onClick={() => void checkUpdate(true)}>{tt("Güncellemeleri denetle")}</TextButton>
         </div>
       )}
     </Row>
@@ -1195,17 +1309,130 @@ function PreviewButton({ color, onClick }: { color: string; onClick: () => void 
   );
 }
 
-/** Ayar satırı: kısa başlık, altında isteğe bağlı tek satır açıklama; aramada ikisi de aranır */
-function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  const studio = useContext(SettingsLook) === "studio";
+/** Aranan metnin geçtiği yeri sarıyla işaretler (büyük/küçük harf ve ı/i fark etmez) */
+function Hit({ text, q }: { text: string; q: string }) {
+  const f = fold(text);
+  const i = q && f.length === text.length ? f.indexOf(q) : -1;
+  if (i < 0) return <>{text}</>;
   return (
-    <div data-row={`${label} ${hint ?? ""}`.toLocaleLowerCase("tr")} className={`flex items-center justify-between gap-2 ${studio ? "min-h-[46px] gap-6 py-2.5" : "min-h-[30px] py-1"}`}>
+    <>
+      {text.slice(0, i)}
+      <mark className="rounded-[4px] px-[1px]" style={{ background: tintBg(ACCENT.yellow, 30), color: tintText(ACCENT.yellow) }}>
+        {text.slice(i, i + q.length)}
+      </mark>
+      {text.slice(i + q.length)}
+    </>
+  );
+}
+
+/**
+ * Ayar satırı: kısa başlık, altında isteğe bağlı tek satır açıklama. Aramada ikisi ve `keys` (eş anlamlı
+ * anahtar sözcükler: "wifi kablosuz internet") aranır; ararken eşleşen yer işaretlenir ve satırın kategorisi
+ * çip olarak görünür (basınca o kategoride bu satıra gider).
+ */
+function Row({ label, hint, keys, children }: { label: string; hint?: string; keys?: string; children: React.ReactNode }) {
+  const studio = useContext(SettingsLook) === "studio";
+  const { q, cat, jump } = useContext(SettingsNav);
+  const c = q && cat ? CATS.find((x) => x.id === cat) : null;
+  return (
+    <div data-row={fold(`${label} ${hint ?? ""} ${keys ?? ""}`)} data-label={label} className={`flex items-center justify-between gap-2 ${studio ? "min-h-[46px] gap-6 py-2.5" : "min-h-[30px] py-1"}`}>
       <span className="min-w-0">
-        <span className={`block text-label ${studio ? "text-[13.5px] font-semibold" : "text-[12px]"}`}>{label}</span>
-        {hint && <span className={`block leading-snug text-label-3 ${studio ? "text-[11.5px]" : "text-[10px]"}`}>{hint}</span>}
+        <span className={`block text-label ${studio ? "text-[13.5px] font-semibold" : "text-[12px]"}`}>
+          <Hit text={label} q={q} />
+          {c && (
+            <button onClick={() => jump(c.id, label)} className="ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-[1px] align-middle !text-[10.5px] font-semibold" style={{ background: tintBg(c.color, 14), borderColor: tintBg(c.color, 36), color: tintText(c.color) }}>
+              <c.icon size={10} strokeWidth={2.6} />
+              {c.title}
+            </button>
+          )}
+        </span>
+        {hint && (
+          <span className={`block leading-snug text-label-3 ${studio ? "text-[11.5px]" : "text-[10px]"}`}>
+            <Hit text={hint} q={q} />
+          </span>
+        )}
       </span>
       <span className="flex shrink-0 items-center">{children}</span>
     </div>
+  );
+}
+
+/** Başka kategoride duran ayarın eski yerindeki küçük yönlendirme satırı (aramada çıkmaz: ayar tek yerde bulunur) */
+function Elsewhere({ label, cat }: { label: string; cat: CatId }) {
+  const studio = useContext(SettingsLook) === "studio";
+  const { jump } = useContext(SettingsNav);
+  return (
+    <div className={`flex items-center justify-between gap-2 ${studio ? "min-h-[40px] py-2" : "min-h-[26px] py-1"}`}>
+      <span className={`min-w-0 text-label-3 ${studio ? "text-[12.5px]" : "text-[11px]"}`}>{label}</span>
+      <TextButton onClick={() => jump(cat, label)}>→ {tt("{0} altında", CATS.find((c) => c.id === cat)!.title)}</TextButton>
+    </div>
+  );
+}
+
+/** "Ne kadar konuşkan olayım?": üç hazır düzey (lib/chattiness); sonradan tek tek değiştirildiyse "Özel" */
+function ChattinessRow() {
+  const s = useNook((st) => st.settings);
+  const level = s.chattiness;
+  const patch = level ? chattinessPatch(level, s) : null;
+  const custom = !!patch && (Object.keys(patch) as (keyof Settings)[]).some((k) => patch[k] !== s[k]);
+  return (
+    <Row label={tt("Ne kadar konuşkan olayım?")} hint={custom || !level ? tt("Kendiliğimden çıkardığım kartların hazır ayarı; alarm ve hatırlatıcılar hep gelir") : CHATTINESS.find((c) => c.id === level)?.hint} keys="konuşkan sessiz dengeli canlı rahatsız etme kartlar bildirim sıklık">
+      <div className="flex items-center gap-1.5">
+        {custom && (
+          <span className="rounded-full px-2 py-[2px] text-[10.5px] font-semibold" style={{ background: tintBg(ACCENT.orange, 16), color: tintText(ACCENT.orange) }}>
+            {tt("Özel")}
+          </span>
+        )}
+        <Segmented id="settings-chattiness" options={CHATTINESS} value={(custom ? "" : (level ?? "")) as never} onChange={applyChattiness} color={ACCENT.pink} />
+      </div>
+    </Row>
+  );
+}
+
+/** Saatin yönelme eki ("08:00'e", "23:30'a"): son okunan sayıya göre */
+function toTime(t: string): string {
+  if (!isTurkish) return t;
+  const [h, m] = [Number(t.slice(0, 2)), Number(t.slice(3, 5))];
+  const n = m || h;
+  const ones = ["", "e", "ye", "e", "e", "e", "ya", "ye", "e", "a"][n % 10];
+  const tens = ["a", "a", "ye", "a", "a", "ye"][Math.floor(n / 10)];
+  return `${t}'${ones || tens}`;
+}
+
+/** Sessiz saatler: her gün bu aralıkta kartlar, hatırlatmalar ve sesler susar (store'daki isQuiet) */
+function QuietHoursRow() {
+  const q = useNook((st) => st.settings.quietHours) ?? DEFAULT_SETTINGS.quietHours!;
+  const update = useNook((st) => st.updateSettings);
+  const set = (patch: Partial<typeof q>) => update({ quietHours: { ...q, ...patch } });
+  // "Şu an sessiz" yazısı aralığa girince / çıkınca kendiliğinden değişsin
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => tick((n) => n + 1), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const active = inQuietHours(q);
+  const field = "rounded-full bg-well px-2 py-0.5 text-[11px] font-medium tabular-nums text-label outline-none [color-scheme:dark] focus:bg-well-hi";
+  return (
+    <>
+      <Row label={tt("Sessiz saatler")} hint={tt("Her gün bu saatlerde kartlar, hatırlatmalar ve sesler susar; alarm, takvim ve aramalar yine gelir")} keys="rahatsız etme gece uyku sessiz mod dnd do not disturb">
+        <div className="flex items-center gap-1.5">
+          {q.on && (
+            <>
+              <input type="time" aria-label={tt("Başlangıç")} value={q.from} onChange={(e) => e.target.value && set({ from: e.target.value })} className={field} />
+              <span className="text-[11px] text-label-3">–</span>
+              <input type="time" aria-label={tt("Bitiş")} value={q.to} onChange={(e) => e.target.value && set({ to: e.target.value })} className={field} />
+            </>
+          )}
+          <Toggle on={q.on} onChange={(v) => set({ on: v })} color={ACCENT.purple} />
+        </div>
+      </Row>
+      {active && (
+        <p className="-mt-0.5 flex items-center gap-1 pb-1.5 text-[11px] font-medium" style={{ color: tintText(ACCENT.purple) }}>
+          <Moon size={11} strokeWidth={2.6} />
+          {tt("Şu an sessiz · {0} kadar", toTime(q.to))}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -1324,7 +1551,7 @@ function ShortcutsSection() {
         const spare = held ? spareShortcut(s, failed) : null;
         return (
           <div key={k.key}>
-            <Row label={k.label}>
+            <Row label={k.label} keys="kısayol tuş hotkey klavye">
               <ShortcutInput value={combo} onChange={(v) => update({ [k.key]: v } as Partial<Settings>)} clearable={k.clearable} />
             </Row>
             {held ? (
@@ -1342,6 +1569,9 @@ function ShortcutsSection() {
           </div>
         );
       })}
+      <Row label={tt("Oyunda kısayolları kapat")} hint={tt("Tam ekran oyundayken Nook'un genel kısayolları tuşları oyundan çalmaz")} keys="oyun tam ekran hotkey">
+        <Toggle on={s.shortcutsOffInGame ?? true} onChange={(v) => update({ shortcutsOffInGame: v })} />
+      </Row>
       <p className="-mt-0.5 pb-1 text-[10px] text-label-3">{tt("Kısayolu değiştirmek için tıkla, yeni tuşlara bas. Kaldırılabilenleri Sil tuşu kaldırır. Bu tuşlar her programda Nook'a gider.")}</p>
     </Section>
   );
@@ -1353,7 +1583,7 @@ function ClipSection() {
   const update = useNook((st) => st.updateSettings);
   return (
     <Section title={tt("Pano ve notlar")}>
-      <Row label={tt("Kopyaladıktan sonra panoyu boşalt")}>
+      <Row label={tt("Kopyaladıktan sonra panoyu boşalt")} keys="pano clipboard kopyala yapıştır geçmiş">
         <Segmented id="clip-clear" options={AUTO_CLEAR} value={s.clipAutoClear} onChange={(v) => update({ clipAutoClear: v })} color={ACCENT.purple} />
       </Row>
       <Row label={tt("Ekran kilitlenince panoyu boşalt")}>
@@ -1380,6 +1610,14 @@ function ClipSection() {
       <Row label={tt("Karalama sekmesi dokunulmazsa temizlensin")}>
         <Segmented id="pad-clear" options={PAD_CLEAR} value={s.padClear} onChange={(v) => update({ padClear: v })} color={ACCENT.yellow} />
       </Row>
+      <Row label={tt("Kopyalanan yabancı metni çevir")} hint={tt("Açıksa yabancı dilde görünen kopyalar çevrilmek için Gemini'ye gönderilir")} keys="çeviri tercüme translate dil ingilizce">
+        <Toggle on={s.translate} onChange={(v) => update({ translate: v })} color={ACCENT.purple} />
+      </Row>
+      {s.translate && !s.geminiKey.trim() && (
+        <Row label={tt("Gemini anahtarı yokken MyMemory ile çevir")} hint={tt("Açıksa metin ücretsiz çeviri servisi MyMemory'ye gider")}>
+          <Toggle on={s.freeTranslate === true} onChange={(v) => update({ freeTranslate: v })} color={ACCENT.purple} />
+        </Row>
+      )}
     </Section>
   );
 }
@@ -1406,9 +1644,9 @@ function ShelfSection() {
 
 const HEADPHONE_DROP: { id: number; label: string }[] = [
   { id: 0, label: tt("Kapalı") },
-  { id: 10, label: "%10" },
-  { id: 25, label: "%25" },
-  { id: 40, label: "%40" },
+  { id: 10, label: pct(10) },
+  { id: 25, label: pct(25) },
+  { id: 40, label: pct(40) },
 ];
 
 /** Ses: kulaklık çıkınca kısma, çıkışlar arasında kısayolla dönme */
@@ -1430,7 +1668,7 @@ function SoundSection() {
   const cycle = s.outputCycle;
   return (
     <Section title={tt("Ses")}>
-      <Row label={tt("Nook'un sesleri (açılınca, bildirim gelince, sevinince)")}>
+      <Row label={tt("Nook'un sesleri (açılınca, bildirim gelince, sevinince)")} keys="ses volume hoparlör efekt sessiz">
         <Toggle on={s.uiSounds} onChange={(v) => { update({ uiSounds: v }); if (v) playSfx("happy", true); }} color={ACCENT.pink} />
       </Row>
       {s.uiSounds && (
@@ -1447,7 +1685,7 @@ function SoundSection() {
             value={s.alarmSound}
             onChange={(v) => update({ alarmSound: v })}
             color={ACCENT.orange}
-            options={[{ id: 0, label: tt("Sessiz") }, ...Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Alarm ${i + 1}` }))]}
+            options={[{ id: 0, label: tt("Sessiz") }, ...Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: tt("Alarm {0}", i + 1) }))]}
           />
           <button
             disabled={s.alarmSound === 0}
@@ -1462,7 +1700,7 @@ function SoundSection() {
       <Row label={tt("Şarkı sözleri (lrclib.net)")}>
         <Toggle on={s.lyrics} onChange={(v) => update({ lyrics: v })} color={ACCENT.pink} />
       </Row>
-      <Row label={tt("Kulaklık çıkınca sesi kıs")}>
+      <Row label={tt("Kulaklık çıkınca sesi kıs")} keys="ses volume hoparlör kulaklık">
         <Segmented id="hp-drop" options={HEADPHONE_DROP} value={s.headphoneDrop} onChange={(v) => update({ headphoneDrop: v })} color={ACCENT.pink} />
       </Row>
       {s.outputShortcut && outputs.length > 1 && (
@@ -1574,16 +1812,49 @@ function CalendarSection() {
   );
 }
 
-/** Yapay zekâ (Gemini): API anahtarı, model, adın, Nook'un hatıraları. */
+const AI_PROVIDERS: { id: "gemini" | "claude"; label: string }[] = [
+  { id: "gemini", label: "Gemini" },
+  { id: "claude", label: "Claude" },
+];
+
+/** Yapay zekâ (Gemini ya da Claude): API anahtarı, model, adın, Nook'un hatıraları. */
 function AiSection() {
   const s = useNook((st) => st.settings);
   const update = useNook((st) => st.updateSettings);
   const chatCount = useNook((st) => st.chat.length);
   const gemini = useGemini();
+  const claude = useClaudeAi();
+  const isClaude = s.aiProvider === "claude";
+  const claudeModels = CLAUDE_MODELS();
 
   return (
-    <Section title={tt("Yapay zekâ (Gemini)")}>
-      <Row label={tt("API anahtarı")}>
+    <Section title={tt("Yapay zekâ")}>
+      <Row label={tt("Nook'un zekâsı")} hint={tt("Sohbet, sesli komut ve ekrana sor bununla çalışır")} keys="claude gemini yapay zeka ai asistan model">
+        <Segmented id="ai-provider" options={AI_PROVIDERS} value={s.aiProvider} onChange={(v) => update({ aiProvider: v })} color={ACCENT.purple} />
+      </Row>
+      {isClaude && (
+        <>
+          <Row label={tt("Claude API anahtarı")} keys="claude anthropic yapay zeka anahtar key şifre">
+            <KeyInput value={s.claudeKey} placeholder="sk-ant-…" onChange={(v) => update({ claudeKey: v })} />
+          </Row>
+          <p className="-mt-1 pb-1 text-[10px]" style={{ color: claude.status === "ok" ? ACCENT.green : claude.status === "error" ? ACCENT.red : "var(--color-label-3)" }}>
+            {claude.status === "ok"
+              ? tt("Bağlandı")
+              : claude.status === "error"
+                ? claude.error
+                : claude.status === "checking"
+                  ? tt("Kontrol ediliyor…")
+                  : tt("Claude daha akıllı ama ücretli: console.anthropic.com'da bir API anahtarı oluşturup buraya yapıştır; kullandıkça o hesaptan düşer. Claude aboneliği ya da Claude Code oturumu burada geçmez. Yalnızca bu bilgisayarda saklanır.")}
+          </p>
+          <Row label={tt("Model")} hint={claudeModels.find((m) => m.id === s.claudeModel)?.hint}>
+            <Dropdown value={s.claudeModel} onChange={(v) => update({ claudeModel: v })} color={ACCENT.purple} options={claudeModels.map((m) => ({ id: m.id, label: m.label }))} />
+          </Row>
+          <p className="-mt-1 pb-1 text-[10px] text-label-3">
+            {tt("Çeviri, günlük ve günün cümlesi Gemini anahtarıyla çalışmayı sürdürür; aşağıya onu da girebilirsin.")}
+          </p>
+        </>
+      )}
+      <Row label={isClaude ? tt("Gemini API anahtarı") : tt("API anahtarı")} keys="claude gemini google yapay zeka anahtar key şifre">
         <KeyInput value={s.geminiKey} onChange={(v) => update({ geminiKey: v })} />
       </Row>
       <p className="-mt-1 pb-1 text-[10px]" style={{ color: gemini.status === "ok" ? ACCENT.green : gemini.status === "error" ? ACCENT.red : "var(--color-label-3)" }}>
@@ -1737,7 +2008,7 @@ function WakeSection() {
         </div>
       ) : (
         <>
-          <Row label={tt("Seslenince dinle")}>
+          <Row label={tt("Seslenince dinle")} keys="hey nook mikrofon sesli komut uyandırma">
             <Toggle on={s.wakeWord} onChange={(v) => update({ wakeWord: v })} color={ACCENT.teal} />
           </Row>
           <Row label={tt("Duyarlılık")}>
@@ -1812,7 +2083,7 @@ function LocalStt() {
           <Toggle on={on} onChange={(v) => update({ localStt: v })} color={ACCENT.teal} />
         ) : st.downloading ? (
           <span className="text-[11px] font-medium tabular-nums" style={{ color: tintText(ACCENT.teal) }}>
-            %{Math.round(st.progress)}
+            {pct(Math.round(st.progress))}
           </span>
         ) : (
           <TextButton onClick={() => void sttDownload().then(() => setSt({ ...st, downloading: true, progress: 0 }))}>{tt("İndir (190 MB)")}</TextButton>
@@ -1837,7 +2108,7 @@ function LocalStt() {
 }
 
 /** API anahtarı: gizli yazılır, göz ikonuyla gösterilir. Yapıştırınca hemen kaydedilir. */
-export function KeyInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function KeyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const [draft, setDraft] = useState(value);
   const [show, setShow] = useState(false);
   useEffect(() => setDraft(value), [value]);
@@ -1847,7 +2118,7 @@ export function KeyInput({ value, onChange }: { value: string; onChange: (v: str
       <input
         type={show ? "text" : "password"}
         value={draft}
-        placeholder={tt("AIza…")}
+        placeholder={placeholder ?? tt("AIza…")}
         spellCheck={false}
         autoComplete="off"
         onChange={(e) => setDraft(e.target.value)}

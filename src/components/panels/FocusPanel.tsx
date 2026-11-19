@@ -5,7 +5,7 @@ import { swElapsed, swLap, swReset, swText, swToggle } from "../../lib/stopwatch
 import { mmss, nextPhase, pauseFocus, PHASE_LABEL, remaining, resumeFocus, startFocus, stopFocus } from "../../lib/focus";
 import { spring } from "../../lib/motion";
 import { dayKey, useNook } from "../../store/nook";
-import { ACCENT, Segmented, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, PrimaryButton, SectionLabel, Segmented, tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 
 const WORK = [
@@ -54,9 +54,7 @@ function StopwatchView({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode
       <ModeSwitch mode={mode} setMode={setMode} />
       <div className="flex min-h-0 flex-1 gap-3">
         <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: tintText(color) }}>
-            {sw ? (running ? tt("Çalışıyor") : tt("Duraklatıldı")) : tt("Hazır")}
-          </p>
+          <SectionLabel color={color}>{sw ? (running ? tt("Çalışıyor") : tt("Duraklatıldı")) : tt("Hazır")}</SectionLabel>
           <p className={`font-round font-extrabold leading-none tabular-nums tracking-tight text-label ${ms >= 3600_000 ? "text-[34px]" : "text-[44px]"}`}>{swText(ms)}</p>
           {/* Dakika çubuğu: her dakika bir kez dolar */}
           <Progress p={(ms % 60_000) / 60_000} color={color} />
@@ -66,7 +64,7 @@ function StopwatchView({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode
           {laps.map((t, i) => {
             const split = t - (laps[i + 1] ?? 0);
             return (
-              <div key={laps.length - i} className="flex items-center justify-between rounded-[8px] px-2 py-[3px] text-[10.5px] tabular-nums odd:bg-well">
+              <div key={laps.length - i} className="flex items-center justify-between rounded-badge px-2 py-[3px] text-[10.5px] tabular-nums odd:bg-well">
                 <span className="text-label-3">{tt("Tur {0}", laps.length - i)}</span>
                 <span className="text-label-2">+{swText(split)}</span>
               </div>
@@ -116,9 +114,7 @@ function PomodoroView({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode:
       <div className="flex min-h-0 flex-1 flex-col justify-center">
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: tintText(color) }}>
-              {label}
-            </p>
+            <SectionLabel color={color}>{label}</SectionLabel>
             <p className="font-round text-[46px] font-extrabold leading-none tabular-nums tracking-tight text-label">{mmss(left)}</p>
           </div>
           <div className="mb-1 text-right">
@@ -128,7 +124,7 @@ function PomodoroView({ mode, setMode }: { mode: "focus" | "stopwatch"; setMode:
                 <span key={i} className="h-2 w-2 rounded-full" style={{ background: i < round % 4 || (round > 0 && round % 4 === 0 && !work) ? ACCENT.red : "rgb(255 255 255 / 0.12)" }} />
               ))}
             </div>
-            <p className="mt-1 text-[10px] text-label-3">{tt("Bugün {0} tur · {1} dk odak", today?.pomodoros ?? 0, today?.focus ?? 0)}</p>
+            <p className="mt-1 text-[10.5px] text-label-3">{tt("Bugün {0} tur · {1} dk odak", today?.pomodoros ?? 0, today?.focus ?? 0)}</p>
           </div>
         </div>
         <Progress p={p} color={color} />
@@ -183,6 +179,7 @@ function Chip({ on, label, hint, color, onClick }: { on: boolean; label: string;
     <button
       onClick={onClick}
       title={hint}
+      aria-pressed={on}
       className="flex h-6 items-center gap-1.5 rounded-full border px-2 text-[10.5px] font-semibold transition-colors"
       style={on ? { background: tintBg(color, 16), borderColor: tintBg(color, 45), color: tintText(color) } : { background: "rgb(255 255 255 / 0.03)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-3)" }}
     >
@@ -192,18 +189,13 @@ function Chip({ on, label, hint, color, onClick }: { on: boolean; label: string;
   );
 }
 
+/** Bölümün ana düğmesi (Başlat / Duraklat / Devam) */
 function Big({ color, icon: Icon, label, onClick }: { color: string; icon: typeof Play; label: string; onClick: () => void }) {
   return (
-    <motion.button
-      whileTap={{ scale: 0.94 }}
-      transition={spring.pop}
-      onClick={onClick}
-      className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] text-[12.5px] font-bold text-white"
-      style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${color} 88%, white), ${color})`, boxShadow: `0 6px 16px -8px ${color}` }}
-    >
+    <PrimaryButton color={color} onClick={onClick} className="flex-1">
       <Icon size={12} strokeWidth={2.6} fill="currentColor" />
       {label}
-    </motion.button>
+    </PrimaryButton>
   );
 }
 
@@ -214,7 +206,8 @@ function Small({ icon: Icon, label, onClick }: { icon: typeof Play; label: strin
       transition={spring.pop}
       onClick={onClick}
       title={label}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-well text-label-2 hover:bg-well-hi hover:text-label"
+      aria-label={label}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-row bg-well text-label-2 hover:bg-well-hi hover:text-label"
     >
       <Icon size={12} strokeWidth={2.6} />
     </motion.button>

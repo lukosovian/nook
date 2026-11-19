@@ -644,7 +644,11 @@ mod imp {
         let err = |e: windows::core::Error| format!("mikrofon açılamadı: {e}");
         let en: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(err)?;
         let device = en.GetDefaultAudioEndpoint(eCapture, eConsole).map_err(|_| "mikrofon bulunamadı".to_string())?;
-        let id = device.GetId().ok().map(|p| p.to_string().unwrap_or_default());
+        let id = device.GetId().ok().map(|p| {
+            let s = p.to_string().unwrap_or_default();
+            CoTaskMemFree(Some(p.0 as _));
+            s
+        });
         let client: IAudioClient = device.Activate(CLSCTX_ALL, None).map_err(err)?;
         let fmt_ptr = client.GetMixFormat().map_err(err)?;
         let fmt: WAVEFORMATEX = *fmt_ptr;
@@ -671,7 +675,11 @@ mod imp {
             // Varsayılan mikrofon değişti mi
             if checked.elapsed() > Duration::from_secs(3) {
                 checked = std::time::Instant::now();
-                let now = en.GetDefaultAudioEndpoint(eCapture, eConsole).ok().and_then(|d| d.GetId().ok()).map(|p| p.to_string().unwrap_or_default());
+                let now = en.GetDefaultAudioEndpoint(eCapture, eConsole).ok().and_then(|d| d.GetId().ok()).map(|p| {
+                    let s = p.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(p.0 as _));
+                    s
+                });
                 if now != id {
                     return Ok(finish(&client, false));
                 }

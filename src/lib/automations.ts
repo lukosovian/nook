@@ -230,7 +230,7 @@ function holds(c: Condition) {
 
 // ---------------------------------------------------------------- Çalıştırma
 
-const norm = (s: string) => s.toLocaleLowerCase("tr").replace(/[^a-z0-9ğüşıöç]/g, "");
+const norm = (s: string) => s.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/[^a-z0-9ğüşöç]/g, "");
 /** Program adı (.exe) ile Başlat menüsündeki adı farklı olanlar */
 const ALIAS: Record<string, string> = {
   msedge: "edge",

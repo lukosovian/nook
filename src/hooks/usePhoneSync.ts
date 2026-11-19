@@ -4,7 +4,7 @@
  */
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { fileIcon, inTauri, isPrimary, subscribe } from "../lib/bridge";
+import { EVENTS, fileIcon, inTauri, isPrimary, remoteEnabled, subscribe } from "../lib/bridge";
 import { useNook, type Pad } from "../store/nook";
 import { normalizeColor, normalizeLook, type Look } from "../lib/look";
 import { useClaude } from "../lib/claude";
@@ -46,7 +46,13 @@ function phoneRun(run: () => Promise<unknown>) {
     });
 }
 
+/** Köprüye en son gönderilen aynanın imzası */
+let sentSig = "";
+/** Telefon köprüsü açık mı (Ayarlar › Telefon); kapalıyken ayna hiç hazırlanmaz */
+let bridgeOn = false;
+
 function mirror() {
+  if (!bridgeOn) return;
   const { clips, pads, padId, hums, shelf, diary } = useNook.getState();
   const deck = getDeck();
   const quick = getQuickState();
@@ -56,8 +62,7 @@ function mirror() {
     missing.forEach((p) => appIcons.set(p, null));
     void Promise.all(missing.map((p) => fileIcon(p, 48).then((i) => appIcons.set(p, i)))).then(mirror);
   }
-  void invoke("remote_mirror", {
-    data: {
+  const data = {
       clips: clips.slice(0, MAX_CLIPS).map((c) => ({
         id: c.id,
         kind: c.kind ?? "text",
@@ -104,8 +109,15 @@ function mirror() {
         steps: a.steps.length,
       })),
       hums: hums.slice(0, MAX_HUMS).map((h) => ({ id: h.id, title: h.title, artist: h.artist, cover: h.cover ?? null, url: h.url ?? null, at: h.at, phone: !!h.phone })),
-    },
-  }).catch(() => {});
+  };
+  // Yalnızca bir şey değiştiyse gönder (15 saniyelik tazeleme çoğu zaman aynı aynayı üretir).
+  // Suyun `nextAt`i her çağrıda birkaç ms kayar: karşılaştırırken dakikaya yuvarlanır.
+  const sig = JSON.stringify({ ...data, water: { ...data.water, nextAt: data.water.nextAt && Math.round(data.water.nextAt / 60_000) } });
+  if (sig === sentSig) return;
+  sentSig = sig;
+  void invoke("remote_mirror", { data }).catch(() => {
+    sentSig = "";
+  });
 }
 
 /** Telefondaki Claude ekranı: oturumlar (en yeni önce), bekleyen onaylar, plan kullanımı */
@@ -154,23 +166,34 @@ export function usePhoneSync() {
     if (!inTauri || !isPrimary) return;
     let timer = 0;
     const schedule = () => {
+      if (!bridgeOn) return;
       window.clearTimeout(timer);
       timer = window.setTimeout(mirror, 600);
     };
-    void refreshQuickState(false).then(mirror);
-    // Yama notları değişmez: bir kez, yalnızca metinleri
-    void invoke("remote_notes", {
-      notes: NOTES.map((n) => ({ version: n.version, date: n.date, headline: n.headline, major: !!n.major, items: n.items.map((i) => ({ title: i.title, text: i.text })) })),
-    }).catch(() => {});
+    // Köprü açılınca (ve açılışta açıksa) her şey bir kez gönderilir; kapalıyken hiçbir şey hazırlanmaz
+    const setBridge = (on: boolean) => {
+      if (on === bridgeOn) return;
+      bridgeOn = on;
+      if (!on) return window.clearTimeout(timer);
+      sentSig = "";
+      void refreshQuickState(false).then(mirror);
+      // Yama notları değişmez: bir kez, yalnızca metinleri
+      void invoke("remote_notes", {
+        notes: NOTES.map((n) => ({ version: n.version, date: n.date, headline: n.headline, major: !!n.major, items: n.items.map((i) => ({ title: i.title, text: i.text })) })),
+      }).catch(() => {});
+    };
+    void remoteEnabled().then(setBridge);
+    const offBridge = subscribe<boolean>(EVENTS.remoteEnabled, setBridge);
     const unsub = useNook.subscribe((st, prev) => {
       if (st.clips !== prev.clips || st.pads !== prev.pads || st.padId !== prev.padId || st.hums !== prev.hums || st.shelf !== prev.shelf || st.diary !== prev.diary || st.deck !== prev.deck || st.automations !== prev.automations || st.reminder !== prev.reminder || st.settings.waterEvery !== prev.settings.waterEvery) schedule();
     });
     // Su sayacı ve mikrofon/ses durumu düzenli olarak telefon aynasında tazelenir
     const tick = window.setInterval(() => {
-      void refreshQuickState(false).then(mirror);
+      if (bridgeOn) void refreshQuickState(false).then(mirror);
     }, 15_000);
     // Claude'da onay isteği hemen telefona yansısın
     const unsubClaude = useClaude.subscribe((st, prev) => {
+      if (!bridgeOn) return;
       if (st.asks !== prev.asks) {
         window.clearTimeout(timer);
         mirror();
@@ -217,6 +240,8 @@ export function usePhoneSync() {
       unsubClaude();
       unsubHabits();
       off();
+      offBridge();
+      bridgeOn = false;
     };
   }, []);
 }

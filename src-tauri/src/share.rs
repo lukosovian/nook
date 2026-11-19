@@ -52,9 +52,17 @@ pub fn spawn(app: AppHandle) {
         .spawn(move || {
             let mut last = Share { on: false, source: String::new() };
             let mut lost: Option<Instant> = None;
+            // Süreç taraması (OBS açık mı) pahalı: her 5 turda bir (10 sn) yapılır, arada son sonuç geçerli
+            let mut round: u32 = 0;
+            let mut process: Option<&'static str> = None;
             loop {
                 thread::sleep(POLL);
-                let now = detect();
+                #[cfg(windows)]
+                if round % 5 == 0 {
+                    process = imp::process_hint();
+                }
+                round = round.wrapping_add(1);
+                let now = detect(process);
                 if last.on && !now.on && lost.get_or_insert_with(Instant::now).elapsed() < GRACE {
                     continue;
                 }
@@ -69,15 +77,13 @@ pub fn spawn(app: AppHandle) {
         .expect("share thread başlatılamadı");
 }
 
-fn detect() -> Share {
+fn detect(process: Option<&'static str>) -> Share {
     #[cfg(windows)]
-    {
-        if let Some(src) = imp::windows_hint() {
-            return Share { on: true, source: src.into() };
-        }
-        if let Some(src) = imp::process_hint() {
-            return Share { on: true, source: src.into() };
-        }
+    if let Some(src) = imp::windows_hint() {
+        return Share { on: true, source: src.into() };
+    }
+    if let Some(src) = process {
+        return Share { on: true, source: src.into() };
     }
     Share { on: false, source: String::new() }
 }

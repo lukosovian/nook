@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { normalizeColor, normalizeLook } from "../lib/look";
 import { SPAN, useBodyImage, useContentBox, type ContentBox } from "../lib/nook3d";
 import { AnimatePresence, motion, useAnimationControls, type TargetAndTransition } from "motion/react";
 import { playAntic } from "../hooks/useAntics";
 import { CHEW_MS } from "../hooks/useFeeding";
 import { useHitRect } from "../hooks/useHitRect";
-import { boostFrames } from "../lib/frameCap";
+import { boostFrames, calmFrames } from "../lib/frameCap";
 import { holdsOnHover, useIslandMode } from "../hooks/useIslandMode";
 import { useArgusCard } from "../lib/argus";
 import { useSoundCard } from "../lib/soundCard";
@@ -34,15 +34,20 @@ import { birthMotion, Intro, INTRO_ANTIC, introKind, introMs } from "./overlays/
 import { OsdView } from "./overlays/OsdView";
 import { PrivacyDots } from "./overlays/PrivacyDots";
 import { ReminderView } from "./overlays/ReminderView";
+import { DayClose } from "./brief/DayClose";
 import { ClaudeView } from "./overlays/ClaudeView";
 import { HumView, HumWave } from "./overlays/HumView";
 import { ToastView } from "./overlays/ToastView";
+import { UndoBar } from "./overlays/UndoBar";
+import { SnippetPicker } from "./overlays/SnippetPicker";
 import { Panels } from "./panels/Panels";
 import { useHeroRows } from "./panels/Frame";
-import { Brief } from "./brief/Brief";
-import { SearchPanel } from "./search/SearchPanel";
-import { Tour, useTourSteps } from "./tour/Tour";
 import { IslandAtmosphere } from "./atmosphere/IslandAtmosphere";
+
+// Seyrek açılan büyük ekranlar ilk gerektiğinde yüklenir (ada açılışına binmesinler)
+const Brief = lazy(() => import("./brief/Brief").then((m) => ({ default: m.Brief })));
+const SearchPanel = lazy(() => import("./search/SearchPanel").then((m) => ({ default: m.SearchPanel })));
+const Tour = lazy(() => import("./tour/TourGate"));
 
 /**
  * Dış gölge yok: şeffaf pencerede yarı saydam siyah, WebView2'nin zemini ara sıra "saydam beyaz"a
@@ -166,6 +171,12 @@ function fitLow(p: { left: number; top: number; scale: number }, h: number, box:
 
 export function Island() {
   const mode = useIslandMode();
+  // Kapalı ada küçük bir çentik: kapanma animasyonu bittikten sonra 30 kare yeter
+  useEffect(() => {
+    if (mode !== "collapsed") return calmFrames(false);
+    const t = window.setTimeout(() => calmFrames(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [mode]);
   useArgusCard(mode);
   useSoundCard(mode);
   const mood = useNook((s) => s.mood);
@@ -249,13 +260,14 @@ export function Island() {
   const view = useNook((s) => viewOf(s.tab, s.searching));
   const heroRows = useHeroRows((s) => s.n);
   const tourStep = useNook((s) => s.tourStep);
-  const tourSteps = useTourSteps();
+  // Tanıtım adımında Nook ortada mı: tembel yüklenen tanıtım bildirir (ilk adım ortada)
+  const [tourCentered, setTourCentered] = useState(true);
   const nookLook = humming ? { ...normalizeLook(settings.look), head: "headphones" as const } : normalizeLook(settings.look);
   const nookColor = normalizeColor(settings.faceColor);
   const box = useContentBox(useBodyImage(nookLook, nookColor, 512));
   const pose =
     mode === "tour"
-      ? tourPose(!!tourSteps[tourStep]?.centered)
+      ? tourPose(tourStep === 0 || tourCentered)
       : cap?.nook
         ? fitLow({ left: cap.nook.x - FACE / 2, top: cap.height / 2 - FACE / 2, scale: cap.nook.scale }, cap.height, box)
         : LOW.has(mode)
@@ -333,9 +345,21 @@ export function Island() {
 
           <AnimatePresence>
             {mode === "expanded" && <Panels key="panels" />}
-            {mode === "search" && <SearchPanel key="search" />}
-            {mode === "tour" && <Tour key="tour" />}
-            {mode === "brief" && <Brief key="brief" />}
+            {mode === "search" && (
+              <Suspense key="search" fallback={null}>
+                <SnippetPicker fallback={<SearchPanel />} />
+              </Suspense>
+            )}
+            {mode === "tour" && (
+              <Suspense key="tour" fallback={null}>
+                <Tour onCentered={setTourCentered} />
+              </Suspense>
+            )}
+            {mode === "brief" && (
+              <Suspense key="brief" fallback={null}>
+                <Brief />
+              </Suspense>
+            )}
           </AnimatePresence>
 
           {/* Nook'un arkasındaki parıltı: yalnızca durum varken, durumun renginde */}
@@ -375,6 +399,7 @@ export function Island() {
             {cap?.kind === "fish" && <FishCapsule key="fishcap" />}
           </AnimatePresence>
           <PrivacyDots mode={mode} />
+          <UndoBar show={mode === "expanded"} />
           <ContextMenu bounds={ref} refreshOnly={mode === "gate"} />
           {/* Yuvarlak sağ/sol alt köşelerde iç katmanların (kart, kenarlık, parıltı) dışarı sızmasını önleyen saf siyah iç çerçeve */}
           <div className="pointer-events-none absolute inset-0 z-30 rounded-[inherit]" style={{ boxShadow: "inset 0 0 0 1.5px #000000" }} />
@@ -384,6 +409,7 @@ export function Island() {
             {mode === "toast" && <ToastView key="toast" />}
             {mode === "alarm" && <AlarmView key="alarm" />}
             {mode === "reminder" && <ReminderView key="reminder" />}
+            {mode === "dayclose" && <DayClose key="dayclose" />}
             {mode === "claude" && <ClaudeView key="claude" />}
             {mode === "hum" && <HumView key="hum" />}
             {mode === "guard" && <GuardView key="guard" />}

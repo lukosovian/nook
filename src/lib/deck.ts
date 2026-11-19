@@ -44,7 +44,9 @@ export type DeckStep =
   /** Nook adada bir şey söyler */
   | { kind: "say"; text: string }
   /** Sonraki adımdan önce bekle (saniye) */
-  | { kind: "wait"; sec: number };
+  | { kind: "wait"; sec: number }
+  /** Sessiz kip: bu kadar dakika kartlar, hatırlatmalar ve sesler susar (tepsideki "1 saat sessiz" gibi) */
+  | { kind: "quiet"; min: number };
 
 export interface DeckKey {
   id: string;
@@ -81,13 +83,14 @@ export const ACTIONS: { id: string; label: string; icon: string; color: string; 
   { id: "brightness", label: tt("Parlaklık"), icon: "sun", color: "#ffd23f", step: { kind: "brightness", value: 50 } },
   { id: "say", label: tt("Nook söylesin"), icon: "say", color: "#9b7bff", step: { kind: "say", text: "" } },
   { id: "wait", label: tt("Bekle"), icon: "wait", color: "#8e8e93", step: { kind: "wait", sec: 5 } },
+  { id: "quiet", label: tt("Sessiz kip"), icon: "quiet", color: "#8e8e93", step: { kind: "quiet", min: 60 } },
   { id: "sleep", label: tt("Uyku"), icon: "sleep", color: "#3d8bff", step: { kind: "power", action: "sleep" }, danger: true },
   { id: "restart", label: tt("Yeniden başlat"), icon: "restart", color: "#f2a33a", step: { kind: "power", action: "restart" }, danger: true },
   { id: "shutdown", label: tt("Kapat"), icon: "power", color: "#f0545c", step: { kind: "power", action: "shutdown" }, danger: true },
 ];
 
 /** Değeri olan adımlar (ses seviyesi, parlaklık, söz, bekleme) */
-export const VALUE_KINDS: DeckStep["kind"][] = ["volume", "brightness", "say", "wait"];
+export const VALUE_KINDS: DeckStep["kind"][] = ["volume", "brightness", "say", "wait", "quiet"];
 
 /** Adımın hazır eylemi (simge ve renk için); aç/kapa ve değerli adımlar türüne göre eşleşir */
 export const actionOf = (s: DeckStep) =>
@@ -100,6 +103,27 @@ export const DEFAULT_DECK: DeckKey[] = ["mic", "mute", "desktop", "lock"].map((i
   const a = ACTIONS.find((x) => x.id === id)!;
   return { id: `d-${id}`, label: a.label, icon: a.icon, color: a.color, steps: [a.step] };
 });
+
+/** Hazır şablonlar (Studio › Tuşlar): tek dokunuşla tuş olur, sonra istenildiği gibi düzenlenir */
+export interface DeckTemplate {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  steps: DeckStep[];
+}
+
+export const DECK_TEMPLATES: DeckTemplate[] = [
+  { id: "meeting", label: tt("Toplantı modu"), icon: "micoff", color: "#f2a33a", steps: [{ kind: "quick", key: "mic", on: true }, { kind: "quiet", min: 60 }] },
+  { id: "game", label: tt("Oyun modu"), icon: "scene", color: "#8f6bff", steps: [{ kind: "quiet", min: 120 }, { kind: "quick", key: "mic", on: false }, { kind: "say", text: tt("İyi oyunlar!") }] },
+  { id: "night", label: tt("Gece modu"), icon: "moon", color: "#3d8bff", steps: [{ kind: "quick", key: "dark", on: true }, { kind: "brightness", value: 30 }, { kind: "volume", value: 20 }] },
+  { id: "present", label: tt("Sunum modu"), icon: "desktop", color: "#3fbfa5", steps: [{ kind: "quiet", min: 60 }, { kind: "brightness", value: 100 }] },
+  { id: "break", label: tt("Mola"), icon: "wait", color: "#ff5c8a", steps: [{ kind: "media", action: "toggle" }, { kind: "power", action: "lock" }] },
+  { id: "morning", label: tt("Güne başla"), icon: "sun", color: "#ffd23f", steps: [{ kind: "quick", key: "dark", on: false }, { kind: "brightness", value: 80 }, { kind: "media", action: "toggle" }] },
+];
+
+/** Şablondan yeni, bağımsız bir tuş (adımları kopyalanır) */
+export const keyFromTemplate = (t: DeckTemplate): DeckKey => ({ id: crypto.randomUUID(), label: t.label, icon: t.icon, color: t.color, steps: t.steps.map((s) => ({ ...s })) });
 
 /** Tuşlar: hiç düzenlenmediyse hazır olanlar */
 export const useDeck = () => useNook((s) => s.deck) ?? DEFAULT_DECK;
@@ -252,6 +276,8 @@ export function stepLabel(s: DeckStep): string {
       return s.text ? tt("Nook: “{0}”", s.text) : tt("Nook söylesin");
     case "wait":
       return tt("{0} sn bekle", s.sec);
+    case "quiet":
+      return s.min % 60 ? tt("{0} dk sessiz", s.min) : tt("{0} saat sessiz", s.min / 60);
     default:
       return actionOf(s)?.label ?? s.kind;
   }
@@ -294,6 +320,8 @@ async function runStep(s: DeckStep, label: string) {
       return pushIslandToast(s.text || label, "", 5000);
     case "wait":
       return wait(s.sec * 1000);
+    case "quiet":
+      return useNook.getState().updateSettings({ quietUntil: Date.now() + s.min * 60_000 });
     case "nook":
       if (s.action === "focus") return void startFocus("work", 0);
       if (s.action === "shield") {

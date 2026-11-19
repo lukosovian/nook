@@ -26,7 +26,7 @@ import {
   Wind,
   type LucideIcon,
 } from "lucide-react";
-import { BUILTIN_HABITS, useHabits, getTodayHabitCount, habitOn, type HabitItem } from "../../lib/habits";
+import { BUILTIN_HABITS, useHabits, getTodayHabitCount, habitOn, habitWeek, type HabitItem } from "../../lib/habits";
 import { triggerReminder } from "../../hooks/useFeatures";
 import { tt } from "../../lib/i18n";
 import { playSfx } from "../../lib/sfx";
@@ -71,6 +71,32 @@ const INTERVALS = [
   { id: 90, label: tt("1,5 saat") },
   { id: 120, label: tt("2 saat") },
 ];
+
+/** Son 7 gün (bugün en sağda, halkalı) ve iki günden uzun seri */
+function Week({ id, color }: { id: string; color: string }) {
+  const { dots } = habitWeek(id);
+  return (
+    <span className="flex shrink-0 items-center gap-[3px]" title={tt("Son 7 gün")}>
+      {dots.map((on, i) => (
+        <i
+          key={i}
+          className="h-[6px] w-[6px] rounded-full"
+          style={{ background: on ? color : "rgb(255 255 255 / 0.12)", boxShadow: i === 6 ? `0 0 0 1.5px ${tintBg(color, on ? 40 : 30)}` : undefined }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function Streak({ id, color }: { id: string; color: string }) {
+  const { streak } = habitWeek(id);
+  if (streak < 2) return null;
+  return (
+    <span className="shrink-0 text-[9.5px] font-semibold" style={{ color: tintText(color) }}>
+      {tt("{0} gün üst üste", streak)}
+    </span>
+  );
+}
 
 export function HabitsPanel() {
   const habits = useHabits((s) => s.habits);
@@ -117,6 +143,8 @@ export function HabitsPanel() {
               <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: tintBg(WATER_C, 18), color: tintText(WATER_C) }}>
                 {tt("{0} / {1} bardak", todayWater, waterGoal)}
               </span>
+              <Week id="water" color={WATER_C} />
+              <Streak id="water" color={WATER_C} />
             </div>
             <span className="text-[11px] text-label-3">
               {done ? tt("Bugünkü hedef tamam") : tt("{0} bardak daha", waterGoal - todayWater)}
@@ -262,8 +290,12 @@ export function HabitsPanel() {
                     {count > 0 && (
                       <span className="shrink-0 rounded-full bg-white/10 px-1.5 text-[9.5px] font-medium text-label-2">{tt("bugün {0}", count)}</span>
                     )}
+                    <Streak id={h.id} color={color} />
                   </div>
-                  {desc && <span className="block truncate text-[10.5px] text-label-3">{desc}</span>}
+                  <span className="flex items-center gap-1.5">
+                    <Week id={h.id} color={color} />
+                    {desc && <span className="min-w-0 truncate text-[10.5px] text-label-3">{desc}</span>}
+                  </span>
                 </div>
 
                 {(h.id === "eyes" || h.id === "stretch") && (

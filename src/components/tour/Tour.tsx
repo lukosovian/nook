@@ -9,7 +9,8 @@ import { endTour } from "../../lib/tour";
 import { useNook, type Antic, type Settings } from "../../store/nook";
 import { ACCENT, Card, tintBg, tintText } from "../ui/primitives";
 import { useArgus } from "../../lib/argus";
-import { AiArt, ArgusArt, CareArt, DoneTips, FeedArt, HelloChips, HoverArt, KeysArt, LookArt, MoodArt } from "./TourArt";
+import { AiArt, ArgusArt, CareArt, FeedArt, HelloChips, KeysArt, LookArt, MoodArt } from "./TourArt";
+import { ChattyCards, TryDoArt, TryHoverArt } from "./TourTry";
 import { ModulesArt, StudioArt } from "./TourArt3";
 import { ClaudeArt, DayArt, HumArt, OutingsArt, ShieldArt } from "./TourArt2";
 import { useClaude } from "../../lib/claude";
@@ -26,7 +27,8 @@ export interface Step {
   antic: Antic;
   /** Nook ortada kocaman (ilk ve son adım) */
   centered?: boolean;
-  Art?: () => React.JSX.Element;
+  /** `onDone`: adımdaki deneme yapıldı (adadaki tanıtım kendiliğinden ilerler) */
+  Art?: (p: { onDone?: () => void }) => React.JSX.Element;
   /** Yalnızca bu bilgisayarda Claude Code varsa gösterilir */
   claude?: boolean;
   /** Metindeki {0}: bu kısayolun kullanıcının seçtiği tuşları; kısayol kaldırılmışsa `noKeys` metni */
@@ -44,17 +46,24 @@ export const useTourMore = create<{ more: boolean }>(() => ({ more: false }));
 export const STEPS: Step[] = [
   {
     title: tt("Merhaba, ben Nook"),
-    text: tt("Ekranının tepesindeki çentikte yaşayan küçük yardımcınım. Müziğini, dosyalarını, alarmlarını tutarım, sorularını cevaplarım. Bir dakikada kendimi tanıtayım mı?"),
+    text: tt("Ekranının tepesindeki çentikte yaşayan küçük yardımcınım. Bir dakikada tanışalım mı?"),
     color: ACCENT.teal,
     antic: "hop",
     centered: true,
   },
   {
     title: tt("Üstüme gel, açılayım"),
-    text: tt("Fareyi ekranın üst ortasındaki siyah çentiğe götür, ada açılır. Uzaklaşınca kendiliğinden kapanır; hiçbir pencerenin önünü kapatmam."),
+    text: tt("Fareyi ekranın üst ortasındaki çentiğe götürünce açılırım, uzaklaşınca kapanırım. Sağdaki küçük ekranda dene!"),
     color: ACCENT.blue,
     antic: "wink",
-    Art: HoverArt,
+    Art: TryHoverArt,
+  },
+  {
+    title: tt("Bir dosya bırak ya da bir alarm kur"),
+    text: tt("Dosyayı üstüme sürükle, Raf'ta saklarım. Ya da bir saat seç, alarmını kurayım."),
+    color: ACCENT.pink,
+    antic: "giggle",
+    Art: TryDoArt,
   },
   {
     title: tt("Ana sayfa ve modüller"),
@@ -62,6 +71,7 @@ export const STEPS: Step[] = [
     color: ACCENT.purple,
     antic: "nod",
     Art: ModulesArt,
+    extra: true,
   },
   {
     title: tt("Nook Studio"),
@@ -69,6 +79,7 @@ export const STEPS: Step[] = [
     color: ACCENT.gray,
     antic: "wink",
     Art: StudioArt,
+    extra: true,
   },
   {
     title: tt("Dosyaları bana yedir"),
@@ -76,6 +87,7 @@ export const STEPS: Step[] = [
     color: ACCENT.pink,
     antic: "giggle",
     Art: FeedArt,
+    extra: true,
   },
   {
     title: tt("Klavyeden çağır"),
@@ -83,13 +95,15 @@ export const STEPS: Step[] = [
     color: ACCENT.yellow,
     antic: "suspicious",
     Art: KeysArt,
+    extra: true,
   },
   {
     title: tt("Benimle konuş"),
-    text: tt("Sohbet, ekrana sor ve sesli komut için Google'ın ücretsiz verdiği bir şifre, Gemini anahtarı lazım; nasıl alınacağı Studio › Ayarlar › Asistan'da adım adım yazar. Bir kere yapıştırman yeter; alarm kurar, not alır, müziği yönetir, aklımda tutarım. İstemezsen geç, gerisi anahtarsız da çalışır."),
+    text: tt("Sohbet, ekrana sor ve sesli komut için Google'ın ücretsiz verdiği bir şifre, Gemini anahtarı lazım; nasıl alınacağı Studio › Ayarlar › Sohbet ve asistan'da adım adım yazar. Bir kere yapıştırman yeter; alarm kurar, not alır, müziği yönetir, aklımda tutarım. İstemezsen geç, gerisi anahtarsız da çalışır."),
     color: ACCENT.purple,
     antic: "love",
     Art: AiArt,
+    extra: true,
   },
   {
     title: tt("Sağlığına göz kulak olurum"),
@@ -97,6 +111,7 @@ export const STEPS: Step[] = [
     color: ACCENT.teal,
     antic: "stretch",
     Art: CareArt,
+    extra: true,
   },
   {
     title: tt("Günün düzeni bende"),
@@ -104,6 +119,7 @@ export const STEPS: Step[] = [
     color: ACCENT.blue,
     antic: "note",
     Art: DayArt,
+    extra: true,
   },
   {
     title: tt("Ekranını korurum"),
@@ -172,7 +188,7 @@ export const STEPS: Step[] = [
   },
   {
     title: tt("Hazırız!"),
-    text: tt("Artık seninleyim. Bu tanıtımı istediğin zaman Nook Studio › Ayarlar › Hakkında'dan yeniden açabilirsin."),
+    text: tt("Artık seninleyim. Son bir şey: ne kadar konuşkan olayım?"),
     color: ACCENT.green,
     antic: "love",
     centered: true,
@@ -279,18 +295,30 @@ export function Tour() {
             exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
             transition={{ duration: 0.28, ease: easeOut }}
           >
-            <h1 className="font-display text-[32px] font-semibold tracking-[-0.03em] text-label">{cur.title}</h1>
-            <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-label-2">{cur.text}</p>
+            <h1 className="font-display text-[32px] font-semibold leading-tight tracking-[-0.03em] text-label">{cur.title}</h1>
+            <p className={`${last ? "mt-1" : "mt-2"} max-w-[520px] text-[14px] leading-relaxed text-label-2`}>{cur.text}</p>
             {step === 0 && (
-              <div className="mt-4">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+                <label className="flex items-center gap-2 text-[13px] font-medium text-label-2">
+                  {tt("Sana nasıl sesleneyim?")}
+                  <input
+                    value={settings.userName}
+                    onChange={(e) => useNook.getState().updateSettings({ userName: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                    placeholder={tt("Adın")}
+                    maxLength={24}
+                    spellCheck={false}
+                    className="h-8 w-[150px] rounded-full bg-well px-3 text-[13px] text-label outline-none placeholder:text-label-3 focus:bg-well-hi"
+                  />
+                </label>
                 <LangChips />
               </div>
             )}
-            <div className="mt-5">{last ? <DoneTips /> : <HelloChips />}</div>
+            <div className={last ? "mt-3" : "mt-4"}>{last ? <ChattyCards /> : <HelloChips />}</div>
             {last && !more && extras > 0 && (
               <button
                 onClick={() => useTourMore.setState({ more: true })}
-                className="mt-4 flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] font-medium transition-colors"
+                className="mt-2.5 flex items-center gap-1.5 rounded-full border px-4 py-1 text-[13px] font-medium transition-colors"
                 style={{ background: tintBg(ACCENT.purple, 14), borderColor: tintBg(ACCENT.purple, 40), color: tintText(ACCENT.purple) }}
               >
                 {tt("Başka neler yapabildiğimi gör ({0} adım)", extras)}
@@ -326,7 +354,7 @@ export function Tour() {
                   {step} / {steps.length - 2}
                 </span>
                 <h2 className="relative font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-label">{cur.title}</h2>
-                <p className="relative mt-2 text-[12.5px] leading-[1.6] text-label-2">{cur.text}</p>
+                <p className={`relative mt-2 leading-[1.6] text-label-2 ${cur.extra ? "text-[12.5px]" : "text-[13.5px]"}`}>{cur.text}</p>
               </Card>
             </motion.div>
 
@@ -337,7 +365,7 @@ export function Tour() {
               animate={{ y: 0, opacity: 1 }}
               transition={{ type: "spring", stiffness: 340, damping: 32, delay: 0.04 }}
             >
-              <Card className="h-full w-full overflow-hidden p-[18px]">{cur.Art && <cur.Art />}</Card>
+              <Card className="h-full w-full overflow-hidden p-[18px]">{cur.Art && <cur.Art onDone={() => useNook.getState().tourStep === step && setStep(step + 1)} />}</Card>
             </motion.div>
           </motion.div>
         )}
@@ -370,7 +398,7 @@ export function Tour() {
             whileHover={{ scale: 1.03 }}
             transition={spring.pop}
             onClick={next}
-            className="flex h-9 items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium"
+            className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-[13px] font-medium"
             style={{ background: tintBg(cur.color, 22), borderColor: tintBg(cur.color, 50), color: tintText(cur.color), boxShadow: `0 0 18px -6px ${cur.color}` }}
           >
             {step === 0 ? tt("Tanıyalım") : last ? tt("Hadi başlayalım") : tt("İleri")}

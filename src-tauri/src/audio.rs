@@ -10,8 +10,12 @@ use tauri::{AppHandle, Emitter};
 
 use crate::system::emit_event;
 
-const TICK: Duration = Duration::from_millis(50);
+/// Art arda ses bildirimleri arasındaki en kısa süre; Windows haber veremiyorsa yoklama aralığı
+const TICK: Duration = Duration::from_millis(100);
+/// Windows haber veremiyorsa varsayılan cihaza bu aralıkla bakılır
 const DEVICE_POLL: Duration = Duration::from_secs(1);
+/// Haberler çalışırken de bu aralıkla bir kez bakılır (kaçan bir haber olursa)
+const SAFETY: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -41,9 +45,15 @@ pub(crate) fn is_headphone(name: &str) -> bool {
 #[cfg(windows)]
 mod imp {
     use super::*;
+    use std::sync::mpsc::{self, Sender};
+    use windows::core::{implement, PCWSTR};
     use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
-    use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
-    use windows::Win32::Media::Audio::{eConsole, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator};
+    use windows::Win32::Foundation::PROPERTYKEY;
+    use windows::Win32::Media::Audio::Endpoints::{IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl};
+    use windows::Win32::Media::Audio::{
+        eConsole, eRender, EDataFlow, ERole, IMMDevice, IMMDeviceEnumerator, IMMNotificationClient, IMMNotificationClient_Impl, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA,
+        DEVICE_STATE,
+    };
     use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ};
 
     struct Endpoint {
@@ -81,6 +91,57 @@ mod imp {
         }
     }
 
+    /// İzleyiciyi uyandıran haberler (Windows'un ses iş parçacıklarından gelir)
+    enum Wake {
+        Volume,
+        Device,
+    }
+
+    /// Ses seviyesi ya da sessiz değişti
+    #[implement(IAudioEndpointVolumeCallback)]
+    struct VolumeWatch(Sender<Wake>);
+
+    impl IAudioEndpointVolumeCallback_Impl for VolumeWatch_Impl {
+        fn OnNotify(&self, _data: *mut AUDIO_VOLUME_NOTIFICATION_DATA) -> windows::core::Result<()> {
+            let _ = self.0.send(Wake::Volume);
+            Ok(())
+        }
+    }
+
+    /// Varsayılan çıkış cihazı değişti
+    #[implement(IMMNotificationClient)]
+    struct DeviceWatch(Sender<Wake>);
+
+    impl IMMNotificationClient_Impl for DeviceWatch_Impl {
+        fn OnDeviceStateChanged(&self, _id: &PCWSTR, _state: DEVICE_STATE) -> windows::core::Result<()> {
+            Ok(())
+        }
+        fn OnDeviceAdded(&self, _id: &PCWSTR) -> windows::core::Result<()> {
+            Ok(())
+        }
+        fn OnDeviceRemoved(&self, _id: &PCWSTR) -> windows::core::Result<()> {
+            Ok(())
+        }
+        fn OnDefaultDeviceChanged(&self, flow: EDataFlow, role: ERole, _id: &PCWSTR) -> windows::core::Result<()> {
+            if flow == eRender && role == eConsole {
+                let _ = self.0.send(Wake::Device);
+            }
+            Ok(())
+        }
+        fn OnPropertyValueChanged(&self, _id: &PCWSTR, _key: &PROPERTYKEY) -> windows::core::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn read(e: &Endpoint) -> Option<Volume> {
+        unsafe {
+            match (e.volume.GetMasterVolumeLevelScalar(), e.volume.GetMute()) {
+                (Ok(value), Ok(muted)) => Some(Volume { value, muted: muted.as_bool() }),
+                _ => None,
+            }
+        }
+    }
+
     pub fn run(app: AppHandle) {
         let enumerator: IMMDeviceEnumerator = unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -90,21 +151,38 @@ mod imp {
             }
         };
 
+        // Windows değişikliği kendisi haber verir; iş parçacığı o zamana dek uyur. Haber kurulamazsa eskisi gibi yoklanır.
+        let (tx, rx) = mpsc::channel::<Wake>();
+        let volume_watch: IAudioEndpointVolumeCallback = VolumeWatch(tx.clone()).into();
+        let device_watch: IMMNotificationClient = DeviceWatch(tx).into();
+        let device_live = unsafe { enumerator.RegisterEndpointNotificationCallback(&device_watch).is_ok() };
+        let listen = |e: &Option<Endpoint>| e.as_ref().is_some_and(|e| unsafe { e.volume.RegisterControlChangeNotify(&volume_watch).is_ok() });
+
         let mut endpoint = open(&enumerator).ok();
-        let mut last_volume: Option<Volume> = None;
+        let mut volume_live = listen(&endpoint);
+        // İlk okuma yalnızca referans — açılışta gösterge çıkmasın.
+        let mut last_volume: Option<Volume> = endpoint.as_ref().and_then(read);
         let mut device_checked = Instant::now();
 
         loop {
-            thread::sleep(TICK);
+            let wake = rx.recv_timeout(if device_live && volume_live { SAFETY } else { TICK });
+            // Kaydırıcı sürüklenirken art arda gelen haberler tek okumada toplanır
+            let mut device = matches!(wake, Ok(Wake::Device));
+            while let Ok(more) = rx.try_recv() {
+                device |= matches!(more, Wake::Device);
+            }
 
-            if device_checked.elapsed() >= DEVICE_POLL {
+            if device || (wake.is_err() && device_checked.elapsed() >= DEVICE_POLL) {
                 device_checked = Instant::now();
                 let id = default_id(&enumerator);
                 if id.as_deref() != endpoint.as_ref().map(|e| e.id.as_str()) {
                     let had_device = endpoint.is_some();
                     let was_headphone = endpoint.as_ref().is_some_and(|e| is_headphone(&e.name));
+                    if let Some(old) = &endpoint {
+                        let _ = unsafe { old.volume.UnregisterControlChangeNotify(&volume_watch) };
+                    }
                     endpoint = open(&enumerator).ok();
-                    last_volume = None; // yeni cihazın seviyesi için gösterge açılmasın
+                    volume_live = listen(&endpoint);
                     if let (true, Some(e)) = (had_device, &endpoint) {
                         // Kulaklık çıktı, ses hoparlöre geçti: ayarlıysa ses kısılır (ortalık birden çınlamasın)
                         let drop = {
@@ -124,19 +202,20 @@ mod imp {
                             emit_event(&app, "audio", title, e.name.clone());
                         }
                     }
+                    // Yeni cihazın seviyesi (kısıldıysa kısılmış hâli) referans: gösterge açılmasın
+                    last_volume = endpoint.as_ref().and_then(read);
+                    continue;
                 }
             }
 
             let Some(e) = &endpoint else { continue };
-            unsafe {
-                if let (Ok(value), Ok(muted)) = (e.volume.GetMasterVolumeLevelScalar(), e.volume.GetMute()) {
-                    let now = Volume { value, muted: muted.as_bool() };
-                    // İlk okuma yalnızca referans — açılışta gösterge çıkmasın.
-                    if last_volume.as_ref().is_some_and(|v| *v != now) {
-                        let _ = app.emit("nook://volume", &now);
-                    }
-                    last_volume = Some(now);
+            if let Some(now) = read(e) {
+                if last_volume.as_ref().is_some_and(|v| *v != now) {
+                    let _ = app.emit("nook://volume", &now);
+                    // Eskisi gibi saniyede en çok 10 bildirim
+                    thread::sleep(TICK);
                 }
+                last_volume = Some(now);
             }
         }
     }

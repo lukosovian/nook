@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { MISSED_AFTER_MS } from "../lib/alarm";
 import { alarmNext, alarmRing, isPrimary, subscribe } from "../lib/bridge";
 import { note } from "../lib/log";
 import { useNook } from "../store/nook";
@@ -6,8 +7,6 @@ import { tt, locale } from "../lib/i18n";
 
 /** Alarm sesi bu kadar çalınca (kimse dokunmazsa) susar; ada ise kapatılana kadar alarmı gösterir. */
 const AUTO_STOP_MS = 3 * 60_000;
-/** Vakti bundan çok geçmiş alarm çalmaz, "kaçırıldı" diye bildirilir */
-const MISSED_AFTER_MS = 10 * 60_000;
 
 /**
  * Saniyede bir zamanı gelen alarmı arar ve çalar. Yalnızca ana adada çalışır
@@ -16,7 +15,18 @@ const MISSED_AFTER_MS = 10 * 60_000;
 export function useAlarms() {
   useEffect(() => {
     if (!isPrimary) return;
-    useNook.getState().rescheduleAlarms();
+    // Nook kapalıyken vakti geçen tek seferlikler: 10 dk'dan yenisi aşağıda çalar, eskisi "kaçırdın" kartı olur
+    const st = useNook.getState();
+    const gone = st.alarms.filter((a) => a.oneShot && a.next !== null && a.next < Date.now() - MISSED_AFTER_MS);
+    st.rescheduleAlarms();
+    if (gone.length) {
+      const when = new Date(gone[0].next!).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      st.pushToast(
+        gone.length === 1
+          ? { kind: "chat", title: tt("Kaçırdın: {0}", gone[0].label || tt("Alarm")), detail: when, ms: 9000 }
+          : { kind: "chat", title: tt("Kaçırdın: {0} hatırlatma", gone.length), detail: gone.map((a) => a.label || tt("Alarm")).join(", "), ms: 9000 },
+      );
+    }
 
     // Sıradaki alarmı Rust'a bildir (değiştikçe)
     let sent: number | null | undefined;
@@ -36,7 +46,7 @@ export function useAlarms() {
       if (!due) return;
       // Bilgisayar uyurken kaçtıysa (Rust'taki gibi 10 dk'dan eski) saatler sonra çalmasın: haber ver, yeniden kur
       if (now - due.next! > MISSED_AFTER_MS) {
-        s.fireAlarm(due.id);
+        s.fireAlarm(due.id, true);
         const at = new Date(due.next!);
         s.pushToast({ kind: "chat", title: tt("Kaçırılan alarm · {0}", at.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })), detail: due.label || tt("Bilgisayar o sırada uykudaydı"), ms: 9000 });
         return;

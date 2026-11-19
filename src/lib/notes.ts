@@ -274,7 +274,53 @@ export type DemoId =
   | "lightstart"
   | "lightmode"
   | "freezecard"
-  | "lowmem";
+  | "lowmem"
+  | "idlerest"
+  | "lazysave"
+  | "fixes314"
+  | "briefnewday"
+  | "brieftiles"
+  | "todaytask"
+  | "dayclose"
+  | "moodfaces"
+  | "decktemplates"
+  | "mediavolume"
+  | "phonewizard"
+  | "settingssearch"
+  | "settingsonce"
+  | "quiethours"
+  | "snippetpick"
+  | "newhome"
+  | "bands"
+  | "chatsetup"
+  | "chatstart"
+  | "tourshort"
+  | "chatty"
+  | "firstweek"
+  | "studionav"
+  | "updatego"
+  | "tuslar"
+  | "claudebrain"
+  | "gamekeys"
+  | "quietwork"
+  | "lighter"
+  | "phonepower"
+  | "readable"
+  | "primarybtn"
+  | "emptyactions"
+  | "controlsplit"
+  | "undobar"
+  | "notifygroups"
+  | "clipfilter"
+  | "snippets"
+  | "shelfmulti"
+  | "remindparse"
+  | "alarmkit"
+  | "missedremind"
+  | "multiday"
+  | "habitstreak"
+  | "quicktimer"
+  | "countdowndays";
 
 export interface NoteItem {
   title: string;
@@ -293,6 +339,243 @@ export interface PatchNote {
 }
 
 export const NOTES: PatchNote[] = [
+  {
+    version: "0.3.14",
+    date: tt("19 Kasım 2026"),
+    headline: tt("Baştan elden geçen Nook: Claude zekâsı, okunaklı yazı, geri al, parçacıklar, akıllı hatırlatıcı ve boşta çok daha hafif bir ada"),
+    items: [
+      {
+        title: tt("Nook'un zekâsı Claude olabilir"),
+        text: tt("Ayarlar › Sohbet ve asistan'da Nook'un zekâsını Gemini ya da Claude olarak seçebilirsin. Claude seçiliyken sohbet, sesli komut ve ekrana sor onunla çalışır; alarm kurmak, müziği yönetmek gibi işleri de yapar. Claude için Anthropic'ten alınan ücretli bir API anahtarı gerekir; Gemini ücretsiz kalır."),
+        demo: "claudebrain",
+      },
+      {
+        title: tt("Oyunda kısayollar tuşları çalmaz"),
+        text: tt("Tam ekran oyun öndeyken Nook genel kısayollarını bırakır; Ctrl+Shift+Space gibi tuşlar doğrudan oyuna gider. Gizlilik kalkanı kısayolu oyunda da çalışır, oyundan çıkınca hepsi geri gelir. Ayarlar › Klavye kısayolları › \"Oyunda kısayolları kapat\" ile kapatılabilir."),
+        demo: "gamekeys",
+      },
+      {
+        title: tt("Daha az arka plan işi"),
+        text: tt("Ses seviyesi, mikrofon/kamera göstergesi ve çalan şarkı artık sürekli yoklanmıyor; Windows haber verince bakılıyor. Ses kartı, Argus kartı ve şarkı bildirimi pencereleri birkaç dakika kullanılmayınca kapanıp belleği bırakıyor, gerektiğinde yeniden açılıyor."),
+        demo: "quietwork",
+      },
+      {
+        title: tt("Daha da hafif"),
+        text: tt("Adadaki güneş, gece ve sis artık bir tur oynayıp dinleniyor; Az ve Orta sıklıkta dinlenirken hiçbir şey çizilmiyor. Yağmur, kar, yapraklar ve müzik dalgası ekran kartını daha az yoruyor. Nook yalnızca seçtiğin dili yüklüyor; tanıtım, günün özeti, arama, oyunlar gibi seyrek açılan ekranlar ilk açtığında geliyor, böylece ada daha çabuk açılıp daha az bellek kullanıyor. Hafif kip artık kalkanda ve Nook Studio'da da geçerli. Telefona yalnızca bir şey değiştiğinde veri gidiyor."),
+        demo: "lighter",
+      },
+      {
+        title: tt("Telefondan kapatma izne bağlı"),
+        text: tt("Telefondan bilgisayarı kapatmak, yeniden başlatmak, uyutmak ve zamanlı kapatma kurmak için \"Telefondan uzaktan kontrol\" açık olmalı. Kilitleme, ekranı kapatma ve kurulu zamanlayıcıyı iptal etme her zaman kullanılabilir."),
+        demo: "phonepower",
+      },
+      {
+        title: tt("Daha okunaklı yazı, klavyeyle gezinme"),
+        text: tt("Soluk gri yazılar artık koyu kartlarda rahat okunuyor, küçük yazılar da biraz büyüdü. Tab ile gezerken hangi düğmede olduğunu modülün renginde bir halka gösterir."),
+        demo: "readable",
+      },
+      {
+        title: tt("Her bölümde aynı ana düğme"),
+        text: tt("Başlat, Kur, Kaydet gibi ana düğmeler artık her yerde aynı boyda ve modülün renginde. Bölüm başlıkları ve köşe yuvarlaklıkları da tek düzene girdi."),
+        demo: "primarybtn",
+      },
+      {
+        title: tt("Boş ekranlar ve hep görünen düğmeler"),
+        text: tt("Boş bir bölümde uyuklayan küçük bir Nook ve ne yapabileceğini söyleyen tek bir düğme var; boş rafta \"Dosya seç\" ile dosya ekleyebilirsin. Sabitle, düzenle, kaldır gibi düğmeler artık hep görünür, üzerine gelince belirginleşir."),
+        demo: "emptyactions",
+      },
+      {
+        title: tt("Kontrol: anahtarlar ve eylemler ayrı"),
+        text: tt("Wi-Fi, Bluetooth, Karanlık ve Mikrofon \"Anahtarlar\" altında; açıkken renkli, altında Açık ya da Kapalı yazar. Kilitle, Ekranı kapat, Uygulama sesi ve Zamanlı kapat ise \"Eylemler\" altında oklu satırlar."),
+        demo: "controlsplit",
+      },
+      {
+        title: tt("Geri al"),
+        text: tt("Bildirimleri, panoyu, rafı ya da bir not sayfasını temizleyince adanın altında 5 saniyeliğine \"Geri al\" şeridi çıkar. Basarsan her şey yerine döner."),
+        demo: "undobar",
+      },
+      {
+        title: tt("Bildirimler uygulamaya göre toplanır"),
+        text: tt("Aynı uygulamanın bildirimleri \"Discord · 4\" gibi tek satırda durur, tıklayınca açılır; liste Bugün, Dün ve Daha eski diye ayrılır. Her uygulama için adada göster, yalnızca biriktir ya da sustur seçebilirsin."),
+        demo: "notifygroups",
+      },
+      {
+        title: tt("Panoda türe göre süz"),
+        text: tt("Aramanın altındaki çiplerle yalnızca metinleri, bağlantıları, kodları, görselleri, renkleri ya da dosyaları gösterebilirsin."),
+        demo: "clipfilter",
+      },
+      {
+        title: tt("Parçacıklar"),
+        text: tt("Adres, IBAN, imza gibi sık yazdıklarını Pano › Parçacıklar'a kaydet; istersen panodaki bir kaydı tek tıkla parçacık yap. Aramaya \"/adres\" yazıp Enter'a basınca kopyalanır."),
+        demo: "snippets",
+      },
+      {
+        title: tt("Rafta çoklu seçim ve kendiliğinden temizlik"),
+        text: tt("Ctrl+tıkla ya da karttaki yuvarlakla birkaç dosya seç; hepsini birlikte sürükle, sabitle ya da kaldır. Alttaki anahtarı açarsan 7 günden eski, sabitlenmemiş dosyalar raftan kendiliğinden kalkar."),
+        demo: "shelfmulti",
+      },
+      {
+        title: tt("Hatırlatıcı yazdığını anlıyor"),
+        text: tt("Yazarken kutunun altında ne anlaşıldığı görünür: \"Yarın 09:00 · 10 sa sonra\". \"1 saat 30 dk sonra ara\", \"12.05 fatura\", \"yarın fatura\" gibi yazımlar çözülür; \"her gün\", \"her salı\", \"hafta içi\" tekrarlayan hatırlatma kurar. Kutu boşken örneklere dokunup başlayabilirsin."),
+        demo: "remindparse",
+      },
+      {
+        title: tt("Alarmda kısayollar, şablonlar ve erteleme süresi"),
+        text: tt("Günleri \"Her gün · Hafta içi · Hafta sonu\" ile tek dokunuşta seç; İlaç, Uyan ve Mola şablonları formu doldurur. Çalan alarmı 5, 10 ya da 15 dakika erteleyebilir, tekrarlı bir alarmın yalnızca sıradaki çalmasını atlayabilirsin."),
+        demo: "alarmkit",
+      },
+      {
+        title: tt("Kaçırılan hatırlatmalar"),
+        text: tt("Nook kapalıyken vakti gelen hatırlatma açılışta \"Kaçırdın\" kartıyla haber verilir; birkaç dakika geciktiyse yine çalar. Geçenler'de \"Kaçırıldı\" etiketiyle durur, tek dokunuşla yeniden kurulur."),
+        demo: "missedremind",
+      },
+      {
+        title: tt("Birkaç gün süren takvim etkinlikleri"),
+        text: tt("Abone takvimdeki birkaç günlük etkinlik artık kapladığı her günde görünür. Outlook'un saat dilimi adları da tanınır."),
+        demo: "multiday",
+      },
+      {
+        title: tt("Alışkanlıklarda seri"),
+        text: tt("Her satırda son yedi günün noktaları var; bugün en sağda. Art arda iki gün ve üstünde \"N gün üst üste\" yazar."),
+        demo: "habitstreak",
+      },
+      {
+        title: tt("Aramadan zamanlayıcı"),
+        text: tt("Hızlı aramaya \"çay 3 dk\" yaz, Enter'a bas: o isimle zamanlayıcı kurulur. Kapalı adada geri sayımı görürsün."),
+        demo: "quicktimer",
+      },
+      {
+        title: tt("Geri sayılan günler"),
+        text: tt("Takvimde bir etkinliği kum saatiyle işaretle; gün gelene dek üstte \"Tatil · 12 gün\" diye görünür."),
+        demo: "countdowndays",
+      },
+      {
+        title: tt("İlk hafta ana sayfası"),
+        text: tt("Nook'u yeni kuranın ana sayfasında hemen işe yarayanlar önde: Bugün ve Medya büyük kartlarda, altında Raf, Not, Alarm ve Pomodoro. Bir hafta sonra sıra yine en çok açtıklarına göre dizilir."),
+        demo: "newhome",
+      },
+      {
+        title: tt("Modüller üç bantta"),
+        text: tt("Tüm modüller artık Gün, İçerik ve Araçlar başlıkları altında; adlar kırpılmadan okunur. Nook Studio'da açılanlar altta ayrı bir şeritte, ok işaretiyle durur. Kurulum bekleyen modülün üstünde \"Kurulum ister\" yazar."),
+        demo: "bands",
+      },
+      {
+        title: tt("Anahtar kurulumu sohbetin içinde"),
+        text: tt("Anahtarın yoksa sohbet üç adımı kendisi gösterir: anahtarı al, buraya yapıştır, dene. Gemini ya da Claude'u aynı karttan seçersin; anahtar tutunca \"Bağlandı\" der ve sohbet açılır."),
+        demo: "chatsetup",
+      },
+      {
+        title: tt("Sohbete dört başlangıç"),
+        text: tt("Boş sohbette dört kart var: Sor, Yaptır, Ekrana sor ve Sesle. Her biri bir örnekle gelir; ekrana sorma ve sesli komutun kısayolu da kartın üstünde yazar."),
+        demo: "chatstart",
+      },
+      {
+        title: tt("Dört adımda tanışma"),
+        text: tt("Tanıtım dört kısa adıma indi ve yaparak öğretiyor: çentiğin üstüne gel, bir dosya bırak ya da bir alarm kur. Geri kalan özellikler son adımdaki \"Başka neler yapabildiğimi gör\" ile gezilir."),
+        demo: "tourshort",
+      },
+      {
+        title: tt("Ne kadar konuşkan olayım?"),
+        text: tt("Tanıtımın sonunda üç seçenek var: Sessiz yalnızca alarmları ve senin kurduklarını gösterir, Dengeli günün özetini, su hatırlatmasını ve önemli olayları ekler, Canlı gezintiler ve oyun teklifleriyle hepsini açar."),
+        demo: "chatty",
+      },
+      {
+        title: tt("İlk haftan"),
+        text: tt("İlk hafta Bugün kartında üç küçük görev durur: bana bir dosya bırak, bir alarm kur, beni giydir. Sıradakine dokununca ilgili bölüm açılır."),
+        demo: "firstweek",
+      },
+      {
+        title: tt("Studio menüsü gruplandı"),
+        text: tt("Soldaki menü Nook, Düzen ve Geçmiş başlıklarına ayrıldı. Yama notları ve Ayarlar altta sabit durur, pencere küçülse de görünür."),
+        demo: "studionav",
+      },
+      {
+        title: tt("Tek dokunuşla güncelleme"),
+        text: tt("\"Yeni sürüm\" kartında artık Güncelle düğmesi var; dokununca indirme hemen başlar. Güncelleme beklerken Studio simgesinde yeşil bir nokta, Studio'da \"hazır\" yazan sürüm etiketi görünür."),
+        demo: "updatego",
+      },
+      {
+        title: tt("Kısayol tuşlarının adı: Tuşlar"),
+        text: tt("Tek basışta çalışan tuşların bölümü her yerde \"Tuşlar\" adını taşıyor; Studio'da \"Tuşlar ve otomasyonlar\". \"Klavye kısayolları\" yalnızca her yerde çalışan tuş birleşimleri için kullanılıyor."),
+        demo: "tuslar",
+      },
+      {
+        title: tt("Telefonu üç adımda eşleştir"),
+        text: tt("Ayarlar › Telefon artık bir sihirbaz: İndir, Eşleştir, Dene. Sıradaki adım renkli görünür, telefon bağlanınca nokta yeşile döner. Güvenlik duvarı ve evden uzakta bağlanma ayarları açılır başlıkların altında durur."),
+        demo: "phonewizard",
+      },
+      {
+        title: tt("Ayarlarda arama daha akıllı"),
+        text: tt("\"wifi\", \"pil\", \"karanlık\" gibi eş anlamlı sözcüklerle de bulursun; sonuçlar hangi kategoride olduğunu çipte gösterir ve eşleşen yer işaretlenir. Bir şey çıkmazsa Nook en yakın üç ayarı \"Bunu mu aradın?\" diye önerir."),
+        demo: "settingssearch",
+      },
+      {
+        title: tt("Her ayar tek yerde"),
+        text: tt("Aynı ayar artık iki kategoride durmuyor; eski yerinde seni asıl yerine götüren küçük bir satır var. Kategoriler \"Sohbet ve asistan\" ve \"Modül ayarları\" adını aldı, günün özeti ve Nook'un günlüğü Genel › Gün'de, kopyalanan metni çevirme Pano ayarlarında."),
+        demo: "settingsonce",
+      },
+      {
+        title: tt("Sessiz saatler"),
+        text: tt("Ayarlar › Bildirimler'den bir aralık seç (örneğin 23:00 – 08:00): o saatlerde kartlar, hatırlatmalar ve sesler susar. Alarmlar, takvim ve aramalar yine gelir."),
+        demo: "quiethours",
+      },
+      {
+        title: tt("Parçacıkları kısayolla yapıştır"),
+        text: tt("Ctrl + Alt + P adada parçacık listesini açar: yaz, ↑↓ ile seç, Enter'a bas; metin üzerinde çalıştığın pencereye yapışır. Kısayolu Ayarlar › Klavye kısayolları'ndan değiştirebilirsin."),
+        demo: "snippetpick",
+      },
+      {
+        title: tt("Yeni güne dönünce günün özeti"),
+        text: tt("Bilgisayar gece yalnızca uykuda kaldıysa, sabah geri döndüğünde günün özeti kendiliğinden açılır. Nook'u kapatıp açmana gerek yok."),
+        demo: "briefnewday",
+      },
+      {
+        title: tt("Özetteki kartları sen seç"),
+        text: tt("Günün özetinde \"Düzenle\"ye bas: istemediğin kartı gizle, kalanları oklarla sırala. Seçimin kaydedilir."),
+        demo: "brieftiles",
+      },
+      {
+        title: tt("Bugünün tek işi"),
+        text: tt("Özette \"Bugün en önemli iş ne?\" kutusuna günün işini yaz. Kapalı adada Nook'un yanında durur; bitirince ✓ ile işaretle, Nook da sevinsin."),
+        demo: "todaytask",
+      },
+      {
+        title: tt("Günü kapat"),
+        text: tt("Akşam ada boştayken küçük bir kart açılır: bugünkü odak süren, içtiğin su, günün işi ve yarının ilk alarmı. \"Yarına bir not\" yazarsan ertesi günün özetinin başında görünür."),
+        demo: "dayclose",
+      },
+      {
+        title: tt("Günlük ruh hâli"),
+        text: tt("Günü kapatırken beş yüzden birine dokun. Karne haftanın yüzlerini, Yıl özeti ay ay ortalamanı gösterir."),
+        demo: "moodfaces",
+      },
+      {
+        title: tt("Tuşlar için hazır şablonlar"),
+        text: tt("Studio › Tuşlar'da Toplantı, Oyun, Gece, Sunum, Mola ve Güne başla şablonları tek dokunuşla tuş olur; sonra istediğin gibi değiştirirsin. Kendi tuşunu şablon olarak kaydedebilir, yeni \"Sessiz kip\" adımını kullanabilirsin."),
+        demo: "decktemplates",
+      },
+      {
+        title: tt("Medya'da çalan uygulamanın sesi"),
+        text: tt("Medya bölümünde kontrollerin altında yalnızca çalan uygulamanın ses kaydırıcısı ve çıkış çipi var. Çipe dokununca ses sıradaki çıkışa (kulaklık, hoparlör) geçer."),
+        demo: "mediavolume",
+      },
+      {
+        title: tt("Boşta dinlenir"),
+        text: tt("Ada kapalıyken 30 karede çizilir, üstüne geldiğin an yine tam hızda açılır. İmleç adadan uzaktayken Nook ona çok daha seyrek bakar; bilgisayar başında değilken hava efektleri çizilmez, ekran kilitliyken çizim tümüyle durur. Hiçbir şey çalmıyorken oynatıcıyı, ses düzeyini ve ekran görüntüsü klasörünü de daha seyrek yoklar."),
+        demo: "idlerest",
+      },
+      {
+        title: tt("Diske yalnızca gerekince yazar"),
+        text: tt("Nook ayarlarını, panoyu ve geçmişini artık yalnızca bunlardan biri değiştiğinde kaydeder. Bir şey değişmedikçe diske dokunmaz; arka planda işlemciye ve diske daha az yük biner."),
+        demo: "lazysave",
+      },
+      {
+        title: tt("Küçük düzeltmeler"),
+        text: tt("Aramada \"illustrator\", \"gimp\" gibi büyük I içeren adlar bulunur. Art arda iki \"İçtim\" iki bardak sayılır ve bekleyen mola kartını kapatmaz. Yeni eklenen alışkanlık ilk hatırlatmasını kendi aralığı dolunca yapar; \"Yaptım\" deyince sayaç baştan başlar. Düzenlediğin hızlı alarm listede kalır. Bildirimlerde \"Temizle\" yalnızca açık sekmeyi temizler. Pomodoro sesi sessiz kipte ve oyunda çalmaz."),
+        demo: "fixes314",
+      },
+    ],
+  },
   {
     version: "0.3.10",
     date: tt("11 Kasım 2026"),

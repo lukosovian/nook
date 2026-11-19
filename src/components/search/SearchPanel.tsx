@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AppWindow, ArrowRightLeft, Calculator, Clapperboard, CornerDownLeft, Globe, Languages, MessageCircle, Search, Smile, StickyNote, TrendingUp, type LucideIcon } from "lucide-react";
+import { AppWindow, ArrowRightLeft, Calculator, Clapperboard, CornerDownLeft, Globe, Languages, MessageCircle, Search, Smile, StickyNote, Timer, TrendingUp, type LucideIcon } from "lucide-react";
 import { playAntic } from "../../hooks/useAntics";
 import { copyText, listApps, openPath, setInteractive, type AppEntry } from "../../lib/bridge";
 import { sendChat } from "../../lib/chat";
 import { useArgus } from "../../lib/argus";
-import { search, searchOnline, type ResultKind, type SearchResult } from "../../lib/search";
+import { search, searchOnline, startTimer, type ResultKind, type SearchResult } from "../../lib/search";
 import { useNook } from "../../store/nook";
 import { Frame, HUB_COLOR } from "../panels/Frame";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
@@ -22,9 +22,10 @@ const KIND: Record<ResultKind, { icon: LucideIcon; color: string }> = {
   note: { icon: StickyNote, color: ACCENT.yellow },
   ask: { icon: MessageCircle, color: ACCENT.purple },
   argus: { icon: Clapperboard, color: ACCENT.orange },
+  timer: { icon: Timer, color: ACCENT.yellow },
 };
 
-const HINTS = ["Spotify", "12*3+4", "100 usd tl", "10 km mi", "en: günaydın", "emoji kalp", "not: süt al"];
+const HINTS = ["Spotify", "12*3+4", "100 usd tl", "10 km mi", "en: günaydın", "emoji kalp", "not: süt al", "çay 3 dk"];
 
 /** Uygulama listesi oturum boyunca bir kez okunur. */
 let appsCache: Promise<AppEntry[]> | undefined;
@@ -93,6 +94,9 @@ export function SearchPanel() {
     } else if (r.kind === "note") {
       const { note, setNote } = useNook.getState();
       setNote(note ? `${note}\n${r.payload}` : r.payload);
+      playAntic("hop");
+    } else if (r.kind === "timer") {
+      startTimer(r.payload);
       playAntic("hop");
     } else {
       await openPath(r.payload).catch(() => {});

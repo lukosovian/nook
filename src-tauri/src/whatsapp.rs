@@ -115,6 +115,9 @@ fn emit_state(app: &AppHandle, st: &WaState) {
     let _ = app.emit("nook://whatsapp", st);
 }
 
+/// Başlık yoklayıcısının iş parçacığı (pencere yokken uyur)
+static POLLER: std::sync::OnceLock<thread::Thread> = std::sync::OnceLock::new();
+
 pub fn spawn(app: AppHandle) {
     let enabled = load_enabled();
     {
@@ -134,6 +137,8 @@ pub fn spawn(app: AppHandle) {
         .spawn(move || loop {
             thread::sleep(Duration::from_millis(1200));
             let Some(win) = poll_app.get_webview_window(LABEL) else {
+                // WhatsApp Web bağlı değilken yoklama durur; pencere açılınca ensure_window uyandırır
+                thread::park_timeout(Duration::from_secs(60));
                 continue;
             };
             if let Ok(title) = win.title() {
@@ -149,7 +154,8 @@ pub fn spawn(app: AppHandle) {
                 }
             }
         })
-        .ok();
+        .ok()
+        .map(|h| POLLER.set(h.thread().clone()));
 
     if enabled {
         let boot_app = app.clone();
@@ -215,6 +221,9 @@ fn ensure_window(app: &AppHandle, show: bool) -> Result<(), String> {
         .initialization_script(WA_BRIDGE_JS)
         .build()
         .map_err(|e| e.to_string())?;
+    if let Some(t) = POLLER.get() {
+        t.unpark();
+    }
 
     let mut guard = STATE.lock().unwrap();
     let st = guard.get_or_insert_with(WaState::default);

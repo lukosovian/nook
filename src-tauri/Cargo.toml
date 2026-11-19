@@ -1,6 +1,6 @@
 [package]
 name = "nook"
-version = "0.3.13"
+version = "0.3.14"
 description = "Nook — yaşayan bir Dynamic Island"
 edition = "2021"
 
@@ -86,6 +86,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_Pipes",
   # Wake-on-LAN hazırlığı: ağ kartını yeniden başlatma
   "Win32_Devices_DeviceAndDriverInstallation",
+  # Mikrofon/kamera göstergesi: kayıt defteri değişikliğini izleme
+  "Win32_System_Registry",
 ] }
 # "Şu an çalan" (GSMTC) — Tauri zaten bu sürümü derliyor
 windows = { version = "0.62", features = [

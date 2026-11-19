@@ -17,7 +17,14 @@
   /* Metin */
   --color-label: #ececee;
   --color-label-2: #9a9aa2;
-  --color-label-3: #5f5f66;
+  /* Koyu kartta (#161618) yaklaşık 5:1 — küçük yazı da okunur; "Net yazı" bunu daha da açar */
+  --color-label-3: #8a8a92;
+  /* Beş köşe yarıçapı: rounded-badge · rounded-row · rounded-tile · rounded-card (+ rounded-full hap) */
+  --radius-badge: 8px;
+  --radius-row: 12px;
+  --radius-tile: 16px;
+  --radius-card: 18px;
+  --radius-pill: 9999px;
   /* Vurgu renkleri (Grok Bot'taki çip renkleri) */
   --color-teal: #3fbfa5;
   --color-red: #f0545c;
@@ -80,6 +87,17 @@ input {
 
 button {
   cursor: default;
+}
+
+/*
+ * Klavye odağı: Tab ile gezerken modülün renginde (--focus-ring; yoksa mor) halka, köşe yarıçapını izler.
+ * Fare tıklamasında çıkmaz. Yazı alanları tıklanınca da :focus-visible sayıldığından onlarda yalnızca
+ * klavyeyle gezinirken (html[data-kbd], bkz. lib/palette.ts) görünür. outline-none sınıflarını ezer.
+ */
+:where(button, a, select, summary, [role="button"], [role="switch"], [role="slider"], [tabindex], input:is([type="range"], [type="checkbox"], [type="radio"], [type="color"])):focus-visible,
+html[data-kbd] :where(input, textarea):focus-visible {
+  outline: 2px solid var(--focus-ring, var(--color-purple)) !important;
+  outline-offset: 2px !important;
 }
 
 /* Kart: üstten hafif ışık alan koyu yüzey */

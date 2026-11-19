@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { BellRing, CalendarDays, Check, Plus, Trash2, X } from "lucide-react";
+import { AlarmClock, BellOff, BellRing, CalendarDays, Check, Plus, Repeat, RotateCcw, Trash2, X } from "lucide-react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { spring } from "../../lib/motion";
 import { dayKey, remindAt, useNook, type CalEvent } from "../../store/nook";
 import { ACCENT, tintBg, tintText } from "../ui/primitives";
-import { locale, tt } from "../../lib/i18n";
+import { lang, locale, tt } from "../../lib/i18n";
+import { repeatOf, repeatText, until } from "../../lib/alarm";
+import { parseRemind, remindExamples, tomorrowMorning } from "../../lib/remind";
 
 const COLOR = ACCENT.orange;
 
@@ -25,74 +27,18 @@ const WHEN: When[] = [
   // 19:00'dan sonra seçenek kaybolur (akşam 20:00'ye bir saatten az kalınca)
   { id: "eve", label: tt("Bu akşam"), at: () => (new Date().getHours() < 19 ? at(0, 20) : null) },
   // Gece 05:00'ten önce "yarın sabah" uyanınca gelen sabahtır (aynı takvim günü)
-  { id: "tom", label: tt("Yarın sabah"), at: () => at(new Date().getHours() < 5 ? 0 : 1, 9) },
+  { id: "tom", label: tt("Yarın sabah"), at: () => tomorrowMorning() },
 ];
-
-/** Pazar = 0 (Date.getDay); "cumartesi" "cuma"dan, "pazartesi" "pazar"dan önce denenir */
-const WEEKDAYS: [RegExp, number][] = [
-  [/pazartesi/, 1],
-  [/sal[ıi]/, 2],
-  [/[çc]ar[şs]amba/, 3],
-  [/per[şs]embe/, 4],
-  [/cumartesi/, 6],
-  [/cuma/, 5],
-  [/pazar/, 0],
-];
-
-/** "salı 10:00 ders", "cuma günü fatura" → o günün (bugünse ve saat geçmediyse bugün) o saati; saat yoksa 09:00 */
-function parseWeekday(text: string): { title: string; at: number } | null {
-  for (const [re, wd] of WEEKDAYS) {
-    const m = new RegExp(`(?:^|\\s)${re.source}(?:\\s+g[üu]n[üu])?(?=\\s|$)`, "iu").exec(text);
-    if (!m) continue;
-    const abs = /(?:^|\s)(?:saat\s+)?(\d{1,2})[:.](\d{2})(?=\s|$)/iu.exec(text);
-    const h = abs ? Number(abs[1]) : 9;
-    const min = abs ? Number(abs[2]) : 0;
-    if (h > 23 || min > 59) return null;
-    let days = (wd - new Date().getDay() + 7) % 7;
-    if (days === 0 && at(0, h, min) <= Date.now()) days = 7;
-    let title = text.replace(m[0], " ");
-    if (abs) title = title.replace(abs[0], " ");
-    return { title: title.replace(/\s+/g, " ").trim(), at: at(days, h, min) };
-  }
-  return null;
-}
-
-/** "çamaşır 20 dk", "20 dakika sonra ilaç", "toplantı 14:30", "yarın 21:00 sunum", "salı 10:00 ders" → metin ve an; saat yoksa null */
-function parse(text: string): { title: string; at: number } | null {
-  const wd = parseWeekday(text);
-  if (wd) return wd;
-  // "yarın" + saat: ertesi takvim gününün o saati (gece 02:00'de de)
-  const tom = /(?:^|\s)yar[ıi]n(?=\s|$)/iu.exec(text);
-  const tomAbs = tom && /(?:^|\s)(?:saat\s+)?(\d{1,2})[:.](\d{2})(?=\s|$)/iu.exec(text);
-  if (tom && tomAbs && Number(tomAbs[1]) < 24 && Number(tomAbs[2]) < 60) {
-    return { title: text.replace(tom[0], " ").replace(tomAbs[0], " ").trim(), at: at(1, Number(tomAbs[1]), Number(tomAbs[2])) };
-  }
-  const rel = /(?:^|\s)(\d{1,3})\s*(dk|dakika|sa|saat)(?:\s+sonra)?(?=\s|$)/iu.exec(text);
-  if (rel) {
-    const n = Number(rel[1]) * (/^s/i.test(rel[2]) ? 60 : 1);
-    if (n > 0) return { title: text.replace(rel[0], " ").trim(), at: Date.now() + n * 60_000 };
-  }
-  const abs = /(?:^|\s)(?:saat\s+)?(\d{1,2})[:.](\d{2})(?=\s|$)/iu.exec(text);
-  if (abs) {
-    const h = Number(abs[1]);
-    const m = Number(abs[2]);
-    if (h < 24 && m < 60) {
-      let t = at(0, h, m);
-      if (t <= Date.now()) t = at(1, h, m);
-      return { title: text.replace(abs[0], " ").trim(), at: t };
-    }
-  }
-  return null;
-}
 
 /** Dakikaya yuvarla (alarm dakika çözünürlüklü): hiç erken çalmasın */
 const ceilMin = (ms: number) => Math.ceil(ms / 60_000) * 60_000;
 
-function whenText(ms: number, now: number) {
+/** `exact`: yakın olsa da saatiyle yazar ("Bugün 14:20") */
+function whenText(ms: number, now: number, exact = false) {
   const left = ms - now;
   const d = new Date(ms);
   const hm = d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
-  if (left < 60 * 60_000 && left > 0) return tt("{0} dk sonra", Math.max(1, Math.round(left / 60_000)));
+  if (!exact && left < 60 * 60_000 && left > 0) return tt("{0} dk sonra", Math.max(1, Math.round(left / 60_000)));
   if (dayKey(d) === dayKey()) return tt("Bugün {0}", hm);
   if (dayKey(d) === dayKey(new Date(now + 86_400_000))) return tt("Yarın {0}", hm);
   return `${d.toLocaleDateString(locale(), { day: "numeric", month: "short", weekday: "short" })} ${hm}`;
@@ -114,8 +60,10 @@ export function RemindPanel() {
     return () => window.clearInterval(t);
   }, []);
   const input = useRef<HTMLInputElement>(null);
+  // "Yeniden kur" ile forma alınan kaçırılmış hatırlatma: yenisi eklenince eskisi listeden kalkar
+  const [redo, setRedo] = useState<string | null>(null);
 
-  const parsed = title.trim() ? parse(title) : null;
+  const parsed = title.trim() ? parseRemind(title, Date.now(), lang) : null;
   const options = WHEN.filter((w) => w.at() !== null);
   const chosen = (): number | null => {
     if (parsed) return parsed.at;
@@ -135,7 +83,9 @@ export function RemindPanel() {
     const t = target;
     if (!text || !t) return;
     const d = new Date(ceilMin(t));
-    useNook.getState().addEvent({ day: dayKey(d), time: d.toTimeString().slice(0, 5), title: text, remind: 0, reminder: true });
+    if (redo) useNook.getState().removeEvent(redo);
+    setRedo(null);
+    useNook.getState().addEvent({ day: dayKey(d), time: d.toTimeString().slice(0, 5), title: text, remind: 0, reminder: true, ...(parsed?.days ? { days: parsed.days } : {}) });
     setTitle("");
     input.current?.focus();
   };
@@ -144,7 +94,11 @@ export function RemindPanel() {
   const { upcoming, past } = useMemo(() => {
     const items = events
       .filter((e) => e.reminder || e.remind >= 0)
-      .map((e) => ({ e, at: remindAt(e) ?? remindAt({ ...e, remind: 0 })!, pending: !!e.alarmId && alarms.some((a) => a.id === e.alarmId && a.enabled) }));
+      .map((e) => {
+        const alarm = e.alarmId ? alarms.find((a) => a.id === e.alarmId && a.enabled) : undefined;
+        // Tekrarlı hatırlatmanın anı alarmının sıradaki çalmasıdır
+        return { e, at: (e.days?.length ? alarm?.next : null) ?? remindAt(e) ?? remindAt({ ...e, remind: 0 })!, pending: !!alarm };
+      });
     return {
       upcoming: items.filter((x) => x.pending).sort((a, b) => a.at - b.at),
       past: items.filter((x) => !x.pending && x.e.reminder).sort((a, b) => b.at - a.at).slice(0, 12),
@@ -172,7 +126,29 @@ export function RemindPanel() {
             className="h-8 w-full rounded-[10px] bg-black/25 px-2.5 text-[12.5px] font-medium text-label outline-none placeholder:text-label-3 focus:bg-black/35"
           />
         </div>
-        <p className="px-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-label-3">{tt("Ne zaman?")}</p>
+        {/* Yazılandan ne anlaşıldı; kutu boşken dokununca yazılan örnekler; saat yazılmadıysa "Ne zaman?" */}
+        <div className="flex h-[18px] shrink-0 items-center gap-1 overflow-hidden px-0.5">
+          {parsed ? (
+            <span className="flex min-w-0 items-center gap-1 rounded-full px-1.5 py-[2px] text-[10px] font-semibold" style={{ background: tintBg(COLOR, 20), color: tintText(COLOR) }}>
+              {parsed.days ? <Repeat size={10} strokeWidth={2.6} className="shrink-0" /> : <AlarmClock size={10} strokeWidth={2.6} className="shrink-0" />}
+              <span className="truncate">
+                {parsed.days ? `${repeatText(repeatOf(parsed.days))} · ${whenText(ceilMin(parsed.at), now, true)}` : `${whenText(ceilMin(parsed.at), now, true)} · ${until(ceilMin(parsed.at), now)}`}
+              </span>
+            </span>
+          ) : title.trim() ? (
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-label-3">{tt("Ne zaman?")}</p>
+          ) : (
+            remindExamples(lang).map((x) => (
+              <button
+                key={x}
+                onClick={() => (setTitle(x), input.current?.focus())}
+                className="shrink-0 rounded-full bg-white/[0.06] px-1.5 py-[2px] text-[9.5px] font-medium text-label-2 transition-colors hover:bg-white/[0.12] hover:text-label"
+              >
+                {x}
+              </button>
+            ))
+          )}
+        </div>
         <div className="grid grid-cols-3 gap-1">
           {options.map((w) => {
             const on = !parsed && pick === w.id;
@@ -235,7 +211,7 @@ export function RemindPanel() {
         <div className="space-y-1">
           <AnimatePresence initial={false}>
             {upcoming.map(({ e, at: t }) => (
-              <Row key={e.id} e={e} color={e.reminder ? COLOR : ACCENT.blue} when={whenText(t, now)} soon={t - now < 15 * 60_000} />
+              <Row key={e.id} e={e} color={e.reminder ? COLOR : ACCENT.blue} when={e.days?.length ? `${repeatText(repeatOf(e.days))} · ${whenText(t, now)}` : whenText(t, now)} soon={t - now < 15 * 60_000} />
             ))}
           </AnimatePresence>
         </div>
@@ -249,7 +225,18 @@ export function RemindPanel() {
             </p>
             <div className="space-y-1">
               {past.map(({ e, at: t }) => (
-                <Row key={e.id} e={e} color={ACCENT.gray} when={new Date(t).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} done />
+                <Row
+                  key={e.id}
+                  e={e}
+                  color={e.missed ? ACCENT.red : ACCENT.gray}
+                  when={new Date(t).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  done
+                  onRedo={() => {
+                    setTitle(e.title);
+                    setRedo(e.id);
+                    input.current?.focus();
+                  }}
+                />
               ))}
             </div>
           </>
@@ -259,7 +246,8 @@ export function RemindPanel() {
   );
 }
 
-function Row({ e, color, when, soon, done }: { e: CalEvent; color: string; when: string; soon?: boolean; done?: boolean }) {
+function Row({ e, color, when, soon, done, onRedo }: { e: CalEvent; color: string; when: string; soon?: boolean; done?: boolean; onRedo?: () => void }) {
+  const missed = !!done && !!e.missed;
   return (
     <motion.div
       layout
@@ -271,15 +259,27 @@ function Row({ e, color, when, soon, done }: { e: CalEvent; color: string; when:
       style={{ background: tintBg(color, done ? 5 : 10), borderColor: tintBg(color, done ? 14 : 26) }}
     >
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px]" style={{ background: tintBg(color, 22), color: tintText(color) }}>
-        {done ? <Check size={12} strokeWidth={2.8} /> : e.reminder ? <BellRing size={12} strokeWidth={2.4} /> : <CalendarDays size={12} strokeWidth={2.4} />}
+        {missed ? <BellOff size={12} strokeWidth={2.4} /> : done ? <Check size={12} strokeWidth={2.8} /> : e.reminder ? <BellRing size={12} strokeWidth={2.4} /> : <CalendarDays size={12} strokeWidth={2.4} />}
       </span>
       <span className="min-w-0 flex-1 leading-tight">
-        <span className={`block truncate text-[12px] font-semibold ${done ? "text-label-3 line-through decoration-white/20" : "text-label"}`}>{e.title}</span>
+        <span className={`block truncate text-[12px] font-semibold ${missed ? "text-label-2" : done ? "text-label-3 line-through decoration-white/20" : "text-label"}`}>{e.title}</span>
         <span className="block truncate text-[10px]" style={{ color: soon ? tintText(color) : "var(--color-label-3)" }}>
+          {missed && <b className="font-semibold" style={{ color: tintText(color) }}>{tt("Kaçırıldı")} · </b>}
           {when}
           {!e.reminder && ` · ${tt("Takvimden")}`}
         </span>
       </span>
+      {missed && onRedo && (
+        <button
+          onClick={onRedo}
+          title={tt("Yeniden kur")}
+          aria-label={tt("Yeniden kur")}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+          style={{ background: tintBg(COLOR, 20), color: tintText(COLOR) }}
+        >
+          <RotateCcw size={11} strokeWidth={2.6} />
+        </button>
+      )}
       <button
         onClick={() => (e.reminder || done ? useNook.getState().removeEvent(e.id) : useNook.getState().cancelRemind(e.id))}
         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-label-3 opacity-60 hover:bg-well-hi hover:text-label group-hover:opacity-100"

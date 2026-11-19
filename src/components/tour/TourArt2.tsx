@@ -462,7 +462,7 @@ export function OutingsArt() {
           <FishScene />
         </Vignette>
       </div>
-      <p className="px-1 text-[10.5px] text-label-3">{tt("İstemezsen Ayarlar › Nook › Ara sıra dışarı çıksın'ı kapat.")}</p>
+      <p className="px-1 text-[10.5px] text-label-3">{tt("İstemezsen Ayarlar › Ada ve Nook › Ara sıra dışarı çıksın'ı kapat.")}</p>
     </div>
   );
 }

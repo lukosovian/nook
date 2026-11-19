@@ -52,6 +52,15 @@ import { DEMOS27 } from "./Demos27";
 import { DEMOS28 } from "./Demos28";
 import { DEMOS29 } from "./Demos29";
 import { DEMOS30 } from "./Demos30";
+import { DEMOS31 } from "./Demos31";
+import { DEMOS39 } from "./Demos39";
+import { DEMOS38 } from "./Demos38";
+import { DEMOS37 } from "./Demos37";
+import { DEMOS32 } from "./Demos32";
+import { DEMOS33 } from "./Demos33";
+import { DEMOS34 } from "./Demos34";
+import { DEMOS35 } from "./Demos35";
+import { DEMOS36 } from "./Demos36";
 
 /** Her `ms`'de bir artan sayaç (sahneler kendini tekrarlasın) */
 function useTick(ms: number) {
@@ -875,6 +884,15 @@ export const DEMOS: Record<DemoId, () => React.JSX.Element> = {
   ...DEMOS28,
   ...DEMOS29,
   ...DEMOS30,
+  ...DEMOS31,
+  ...DEMOS39,
+  ...DEMOS38,
+  ...DEMOS37,
+  ...DEMOS32,
+  ...DEMOS33,
+  ...DEMOS34,
+  ...DEMOS35,
+  ...DEMOS36,
   lang: LangDemo,
   scale: ScaleDemo,
   cvd: CvdDemo,

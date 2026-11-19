@@ -12,6 +12,7 @@ export type Sfx = "open" | "close" | "tab" | "pop" | "success" | "error" | "out"
 
 let ctx: AudioContext | null = null;
 let last = 0;
+let idle = 0;
 
 interface ToneOpts {
   type?: OscillatorType;
@@ -130,6 +131,9 @@ export function playSfx(kind: Sfx, force = false) {
     ctx ??= new AudioContext();
     const a = ctx;
     void a.resume();
+    // Son sesten kısa süre sonra ses aygıtı bırakılır (açık bağlam boştayken de işlemci harcar)
+    window.clearTimeout(idle);
+    idle = window.setTimeout(() => void a.suspend(), 2000);
     const out = a.createGain();
     out.gain.value = 0.6 * (s.settings.uiVolume ?? 0.6);
     const soft = a.createBiquadFilter();

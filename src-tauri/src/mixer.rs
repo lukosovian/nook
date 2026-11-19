@@ -205,7 +205,11 @@ mod imp {
                     let display = ctl
                         .GetDisplayName()
                         .ok()
-                        .and_then(|p| p.to_string().ok())
+                        .and_then(|p| {
+                            let s = p.to_string().ok();
+                            windows::Win32::System::Com::CoTaskMemFree(Some(p.0 as _));
+                            s
+                        })
                         .filter(|s| !s.is_empty() && !s.starts_with('@'))
                         .unwrap_or_default();
                     let key = if system {

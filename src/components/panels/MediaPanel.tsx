@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationFrame } from "motion/react";
-import { MicVocal, RotateCcw } from "lucide-react";
+import { Headphones, MicVocal, RotateCcw, Speaker, Volume1, VolumeX } from "lucide-react";
 import { lineAt, lyricOffset, shiftLyrics, useLyrics } from "../../lib/lyrics";
-import { mediaControl, mediaSeek, type MediaAction } from "../../lib/bridge";
+import { mediaControl, mediaSeek, mixerList, mixerOutput, mixerSet, quickState, type AppVolume, type AudioOutput, type MediaAction } from "../../lib/bridge";
 import { appName, formatTime, livePosition } from "../../lib/media";
 import { spring } from "../../lib/motion";
 import { useNook, type NowPlaying } from "../../store/nook";
 import { Equalizer } from "../media/Equalizer";
 import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph } from "../ui/glyphs";
 import { ACCENT, EmptyState, MiniNook, tintBg, tintText } from "../ui/primitives";
-import { tt } from "../../lib/i18n";
+import { pct, tt } from "../../lib/i18n";
 
 export function MediaPanel() {
   const media = useNook((s) => s.media);
@@ -95,7 +95,102 @@ export function MediaPanel() {
         </AnimatePresence>
         {media.durationMs > 0 && <Progress media={media} />}
         <Controls playing={media.playing} />
+        <AppVolumeRow app={media.app} />
       </div>
+    </div>
+  );
+}
+
+const plain = (x: string) => x.toLowerCase().replace(/\.exe$/, "").replace(/[^a-z0-9]/g, "");
+
+/** Çalan uygulamanın ses oturumu (Uygulama sesi listesinden, ada göre); bulunamazsa null */
+function sessionOf(apps: AppVolume[], app: string): AppVolume | null {
+  const want = [plain(appName(app)), plain(app.split(/[!\\/]/).pop() ?? "")].filter((w) => w.length >= 3);
+  const names = (a: AppVolume) => [plain(a.name), plain(a.key.split(/[\\/]/).pop() ?? "")].filter((n) => n.length >= 3);
+  const list = apps.filter((a) => a.key !== "system");
+  return list.find((a) => names(a).some((n) => want.includes(n))) ?? list.find((a) => names(a).some((n) => want.some((w) => n.includes(w) || w.includes(n)))) ?? null;
+}
+
+/**
+ * Yalnızca çalan uygulamanın sesi: ince kaydırıcı ve çıkış çipi (Kulaklık/Hoparlör; tıklayınca sıradaki).
+ * Panel açılınca ve açıkken 5 sn'de bir okunur; uygulamanın ses oturumu bulunamazsa satır hiç görünmez.
+ */
+function AppVolumeRow({ app }: { app: string }) {
+  const [session, setSession] = useState<AppVolume | null>(null);
+  const [outputs, setOutputs] = useState<AudioOutput[]>([]);
+  // Kaydırırken tazeleme değeri geri itmesin
+  const dragging = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      if (dragging.current) return;
+      void mixerList()
+        .then((l) => alive && !dragging.current && setSession(sessionOf(l, app)))
+        .catch(() => {});
+      void quickState()
+        .then((q) => alive && q && setOutputs(q.outputs))
+        .catch(() => {});
+    };
+    load();
+    const t = window.setInterval(load, 5000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [app]);
+  if (!session) return null;
+
+  const level = Math.round((session.muted ? 0 : session.volume) * 100);
+  const out = (session.output ? outputs.find((o) => o.id === session.output) : null) ?? outputs.find((o) => o.default) ?? null;
+  const cycle = () => {
+    const ring: (string | null)[] = [null, ...outputs.map((o) => o.id)];
+    const next = ring[(ring.indexOf(session.output ?? null) + 1) % ring.length];
+    setSession({ ...session, output: next });
+    void mixerOutput(session.key, next).catch(() => {});
+  };
+  const OutIcon = out?.headphone ? Headphones : Speaker;
+  return (
+    <div className="mt-1.5 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => {
+          setSession({ ...session, muted: !session.muted });
+          void mixerSet(session.key, undefined, !session.muted).catch(() => {});
+        }}
+        title={session.muted ? tt("Sesi aç") : tt("Sessize al")}
+        aria-label={session.muted ? tt("Sesi aç") : tt("Sessize al")}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full hover:bg-white/[0.1]"
+        style={{ color: session.muted ? tintText(ACCENT.red) : "var(--color-label-2)" }}
+      >
+        {session.muted ? <VolumeX size={12} /> : <Volume1 size={12} />}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={level}
+        aria-label={tt("{0} sesi", appName(app))}
+        title={tt("{0} sesi", appName(app))}
+        onPointerDown={() => (dragging.current = true)}
+        onPointerUp={() => (dragging.current = false)}
+        onChange={(e) => {
+          const v = Number(e.target.value) / 100;
+          void mixerSet(session.key, v, session.muted && v > 0 ? false : undefined).catch(() => {});
+          setSession({ ...session, volume: v, muted: false });
+        }}
+        className="h-1 min-w-0 flex-1"
+        style={{ accentColor: ACCENT.pink }}
+      />
+      <span className="w-[30px] shrink-0 text-right text-[10px] font-medium tabular-nums text-label-3">{pct(level)}</span>
+      {out && (
+        <button
+          onClick={outputs.length > 1 ? cycle : undefined}
+          title={outputs.length > 1 ? tt("Çıkış: {0}\nTıkla: sıradaki", out.name) : tt("Çıkış: {0}", out.name)}
+          className={`flex h-5 max-w-[120px] shrink-0 items-center gap-1 rounded-full bg-black/35 px-2 text-[9.5px] font-medium text-label-2 ${outputs.length > 1 ? "hover:text-label" : "cursor-default"}`}
+        >
+          <OutIcon size={10} strokeWidth={2.4} className="shrink-0" />
+          <span className="truncate">{out.headphone ? tt("Kulaklık") : tt("Hoparlör")}</span>
+        </button>
+      )}
     </div>
   );
 }

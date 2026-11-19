@@ -7,7 +7,7 @@ import { useNook } from "../../store/nook";
 import { normalizeColor, normalizeLook } from "../../lib/look";
 import { NookFigure } from "../../components/mascot/Figure";
 import { ACCENT, tintBg, tintText } from "../../components/ui/primitives";
-import { Breakdown, grade, hm, LETTER_COLOR, SCALE, Tile, tiles, WeekChart, weekOf } from "../../components/report/Report";
+import { Breakdown, grade, hm, LETTER_COLOR, MoodWeek, SCALE, Tile, tiles, WeekChart, weekOf } from "../../components/report/Report";
 import { locale, tt } from "../../lib/i18n";
 import { Page, PageHeader, Panel } from "../ui";
 
@@ -97,6 +97,7 @@ export function ReportPage() {
                 </span>
               </Line>
             )}
+            <MoodWeek week={week} />
           </div>
         </Panel>
 

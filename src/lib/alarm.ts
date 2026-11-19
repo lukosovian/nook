@@ -18,7 +18,14 @@ export interface Alarm {
   oneShot?: boolean;
   /** Sessiz: çalınca yalnızca ada açılır, ses çıkmaz */
   silent?: boolean;
+  /** "Sıradakini atla": atlanan çalma anı (ms); `next` ondan sonrakine kurulur */
+  skipped?: number;
 }
+
+/** Vakti bundan çok geçmiş alarm çalmaz, "kaçırıldı" diye bildirilir */
+export const MISSED_AFTER_MS = 10 * 60_000;
+/** Çalan alarmda seçilebilen erteleme süreleri (dk) */
+export const SNOOZE = [5, 10, 15];
 
 export const REPEAT_LABEL: Record<Repeat, string> = {
   once: tt("Bir kez"),

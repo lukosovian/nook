@@ -10,7 +10,7 @@ import { persist } from "zustand/middleware";
 import { useNook, dayKey } from "../store/nook";
 import { playSfx } from "./sfx";
 import { tt } from "./i18n";
-import { drankWater } from "../hooks/useFeatures";
+import { drankWater, resetBreak } from "../hooks/useFeatures";
 
 export interface HabitItem {
   id: string;
@@ -127,6 +127,7 @@ export const useHabits = create<HabitsStore>()(
           get().drinkGlass();
           return;
         }
+        resetBreak(id);
         const k = dayKey();
         const prev = get().history[k] ?? { custom: {} };
         const count = (prev.custom[id] ?? 0) + 1;
@@ -191,7 +192,7 @@ export const useHabits = create<HabitsStore>()(
           targetDaily: item.targetDaily || 1,
           enabled: true,
           notifyOnMobile: item.notifyOnMobile ?? true,
-          lastDoneAt: 0,
+          lastDoneAt: Date.now(),
           isCustom: true,
         };
         set({ habits: [...get().habits, newHabit] });
@@ -228,6 +229,22 @@ export function getTodayHabitCount(id: string): number {
   const k = dayKey();
   const hist = useHabits.getState().history[k];
   return hist?.custom?.[id] ?? 0;
+}
+
+/**
+ * Son 7 gün (bugün en sonda) yapıldı mı ve kaç gündür üst üste yapılıyor. Su, günlük hedefe ulaşınca yapılmış sayılır.
+ * Bugün henüz yapılmadıysa seri bozulmaz, dünden geriye sayılır.
+ */
+export function habitWeek(id: string): { dots: boolean[]; streak: number } {
+  const { history, waterGoal } = useHabits.getState();
+  const days = useNook.getState().days;
+  const done = (back: number) => {
+    const k = dayKey(new Date(Date.now() - back * 86_400_000));
+    return id === "water" ? (days[k]?.water ?? 0) >= waterGoal : (history[k]?.custom?.[id] ?? 0) > 0;
+  };
+  let streak = 0;
+  for (let i = done(0) ? 0 : 1; i < 400 && done(i); i++) streak++;
+  return { dots: Array.from({ length: 7 }, (_, i) => done(6 - i)), streak };
 }
 
 /** Hazır molalar (su, göz, esneme) ayarlardan yönetilir; alışkanlık listesindeki kayıtları yalnızca sayaç içindir */

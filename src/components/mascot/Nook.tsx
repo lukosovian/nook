@@ -618,6 +618,9 @@ function Glass() {
  * Dalgalı ses gözleri (Grok Bot "▮•▮"): ortadan simetrik üç çubuk, kendi ritminde.
  * Dıştakiler uzarken ortadaki nokta küçülür, sonra tersi: "▮•▮" ↔ "|▮|". Ses seviyesinden bağımsız.
  */
+/** Çubukların en uzun hâli: boy sabit, uzayıp kısalma scaleY ile (yerleşim her karede yeniden hesaplanmaz) */
+const WAVE_EYE_MAX = [10, 9, 10];
+
 function WaveEyes() {
   const bars = useRef<(HTMLSpanElement | null)[]>([]);
   const cur = useRef([4, 2.6, 4]);
@@ -632,7 +635,7 @@ function WaveEyes() {
     bars.current.forEach((el, i) => {
       if (!el) return;
       cur.current[i] += (target[i] - cur.current[i]) * 0.4;
-      el.style.height = `${cur.current[i].toFixed(2)}px`;
+      el.style.transform = `scaleY(${(cur.current[i] / WAVE_EYE_MAX[i]).toFixed(3)})`;
     });
   });
 
@@ -650,7 +653,7 @@ function WaveEyes() {
           key={i}
           ref={(el) => void (bars.current[i] = el)}
           className="block rounded-full bg-black"
-          style={{ width: i === 1 ? 2.6 : 3.6, height: cur.current[i] }}
+          style={{ width: i === 1 ? 2.6 : 3.6, height: WAVE_EYE_MAX[i], transformOrigin: "center", transform: `scaleY(${cur.current[i] / WAVE_EYE_MAX[i]})` }}
         />
       ))}
     </motion.div>

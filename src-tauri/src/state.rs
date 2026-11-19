@@ -121,6 +121,8 @@ pub struct Settings {
     pub live_shortcut: String,
     /// Hum: çalan şarkıyı bul
     pub hum_shortcut: String,
+    /// Parçacık seçici: adada parçacık listesi açılır, seçilen önceki pencereye yapıştırılır
+    pub snippet_shortcut: String,
     /// Otomatik Hum: arkada dinler, bulduğu şarkıları kaydeder
     pub hum_auto: bool,
     /// Kısayol tuşlarının klavye kısayolları (basılınca ön yüz o tuşu çalıştırır)
@@ -131,6 +133,8 @@ pub struct Settings {
     pub wallpaper_cycle: Option<WallCycle>,
     /// Tailscale kapanırsa Nook yeniden bağlasın ve girişsiz çalışma (unattended) açılsın
     pub tailscale_keep: bool,
+    /// Tam ekran oyun öndeyken genel kısayollar (kalkan dışında) bırakılır: tuşlar oyuna gider
+    pub shortcuts_off_in_game: bool,
 }
 
 /// Duvar kağıdı döngüsü: `ids` sırayla, `every_min` dakikada bir; `since` (ms) döngünün açıldığı an, ilk resim o an
@@ -201,11 +205,13 @@ impl Default for Settings {
             headphone_drop: 0,
             live_shortcut: "Ctrl+Alt+L".into(),
             hum_shortcut: "Ctrl+Alt+M".into(),
+            snippet_shortcut: "Ctrl+Alt+P".into(),
             hum_auto: false,
             deck_hotkeys: Vec::new(),
             log_days: 14,
             wallpaper_cycle: None,
             tailscale_keep: false,
+            shortcuts_off_in_game: true,
         }
     }
 }

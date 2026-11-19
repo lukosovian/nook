@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { CalendarClock, Timer } from "lucide-react";
 import { nextEvent } from "../../hooks/useCalendarFeed";
@@ -79,12 +79,13 @@ export function EventMini() {
  */
 export function useEventSoon(): { soon: boolean; urgent: boolean } {
   const now = useNow(15_000);
-  const soon = useNook((s) => s.settings.calCountdown && !!nextEvent(s, now));
-  const urgent = useNook((s) => {
-    if (!s.settings.calCountdown) return false;
-    const ev = nextEvent(s, now);
-    if (!ev) return false;
-    return ev.start > now ? ev.start - now <= 15 * 60_000 : !!ev.end && ev.end - now <= 10 * 60_000;
-  });
-  return { soon, urgent };
+  const on = useNook((s) => s.settings.calCountdown);
+  const events = useNook((s) => s.events);
+  const extEvents = useNook((s) => s.extEvents);
+  // Takvim yalnızca etkinlikler ya da saat değişince taranır (deponun her değişiminde değil)
+  return useMemo(() => {
+    const ev = on ? nextEvent({ events, extEvents }, now) : null;
+    if (!ev) return { soon: false, urgent: false };
+    return { soon: true, urgent: ev.start > now ? ev.start - now <= 15 * 60_000 : !!ev.end && ev.end - now <= 10 * 60_000 };
+  }, [on, events, extEvents, now]);
 }

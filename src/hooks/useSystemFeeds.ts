@@ -136,7 +136,7 @@ export function useIdleFeed() {
       lastTitle = pick(tier.titles, lastTitle);
       const name = st.settings.userName.trim();
       const detail = tier.details[Math.floor(Math.random() * tier.details.length)];
-      st.pushToast({ kind: "welcome", title: tier.titles[lastTitle](since, plain), detail: name ? `${name}, ${detail.charAt(0).toLocaleLowerCase("tr")}${detail.slice(1)}` : detail, ms: 6500 });
+      st.pushToast({ kind: "welcome", title: tier.titles[lastTitle](since, plain), detail: name ? `${name}, ${/^I/.test(detail) ? detail.charAt(0) : detail.charAt(0).toLocaleLowerCase(locale())}${detail.slice(1)}` : detail, ms: 6500 });
       playAntic(tier.antic);
     });
   }, []);
@@ -589,10 +589,12 @@ const native = (s: Settings, deck: DeckKey[] | null) => ({
   headphoneDrop: s.headphoneDrop ?? 0,
   liveShortcut: s.liveShortcut ?? "",
   humShortcut: s.humShortcut ?? "",
+  snippetShortcut: s.snippetShortcut ?? "",
   humAuto: s.humAuto ?? false,
   logDays: s.logDays ?? 14,
   wallpaperCycle: s.wallpaperCycle ?? null,
   tailscaleKeep: s.tailscaleKeep ?? false,
+  shortcutsOffInGame: s.shortcutsOffInGame ?? true,
   // Klavye kısayolu atanmış kısayol tuşları
   deckHotkeys: (deck ?? []).filter((k) => k.hotkey).map((k) => ({ id: k.id, accel: k.hotkey! })),
 });
@@ -608,8 +610,14 @@ export function useFullscreenFeed() {
       if (on) hide = window.setTimeout(() => pauseFrames(true), 400);
       else pauseFrames(false);
     });
+    // Ekran kilitliyken de kimse bakmıyor: çizim dursun, açılınca kaldığı yerden sürsün
+    const offLock = subscribe<boolean>(EVENTS.locked, (locked) => {
+      if (locked) pauseFrames(true);
+      else if (!useNook.getState().fullscreen) pauseFrames(false);
+    });
     return () => {
       off();
+      offLock();
       window.clearTimeout(hide);
       pauseFrames(false);
     };
@@ -711,6 +719,7 @@ export function useWeatherFeed() {
  */
 export function useAffection() {
   useEffect(() => {
+    if (!isPrimary) return;
     const { lastCare, care } = useNook.getState();
     const idleHours = (Date.now() - lastCare) / 3600_000 - 1;
     if (idleHours > 0) care(-Math.min(40, Math.round(idleHours * 3)));

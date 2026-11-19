@@ -4,6 +4,7 @@
  */
 import { aiErrorText, GeminiError, inlinePart, pickFallbackModel, pickQuickModel, streamChat, type Content, type Part } from "./ai";
 import { modelsFor } from "../hooks/useGemini";
+import { CLAUDE_DEFAULT, claudeChat, claudeErrorText, type ClaudeTurn } from "./anthropic";
 import { functions, runTool, systemPrompt } from "./aiTools";
 import { useNook, type ChatItem } from "../store/nook";
 import { nookName } from "./look";
@@ -44,15 +45,20 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   const q = text.trim() || (image ? tt("Ekranımda ne görüyorsun? Kısaca anlat, bir sorun varsa nasıl çözeceğimi söyle.") : "");
   const s = useNook.getState();
   if (!q || s.chatBusy) return;
-  const key = s.settings.geminiKey.trim();
+  const claude = s.settings.aiProvider === "claude";
+  const key = (claude ? s.settings.claudeKey : s.settings.geminiKey).trim();
   // Anahtar yoksa soruyu gönderip sonra hata vermek yerine baştan söyle (aramadan, sesli komuttan gelince de)
   if (!key) {
-    s.pushToast({ kind: "chat", title: tt("Önce Gemini anahtarı lazım"), detail: tt("Ücretsiz alınır; Ayarlar › Asistan'da nasıl alınacağı yazıyor"), ms: 6000 });
+    s.pushToast(
+      claude
+        ? { kind: "chat", title: tt("Önce Claude anahtarı lazım"), detail: tt("Ayarlar › Sohbet ve asistan'da nasıl alınacağı yazıyor"), ms: 6000 }
+        : { kind: "chat", title: tt("Önce Gemini anahtarı lazım"), detail: tt("Ücretsiz alınır; Ayarlar › Sohbet ve asistan'da nasıl alınacağı yazıyor"), ms: 6000 },
+    );
     return;
   }
-  let model = s.settings.aiModel;
+  let model = claude ? s.settings.claudeModel || CLAUDE_DEFAULT : s.settings.aiModel;
   // Sesli komut: hızlı model (Flash) — Pro uzun uzun düşünüp bekletmesin
-  if (opts.quick && key) model = pickQuickModel(await modelsFor(key).catch(() => [])) ?? model;
+  if (!claude && opts.quick && key) model = pickQuickModel(await modelsFor(key).catch(() => [])) ?? model;
   /** Bu cevapta yoğunluk yüzünden yedek modele geçildi mi */
   let fellBack = false;
 
@@ -79,6 +85,44 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
   try {
     if (!model) throw new Error(tt("Ayarlar'dan bir model seç"));
 
+    if (claude) {
+      const turns: ClaudeTurn[] = contents.map((c) => ({
+        role: c.role === "user" ? "user" : "assistant",
+        text: c.parts.map((p) => p.text ?? "").join(""),
+        image: undefined,
+      }));
+      // Ekran görüntüleri: geçmiştekiler ve bu sorudaki
+      const shots = [...s.chat.slice(-HISTORY).filter((m) => m.text.trim() && !m.error), { image }];
+      turns.forEach((t, i) => (t.image = shots[i]?.image));
+      await claudeChat({
+        key,
+        model,
+        system: opts.voice ? systemPrompt() + VOICE_RULES : systemPrompt(),
+        turns,
+        functions: functions(),
+        quick: opts.quick,
+        signal: controller.signal,
+        onText: (delta) => {
+          if (!reply) {
+            if (!delta.trim()) return;
+            useNook.getState().setBusy("ai", false);
+            useNook.getState().setTalking(true);
+          }
+          reply += delta;
+          useNook.getState().patchChat(replyId, { text: reply });
+        },
+        runTool: async (name, args) => {
+          const { result, note } = await runTool(name, args);
+          const item = useNook.getState().chat.find((m) => m.id === replyId);
+          useNook.getState().patchChat(replyId, { notes: [...(item?.notes ?? []), note] });
+          return result;
+        },
+        onRefusal: () => {
+          if (!reply.trim()) reply = tt("Buna yardımcı olamıyorum.");
+          useNook.getState().patchChat(replyId, { text: reply });
+        },
+      });
+    } else
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const parts: Part[] = [];
       const turnStart = reply.length;
@@ -121,7 +165,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
             useNook.getState().patchChat(replyId, {
               notes: [
                 ...(item?.notes ?? []),
-                { icon: "error", text: quotaOut ? tt("Pro'nun kotası doldu; artık {0} ile konuşuyorum (Ayarlar › Yapay zekâ)", fallback) : tt("Pro meşguldü, {0} cevapladı", fallback) },
+                { icon: "error", text: quotaOut ? tt("Pro'nun kotası doldu; artık {0} ile konuşuyorum (Ayarlar › Sohbet ve asistan)", fallback) : tt("Pro meşguldü, {0} cevapladı", fallback) },
               ],
             });
           }
@@ -146,7 +190,7 @@ export async function sendChat(text: string, opts: { image?: string | null; voic
     }
   } catch (e) {
     if ((e as Error).name !== "AbortError") {
-      reply = reply || tt("Bir sorun çıktı: {0}", aiErrorText(e));
+      reply = reply || tt("Bir sorun çıktı: {0}", claude ? await claudeErrorText(e) : aiErrorText(e));
       useNook.getState().patchChat(replyId, { text: reply, error: true });
     }
   } finally {

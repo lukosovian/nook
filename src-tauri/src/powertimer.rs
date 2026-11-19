@@ -25,6 +25,8 @@ static APP: Mutex<Option<AppHandle>> = Mutex::new(None);
 /// Son dakika uyarısı hangi zamanlayıcı için verildi (aynısı için bir kez)
 static WARNED: AtomicI64 = AtomicI64::new(0);
 const WARN_BEFORE_MS: i64 = 60_000;
+/// Zamanlayıcıyı izleyen iş parçacığı (zamanlayıcı yokken uyur)
+static WAKER: std::sync::OnceLock<std::thread::Thread> = std::sync::OnceLock::new();
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
@@ -55,6 +57,9 @@ pub fn set(t: Option<PowerTimer>) -> Result<Option<PowerTimer>, String> {
     }
     *TIMER.lock().unwrap() = t.clone();
     WARNED.store(0, Ordering::Relaxed);
+    if let Some(w) = WAKER.get() {
+        w.unpark();
+    }
     crate::log::write("info", &format!("zamanlı kapatma: {t:?}"));
     emit("nook://power-timer", &t);
     Ok(t)
@@ -62,8 +67,14 @@ pub fn set(t: Option<PowerTimer>) -> Result<Option<PowerTimer>, String> {
 
 pub fn spawn(app: AppHandle) {
     *APP.lock().unwrap() = Some(app);
-    std::thread::spawn(|| loop {
-        std::thread::sleep(Duration::from_secs(1));
+    let h = std::thread::spawn(|| loop {
+        // Zamanlayıcı yokken uyur (kurulunca set uyandırır); vakit uzaksa seyrek, son dakikalarda saniyede bir bakar
+        let wait = match get().map(|t| t.at - now_ms()) {
+            None => Duration::from_secs(600),
+            Some(left) if left > WARN_BEFORE_MS + 30_000 => Duration::from_secs(10),
+            Some(_) => Duration::from_secs(1),
+        };
+        std::thread::park_timeout(wait);
         let Some(t) = get() else { continue };
         let left = t.at - now_ms();
         if left <= 0 {
@@ -82,6 +93,7 @@ pub fn spawn(app: AppHandle) {
             emit("nook://power-timer-warn", &Some(t));
         }
     });
+    let _ = WAKER.set(h.thread().clone());
 }
 
 #[tauri::command]

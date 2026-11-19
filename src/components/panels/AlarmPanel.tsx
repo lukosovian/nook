@@ -1,14 +1,36 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { AnimatePresence, motion } from "motion/react";
-import { AlarmClock, Bell, BellOff, Check, ChevronDown, ChevronUp, Pencil, Pill, X } from "lucide-react";
+import { AlarmClock, Bell, BellOff, Check, ChevronDown, ChevronUp, Coffee, Pencil, Pill, SkipForward, Sunrise, X, type LucideIcon } from "lucide-react";
 import { clock, DAY_SHORT, daysOf, pad, repeatOf, repeatText, until, WEEK, type Alarm } from "../../lib/alarm";
 import { spring } from "../../lib/motion";
 import { useNook } from "../../store/nook";
 import { ACCENT, MiniNook, tintBg, tintText, Toggle } from "../ui/primitives";
-import { tt } from "../../lib/i18n";
+import { locale, tt } from "../../lib/i18n";
 
 const QUICK = [5, 10, 25, 60];
+
+/** Gün kısayolları: tek dokunuşla günleri seçer */
+const DAY_SETS: { label: string; days: number[] }[] = [
+  { label: tt("Her gün"), days: [1, 2, 3, 4, 5, 6, 0] },
+  { label: tt("Hafta içi"), days: [1, 2, 3, 4, 5] },
+  { label: tt("Hafta sonu"), days: [6, 0] },
+];
+
+/** Şablonlar: soldaki kartı hazır isim, saat ve günlerle doldurur; Kur'a basmak sana kalır */
+const TEMPLATES: { label: string; icon: LucideIcon; color: string; hour: number; minute: number; days: number[]; title: string }[] = [
+  { label: tt("İlaç"), icon: Pill, color: ACCENT.green, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 0], title: tt("Her gün aynı saatte çalan ilaç alarmı: saati soldan ayarla, Kur'a bas. Çalınca \"Aldım\" dersin") },
+  { label: tt("Uyan"), icon: Sunrise, color: ACCENT.orange, hour: 7, minute: 0, days: [1, 2, 3, 4, 5], title: tt("Hafta içi sabah alarmı: saati soldan ayarla, Kur'a bas") },
+  { label: tt("Mola"), icon: Coffee, color: ACCENT.blue, hour: 15, minute: 0, days: [1, 2, 3, 4, 5], title: tt("Hafta içi öğleden sonra molası: saati soldan ayarla, Kur'a bas") },
+];
+const sameDays = (a: number[], b: number[]) => a.length === b.length && b.every((d) => a.includes(d));
+
+/** Atlanan çalma: "Yarın atlanacak" */
+function skipText(at: number) {
+  const d = new Date(at);
+  const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
+  return days === 0 ? tt("Bugün atlanacak") : days === 1 ? tt("Yarın atlanacak") : tt("{0} atlanacak", d.toLocaleDateString(locale(), { weekday: "long" }));
+}
 
 /** Alarm kur: saat seçici + isim + tekrar; hızlı "+N dk"; kurulu alarmlar listesi (satıra tıklayınca düzenlenir). */
 export function AlarmPanel() {
@@ -33,6 +55,8 @@ export function AlarmPanel() {
   const [silent, setSilent] = useState(() => useNook.getState().settings.alarmSound === 0);
   // Düzenlenen alarm: üstteki seçici onun değerleriyle dolar, "Kur" → "Kaydet"
   const [editing, setEditing] = useState<string | null>(null);
+  // Şablon seçilince soldaki kart kısaca parlar
+  const [flash, setFlash] = useState(0);
 
   // Düzenlenen alarm silindiyse (ya da tek seferlik olup çaldıysa) düzenleme biter
   useEffect(() => {
@@ -74,19 +98,48 @@ export function AlarmPanel() {
         <p className="text-[9.5px] font-bold uppercase tracking-[0.12em]" style={{ color: tintText(ACCENT.yellow) }}>
           {editing ? tt("Alarmı düzenle") : tt("Yeni alarm")}
         </p>
+        {flash > 0 && (
+          <motion.span
+            key={flash}
+            className="pointer-events-none absolute inset-0 rounded-[16px]"
+            style={{ background: tintBg(ACCENT.yellow, 45) }}
+            initial={{ opacity: 0.7 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          />
+        )}
         <div className="flex items-center justify-center rounded-[12px] bg-black/30 py-0.5">
           <Digit value={hour} max={23} onChange={setHour} />
           <span className="pb-0.5 font-display text-[28px] font-medium text-label-3">:</span>
           <Digit value={minute} max={59} onChange={setMinute} />
         </div>
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          onKeyDown={(e) => (e.key === "Enter" ? add() : e.key === "Escape" && editing && cancel())}
-          placeholder={tt("İsim (ör. Toplantı)")}
-          spellCheck={false}
-          className="h-7 w-full rounded-[10px] bg-black/30 px-2.5 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-black/45"
-        />
+        <div className="flex gap-1">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => (e.key === "Enter" ? add() : e.key === "Escape" && editing && cancel())}
+            placeholder={tt("İsim (ör. Toplantı)")}
+            spellCheck={false}
+            className="h-7 w-full min-w-0 flex-1 rounded-[10px] bg-black/30 px-2.5 text-[12px] text-label outline-none placeholder:text-label-3 focus:bg-black/45"
+          />
+          <BellToggle silent={silent} onChange={setSilent} />
+        </div>
+        {/* Gün kısayolları: seçiliyken yeniden basınca "bir kez"e döner */}
+        <div className="flex gap-0.5">
+          {DAY_SETS.map((s) => {
+            const on = sameDays(days, s.days);
+            return (
+              <button
+                key={s.label}
+                onClick={() => setDays(on ? [] : s.days)}
+                className="h-[18px] min-w-0 flex-auto truncate rounded-full px-1 text-[9.5px] font-semibold"
+                style={{ background: on ? tintBg(ACCENT.yellow, 26) : "rgb(255 255 255 / 0.05)", color: on ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
         <div className="flex gap-1">
           {/* Tekrar: çalacağı günler; hiçbiri seçili değilse bir kez */}
           <div className="flex min-w-0 flex-1 gap-0.5" title={days.length ? repeatText(repeatOf(days)) : tt("Bir kez · gün seçersen her hafta o günlerde çalar")}>
@@ -96,7 +149,7 @@ export function AlarmPanel() {
                 <button
                   key={d}
                   onClick={() => setDays(on ? days.filter((x) => x !== d) : [...days, d])}
-                  className="flex h-7 min-w-0 flex-1 items-center justify-center rounded-[8px] border text-[9px] font-bold"
+                  className="flex h-7 min-w-0 flex-1 items-center justify-center rounded-[8px] border text-[10.5px] font-bold"
                   style={{
                     background: on ? tintBg(ACCENT.yellow, 30) : "rgb(0 0 0 / 0.3)",
                     borderColor: on ? tintBg(ACCENT.yellow, 60) : "transparent",
@@ -108,7 +161,6 @@ export function AlarmPanel() {
               );
             })}
           </div>
-          <BellToggle silent={silent} onChange={setSilent} />
         </div>
         <motion.button
           whileTap={{ scale: 0.95 }}
@@ -141,7 +193,8 @@ export function AlarmPanel() {
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         {/* Sıradaki alarm ve hızlı geri sayımlar */}
-        <div className="flex shrink-0 items-center gap-3 rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+        <div className="flex shrink-0 flex-col gap-1.5 rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+          <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1 leading-tight">
             <p className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-label-3">{tt("Sıradaki")}</p>
             {next ? (
@@ -168,24 +221,32 @@ export function AlarmPanel() {
                 +{m >= 60 ? tt("{0} sa", m / 60) : tt("{0} dk", m)}
               </button>
             ))}
-            {/* İlaç: her gün 09:00 "İlaç" hazır gelir; saati ve günleri soldan değiştirip Kur'a basılır */}
-            <button
-              onClick={() => {
-                if (!editing) {
-                  setHour(9);
-                  setMinute(0);
-                }
-                setLabel(tt("İlaç"));
-                setDays([...WEEK]);
-              }}
-              title={tt("Her gün aynı saatte çalan ilaç alarmı: saati soldan ayarla, Kur'a bas. Çalınca \"Aldım\" dersin")}
-              className="col-span-2 flex items-center justify-center gap-1 rounded-[9px] px-2 py-[3px] text-[10.5px] font-semibold transition-colors"
-              style={{ background: tintBg(ACCENT.green, 14), color: tintText(ACCENT.green) }}
-            >
-              <Pill size={11} strokeWidth={2.5} />
-              {tt("İlaç")}
-            </button>
           </div>
+          </div>
+            {/* Şablonlar: isim, saat ve günler hazır gelir; saati soldan değiştirip Kur'a basılır */}
+            <div className="flex items-center gap-1">
+              <span className="pr-1 text-[9.5px] font-bold uppercase tracking-[0.1em] text-label-3">{tt("Şablon")}</span>
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.label}
+                  onClick={() => {
+                    if (!editing) {
+                      setHour(t.hour);
+                      setMinute(t.minute);
+                    }
+                    setLabel(t.label);
+                    setDays(t.days);
+                    setFlash((n) => n + 1);
+                  }}
+                  title={t.title}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-[9px] px-1.5 py-[3px] text-[10.5px] font-semibold transition-colors"
+                  style={{ background: tintBg(t.color, 14), color: tintText(t.color) }}
+                >
+                  <t.icon size={11} strokeWidth={2.5} />
+                  {t.label}
+                </button>
+              ))}
+            </div>
         </div>
 
         <div ref={scroller} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
@@ -198,7 +259,7 @@ export function AlarmPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={spring.pop}
-                className="flex h-10 items-center gap-2 rounded-[13px] border pl-1.5 pr-1.5"
+                className="flex h-10 items-center gap-1.5 rounded-[13px] border pl-1.5 pr-1.5"
                 style={{
                   background: editing === a.id ? tintBg(ACCENT.yellow, 18) : a.enabled ? tintBg(ACCENT.yellow, 9) : "rgb(255 255 255 / 0.03)",
                   borderColor: editing === a.id ? tintBg(ACCENT.yellow, 60) : a.enabled ? tintBg(ACCENT.yellow, 26) : "rgb(255 255 255 / 0.05)",
@@ -207,20 +268,43 @@ export function AlarmPanel() {
                 {/* Saate/isme tıklayınca soldaki kartta düzenlenir */}
                 <button onClick={() => edit(a)} title={tt("Düzenle")} className="group flex min-w-0 flex-1 items-center gap-2 text-left">
                   <MiniNook color={a.enabled ? ACCENT.yellow : "#5a5a62"} size={24} eyes={a.enabled ? "open" : "closed"} />
-                  <span className="font-round text-[16px] font-extrabold tabular-nums" style={{ color: a.enabled ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}>
-                    {clock(a)}
+                  {/* Üstte saat ve isim, altta kalan süre (ya da "Yarın atlanacak") */}
+                  <span className="min-w-0 flex-1 leading-none">
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="font-round text-[15px] font-extrabold tabular-nums" style={{ color: a.enabled ? tintText(ACCENT.yellow) : "var(--color-label-3)" }}>
+                        {clock(a)}
+                      </span>
+                      <span className="min-w-0 truncate text-[10.5px] text-label-2">{a.label || repeatText(a)}</span>
+                    </span>
+                    {a.enabled && a.next && (
+                      <span className="mt-[3px] block truncate text-[9.5px]" style={{ color: a.skipped && a.skipped > now ? tintText(ACCENT.orange) : "var(--color-label-3)" }}>
+                        {a.skipped && a.skipped > now ? skipText(a.skipped) : until(a.next, now)}
+                      </span>
+                    )}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-label-3">
-                    <span className="text-label-2">{a.label || repeatText(a)}</span>
-                    {a.enabled && a.next ? ` · ${until(a.next, now)}` : ""}
-                  </span>
-                  <Pencil size={10} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-opacity ${editing === a.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
+                  <Pencil size={10} strokeWidth={2.4} className={`shrink-0 text-label-3 transition-opacity ${editing === a.id ? "opacity-100" : "opacity-50 group-hover:opacity-100"}`} />
                 </button>
+                {/* Tekrarlı alarm: sıradaki çalmayı bir kez atla (yeniden basınca geri alınır) */}
+                {a.enabled && a.repeat !== "once" && (
+                  <button
+                    onClick={() => useNook.getState().skipAlarm(a.id, !(a.skipped && a.skipped > now))}
+                    title={a.skipped && a.skipped > now ? tt("Atlamaktan vazgeç") : tt("Yalnızca sıradakini atla")}
+                    aria-label={tt("Yalnızca sıradakini atla")}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
+                    style={
+                      a.skipped && a.skipped > now
+                        ? { background: tintBg(ACCENT.orange, 16), borderColor: tintBg(ACCENT.orange, 40), color: tintText(ACCENT.orange) }
+                        : { background: "rgb(255 255 255 / 0.04)", borderColor: "rgb(255 255 255 / 0.08)", color: "var(--color-label-3)" }
+                    }
+                  >
+                    <SkipForward size={11} strokeWidth={2.4} />
+                  </button>
+                )}
                 <BellToggle silent={!!a.silent} small onChange={(v) => useNook.getState().setAlarmSilent(a.id, v)} />
                 <Toggle on={a.enabled} onChange={(v) => useNook.getState().toggleAlarm(a.id, v)} color={ACCENT.yellow} />
                 <button
                   onClick={() => useNook.getState().removeAlarm(a.id)}
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-label-3 hover:bg-well-hi hover:text-label"
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-label-3 opacity-70 hover:bg-well-hi hover:text-label hover:opacity-100"
                   aria-label={tt("Sil")}
                 >
                   <X size={11} strokeWidth={2.6} />

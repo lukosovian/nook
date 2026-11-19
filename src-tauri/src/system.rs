@@ -75,6 +75,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let mut drives_prev = imp::removable_drives();
             let shots_dir = screenshots_dir(&app);
             let mut shots_seen = shots_dir.as_ref().map(|d| list_images(d)).unwrap_or_default();
+            let mut shots_mtime: Option<std::time::SystemTime> = None;
 
             loop {
                 thread::sleep(POLL);
@@ -133,7 +134,11 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
                 drives_prev = drives;
 
                 // --- Ekran görüntüleri
-                if let Some(dir) = &shots_dir {
+                // Klasör değişmediyse (dosya eklenince klasörün tarihi değişir) baştan listeleme
+                let shots_stamp = shots_dir.as_ref().and_then(|d| std::fs::metadata(d).and_then(|m| m.modified()).ok());
+                let shots_changed = shots_stamp != shots_mtime || tick % 15 == 0;
+                shots_mtime = shots_stamp;
+                if let Some(dir) = shots_dir.as_ref().filter(|_| shots_changed) {
                     let now = list_images(dir);
                     if shared.settings().auto_screenshots {
                         for path in now.difference(&shots_seen) {

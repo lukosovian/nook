@@ -13,7 +13,7 @@ import { ArrowDown, CalendarClock, Coffee, Mic, Moon, Pause, Sun, Target, Termin
 import { useClaude, CLAUDE_COLOR } from "../../lib/claude";
 import { mmss, remaining } from "../../lib/focus";
 import { swElapsed } from "../../lib/stopwatch";
-import { isLive, isSleeping, useNook, type CapsuleCfg, type FocusState, type NowPlaying, type Tab } from "../../store/nook";
+import { dayKey, isLive, isSleeping, useNook, type CapsuleCfg, type FocusState, type NowPlaying, type Tab } from "../../store/nook";
 import { setHitExtra } from "../../hooks/useHitRect";
 import { ACCENT, MiniNook, tintBg, tintText } from "../ui/primitives";
 import { useEventSoon } from "./TimeMini";
@@ -65,6 +65,7 @@ export function useCapsule(collapsed: boolean): Capsule | null {
   const info = useNook((s) => (s.settings.collapsedInfo ?? true) && (s.settings.capsule.infoClock || s.settings.capsule.infoWeather || s.settings.capsule.infoDate));
   const claudeWorking = useClaude((s) => Object.values(s.sessions).some((x) => x.state === "working"));
   const eventSoon = useEventSoon();
+  const task = useNook(todayTaskText);
   if (!collapsed) return null;
   // Güncelleme her şeyin önünde, kapatılamaz: Nook birazdan kapanıp yeni sürümle açılacak
   if (updating) return { kind: "update", ...SHAPE.update, second: null };
@@ -84,11 +85,14 @@ export function useCapsule(collapsed: boolean): Capsule | null {
   const first = outing === "fish" ? "fish" : outing === "camp" ? "camp" : shown[0] ?? (asleep && on("sleep") ? "sleep" : info && !outing ? "info" : null);
   if (!first) return null;
   const second = !cfg.split || first === "fish" || first === "camp" ? null : (shown.find((k) => k !== first) ?? null);
-  return { kind: first, ...capsuleShape(first, cfg), second };
+  return { kind: first, ...capsuleShape(first, cfg, task), second };
 }
 
+/** Bugünün tek işi (yazıldıysa ve daha yapılmadıysa): boştaki kapsülde Nook ile saat arasında */
+const todayTaskText = (s: ReturnType<typeof useNook.getState>) => (s.todayTask && s.todayTask.day === dayKey() && !s.todayTask.done ? s.todayTask.text : "");
+
 /** Kapsülün boyu ve Nook'un yeri; içinden kapatılan parçalar (kapak, dalga, tarih…) yer kaplamasın */
-export function capsuleShape(kind: CapsuleKind, cfg: CapsuleCfg): Omit<Capsule, "kind" | "second"> {
+export function capsuleShape(kind: CapsuleKind, cfg: CapsuleCfg, task = ""): Omit<Capsule, "kind" | "second"> {
   const base = SHAPE[kind];
   if (kind === "music") {
     // Ne şarkı adı ne sanatçı: yazının yeri de kalkar, plak + Nook + dalga kalır
@@ -96,7 +100,7 @@ export function capsuleShape(kind: CapsuleKind, cfg: CapsuleCfg): Omit<Capsule, 
     const width = base.width - (cfg.musicCover ? 0 : 34) - (cfg.musicWave ? 0 : 26) - (text ? 0 : 146);
     return { ...base, width, nook: { x: cfg.musicCover ? 58 : 24, scale: base.nook!.scale } };
   }
-  if (kind === "info") return { ...base, width: base.width + (cfg.infoDate ? 54 : 0) + (cfg.infoSeconds && cfg.infoClock ? 18 : 0) };
+  if (kind === "info") return { ...base, width: base.width + (cfg.infoDate ? 54 : 0) + (cfg.infoSeconds && cfg.infoClock ? 18 : 0) + (task ? Math.min(124, 18 + Math.round(task.length * 5.6)) : 0) };
   if (kind === "focus") return { ...base, width: base.width - (cfg.focusPercent ? 0 : 40) };
   return base;
 }
@@ -117,9 +121,10 @@ export function MusicCapsule({ media }: { media: NowPlaying }) {
   return (
     <motion.div className="pointer-events-none absolute inset-0" {...appear}>
       {cfg.musicCover && (
+      // Işıltı dönmeyen sarmalda: dönen plak her karede gölgeyi yeniden boyamasın
+      <div className="absolute left-[7px] top-1/2 h-[28px] w-[28px] -translate-y-1/2 rounded-full" style={{ boxShadow: `0 0 10px -2px ${ACCENT.pink}` }}>
       <motion.div
-        className="absolute left-[7px] top-1/2 h-[28px] w-[28px] -translate-y-1/2 overflow-hidden rounded-full"
-        style={{ boxShadow: `0 0 10px -2px ${ACCENT.pink}` }}
+        className="relative h-full w-full overflow-hidden rounded-full"
         animate={{ rotate: media.playing ? 360 : 0 }}
         transition={media.playing ? { duration: 5, repeat: Infinity, ease: "linear" } : { duration: 0.4 }}
       >
@@ -131,6 +136,7 @@ export function MusicCapsule({ media }: { media: NowPlaying }) {
         {/* Plağın ortası */}
         <span className="absolute left-1/2 top-1/2 h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black ring-1 ring-white/30" />
       </motion.div>
+      </div>
       )}
       {main !== null && (
         <div className="absolute top-1/2 -translate-y-1/2 leading-tight" style={{ left: cfg.musicCover ? 82 : 48, right: cfg.musicWave ? 40 : 14 }}>
@@ -152,22 +158,37 @@ export function MusicCapsule({ media }: { media: NowPlaying }) {
 }
 
 /** Şarkının ilerlemesiyle birlikte dans eden dört renkli nokta */
+const WAVE_COLORS = [ACCENT.pink, ACCENT.purple, ACCENT.blue, ACCENT.teal];
+/** Çubuğun en uzun hâli (px): boy sabit, uzayıp kısalma scaleY ile (yerleşim her karede yeniden hesaplanmaz) */
+const WAVE_MAX = 15;
+
 function Wave({ playing, media }: { playing: boolean; media: NowPlaying }) {
-  const bars = useRef<(HTMLSpanElement | null)[]>([]);
   const latest = useRef(media);
   latest.current = media;
+  // Duraklatılmışken dört nokta kıpırtısız: kare döngüsü hiç çalışmaz
+  if (playing) return <WaveBars />;
+  return (
+    <span className="flex h-4 items-center gap-[2.5px]">
+      {WAVE_COLORS.map((c, i) => (
+        <span key={i} className="w-[3px] rounded-full" style={{ height: 4, background: c }} />
+      ))}
+    </span>
+  );
+}
+
+function WaveBars() {
+  const bars = useRef<(HTMLSpanElement | null)[]>([]);
   useAnimationFrame((t) => {
     bars.current.forEach((el, i) => {
       if (!el) return;
-      const h = playing ? 4 + (Math.sin(t / (170 + i * 37) + i * 1.7) * 0.5 + 0.5) * 11 : 4;
-      el.style.height = `${h}px`;
+      const h = 4 + (Math.sin(t / (170 + i * 37) + i * 1.7) * 0.5 + 0.5) * 11;
+      el.style.transform = `scaleY(${(h / WAVE_MAX).toFixed(3)})`;
     });
   });
-  const colors = [ACCENT.pink, ACCENT.purple, ACCENT.blue, ACCENT.teal];
   return (
     <span className="flex h-4 items-center gap-[2.5px]">
-      {colors.map((c, i) => (
-        <span key={i} ref={(el) => void (bars.current[i] = el)} className="w-[3px] rounded-full" style={{ height: 4, background: c }} />
+      {WAVE_COLORS.map((c, i) => (
+        <span key={i} ref={(el) => void (bars.current[i] = el)} className="w-[3px] origin-center rounded-full" style={{ height: WAVE_MAX, transform: `scaleY(${4 / WAVE_MAX})`, background: c }} />
       ))}
     </span>
   );
@@ -301,21 +322,23 @@ export function InfoCapsule() {
   const seconds = cfg.infoClock && cfg.infoSeconds;
   const now = useNow(seconds ? 1000 : 10_000);
   const weather = useNook((s) => s.weather);
+  const task = useNook(todayTaskText);
   const night = now.valueOf() && (new Date(now).getHours() >= 20 || new Date(now).getHours() < 6);
   return (
     <motion.div className="pointer-events-none absolute inset-0" {...appear}>
-      <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-baseline gap-2 tabular-nums">
+      <div className="absolute left-[40px] right-3 top-1/2 flex -translate-y-1/2 items-baseline justify-end gap-2 tabular-nums">
+        {task && <span className="min-w-0 flex-1 truncate text-[10.5px] font-medium text-label-3">{task}</span>}
         {cfg.infoDate && (
-          <span className="text-[10.5px] font-semibold text-label-2">{new Date(now).toLocaleDateString(locale(), { day: "numeric", month: "short", weekday: "short" })}</span>
+          <span className="shrink-0 text-[10.5px] font-semibold text-label-2">{new Date(now).toLocaleDateString(locale(), { day: "numeric", month: "short", weekday: "short" })}</span>
         )}
         {cfg.infoWeather && weather && (
-          <span className="flex items-center gap-1 text-[10.5px] font-semibold text-label-2">
+          <span className="flex shrink-0 items-center gap-1 text-[10.5px] font-semibold text-label-2">
             {night ? <Moon size={10} strokeWidth={2.6} /> : <Sun size={10} strokeWidth={2.6} />}
             {weather.temp}°
           </span>
         )}
         {cfg.infoClock && (
-          <span className="text-[13px] font-extrabold tracking-tight text-label">
+          <span className="shrink-0 text-[13px] font-extrabold tracking-tight text-label">
             {new Date(now).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}) })}
           </span>
         )}

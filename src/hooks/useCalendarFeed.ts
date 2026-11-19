@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { isPrimary } from "../lib/bridge";
+import type { Alarm } from "../lib/alarm";
 import { syncFeeds } from "../lib/ics";
 import { note } from "../lib/log";
 import { tt } from "../lib/i18n";
@@ -58,8 +59,8 @@ export function useExtReminders() {
         for (const e of st.extEvents) {
           if (e.allDay || told.has(e.id)) continue;
           const at = e.start - lead * 60_000;
-          // Bu aralıkta vakti gelenler (Nook kapalıyken geçenler sessiz geçer)
-          if (at > last && at <= now) {
+          // Bu aralıkta vakti gelenler (Nook kapalıyken geçenler sessiz geçer; uykudan dönünce 2 dk'dan eskisi de)
+          if (at > last && at <= now && now - at <= 120_000) {
             told.add(e.id);
             st.pushToast({ kind: "calendar", title: e.title, detail: lead ? tt("{0} dk sonra · {1}", lead, e.time) : tt("Şimdi başlıyor · {0}", e.time), ms: 8000 });
             playAntic("surprised");
@@ -82,7 +83,7 @@ export interface NextEvent {
 }
 
 /** Kapalı adadaki geri sayım: 1 saat içinde başlayacak ya da sürmekte olan saatli etkinlik */
-export function nextEvent(s: Pick<ReturnType<typeof useNook.getState>, "events" | "extEvents">, now = Date.now()): NextEvent | null {
+export function nextEvent(s: Pick<ReturnType<typeof useNook.getState>, "events" | "extEvents"> & { alarms?: Alarm[] }, now = Date.now()): NextEvent | null {
   const own = s.events
     .filter((e) => e.time)
     .map((e) => {
@@ -91,7 +92,12 @@ export function nextEvent(s: Pick<ReturnType<typeof useNook.getState>, "events" 
       return { title: e.title, start: new Date(y, m - 1, d, hh, mm).getTime(), end: null as number | null };
     });
   const ext = s.extEvents.filter((e) => !e.allDay).map((e) => ({ title: e.title, start: e.start, end: e.end > e.start ? e.end : null }));
-  const all = [...own, ...ext];
+  // Hızlı zamanlayıcılar ("+5 dk", aramadan "çay 3 dk", erteleme): etkinliğe bağlı olmayan tek seferlik alarmlar
+  const linked = new Set(s.events.map((e) => e.alarmId));
+  const timers = (s.alarms ?? useNook.getState().alarms)
+    .filter((a) => a.oneShot && a.enabled && a.next !== null && !linked.has(a.id))
+    .map((a) => ({ title: a.label, start: a.next!, end: null as number | null }));
+  const all = [...own, ...ext, ...timers];
   // Önce süren etkinlik (bitmesine 1 saatten az kaldıysa), yoksa 1 saat içinde başlayacak olan
   const ongoing = all.filter((e) => e.end && e.start <= now && e.end > now && e.end - now <= 3600_000).sort((a, b) => a.end! - b.end!)[0];
   if (ongoing) return ongoing;

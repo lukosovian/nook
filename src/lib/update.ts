@@ -14,6 +14,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { inTauri, isPrimary, subscribe } from "./bridge";
 import { useNook } from "../store/nook";
 import { tt } from "./i18n";
+import { NOTES } from "./notes";
 import { resolveUpdateAnim, type UpdateAnimId } from "../components/overlays/UpdateAnims";
 
 const FIRST_CHECK_MS = 30_000;
@@ -25,6 +26,8 @@ const MIN_SHOW_MS = 5000;
 const INSTALL_EVENT = "nook://update-install";
 const PROGRESS_EVENT = "nook://update-progress";
 const DEMO_EVENT = "nook://update-demo";
+/** Sonradan açılan pencere (Studio) "yeni sürüm var mı?" diye sorar; ada elindeki sonucu paylaşır */
+const ASK_EVENT = "nook://update-ask";
 /** Denemede indirme bu kadar sürer */
 const DEMO_DOWNLOAD_MS = 3600;
 
@@ -62,16 +65,22 @@ export async function checkUpdate(manual = false) {
   try {
     const u = await check({ timeout: 30_000 });
     pending = u;
-    useUpdate.setState({ available: u?.version ?? null, status: u ? "" : tt("Güncel") });
+    share({ available: u?.version ?? null, status: u ? "" : tt("Güncel") });
     if (u && announced !== u.version) {
       announced = u.version;
-      useNook.getState().pushToast({ kind: "update", title: tt("Yeni sürüm: {0}", u.version), detail: tt("Studio › Ayarlar › Hakkında'dan güncelle"), ms: 7000 });
+      useNook.getState().pushToast({ kind: "update", title: tt("Yeni sürüm: {0}", u.version), detail: whatsInside(u.version, u.body), ms: 12_000 });
     }
   } catch (e) {
     // Henüz yayın yoksa ya da internet yoksa sessizce geç; elle denetlendiyse söyle
     useUpdate.setState({ status: manual ? tt("Denetlenemedi") : "" });
     console.warn("[nook] güncelleme denetimi", e);
   }
+}
+
+/** Kartın alt satırı: sürümde ne olduğu biliniyorsa o (yayın notunun ilk satırı), yoksa nötr bir satır */
+export function whatsInside(version: string, body?: string | null): string {
+  const line = body?.split("\n").map((l) => l.replace(/^[#\s*•-]+/, "").trim()).find(Boolean);
+  return NOTES.find((n) => n.version === version)?.headline ?? line ?? tt("Tek dokunuşla kurulur");
 }
 
 export async function installUpdate() {
@@ -181,13 +190,15 @@ export function useUpdateCheck() {
   useEffect(() => {
     if (!inTauri) return;
     void getVersion().then((current) => useUpdate.setState({ current }));
-    if (!isPrimary) return;
+    if (!isPrimary) return void emitTo("island", ASK_EVENT, null).catch(() => {});
     const first = window.setTimeout(() => void checkUpdate(), FIRST_CHECK_MS);
     const every = window.setInterval(() => void checkUpdate(), CHECK_EVERY_MS);
     const off = subscribe(INSTALL_EVENT, () => void installUpdate());
     const offDemo = subscribe<UpdateAnimId>(DEMO_EVENT, (a) => playUpdateDemo(a));
+    const offAsk = subscribe(ASK_EVENT, () => share({ available: useUpdate.getState().available }));
     return () => {
       offDemo();
+      offAsk();
       window.clearTimeout(first);
       window.clearInterval(every);
       off();

@@ -10,6 +10,7 @@ import { allProfiles } from "../../lib/profiles";
 import { tintBg, tintText } from "../ui/primitives";
 import { tt } from "../../lib/i18n";
 import { useDeck } from "../../lib/deck";
+import { firstWeekTasks } from "../../lib/firstWeek";
 import { HomeKeys } from "./AppsPanel";
 import {
   Breath,
@@ -35,10 +36,12 @@ export function HomeBento() {
   const profiles = useNook((s) => s.settings.profiles);
   const use = useNook((s) => s.moduleUse);
   const newcomer = useNook((s) => Object.keys(s.days).length <= NEWCOMER_DAYS);
+  // İlk hafta: kurulum istemeyenler önde. Kullanıcı kendi sırasını dizdiyse ya da profil seçtiyse onunki geçerli
+  const ownOrder = useNook((s) => s.settings.homeOrder.length > 0);
   const sub = useModuleStatus();
   const profile = allProfiles(profiles).find((p) => p.id === profileId);
   const shown = byProfile(available.filter((m) => !hidden.includes(m.id)), profile);
-  const ranked = byUse(shown, use, newcomer);
+  const ranked = newcomer && (ownOrder || (profile && profile.id !== "all")) ? shown : byUse(shown, use, newcomer);
   const big = ranked.slice(0, 2);
   const small = ranked.slice(2, 6);
   const rest = ranked.slice(6);
@@ -66,6 +69,10 @@ function BigCard({ m, st, delay }: { m: ModuleDef; st: Status | undefined; delay
   const on = state === "active" || state === "alert";
   const explain = useExplain(m.id) && !on;
   const progress = st?.progress;
+  // İlk hafta: "Bugün" kartının alt satırı sıradaki küçük görevi gösterir (dokununca o bölüm açılır)
+  const week = useNook((s) => (m.id === "today" && Object.keys(s.days).length <= NEWCOMER_DAYS ? firstWeekTasks(s).map((t) => (t.done ? 1 : 0)).join("") : ""));
+  const tasks = week ? firstWeekTasks() : [];
+  const todo = tasks.find((t) => !t.done);
   return (
     <motion.button
       onClick={() => openModule(m.id)}
@@ -97,7 +104,22 @@ function BigCard({ m, st, delay }: { m: ModuleDef; st: Status | undefined; delay
         )}
       </div>
       <div className="mt-auto">
-        {st?.foot && (
+        {todo ? (
+          <span
+            role="button"
+            title={todo.hint}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModule(todo.tab);
+            }}
+            className="mb-1.5 flex w-fit max-w-full items-center gap-1.5 rounded-full border py-[2px] pl-2 pr-1.5 text-[10.5px] font-medium"
+            style={{ background: tintBg(m.color, 16), borderColor: tintBg(m.color, 40), color: tintText(m.color) }}
+          >
+            <b className="shrink-0 font-bold tabular-nums">{tt("İlk haftan · {0}/{1}", tasks.filter((t) => t.done).length, tasks.length)}</b>
+            <span className="truncate text-label-2">{todo.title}</span>
+            <ArrowRight size={11} strokeWidth={2.6} className="shrink-0" />
+          </span>
+        ) : st?.foot && (
           <div className="mb-1.5 flex items-center justify-between gap-2 text-[9.5px]">
             <span className="truncate text-label-3">{st.foot[0]}</span>
             {st.foot[1] && (

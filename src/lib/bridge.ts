@@ -80,6 +80,10 @@ export const EVENTS = {
   phoneEvent: "nook://phone-event",
   /** WhatsApp Web köprüsü durum ve mesaj güncellemesi */
   whatsapp: "nook://whatsapp",
+  /** Parçacık seçici kısayoluna basıldı */
+  snippets: "nook://snippets",
+  /** Telefon köprüsü açıldı / kapandı (boolean) */
+  remoteEnabled: "nook://remote-enabled",
 } as const;
 
 /** Panoya kopyalanan metin ve kopyalayan uygulama (küçük harf, .exe'siz; bilinmiyorsa boş) */
@@ -489,6 +493,8 @@ export interface NativeSettings {
   liveShortcut: string;
   /** Hum: çalan şarkıyı bul */
   humShortcut: string;
+  /** Parçacık seçici: adada parçacıklar listelenir, seçilen önceki pencereye yapıştırılır (boş = kapalı) */
+  snippetShortcut: string;
   /** Otomatik Hum: arkada dinler, bulduklarını kaydeder */
   humAuto: boolean;
   /** Günlük kayıtları kaç gün saklansın */
@@ -499,6 +505,8 @@ export interface NativeSettings {
   deckHotkeys?: { id: string; accel: string }[];
   /** Tailscale kapanırsa Nook yeniden bağlasın, girişsiz çalışma açılsın */
   tailscaleKeep?: boolean;
+  /** Tam ekran oyun öndeyken genel kısayollar (kalkan dışında) bırakılır */
+  shortcutsOffInGame?: boolean;
 }
 
 /** fx: adanın ortasının yatay yeri, fy: üst kenarının dikey yeri (0 = üste yapışık) — ekran boyuna oranla */
@@ -619,6 +627,8 @@ export const wakeOutsideStatus = () =>
     : Promise.resolve<WakeOutside | null>(import.meta.env.DEV ? { on: true, upnp: true, target: "192.168.1.255", externalIp: "213.14.176.118", cgnat: false, error: null } : null);
 export const wakeOutsideSet = (on: boolean) => invoke<WakeOutside>("wake_outside_set", { on });
 export const remoteSet = (enabled: boolean) => invoke<RemoteInfo>("remote_set", { enabled });
+/** Telefon köprüsü açık mı (ucuz: yalnızca ayarı okur) */
+export const remoteEnabled = () => (inTauri ? invoke<boolean>("remote_enabled") : Promise.resolve(false));
 export const remoteControlSet = (on: boolean) => invoke<RemoteInfo>("remote_control_set", { on });
 export const remoteReset = () => invoke<RemoteInfo>("remote_reset");
 /** Telefona gösterilecek Nook (renk, ad, görünüm) ve kullanılacak Argus profili */
@@ -777,6 +787,8 @@ export const archiveExtract = (path: string, entry: string) => invoke<string>("a
 export const islandDrag = () => (inTauri ? invoke<void>("island_drag") : Promise.resolve());
 export const setWindowSize = (width?: number, height?: number) => (inTauri ? invoke<void>("set_window_size", { width, height }) : noop());
 export const releaseFocus = () => (inTauri ? invoke<void>("release_focus") : noop());
+/** Odağı önceki pencereye verip panodaki metni oraya yapıştırır (parçacık seçici) */
+export const pastePrevious = () => (inTauri ? invoke<void>("paste_previous") : noop());
 export const openPath = (path: string) =>
   inTauri ? invoke<void>("open_path", { path }) : Promise.resolve(void window.open(path, "_blank"));
 export const revealPath = (path: string) => (inTauri ? invoke<void>("reveal_path", { path }) : noop());

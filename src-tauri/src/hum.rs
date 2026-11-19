@@ -779,7 +779,9 @@ mod imp {
         let mut last_check = Instant::now();
 
         let result = loop {
-            std::thread::sleep(Duration::from_millis(20));
+            // Arkada dinlerken (Otomatik Hum) seyrek oku: arabellek 1 sn, veri kaybolmaz
+            let quick = super::MANUAL.load(std::sync::atomic::Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(if quick { 20 } else { 100 }));
             mono.clear();
             loop {
                 let n = match capture.GetNextPacketSize() {

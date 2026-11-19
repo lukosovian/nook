@@ -4,7 +4,7 @@ import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { diskEject, diskHealth, localIp, speedTest, systemDisks, systemUptime, type DiskVolume, type PhysicalDisk } from "../../lib/bridge";
 import { formatSize } from "../../lib/format";
 import { useNook } from "../../store/nook";
-import { ACCENT, Bar, levelColor, MiniNook, tintBg, tintText } from "../ui/primitives";
+import { ACCENT, Bar, EmptyState, levelColor, MiniNook, SectionLabel, tintBg, tintText } from "../ui/primitives";
 import { dec, pct as fmtPct, tt } from "../../lib/i18n";
 
 /** Üstte işlemci, ekran kartı, bellek (ve pil) kartları; altında ağ (grafik, hız testi), bütün diskler. Rust saniyede bir günceller. */
@@ -14,7 +14,7 @@ export function StatsPanel() {
   const stats = useNook((s) => s.stats);
   const netHistory = useNook((s) => s.netHistory);
   const cpuHistory = useNook((s) => s.cpuHistory);
-  if (!stats) return <div className="flex h-full items-center justify-center text-[12px] text-label-3">{tt("Ölçülüyor…")}</div>;
+  if (!stats) return <EmptyState title={tt("Ölçülüyor…")} hint={tt("İşlemci, bellek, ağ ve diskler birazdan burada")} color={ACCENT.teal} />;
 
   const memPct = stats.memTotal ? (stats.memUsed / stats.memTotal) * 100 : 0;
   const b = stats.battery;
@@ -43,9 +43,9 @@ const rate = (bps: number) => (bps < 1024 ? `${bps} B/s` : `${formatSize(bps)}/s
 function Meter({ tag, label, pct, value, unit, color, history }: { tag: string; label: string; pct: number; value: string; unit?: string; color?: string; history?: number[] }) {
   const c = color ?? levelColor(pct, true);
   return (
-    <div className="relative flex h-[96px] min-w-0 flex-col overflow-hidden rounded-[14px] border px-2.5 pb-2 pt-2" style={{ background: tintBg(c, 7), borderColor: tintBg(c, 24) }}>
+    <div className="relative flex h-[96px] min-w-0 flex-col overflow-hidden rounded-tile border px-2.5 pb-2 pt-2" style={{ background: tintBg(c, 7), borderColor: tintBg(c, 24) }}>
       <div className="flex items-center justify-between gap-1">
-        <span className="rounded-[6px] px-1.5 py-[1px] text-[9px] font-bold tracking-wider" style={{ background: tintBg(c, 20), color: tintText(c) }}>
+        <span className="rounded-badge px-1.5 py-[1px] text-[9px] font-bold tracking-wider" style={{ background: tintBg(c, 20), color: tintText(c) }}>
           {tag}
         </span>
         <MiniNook color={c} size={14} eyes={pct > 85 ? "closed" : "open"} />
@@ -56,10 +56,10 @@ function Meter({ tag, label, pct, value, unit, color, history }: { tag: string; 
         </div>
       )}
       <div className="relative mt-auto">
-        <p className="truncate text-[10px] text-label-3">{label}</p>
+        <p className="truncate text-[10.5px] text-label-3">{label}</p>
         <p className="truncate font-round text-[17px] font-extrabold leading-tight tabular-nums text-label">
           {value}
-          {unit && <span className="ml-0.5 text-[10px] font-semibold text-label-3">{unit}</span>}
+          {unit && <span className="ml-0.5 text-[10.5px] font-semibold text-label-3">{unit}</span>}
         </p>
         <Bar pct={pct} color={c} className="mt-1" />
       </div>
@@ -68,7 +68,7 @@ function Meter({ tag, label, pct, value, unit, color, history }: { tag: string; 
 }
 
 function Title({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.12em] text-label-3">{children}</p>;
+  return <SectionLabel className="mb-1">{children}</SectionLabel>;
 }
 
 /** Anlık hız + grafik; altında yerel IP, bu oturumun toplamı ve hız testi */
@@ -88,7 +88,7 @@ function Network({ down, up, history }: { down: number; up: number; history: num
   return (
     <div>
       <Title>{tt("Ağ")}</Title>
-      <div className="rounded-[14px] border px-3 py-2" style={{ background: tintBg(ACCENT.teal, 6), borderColor: tintBg(ACCENT.teal, 20) }}>
+      <div className="rounded-tile border px-3 py-2" style={{ background: tintBg(ACCENT.teal, 6), borderColor: tintBg(ACCENT.teal, 20) }}>
         <div className="flex items-center gap-3">
           <div className="shrink-0 space-y-0.5 text-[12.5px] font-bold tabular-nums">
             <p className="flex items-center gap-1" style={{ color: tintText(ACCENT.teal) }}>
@@ -172,7 +172,7 @@ function Disks() {
                   onClick={() => doEject(v.root)}
                   disabled={!!eject[v.root] && eject[v.root] === tt("Çıkarılıyor…")}
                   title={eject[v.root] ?? tt("Güvenle çıkar")}
-                  className="shrink-0 rounded-full border px-2 py-[2px] text-[10px] font-medium"
+                  className="shrink-0 rounded-full border px-2 py-[2px] text-[10.5px] font-medium"
                   style={{ background: tintBg(ACCENT.blue, 12), borderColor: tintBg(ACCENT.blue, 32), color: tintText(ACCENT.blue) }}
                 >
                   {eject[v.root] && eject[v.root].length < 16 ? eject[v.root] : tt("Çıkar")}
@@ -187,7 +187,7 @@ function Disks() {
               const color = d.health === "healthy" ? ACCENT.green : d.health === "warning" ? ACCENT.yellow : d.health === "unhealthy" ? ACCENT.red : ACCENT.gray;
               const word = d.health === "healthy" ? tt("Sağlıklı") : d.health === "warning" ? tt("Uyarı") : d.health === "unhealthy" ? tt("Arızalı") : tt("Bilinmiyor");
               return (
-                <span key={i} className="flex max-w-full items-center gap-1 rounded-full bg-well px-2 py-[2px] text-[10px] text-label-2" title={`${d.name} · ${formatSize(d.size)}`}>
+                <span key={i} className="flex max-w-full items-center gap-1 rounded-full bg-well px-2 py-[2px] text-[10.5px] text-label-2" title={`${d.name} · ${formatSize(d.size)}`}>
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 5px ${color}` }} />
                   <span className="truncate">{d.media ? `${d.media} · ` : ""}{d.name}</span>
                   <span style={{ color: tintText(color) }}>{word}</span>

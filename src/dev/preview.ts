@@ -153,12 +153,24 @@ export function applyPreview(mode: string) {
     extEvents: CLAUDE_IDLE.includes(mode) && !params0.has("event") ? [] : [
       { id: "e1", day: dayKey(), time: "14:00", title: "Sprint planlama", start: Date.now() + 12 * 60_000, end: Date.now() + 72 * 60_000, allDay: false },
       { id: "e2", day: dayKey(), time: "", title: "Annemin doğum günü", start: Date.now(), end: Date.now() + 86_400_000, allDay: true },
+      { id: "e3", day: day(2), time: "", title: "Fuar", start: new Date().setHours(0, 0, 0, 0) + 2 * 86_400_000, end: new Date().setHours(0, 0, 0, 0) + 5 * 86_400_000, allDay: true },
     ],
     focus: mode === "focus" && !params0.has("sw") ? { phase: "work", endsAt: Date.now() + 14 * 60_000 + 5000, left: 0, total: 25 * 60_000, round: 2 } : null,
     notifications: [
       { id: 1, app: "Discord", appId: "d", title: "Ayşe", body: "Akşam maça geliyor musun?", icon: null, at: Date.now() - 3 * 60_000 },
       { id: 2, app: "WhatsApp", appId: "w", title: "Annem", body: "Eve gelirken ekmek al", icon: null, at: Date.now() - 50 * 60_000 },
       { id: 3, app: "Outlook", appId: "o", title: "Toplantı daveti", body: "Perşembe 14:00 · Proje değerlendirme", icon: null, at: Date.now() - 4 * 3600_000 },
+      // Gruplama ve gün ayraçları (Bildirimler): aynı uygulamadan birkaç tane, dünden ve daha eskiden birer tane
+      { id: 4, app: "Discord", appId: "d", title: "Mert", body: "Sunucuya yeni kanal açtım", icon: null, at: Date.now() - 20 * 60_000 },
+      { id: 5, app: "Discord", appId: "d", title: "Ayşe", body: "Biletleri aldım", icon: null, at: Date.now() - 35 * 60_000 },
+      { id: 6, app: "Steam", appId: "s", title: "İndirim", body: "İstek listendeki 2 oyun indirimde", icon: null, at: Date.now() - 26 * 3600_000 },
+      { id: 7, app: "Mail", appId: "m", title: "Fatura", body: "Kasım ayı faturanız hazır", icon: null, at: Date.now() - 4 * 86_400_000 },
+    ],
+    // Pano › Parçacıklar (?preview=clip&snip)
+    snippets: [
+      { id: "sn1", name: "Ev adresi", trigger: "/adres", text: "Bağdat Cad. No: 12 D: 4\nKadıköy / İstanbul" },
+      { id: "sn2", name: "E-posta imzası", trigger: "/imza", text: "İyi çalışmalar,\nLuko" },
+      { id: "sn3", name: "IBAN", text: "TR00 0000 0000 0000 0000 0000 00" },
     ],
     pinnedApps: [
       { id: "p1", name: "Spotify", path: "x" },
@@ -197,7 +209,7 @@ export function applyPreview(mode: string) {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const j = i % 7;
         const k = i < 7 ? 1 : 0.7;
-        return [key, { music: 60 + j * 9, focus: Math.round([45, 90, 20, 75, 0, 110, 60][j] * k), pomodoros: Math.round([2, 4, 1, 3, 0, 4, 2][j] * k), game: [30, 0, 120, 0, 200, 15, 40][j], active: [260, 410, 180, 380, 90, 450, 300][j], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, water: [3, 5, 2, 4, 6, 1, 4][j], mouse: 41_000 + j * 9000 }];
+        return [key, { music: 60 + j * 9, focus: Math.round([45, 90, 20, 75, 0, 110, 60][j] * k), pomodoros: Math.round([2, 4, 1, 3, 0, 4, 2][j] * k), game: [30, 0, 120, 0, 200, 15, 40][j], active: [260, 410, 180, 380, 90, 450, 300][j], notifs: 12, care: 8, moodSum: 70 * 60, moodN: 60, mood: [4, 3, 5, 0, 2, 4, 5][j], water: [3, 5, 2, 4, 6, 1, 4][j], mouse: 41_000 + j * 9000 }];
       }),
     ),
     weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() },
@@ -237,6 +249,8 @@ export function applyPreview(mode: string) {
           active: 52_000, music: 14_400, focus: 6_200, pomodoros: 214, game: 9_800, notifs: 3_120, care: 860, water: 412, plays: 96, feeds: 143, songs: 2_870,
           hours, days: Array.from({ length: 180 }, (_, i) => dayKey(new Date(Date.now() - i * 86_400_000))),
           artists: { "The Weeknd": 2_100, "Sezen Aksu": 1_640, "Daft Punk": 980, Tarkan: 700 },
+          // Ruh hâli: yılın başından bugüne, birkaç günde bir
+          moods: Object.fromEntries(Array.from({ length: 120 }, (_, i) => [dayKey(new Date(Date.now() - i * 2 * 86_400_000)).slice(5), 1 + ((i * 7 + Math.floor(i / 9)) % 5)]).filter(([d]) => (d as string) <= dayKey().slice(5))),
         },
       },
       scores: { catch: 17, simon: 9, whack: 42, aim: 31 },
@@ -285,6 +299,7 @@ export function applyPreview(mode: string) {
     st.addEvent({ day: d(0), time: "19:00", title: "Halı saha", remind: 60 });
     st.addEvent({ day: d(3), time: "14:00", title: "Diş hekimi", remind: 1440 });
     st.addEvent({ day: d(9), time: "", title: "Kira", remind: 0 });
+    st.addEvent({ day: d(12), time: "", title: "Tatil", remind: -1, countdown: true });
   }
   if (mode === "news") {
     // Tarayıcıda RSS CORS'a takılır; örnek başlıklar (uygulamada Rust indirir)
@@ -313,7 +328,28 @@ export function applyPreview(mode: string) {
     st.addEvent({ ...at(60 * 20), title: "Faturayı öde", remind: 0, reminder: true });
     st.addEvent({ day: dayKey(new Date(Date.now() + 86_400_000)), time: "10:30", title: "Sprint toplantısı", remind: 10 });
     st.addEvent({ ...at(-90), title: "Kargoyu al", remind: -1, reminder: true });
+    st.addEvent({ ...at(-200), title: "Su filtresi", remind: -1, reminder: true, missed: true });
+    st.addEvent({ ...at(600), title: "Vitamin", remind: 0, reminder: true, days: [1, 2, 3, 4, 5] });
   }
+  // ?task[=metin] → bugünün tek işi yazılmış (özet, kapalı ada kapsülü, Günü kapat) · ?taskdone → yapılmış
+  if (params.has("task")) useNook.setState({ todayTask: { day: dayKey(), text: params.get("task") || "Sunumu bitir", done: params.has("taskdone") } });
+  // ?daynote → dünden kalan "Yarına bir not" (özetin üstünde)
+  if (params.has("daynote")) useNook.setState({ dayNote: { day: day(-1), text: "Sabah ilk iş faturayı öde, sonra spor çantasını hazırla" } });
+  // ?skip → ilk alarmın sıradaki çalması atlanmış · ?q=metin → ilk metin kutusuna yazar (arama, hatırlatıcı)
+  if (params.has("skip")) useNook.getState().skipAlarm("a1", true);
+  if (mode === "habits") void import("../lib/habits").then(({ useHabits }) => useHabits.setState({ waterGoal: 4, history: Object.fromEntries([0, 1, 2, 4, 5].map((i) => [day(-i), { custom: { eyes: 2, stretch: i % 2 } }])) }));
+  const typed = params.get("q");
+  if (typed)
+    window.setTimeout(() => {
+      const el = document.querySelector<HTMLInputElement>("input:not([type=time])");
+      if (!el) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, typed);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }, 900);
+  // ?undo → açık adanın altında "Geri al" şeridi (panellerde: clip&snip parçacıklar · notify&open ilk grup açık · shelf&pick iki dosya seçili)
+  if (params.has("undo")) window.setTimeout(() => void import("../lib/undo").then((m) => m.offerUndo({ label: "Pano temizlendi", undo: () => {} })), 3500);
+  // ?empty → boş durumlar (raf, pano, bildirimler)
+  if (params.has("empty")) useNook.setState({ shelf: [], clips: [], notifications: [] });
   // ?scroll=px → görünüm panelinin aşağısı
   // ?askclip → Pano'daki ilk metin çeviri izni bekliyor (Gemini anahtarı yok)
   if (params.has("askclip")) {
@@ -321,6 +357,8 @@ export function applyPreview(mode: string) {
     if (c) useNook.getState().patchClip(c.id, { askTranslate: true, translation: undefined });
   }
   if (params.get("scroll")) window.setInterval(() => document.querySelectorAll(".overflow-y-auto").forEach((el) => (el.scrollTop = Number(params.get("scroll")))), 500);
+  // ?quiet → sessiz saatler açık ve şu an içinde (Ayarlar › Bildirimler)
+  if (params.has("quiet")) useNook.getState().updateSettings({ quietHours: { on: true, from: "00:00", to: "23:59" } });
   // ?sec=Başlık → Ayarlar'da o bölüme kaydır
   if (params.get("sec")) window.setInterval(() => document.querySelector(`[data-sec="${params.get("sec")}"]`)?.scrollIntoView({ block: "start" }), 500);
   // ?look=şekil,göz,gözlük,başlık,boyun,doku&color=… &name=…
@@ -355,8 +393,14 @@ export function applyPreview(mode: string) {
     // ?longline → uzun günün mesajı (taşma denetimi)
     if (params.has("longline"))
       localStorage.setItem("nook-today-line", JSON.stringify({ day: dayKey(), text: "Günaydın Luko! Bugün İstanbul parçalı bulutlu, akşam Lanterns'in yeni bölümü var; önce suyunu içmeyi unutma, sonra keyfine bak." }));
-    useNook.setState({ media: null, brief: true, settings: { ...useNook.getState().settings, weather: false, userName: "Luko" } });
+    useNook.setState({ media: null, brief: true, settings: { ...useNook.getState().settings, weather: false, userName: "Luko", dayClose: !params.has("moodrow") } });
+    // ?firstweek → ilk hafta görevleri · ?edit → kartları düzenleme kipi · ?moodrow → Günü kapat kapalı, ruh hâli özette
+    if (params.has("firstweek")) useNook.setState({ days: {} });
+    if (params.has("edit")) window.setTimeout(() => document.querySelector<HTMLButtonElement>("[data-brief-edit]")?.click(), 1200);
     window.setTimeout(() => useNook.setState({ weather: { city: "İstanbul", temp: 18, high: 21, low: 13, sky: "partly", isDay: true, rainChance: 20, at: Date.now() } }), 300);
+  } else if (mode === "dayclose") {
+    // Akşamki "Günü kapat" kartı
+    useNook.setState({ media: null, dayClose: true });
   } else if (mode === "archive") {
     useNook.setState({
       media: null,
@@ -381,7 +425,8 @@ export function applyPreview(mode: string) {
     const v = params.get("v");
     location.replace(`/?preview=studio&still#${mode}${mode === "notes" && v ? `:${v}` : ""}`);
   } else if (mode === "tour") {
-    useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0) });
+    // ?fresh → ilk kurulumdaki tanıtım (son adımda "Dengeli" seçili gelir)
+    useNook.setState({ media: null, tour: true, tourStep: Number(params.get("step") ?? 0), ...(params.has("fresh") ? { toured: false } : {}) });
   } else if (TABS.includes(mode as Tab)) {
     if (mode === "notify" && !useNook.getState().nookNotifs.length) {
       const at = Date.now();
@@ -424,10 +469,17 @@ export function applyPreview(mode: string) {
   } else if (mode === "welcome") {
     useNook.setState({ media: null, toasts: [{ id: "w", kind: "welcome", title: "Az daha kayıp ilanı veriyordum, 1 saat 20 dakikadır yoktun", detail: "Luko, bir daha bu kadar uzun gitme, tamam mı?", ms: 99999 }] });
   } else if (mode === "toast") {
-    useNook.setState({ media: null, toasts: [{ id: "t", kind: "device-low", title: "Mouse pili azalıyor", detail: "%10 kaldı" }] });
+    // ?update → "Yeni sürüm" kartı (Güncelle düğmesiyle)
+    if (params.has("update")) useNook.setState({ media: null, toasts: [{ id: "u", kind: "update", title: "Yeni sürüm: 0.3.99", detail: "Tek dokunuşla kurulur", ms: 99999 }] });
+    else useNook.setState({ media: null, toasts: [{ id: "t", kind: "device-low", title: "Mouse pili azalıyor", detail: "%10 kaldı" }] });
   } else if (mode === "call") {
     // Telefonda çalan arama kartı
     useNook.setState({ media: null, toasts: [{ id: "c", kind: "notify", title: "Annem", detail: "Arıyor…", phoneKey: "k", call: { canDecline: true, canMute: true }, ms: 600_000 }] });
+  } else if (mode === "snippick") {
+    // Parçacık seçici (?empty → parçacık yokken)
+    if (params.has("empty")) useNook.setState({ snippets: [] });
+    useNook.setState({ searching: true });
+    void import("../components/overlays/SnippetPicker").then((m) => m.useSnippetPick.setState({ on: true }));
   } else if (mode === "search") {
     useNook.setState({ searching: true });
   } else if (mode === "collapsed" || mode === "privacy") {

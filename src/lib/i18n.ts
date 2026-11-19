@@ -8,16 +8,10 @@
  *
  * Dil, sayfa yüklenirken bir kez belirlenir (modüllerin sabit listeleri de doğru dilde kurulsun diye);
  * dil değişince bütün Nook pencereleri yeniden yüklenir.
+ *
+ * Yalnızca seçili dilin sözlüğü yüklenir: main.tsx önce `loadLocale()`u bekler, uygulamanın geri kalanını
+ * (tt() çağıran bütün modülleri) ondan sonra içe aktarır.
  */
-import en from "../locales/en.json";
-import es from "../locales/es.json";
-import pt from "../locales/pt.json";
-import de from "../locales/de.json";
-import fr from "../locales/fr.json";
-import ru from "../locales/ru.json";
-import zh from "../locales/zh.json";
-import ja from "../locales/ja.json";
-
 export type Lang = "tr" | "en" | "es" | "pt" | "de" | "fr" | "ru" | "zh" | "ja";
 
 export const LANGS: { id: Lang; label: string; locale: string }[] = [
@@ -45,7 +39,18 @@ export const LANG_NAME_TR: Record<Lang, string> = {
   ja: "Japonca",
 };
 
-const DICTS: Partial<Record<Lang, Record<string, string>>> = { en, es, pt, de, fr, ru, zh, ja };
+type Dict = Record<string, string>;
+/** Sözlükler ayrı parçalarda: yalnızca seçili dilinki indirilir (Türkçe kaynak dil, dosyası yok) */
+const DICTS: Record<Exclude<Lang, "tr">, () => Promise<{ default: Dict }>> = {
+  en: () => import("../locales/en.json"),
+  es: () => import("../locales/es.json"),
+  pt: () => import("../locales/pt.json"),
+  de: () => import("../locales/de.json"),
+  fr: () => import("../locales/fr.json"),
+  ru: () => import("../locales/ru.json"),
+  zh: () => import("../locales/zh.json"),
+  ja: () => import("../locales/ja.json"),
+};
 
 /** Windows'taki bölge ("TR"); Rust açılışta her pencereye yazar */
 const region = (): string => (typeof window === "undefined" ? "" : String((window as { __NOOK_REGION__?: string }).__NOOK_REGION__ ?? "").toUpperCase());
@@ -82,7 +87,17 @@ function initialLang(): Lang {
 }
 
 export const lang: Lang = typeof localStorage === "undefined" ? "tr" : initialLang();
-const dict = DICTS[lang] ?? {};
+let dict: Dict = {};
+
+/** Seçili dilin sözlüğünü yükler. Uygulama modülleri içe aktarılmadan ÖNCE beklenmeli (bkz. main.tsx). */
+export async function loadLocale() {
+  if (lang === "tr") return;
+  try {
+    dict = (await DICTS[lang]()).default;
+  } catch {
+    // Sözlük yüklenemezse metinler Türkçe kalır
+  }
+}
 
 /** Tarih/saat ve sayı biçimi için yerel ayar ("tr-TR", "en-US"…) */
 // İngilizce arayüz ABD dışındaki bir bölgede: saat 24 saatlik (alarmlarla aynı), tarih gün/ay

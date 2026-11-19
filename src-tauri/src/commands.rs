@@ -45,6 +45,17 @@ pub fn release_focus(shared: State<'_, Arc<Shared>>) {
     focus::release(&shared);
 }
 
+/// Parçacık seçici: odağı önceki pencereye verir ve panodaki metni oraya yapıştırır (metni ön yüz panoya yazdı).
+#[tauri::command]
+pub fn paste_previous(shared: State<'_, Arc<Shared>>) {
+    focus::release(&shared);
+    std::thread::spawn(|| {
+        // Önceki pencere öne gelsin, sonra Ctrl+V
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        crate::clipboard::paste_plain();
+    });
+}
+
 /// Frontend ayarları değişince (ve açılışta) çağrılır.
 #[tauri::command]
 pub async fn apply_settings(app: AppHandle, settings: Settings, shared: State<'_, Arc<Shared>>) -> Result<(), String> {

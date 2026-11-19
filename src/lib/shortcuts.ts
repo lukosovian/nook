@@ -21,7 +21,8 @@ export type ShortcutKey =
   | "shelfShortcut"
   | "plainPasteShortcut"
   | "liveShortcut"
-  | "outputShortcut";
+  | "outputShortcut"
+  | "snippetShortcut";
 
 export interface ShortcutInfo {
   key: ShortcutKey;
@@ -40,6 +41,7 @@ export const SHORTCUTS: ShortcutInfo[] = [
   { key: "plainPasteShortcut", label: tt("Düz metin olarak yapıştır"), clearable: true },
   { key: "liveShortcut", label: tt("Yayın maskesini aç / kapat"), clearable: true },
   { key: "outputShortcut", label: tt("Ses çıkışını değiştir"), clearable: true },
+  { key: "snippetShortcut", label: tt("Parçacık seç ve yapıştır"), clearable: true },
 ];
 
 const BROWSERS = /chrome|edge|brave|opera|vivaldi|firefox/i;
@@ -77,6 +79,7 @@ const KNOWN: Record<string, Known | Known[]> = {
   "ctrl+alt+m": { what: tt("JetBrains IDE'lerinde metot çıkarma"), apps: JETBRAINS },
   "ctrl+alt+h": { what: tt("JetBrains IDE'lerinde çağrı hiyerarşisi"), apps: JETBRAINS },
   "ctrl+alt+s": { what: tt("JetBrains IDE'lerinde ayarlar"), apps: JETBRAINS },
+  "ctrl+alt+p": { what: tt("JetBrains IDE'lerinde parametre çıkarma"), apps: JETBRAINS },
 };
 
 const norm = (combo: string) => combo.toLowerCase().replace(/\s+/g, "");
@@ -129,7 +132,7 @@ export function conflictOf(combo: string, apps: string[]): string | null {
 }
 
 /** Rust'ın kısayolları kaydettiği sıra (src-tauri/src/shortcut.rs): aynı tuşlar iki işe verildiyse önce gelen kazanır */
-const REGISTER_ORDER: ShortcutKey[] = ["shortcut", "askShortcut", "voiceShortcut", "shieldShortcut", "shelfShortcut", "plainPasteShortcut", "outputShortcut", "liveShortcut", "humShortcut"];
+const REGISTER_ORDER: ShortcutKey[] = ["shortcut", "askShortcut", "voiceShortcut", "shieldShortcut", "shelfShortcut", "plainPasteShortcut", "outputShortcut", "liveShortcut", "humShortcut", "snippetShortcut"];
 
 /** Aynı kombinasyon Nook'ta başka bir işe de verildiyse ve o önce kaydediliyorsa, o iş (bu kısayol çalışmaz) */
 export function duplicateOf(settings: Settings, key: ShortcutKey): ShortcutInfo | null {

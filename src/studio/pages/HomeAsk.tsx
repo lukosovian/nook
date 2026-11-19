@@ -4,11 +4,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AppWindow, ArrowRightLeft, Calculator, Check, Clapperboard, CornerDownLeft, Globe, Languages, MessageCircle, Search, Smile, StickyNote, Trash2, TrendingUp, type LucideIcon } from "lucide-react";
+import { AppWindow, ArrowRightLeft, Calculator, Check, Clapperboard, CornerDownLeft, Globe, Languages, MessageCircle, Search, Smile, StickyNote, Timer, Trash2, TrendingUp, type LucideIcon } from "lucide-react";
 import { copyText, listApps, openPath, type AppEntry } from "../../lib/bridge";
 import { sendChat } from "../../lib/chat";
 import { useArgus } from "../../lib/argus";
-import { search, searchOnline, type ResultKind, type SearchResult } from "../../lib/search";
+import { search, searchOnline, startTimer, type ResultKind, type SearchResult } from "../../lib/search";
 import { studioGo } from "../../lib/studio";
 import { ek, normalizeColor, normalizeLook, useNookName } from "../../lib/look";
 import { useNook } from "../../store/nook";
@@ -28,6 +28,7 @@ const KIND: Record<ResultKind, { icon: LucideIcon; color: string }> = {
   note: { icon: StickyNote, color: ACCENT.yellow },
   ask: { icon: MessageCircle, color: ACCENT.purple },
   argus: { icon: Clapperboard, color: ACCENT.orange },
+  timer: { icon: Timer, color: ACCENT.yellow },
 };
 
 const HINTS = ["Spotify", "12*3+4", "100 usd tl", "10 km mi", "en: günaydın", "emoji kalp", "not: süt al"];
@@ -91,6 +92,9 @@ export function HomeSearch() {
       const { note, setNote } = useNook.getState();
       setNote(note ? `${note}\n${r.payload}` : r.payload);
       return flash(r, tt("Nota eklendi"));
+    } else if (r.kind === "timer") {
+      startTimer(r.payload);
+      return flash(r, tt("Kuruldu"));
     } else {
       await openPath(r.payload).catch(() => {});
     }
@@ -199,7 +203,7 @@ export function HomeChat({ delay = 0 }: { delay?: number }) {
   const name = useNookName();
   const look = normalizeLook(useNook((s) => s.settings.look));
   const color = normalizeColor(useNook((s) => s.settings.faceColor));
-  const model = useNook((s) => s.settings.aiModel);
+  const model = useNook((s) => (s.settings.aiProvider === "claude" ? s.settings.claudeModel : s.settings.aiModel));
   const count = useNook((s) => s.chat.length);
   const busy = useNook((s) => s.chatBusy);
   return (

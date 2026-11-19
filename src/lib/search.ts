@@ -8,9 +8,12 @@ import { convertCurrency, parseCurrency, translate } from "./online";
 import { tt } from "./i18n";
 import { useNook } from "../store/nook";
 
-const hasKey = () => !!useNook.getState().settings.geminiKey.trim();
+const hasKey = () => {
+  const s = useNook.getState().settings;
+  return !!(s.aiProvider === "claude" ? s.claudeKey : s.geminiKey).trim();
+};
 
-export type ResultKind = "calc" | "convert" | "currency" | "translate" | "emoji" | "app" | "web" | "note" | "ask" | "argus";
+export type ResultKind = "calc" | "convert" | "currency" | "translate" | "emoji" | "app" | "web" | "note" | "ask" | "argus" | "timer";
 
 export interface SearchResult {
   id: string;
@@ -22,8 +25,11 @@ export interface SearchResult {
 }
 
 /** Basit bulanık eşleşme puanı: baştan eşleşme > kelime başı > içerir > harf sırası. */
+/** Küçük harfe çevirir; ı/I/İ tek "i" sayılır ("Illustrator", "GIMP" Türkçe küçültmede kaybolmasın) */
+export const fold = (s: string) => s.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/i̇/g, "i");
+
 function score(name: string, q: string): number {
-  const n = name.toLocaleLowerCase("tr");
+  const n = fold(name);
   if (n.startsWith(q)) return 100 - n.length / 10;
   if (n.split(/[\s\-_.]+/).some((w) => w.startsWith(q))) return 80 - n.length / 10;
   if (n.includes(q)) return 60 - n.length / 10;
@@ -41,10 +47,25 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
   if (!q) return [];
   const out: SearchResult[] = [];
 
+  // "/adres" → Pano › Parçacıklar'daki hazır metin; Enter ile kopyalanır ("convert" türü: yükü kopyalar)
+  if (q.startsWith("/"))
+    for (const sn of useNook.getState().snippets ?? [])
+      if (sn.trigger && fold(sn.trigger).startsWith(fold(q))) out.push({ id: `snippet:${sn.id}`, kind: "convert", title: tt("Parçacık: {0}", sn.name), subtitle: tt("Enter ile kopyala"), payload: sn.text });
+
   // "not: …" → uçucu nota ekle
   const note = /^not[:\s]\s*(.+)$/i.exec(q);
   if (note) {
     out.push({ id: "note", kind: "note", title: note[1], subtitle: tt("Nota ekle"), payload: note[1] });
+  }
+
+  // "çay 3 dk", "3 dk" → hızlı zamanlayıcı (yalnızca sonu sayı + süre birimiyle biten sorguda)
+  const timer = note ? null : /^(?:(.+?)\s+)?(\d{1,3})\s*(dk|dakika|sn|saniye|sa|saat|min|m|h|s)$/i.exec(q);
+  if (timer && Number(timer[2]) > 0) {
+    const n = Number(timer[2]);
+    const unit = fold(timer[3]);
+    const [ms, text] = /^(sn|saniye|s)$/.test(unit) ? [n * 1000, tt("{0} sn", n)] : /^(sa|saat|h)$/.test(unit) ? [n * 3600_000, tt("{0} sa", n)] : [n * 60_000, tt("{0} dk", n)];
+    const label = timer[1]?.trim() ?? "";
+    out.push({ id: "timer", kind: "timer", title: tt("Zamanlayıcı: {0}", label ? `${label} · ${text}` : text), subtitle: tt("Enter ile kur"), payload: JSON.stringify({ ms, label: label || tt("{0} sonra", text) }) });
   }
 
   // "emoji kalp" / ":kalp" → emojiler
@@ -63,7 +84,7 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
     out.push({ id: "calc", kind: "calc", title: `= ${v}`, subtitle: tt("Enter ile sonucu kopyala"), payload: v });
   }
 
-  const lower = q.toLocaleLowerCase("tr");
+  const lower = fold(q);
   apps
     .map((a) => ({ a, s: score(a.name, lower) }))
     .filter((x) => x.s >= 0)
@@ -90,7 +111,7 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
   }
 
   // Yerel yapay zekâya sor
-  out.push({ id: "ask", kind: "ask", title: q, subtitle: hasKey() ? tt("{0} sor", ek(nookName(), "a")) : tt("{0} sor · önce Gemini anahtarı lazım", ek(nookName(), "a")), payload: q });
+  out.push({ id: "ask", kind: "ask", title: q, subtitle: hasKey() ? tt("{0} sor", ek(nookName(), "a")) : tt("{0} sor · önce anahtar lazım", ek(nookName(), "a")), payload: q });
 
   const isUrl = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i.test(q) && !/\s/.test(q);
   out.push(
@@ -105,6 +126,15 @@ export function search(query: string, apps: AppEntry[], argus: ArgusItem[] = [])
         },
   );
   return out;
+}
+
+/** "timer" sonucunu çalıştırır: o kadar süre sonra çalan tek seferlik alarm ("+5 dk" gibi) */
+export function startTimer(payload: string) {
+  const { ms, label } = JSON.parse(payload) as { ms: number; label: string };
+  const st = useNook.getState();
+  const at = Date.now() + ms;
+  const d = new Date(at);
+  st.addAlarm({ hour: d.getHours(), minute: d.getMinutes(), label, repeat: "once", oneShot: true, at, silent: st.settings.alarmSound === 0 });
 }
 
 /** İnternet gerektiren sonuçlar (döviz, çeviri) — yazmayı bitirince ayrıca eklenir. */
